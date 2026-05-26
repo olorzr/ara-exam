@@ -5,4 +5,8 @@ export { default as CategoryTree } from './CategoryTree';
 export { default as MasterListPanel } from './MasterListPanel';
 export { default as MoveWordsDialog } from './MoveWordsDialog';
 export { default as DuplicateWordsDialog } from './DuplicateWordsDialog';
+export { default as WordListHeader } from './WordListHeader';
+export { default as WordEditDialog } from './WordEditDialog';
+export { default as CurriculumCategoryTab } from './CurriculumCategoryTab';
+export { default as ExternalCategoryTab } from './ExternalCategoryTab';
 export type { WordEntry } from './WordEntryTable';

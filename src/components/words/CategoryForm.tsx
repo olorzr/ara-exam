@@ -1,195 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import type { CategoryLevel, Publisher, MajorChapter, SubChapter, School, SchoolMaterial } from '@/types';
-import { EXTERNAL_LEVEL, MIDDLE_SCHOOL_GRADES, HIGH_SCHOOL_GRADES, SEMESTER_OPTIONS } from '@/lib/constants';
-import {
-  getPublishers, getMajorChapters, getSubChapters,
-  getSchools, getSchoolMaterials,
-} from '@/lib/category-master';
+import type { CategoryLevel } from '@/types';
+import { EXTERNAL_LEVEL, SEMESTER_OPTIONS } from '@/lib/constants';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Settings } from 'lucide-react';
-
-interface CategoryFormProps {
-  level: CategoryLevel;
-  grade: string;
-  publisher: string;
-  semester: string;
-  chapter: string;
-  subChapter: string;
-  schoolName: string;
-  onLevelChange: (value: CategoryLevel) => void;
-  onGradeChange: (value: string) => void;
-  onPublisherChange: (value: string) => void;
-  onSemesterChange: (value: string) => void;
-  onChapterChange: (value: string) => void;
-  onSubChapterChange: (value: string) => void;
-  onSchoolNameChange: (value: string) => void;
-}
+import { useCategoryFormState, type CategoryFormProps } from '@/hooks/useCategoryFormState';
 
 /**
  * 단어 입력 시 카테고리(구분/학년/출판사/학기/단원) 선택 폼 컴포넌트.
- * 마스터 데이터에서 등록된 항목만 선택 가능하다.
+ * 마스터 데이터에서 등록된 항목만 선택 가능하다. 데이터 로딩/선택 상태 로직은
+ * useCategoryFormState 훅이 담당하고, 이 컴포넌트는 화면만 그린다.
  */
-export default function CategoryForm({
-  level, grade, publisher, semester, chapter, subChapter, schoolName,
-  onLevelChange, onGradeChange, onPublisherChange, onSemesterChange,
-  onChapterChange, onSubChapterChange, onSchoolNameChange,
-}: CategoryFormProps) {
-  const [publishers, setPublishers] = useState<Publisher[]>([]);
-  const [chapters, setChapters] = useState<MajorChapter[]>([]);
-  const [subChaptersList, setSubChaptersList] = useState<SubChapter[]>([]);
-  const [schools, setSchools] = useState<School[]>([]);
-  const [materials, setMaterials] = useState<SchoolMaterial[]>([]);
-
-  const [publisherId, setPublisherId] = useState('');
-  const [chapterId, setChapterId] = useState('');
-  const [subChapterId, setSubChapterId] = useState('');
-  const [schoolId, setSchoolId] = useState('');
-  const [materialId, setMaterialId] = useState('');
-
-  const gradeOptions = level === '중등' ? MIDDLE_SCHOOL_GRADES : level === '고등' ? HIGH_SCHOOL_GRADES : [];
-
-  // 출판사/학교 목록 로드
-  useEffect(() => {
-    (async () => {
-      if (level === EXTERNAL_LEVEL) {
-        setSchools(await getSchools());
-      } else {
-        setPublishers(await getPublishers(level));
-      }
-    })();
-  }, [level]);
-
-  // 출판사 이름 → ID 역추적 (임시저장 복원용)
-  useEffect(() => {
-    (async () => {
-      if (!publisher || publishers.length === 0) return;
-      const found = publishers.find((p) => p.name === publisher);
-      if (found && found.id !== publisherId) setPublisherId(found.id);
-    })();
-  }, [publisher, publishers, publisherId]);
-
-  // 대단원 로드
-  useEffect(() => {
-    (async () => {
-      if (!publisherId || !grade || !semester) { setChapters([]); return; }
-      setChapters(await getMajorChapters(publisherId, grade, semester));
-    })();
-  }, [publisherId, grade, semester]);
-
-  // 대단원 이름 → ID 역추적
-  useEffect(() => {
-    (async () => {
-      if (!chapter || chapters.length === 0) return;
-      const found = chapters.find((c) => c.name === chapter);
-      if (found && found.id !== chapterId) setChapterId(found.id);
-    })();
-  }, [chapter, chapters, chapterId]);
-
-  // 소단원 로드
-  useEffect(() => {
-    (async () => {
-      if (!chapterId) { setSubChaptersList([]); return; }
-      setSubChaptersList(await getSubChapters(chapterId));
-    })();
-  }, [chapterId]);
-
-  // 소단원 이름 → ID 역추적
-  useEffect(() => {
-    (async () => {
-      if (!subChapter || subChaptersList.length === 0) return;
-      const found = subChaptersList.find((s) => s.name === subChapter);
-      if (found && found.id !== subChapterId) setSubChapterId(found.id);
-    })();
-  }, [subChapter, subChaptersList, subChapterId]);
-
-  // 학교 이름 → ID 역추적
-  useEffect(() => {
-    (async () => {
-      if (!schoolName || schools.length === 0) return;
-      const found = schools.find((s) => s.name === schoolName);
-      if (found && found.id !== schoolId) setSchoolId(found.id);
-    })();
-  }, [schoolName, schools, schoolId]);
-
-  // 프린트/작품명 로드
-  useEffect(() => {
-    (async () => {
-      if (!schoolId) { setMaterials([]); return; }
-      setMaterials(await getSchoolMaterials(schoolId));
-    })();
-  }, [schoolId]);
-
-  // 프린트/작품명 이름 → ID 역추적
-  useEffect(() => {
-    (async () => {
-      if (!chapter || materials.length === 0) return;
-      const found = materials.find((m) => m.name === chapter);
-      if (found && found.id !== materialId) setMaterialId(found.id);
-    })();
-  }, [chapter, materials, materialId]);
-
-  const handleLevelChange = (v: CategoryLevel) => {
-    onLevelChange(v);
-    onGradeChange(''); onPublisherChange(''); onSemesterChange('');
-    onChapterChange(''); onSubChapterChange(''); onSchoolNameChange('');
-    setPublisherId(''); setChapterId(''); setSubChapterId('');
-    setSchoolId(''); setMaterialId('');
-  };
-
-  const handleGradeChange = (v: string) => {
-    onGradeChange(v);
-    onPublisherChange(''); onSemesterChange('');
-    onChapterChange(''); onSubChapterChange('');
-    setPublisherId(''); setChapterId(''); setSubChapterId('');
-  };
-
-  const handlePublisherSelect = (pubId: string) => {
-    setPublisherId(pubId);
-    const pub = publishers.find((p) => p.id === pubId);
-    onPublisherChange(pub?.name ?? '');
-    onSemesterChange(''); onChapterChange(''); onSubChapterChange('');
-    setChapterId(''); setSubChapterId('');
-  };
-
-  const handleSemesterChange = (v: string) => {
-    onSemesterChange(v);
-    onChapterChange(''); onSubChapterChange('');
-    setChapterId(''); setSubChapterId('');
-  };
-
-  const handleChapterSelect = (chapId: string) => {
-    setChapterId(chapId);
-    const ch = chapters.find((c) => c.id === chapId);
-    onChapterChange(ch?.name ?? '');
-    onSubChapterChange(''); setSubChapterId('');
-  };
-
-  const handleSubChapterSelect = (subId: string) => {
-    setSubChapterId(subId);
-    const sub = subChaptersList.find((s) => s.id === subId);
-    onSubChapterChange(sub?.name ?? '');
-  };
-
-  const handleSchoolSelect = (schId: string) => {
-    setSchoolId(schId);
-    const sch = schools.find((s) => s.id === schId);
-    onSchoolNameChange(sch?.name ?? '');
-    onChapterChange(''); setMaterialId('');
-  };
-
-  const handleMaterialSelect = (matId: string) => {
-    setMaterialId(matId);
-    const mat = materials.find((m) => m.id === matId);
-    onChapterChange(mat?.name ?? '');
-  };
-
-  const noPublishers = publishers.length === 0 && grade && level !== EXTERNAL_LEVEL;
-  const noSchools = schools.length === 0 && level === EXTERNAL_LEVEL;
+export default function CategoryForm(props: CategoryFormProps) {
+  const { level, grade, semester } = props;
+  const s = useCategoryFormState(props);
 
   return (
     <Card>
@@ -207,7 +34,7 @@ export default function CategoryForm({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div className="space-y-2">
             <Label>구분</Label>
-            <Select value={level} onValueChange={(v) => { if (v) handleLevelChange(v as CategoryLevel); }}>
+            <Select value={level} onValueChange={(v) => { if (v) s.handleLevelChange(v as CategoryLevel); }}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="중등">중등</SelectItem>
@@ -221,10 +48,10 @@ export default function CategoryForm({
             <>
               <div className="space-y-2">
                 <Label>학년</Label>
-                <Select value={grade} onValueChange={(v) => { if (v) handleGradeChange(v); }}>
+                <Select value={grade} onValueChange={(v) => { if (v) s.handleGradeChange(v); }}>
                   <SelectTrigger><SelectValue placeholder="학년 선택" /></SelectTrigger>
                   <SelectContent>
-                    {gradeOptions.map((g) => (
+                    {s.gradeOptions.map((g) => (
                       <SelectItem key={g} value={g}>{g}</SelectItem>
                     ))}
                   </SelectContent>
@@ -232,10 +59,10 @@ export default function CategoryForm({
               </div>
               <div className="space-y-2">
                 <Label>출판사</Label>
-                <Select value={publisherId} onValueChange={(v) => { if (v) handlePublisherSelect(v); }} disabled={!grade}>
+                <Select value={s.publisherId} onValueChange={(v) => { if (v) s.handlePublisherSelect(v); }} disabled={!grade}>
                   <SelectTrigger><SelectValue placeholder="출판사 선택" /></SelectTrigger>
                   <SelectContent>
-                    {publishers.map((p) => (
+                    {s.publishers.map((p) => (
                       <SelectItem key={p.id} value={p.id} label={p.name}>{p.name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -243,21 +70,21 @@ export default function CategoryForm({
               </div>
               <div className="space-y-2">
                 <Label>학기</Label>
-                <Select value={semester} onValueChange={(v) => { if (v) handleSemesterChange(v); }} disabled={!publisherId}>
+                <Select value={semester} onValueChange={(v) => { if (v) s.handleSemesterChange(v); }} disabled={!s.publisherId}>
                   <SelectTrigger><SelectValue placeholder="학기 선택" /></SelectTrigger>
                   <SelectContent>
-                    {SEMESTER_OPTIONS.map((s) => (
-                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    {SEMESTER_OPTIONS.map((sem) => (
+                      <SelectItem key={sem} value={sem}>{sem}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label>대단원</Label>
-                <Select value={chapterId} onValueChange={(v) => { if (v) handleChapterSelect(v); }} disabled={!semester}>
+                <Select value={s.chapterId} onValueChange={(v) => { if (v) s.handleChapterSelect(v); }} disabled={!semester}>
                   <SelectTrigger><SelectValue placeholder="대단원 선택" /></SelectTrigger>
                   <SelectContent>
-                    {chapters.map((c) => (
+                    {s.chapters.map((c) => (
                       <SelectItem key={c.id} value={c.id} label={c.name}>{c.name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -265,11 +92,11 @@ export default function CategoryForm({
               </div>
               <div className="space-y-2">
                 <Label>소단원 (선택)</Label>
-                <Select value={subChapterId} onValueChange={(v) => { if (v) handleSubChapterSelect(v); }} disabled={!chapterId}>
+                <Select value={s.subChapterId} onValueChange={(v) => { if (v) s.handleSubChapterSelect(v); }} disabled={!s.chapterId}>
                   <SelectTrigger><SelectValue placeholder="소단원 선택" /></SelectTrigger>
                   <SelectContent>
-                    {subChaptersList.map((s) => (
-                      <SelectItem key={s.id} value={s.id} label={s.name}>{s.name}</SelectItem>
+                    {s.subChaptersList.map((sub) => (
+                      <SelectItem key={sub.id} value={sub.id} label={sub.name}>{sub.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -279,21 +106,21 @@ export default function CategoryForm({
             <>
               <div className="space-y-2">
                 <Label>학교명</Label>
-                <Select value={schoolId} onValueChange={(v) => { if (v) handleSchoolSelect(v); }}>
+                <Select value={s.schoolId} onValueChange={(v) => { if (v) s.handleSchoolSelect(v); }}>
                   <SelectTrigger><SelectValue placeholder="학교 선택" /></SelectTrigger>
                   <SelectContent>
-                    {schools.map((s) => (
-                      <SelectItem key={s.id} value={s.id} label={s.name}>{s.name}</SelectItem>
+                    {s.schools.map((sch) => (
+                      <SelectItem key={sch.id} value={sch.id} label={sch.name}>{sch.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label>프린트/작품명</Label>
-                <Select value={materialId} onValueChange={(v) => { if (v) handleMaterialSelect(v); }} disabled={!schoolId}>
+                <Select value={s.materialId} onValueChange={(v) => { if (v) s.handleMaterialSelect(v); }} disabled={!s.schoolId}>
                   <SelectTrigger><SelectValue placeholder="프린트/작품명 선택" /></SelectTrigger>
                   <SelectContent>
-                    {materials.map((m) => (
+                    {s.materials.map((m) => (
                       <SelectItem key={m.id} value={m.id} label={m.name}>{m.name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -303,7 +130,7 @@ export default function CategoryForm({
           )}
         </div>
 
-        {(noPublishers || noSchools) && (
+        {(s.noPublishers || s.noSchools) && (
           <p className="mt-3 text-xs text-gray-500">
             등록된 항목이 없습니다.{' '}
             <Link href="/words/categories" className="text-primary underline">카테고리 관리</Link>
