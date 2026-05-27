@@ -282,17 +282,19 @@
 /* 객관식 답안지 — 5열 그리드 */
 .mc-answer-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 6px 12px;
-  max-width: 400px;
-  margin: 16px auto 0;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px 16px;
+  width: 100%;
+  max-width: 520px;
+  margin: 20px auto 0;
 }
 .mc-answer-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
-  border-radius: 4px;
+  gap: 10px;
+  padding: 7px 12px;
+  border-radius: 6px;
+  min-height: 34px;
 }
 .mc-answer-item:nth-child(10n+1),
 .mc-answer-item:nth-child(10n+2),
@@ -300,16 +302,19 @@
 .mc-answer-item:nth-child(10n+4),
 .mc-answer-item:nth-child(10n+5) { background: #F0FAF9; }
 .mc-answer-num {
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 800;
   color: #5BBFB7;
-  width: 20px;
+  line-height: 1;
+  width: 26px;
   text-align: center;
+  flex-shrink: 0;
 }
 .mc-answer-label {
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 700;
   color: #222;
+  line-height: 1;
 }
 
 /* 단어장 2단 레이아웃 (flexbox 수동 분할) */
