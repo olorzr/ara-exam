@@ -8,6 +8,7 @@ import { ADMIN_EMAIL } from '@/lib/constants';
 import { formatDateKR } from '@/lib/format';
 import type { AuditLog } from '@/types';
 import { Shield, ChevronDown, ChevronRight } from 'lucide-react';
+import { toast } from 'sonner';
 
 const ACTION_LABEL: Record<string, string> = {
   INSERT: '생성',
@@ -37,6 +38,7 @@ export default function AuditLogPage() {
   const router = useRouter();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [filterTable, setFilterTable] = useState<string>('');
   const [filterAction, setFilterAction] = useState<string>('');
@@ -61,8 +63,13 @@ export default function AuditLogPage() {
 
       const { data, error } = await query;
       if (error) {
-        console.error('감사 로그 조회 실패:', error.message);
+        setLoadError(true);
+        toast.error('감사 로그를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+        setLogs([]);
+        setLoading(false);
+        return;
       }
+      setLoadError(false);
       setLogs(data ?? []);
       setLoading(false);
     })();
@@ -131,6 +138,8 @@ export default function AuditLogPage() {
         <div className="flex items-center justify-center py-20">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
+      ) : loadError ? (
+        <p className="text-center text-red-500 py-20">감사 로그를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.</p>
       ) : logs.length === 0 ? (
         <p className="text-center text-gray-400 py-20">감사 로그가 없습니다.</p>
       ) : (

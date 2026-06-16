@@ -45,7 +45,8 @@ export default function ExternalCategoryTab() {
     loadSchools();
   };
   const handleDeleteSchool = async (id: string) => {
-    await cm.deleteSchool(id);
+    const { error } = await cm.deleteSchool(id);
+    if (error) { toast.error(`학교 삭제 실패: ${error.message}`); return; }
     toast.success('학교가 삭제되었습니다.');
     if (selectedSchoolId === id) setSelectedSchoolId('');
     loadSchools();
@@ -66,7 +67,8 @@ export default function ExternalCategoryTab() {
     reloadMats();
   };
   const handleDeleteMat = async (id: string) => {
-    await cm.deleteSchoolMaterial(id);
+    const { error } = await cm.deleteSchoolMaterial(id);
+    if (error) { toast.error(`항목 삭제 실패: ${error.message}`); return; }
     toast.success('항목이 삭제되었습니다.');
     reloadMats();
   };

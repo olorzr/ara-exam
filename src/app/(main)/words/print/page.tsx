@@ -15,6 +15,7 @@ function WordsPrintContent() {
   const categoryId = searchParams.get('categoryId');
   const [category, setCategory] = useState<Category | null>(null);
   const [words, setWords] = useState<Word[]>([]);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     if (!categoryId) return;
@@ -23,7 +24,13 @@ function WordsPrintContent() {
         supabase.from('categories').select('*').eq('id', categoryId).single(),
         supabase.from('words').select('*').eq('category_id', categoryId).order('order_index'),
       ]);
-      if (catRes.data) setCategory(catRes.data);
+      // 조회에 실패하거나 행이 없으면 not-found 로 전환한다.
+      // (이 처리가 없으면 category 가 영원히 null 이라 스피너가 멈추지 않는다)
+      if (catRes.error || !catRes.data) {
+        setLoadFailed(true);
+        return;
+      }
+      setCategory(catRes.data);
       if (wordsRes.data) {
         const sorted = [...wordsRes.data].sort((a, b) => a.word.localeCompare(b.word, 'ko'));
         setWords(sorted);
@@ -31,6 +38,21 @@ function WordsPrintContent() {
     }
     load();
   }, [categoryId]);
+
+  // categoryId 가 아예 없는 경우는 렌더 시점에 판정한다(effect 내 동기 setState 회피).
+  if (!categoryId || loadFailed) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 py-20">
+        <p className="text-gray-600">단어장을 찾을 수 없어요. 삭제되었거나 잘못된 주소예요.</p>
+        <Link href="/words">
+          <Button variant="outline" size="sm">
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            단어 관리로 돌아가기
+          </Button>
+        </Link>
+      </div>
+    );
+  }
 
   if (!category) {
     return (

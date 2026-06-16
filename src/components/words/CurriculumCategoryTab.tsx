@@ -74,7 +74,8 @@ export default function CurriculumCategoryTab() {
     loadPublishers();
   };
   const handleDeletePub = async (id: string) => {
-    await cm.deletePublisher(id);
+    const { error } = await cm.deletePublisher(id);
+    if (error) { toast.error(`출판사 삭제 실패: ${error.message}`); return; }
     toast.success('출판사가 삭제되었습니다.');
     if (selectedPubId === id) setSelectedPubId('');
     loadPublishers();
@@ -95,7 +96,8 @@ export default function CurriculumCategoryTab() {
     reloadChapters();
   };
   const handleDeleteChapter = async (id: string) => {
-    await cm.deleteMajorChapter(id);
+    const { error } = await cm.deleteMajorChapter(id);
+    if (error) { toast.error(`대단원 삭제 실패: ${error.message}`); return; }
     toast.success('대단원이 삭제되었습니다.');
     if (selectedChapterId === id) setSelectedChapterId('');
     reloadChapters();
@@ -116,7 +118,8 @@ export default function CurriculumCategoryTab() {
     reloadSubs();
   };
   const handleDeleteSub = async (id: string) => {
-    await cm.deleteSubChapter(id);
+    const { error } = await cm.deleteSubChapter(id);
+    if (error) { toast.error(`소단원 삭제 실패: ${error.message}`); return; }
     toast.success('소단원이 삭제되었습니다.');
     reloadSubs();
   };
