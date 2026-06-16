@@ -214,12 +214,17 @@ CREATE TRIGGER words_updated_at
 -- 마스터 테이블 이름 변경 시 categories 자동 동기화 트리거
 -- =============================================
 
--- 출판사명 변경 → categories.publisher 동기화
+-- 출판사명 변경 → categories.publisher + concept_sheets.publisher 동기화
+-- (concept_sheets 동기화 근거: sql/migration_sync_concept_sheets.sql)
 CREATE OR REPLACE FUNCTION sync_publisher_name()
 RETURNS TRIGGER AS $$
 BEGIN
   IF OLD.name != NEW.name THEN
     UPDATE categories
+    SET publisher = NEW.name
+    WHERE publisher = OLD.name AND level = OLD.level;
+
+    UPDATE concept_sheets
     SET publisher = NEW.name
     WHERE publisher = OLD.name AND level = OLD.level;
   END IF;
@@ -232,7 +237,8 @@ CREATE TRIGGER sync_publisher_name_trigger
   FOR EACH ROW
   EXECUTE FUNCTION sync_publisher_name();
 
--- 대단원명 변경 → categories.chapter 동기화
+-- 대단원명 변경 → categories.chapter + concept_sheets.unit 동기화
+-- (concept_sheets 동기화 근거: sql/migration_sync_concept_sheets.sql)
 CREATE OR REPLACE FUNCTION sync_major_chapter_name()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -246,6 +252,16 @@ BEGIN
       AND categories.grade = OLD.grade
       AND categories.semester = OLD.semester
       AND p.id = OLD.publisher_id;
+
+    UPDATE concept_sheets
+    SET unit = NEW.name
+    FROM publishers p
+    WHERE concept_sheets.unit = OLD.name
+      AND concept_sheets.publisher = p.name
+      AND concept_sheets.level = p.level
+      AND concept_sheets.grade = OLD.grade
+      AND concept_sheets.semester = OLD.semester
+      AND p.id = OLD.publisher_id;
   END IF;
   RETURN NEW;
 END;
@@ -256,7 +272,8 @@ CREATE TRIGGER sync_major_chapter_name_trigger
   FOR EACH ROW
   EXECUTE FUNCTION sync_major_chapter_name();
 
--- 소단원명 변경 → categories.sub_chapter 동기화
+-- 소단원명 변경 → categories.sub_chapter + concept_sheets.subunit 동기화
+-- (concept_sheets 동기화 근거: sql/migration_sync_concept_sheets.sql)
 CREATE OR REPLACE FUNCTION sync_sub_chapter_name()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -271,6 +288,18 @@ BEGIN
       AND categories.level = p.level
       AND categories.grade = mc.grade
       AND categories.semester = mc.semester
+      AND mc.id = OLD.major_chapter_id;
+
+    UPDATE concept_sheets
+    SET subunit = NEW.name
+    FROM major_chapters mc
+    JOIN publishers p ON p.id = mc.publisher_id
+    WHERE concept_sheets.subunit = OLD.name
+      AND concept_sheets.unit = mc.name
+      AND concept_sheets.publisher = p.name
+      AND concept_sheets.level = p.level
+      AND concept_sheets.grade = mc.grade
+      AND concept_sheets.semester = mc.semester
       AND mc.id = OLD.major_chapter_id;
   END IF;
   RETURN NEW;
