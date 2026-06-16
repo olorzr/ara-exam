@@ -14,7 +14,14 @@ import { Input } from '@/components/ui/input';
 import { CategoryTree } from '@/components/words';
 import { PlusCircle, Search, FileText, Trash2, List } from 'lucide-react';
 import { toast } from 'sonner';
-import type { ConceptSheet, Category } from '@/types';
+import type { ConceptSheetListItem, Category } from '@/types';
+
+/** 한 번에 렌더링할 개념지 카드 수(스크롤 렌더 비용 상한) */
+const PAGE_SIZE = 24;
+
+/** 목록/트리에 필요한 컬럼만 조회한다(무거운 editor_html 제외) */
+const LIST_COLUMNS =
+  'id,title,level,grade,publisher,semester,unit,subunit,marks,user_id,created_at,updated_at';
 
 /**
  * 개념지 목록 페이지.
@@ -22,17 +29,18 @@ import type { ConceptSheet, Category } from '@/types';
  */
 export default function ConceptListPage() {
   const { user } = useAuth();
-  const [sheets, setSheets] = useState<ConceptSheet[]>([]);
+  const [sheets, setSheets] = useState<ConceptSheetListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   useEffect(() => {
     (async () => {
       if (!user) return;
       const { data, error } = await supabase
         .from('concept_sheets')
-        .select('*')
+        .select(LIST_COLUMNS)
         .order('updated_at', { ascending: false });
 
       if (error) {
@@ -69,6 +77,17 @@ export default function ConceptListPage() {
 
   const handleSelectCategory = (cat: Category) => {
     setSelectedCategory((prev) => (prev?.id === cat.id ? null : cat));
+    setVisibleCount(PAGE_SIZE);
+  };
+
+  const handleSearchChange = (q: string) => {
+    setSearchQuery(q);
+    setVisibleCount(PAGE_SIZE);
+  };
+
+  const clearCategory = () => {
+    setSelectedCategory(null);
+    setVisibleCount(PAGE_SIZE);
   };
 
   const handleDelete = async (id: string, title: string) => {
@@ -108,6 +127,9 @@ export default function ConceptListPage() {
     return result;
   }, [sheets, selectedCategory, searchQuery]);
 
+  const visible = filtered.slice(0, visibleCount);
+  const hasMore = filtered.length > visible.length;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -135,7 +157,7 @@ export default function ConceptListPage() {
           placeholder="제목, 출판사, 단원 검색..."
           className="pl-10"
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => handleSearchChange(e.target.value)}
         />
       </div>
 
@@ -147,7 +169,7 @@ export default function ConceptListPage() {
               {selectedCategory && (
                 <button
                   className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-primary px-2 mb-3"
-                  onClick={() => setSelectedCategory(null)}
+                  onClick={clearCategory}
                 >
                   <List className="h-3.5 w-3.5" />
                   전체 보기
@@ -199,7 +221,7 @@ export default function ConceptListPage() {
                 )}
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filtered.map((sheet) => (
+                {visible.map((sheet) => (
                   <ConceptSheetCard
                     key={sheet.id}
                     sheet={sheet}
@@ -207,6 +229,16 @@ export default function ConceptListPage() {
                   />
                 ))}
               </div>
+              {hasMore && (
+                <div className="flex justify-center pt-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                  >
+                    더 보기 ({filtered.length - visible.length}개 남음)
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -218,7 +250,7 @@ export default function ConceptListPage() {
 /* ── 개념지 카드 ── */
 
 interface ConceptSheetCardProps {
-  sheet: ConceptSheet;
+  sheet: ConceptSheetListItem;
   onDelete: (id: string, title: string) => void;
 }
 

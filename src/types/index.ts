@@ -118,3 +118,9 @@ export interface ConceptSheet {
   created_at: string;
   updated_at: string;
 }
+
+/**
+ * 개념지 목록/트리용 경량 타입. 무거운 `editor_html` 본문은 제외한다
+ * (목록·카드·트리에서 쓰지 않으며, 상세 페이지 진입 시에만 별도 조회).
+ */
+export type ConceptSheetListItem = Omit<ConceptSheet, 'editor_html'>;
