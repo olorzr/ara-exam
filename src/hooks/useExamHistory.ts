@@ -6,13 +6,20 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { buildCategoryTree } from '@/lib/category-tree';
 import { toLocalDateString } from '@/lib/format';
-import { shuffle } from '@/lib/shuffle';
 import { MIN_EXAM_WORDS } from '@/lib/constants';
 import { toast } from 'sonner';
 import type { Category } from '@/types';
 
 /** 한 번에 렌더링할 원본 시험(스레드) 수 — 렌더 비용 상한 */
 const PAGE_SIZE = 30;
+
+/**
+ * 시험 이력 목록/필터에 필요한 컬럼만 조회한다.
+ * 무거운 `word_ids`(시험당 수백 UUID 배열)는 목록에서 쓰지 않으므로 제외해
+ * 전건 조회 시 네트워크·파싱 비용을 줄인다(상세는 view 페이지가 exam_words 로 로드).
+ */
+const EXAM_LIST_COLUMNS =
+  'id,title,pass_percentage,total_questions,pass_count,parent_exam_id,retake_number,category_ids,created_at';
 
 export interface ExamRecord {
   id: string;
@@ -54,13 +61,19 @@ export function useExamHistory() {
   useEffect(() => {
     (async () => {
       if (!user) return;
-      const [examRes, catRes] = await Promise.all([
-        supabase.from('exams').select('*').order('created_at', { ascending: false }),
-        supabase.from('categories').select('*').order('level').order('grade'),
-      ]);
-      setExams(examRes.data ?? []);
-      setCategories(catRes.data ?? []);
-      setLoading(false);
+      // 네트워크 예외(throw)가 나도 스피너가 멈추도록 finally 에서 loading 을 내린다.
+      try {
+        const [examRes, catRes] = await Promise.all([
+          supabase.from('exams').select(EXAM_LIST_COLUMNS).order('created_at', { ascending: false }),
+          supabase.from('categories').select('*').order('level').order('grade'),
+        ]);
+        setExams(examRes.data ?? []);
+        setCategories(catRes.data ?? []);
+      } catch {
+        toast.error('시험 이력을 불러오지 못했어요.');
+      } finally {
+        setLoading(false);
+      }
     })();
   }, [user]);
 
@@ -209,10 +222,11 @@ export function useExamHistory() {
       return;
     }
 
-    const shuffled = shuffle(originalWords);
-
-    // 차수와 제목 접미사는 서버(create_exam_with_words RPC)가 advisory lock 아래에서 결정한다.
-    // 클라이언트는 원본 제목만 넘기고, p_retake_number 는 전달하지 않는다.
+    // 재시험은 서버(create_exam_with_words RPC)가 부모 exam_words 를 직접 읽어
+    // 재조립하고 셔플 순서·차수·제목 접미사를 모두 서버가 결정한다. 클라이언트가
+    // 보내는 p_words/p_word_ids/메타는 재시험 경로에서 전혀 사용되지 않으므로,
+    // 별도 셔플 없이 부모 단어를 그대로 전달한다(원본 제목만 넘기고
+    // p_retake_number 는 전달하지 않는다).
     const { data: newExamId, error: rpcErr } = await supabase.rpc(
       'create_exam_with_words',
       {
@@ -221,8 +235,8 @@ export function useExamHistory() {
         p_total_questions: originalExam.total_questions,
         p_pass_count: originalExam.pass_count,
         p_category_ids: originalExam.category_ids,
-        p_word_ids: shuffled.map((w) => w.word_id),
-        p_words: shuffled.map((w, i) => ({
+        p_word_ids: originalWords.map((w) => w.word_id),
+        p_words: originalWords.map((w, i) => ({
           word_id: w.word_id,
           word: w.word,
           meaning: w.meaning,
