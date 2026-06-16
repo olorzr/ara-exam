@@ -1,17 +1,24 @@
 -- =============================================
--- [SUPERSEDED] 이 파일은 sql/13_migration_enforce_user_id.sql 로 승격·대체되었다.
---   신규 부트스트랩/재적용 대상이 아니다(이력 보존용). 트리거 정식 정의는 13 에 있다.
+-- user_id attribution 을 DB auth.uid() 로 강제 (정식 numbered migration 승격)
+-- 실행: Supabase SQL Editor 에서 postgres 로 실행
 -- =============================================
--- user_id attribution을 DB auth.uid()로 강제
--- =============================================
--- 배경: exams / categories / concept_sheets 는 RLS가 'authenticated'만 체크하므로
--- 인증된 클라이언트가 임의의 user_id 로 INSERT 하거나 기존 행의 user_id 를
--- 다른 사람으로 UPDATE 해 생성자(크레딧)를 위조할 수 있다.
--- 본 마이그레이션은 BEFORE INSERT/UPDATE 트리거로 attribution 을 auth.uid() 로
--- 고정해, 클라이언트가 무엇을 보내든 무시되도록 만든다.
+-- 배경(High): exams / categories / concept_sheets 의 user_id 는 NOT NULL 이지만,
+--   앱 코드(create_exam_with_words RPC, words-save, useConceptSheetEditor)는
+--   user_id 를 보내지 않는다. 이 값을 채우는 BEFORE INSERT 트리거
+--   enforce_user_id_from_auth 가 그동안 sql/archive/migration_enforce_user_id.sql
+--   에만 있어서, 번호 마이그레이션(01~12)만 적용한 신규 환경에서는
+--     (a) 트리거가 없어 user_id 가 NULL → NOT NULL 위반으로 모든 생성이 깨지고,
+--     (b) "DB 가 auth.uid() 로 user_id 를 강제한다"는 보안 전제도 active 경로에
+--         존재하지 않는 문서/실제 불일치가 발생했다.
+--   본 파일은 그 트리거 정의를 archive 에서 정식 번호 마이그레이션으로 승격한다.
+--   (archive/migration_enforce_user_id.sql 은 이 파일로 대체됨 — 이력 보존용)
+--
+-- 멱등성: 함수는 CREATE OR REPLACE, 트리거는 DROP IF EXISTS → CREATE 라
+--   이미 트리거가 적용된 기존 운영 DB 에 재실행해도 안전하다(동일 재생성).
 --
 -- 트리거 함수는 audit_log 트리거와 동일하게 SECURITY DEFINER 로 둔다.
--- auth.uid() 가 NULL 이면(postgres 역할로 실행되는 시드/백필) 덮어쓰지 않는다.
+--   auth.uid() 가 NULL 이면(postgres 역할로 실행되는 시드/백필) 덮어쓰지 않는다.
+--   SET search_path 를 고정해 무자격 객체 참조의 스키마 오염을 차단한다.
 
 -- 1) INSERT 시 auth.uid() 로 user_id 강제
 CREATE OR REPLACE FUNCTION enforce_user_id_from_auth()
@@ -36,7 +43,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 -- 3) exams 테이블에 트리거 부착
--- 트리거 이름은 알파벳 앞쪽으로 둬서 audit_exam_update 보다 먼저 실행되게 한다
+-- 트리거 이름을 알파벳 앞쪽(aa_)으로 둬서 audit_exam_* 보다 먼저 실행되게 한다
 -- (audit 트리거의 new_data 에 잠긴 user_id 가 반영되도록).
 DROP TRIGGER IF EXISTS aa_enforce_user_id_exams_insert ON exams;
 CREATE TRIGGER aa_enforce_user_id_exams_insert
@@ -69,19 +76,3 @@ DROP TRIGGER IF EXISTS aa_lock_user_id_concept_sheets_update ON concept_sheets;
 CREATE TRIGGER aa_lock_user_id_concept_sheets_update
   BEFORE UPDATE ON concept_sheets
   FOR EACH ROW EXECUTE FUNCTION lock_user_id_on_update();
-
--- 6) create_exam_with_words RPC 시그니처에서 p_user_id 제거
--- 기존 옛 시그니처(p_user_id 포함)만 정리한다.
-DROP FUNCTION IF EXISTS create_exam_with_words(
-  TEXT, INT, INT, INT, UUID[], UUID[], UUID, JSONB, UUID, INT
-);
-
--- [2026-05-26] 주의: 이 파일에 있던 create_exam_with_words 재정의(advisory lock·
--- DEFINER·서버 검증 없음)는 제거했다. 과거 이 정의가 01_schema.sql /
--- archive/migration_retake_atomic.sql 의 최신 정의를 실행 순서에 따라 덮어써, 재시험
--- 직렬화나 exam_words 쓰기 차단이 사라지는 퇴행을 일으킬 수 있었다.
--- create_exam_with_words 의 정식(canonical) 정의는
---   sql/10_migration_lock_exam_words.sql
--- 한 곳에서만 관리한다. 마이그레이션 적용 시 이 파일을 먼저 실행하고,
--- archive/migration_retake_atomic.sql → 10_migration_lock_exam_words.sql 순서로 마지막에
--- 정식 RPC 를 올릴 것.

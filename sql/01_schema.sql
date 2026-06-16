@@ -363,7 +363,7 @@ CREATE TRIGGER sync_school_material_name_trigger
 -- 서버에서 결정한다. pg_advisory_xact_lock 으로 동일 부모 동시 호출을 직렬화하고,
 -- (parent_exam_id, retake_number) 부분 유일 인덱스가 마지막 안전망으로 동작한다.
 --
--- user_id 는 sql/archive/migration_enforce_user_id.sql 의 BEFORE INSERT 트리거가
+-- user_id 는 sql/13_migration_enforce_user_id.sql 의 BEFORE INSERT 트리거가
 -- auth.uid() 로 채운다. 본 RPC 는 user_id 컬럼을 명시하지 않는다.
 --
 -- 이 함수는 SECURITY DEFINER 다. exam_words 직접 쓰기를 RLS 로 차단했기 때문에
@@ -486,13 +486,22 @@ BEGIN
         USING ERRCODE = 'foreign_key_violation';
     END IF;
 
+    -- category_ids 는 클라이언트 입력(p_category_ids)을 신뢰하지 않고, 실제 포함된
+    -- 단어들의 canonical words.category_id 집합으로 서버가 재계산한다(words.category_id
+    -- 는 NOT NULL). 직접 RPC 호출로 시험 내용과 무관한 출처/필터 라벨을 위조하는 것을 차단한다.
+    v_category_ids := ARRAY(
+      SELECT DISTINCT w.category_id
+      FROM unnest(v_word_ids) AS wid
+      JOIN words w ON w.id = wid
+    );
+
     INSERT INTO exams (
       title, pass_percentage, total_questions, pass_count,
       category_ids, word_ids, parent_exam_id, retake_number
     )
     VALUES (
       p_title, p_pass_percentage, v_total, v_pass,
-      p_category_ids, v_word_ids, NULL, 0
+      v_category_ids, v_word_ids, NULL, 0
     )
     RETURNING id INTO v_exam_id;
 

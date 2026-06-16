@@ -193,14 +193,24 @@ BEGIN
         USING ERRCODE = 'foreign_key_violation';
     END IF;
 
-    -- user_id 는 aa_enforce_user_id_exams_insert 트리거가 auth.uid() 로 채움
+    -- category_ids 는 클라이언트 입력(p_category_ids)을 신뢰하지 않고, 실제 포함된
+    -- 단어들의 canonical words.category_id 집합으로 서버가 재계산한다(words.category_id
+    -- 는 NOT NULL). 직접 RPC 호출로 시험 내용과 무관한 출처/필터 라벨을 위조하는 것을 차단한다.
+    v_category_ids := ARRAY(
+      SELECT DISTINCT w.category_id
+      FROM unnest(v_word_ids) AS wid
+      JOIN words w ON w.id = wid
+    );
+
+    -- user_id 는 aa_enforce_user_id_exams_insert 트리거(sql/13_migration_enforce_user_id.sql)가
+    -- auth.uid() 로 채움
     INSERT INTO exams (
       title, pass_percentage, total_questions, pass_count,
       category_ids, word_ids, parent_exam_id, retake_number
     )
     VALUES (
       p_title, p_pass_percentage, v_total, v_pass,
-      p_category_ids, v_word_ids, NULL, 0
+      v_category_ids, v_word_ids, NULL, 0
     )
     RETURNING id INTO v_exam_id;
 
