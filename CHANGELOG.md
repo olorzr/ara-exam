@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.1.4] - 2026-06-16
+### Security
+- 개념지 편집기 로드(읽기) 경로에서도 `editor_html` 을 `sanitizeConceptHTML` 로 정화 — 저장 시점 정화만으로는 과거 오염 데이터·직접 DB/RPC 쓰기로 남은 페이로드가 편집기 `content` 주입 시 실행될 수 있었음(Stored XSS). `useConceptSheetEditor` 기존 개념지 로드에서 정화 후 `initialHTML`/`editorHTML` 설정 ([src/hooks/useConceptSheetEditor.ts](src/hooks/useConceptSheetEditor.ts))
+- sanitizer 화이트리스트 강화 — `class` 속성 허용 제거(Tailwind 유틸리티 기반 `fixed inset-0` 전체화면 overlay·클릭 유도 UI 주입 차단), `ALLOW_DATA_ATTR: true → false` 로 임의 `data-*` 주입 차단(명시 화이트리스트만 통과). 회귀 테스트 2건 추가 ([src/lib/sanitize-html.ts](src/lib/sanitize-html.ts))
+- `user_id` 강제 트리거(`enforce_user_id_from_auth`/`lock_user_id_on_update`)를 `sql/archive` 에서 정식 번호 마이그레이션 [sql/13_migration_enforce_user_id.sql](sql/13_migration_enforce_user_id.sql) 로 승격 — archive 에만 있어 번호(01~12)만 적용한 신규 환경은 트리거 부재로 `user_id`(NOT NULL) 가 안 채워져 모든 생성이 깨지고 "DB 가 attribution 강제"라는 보안 전제도 빠져 있었음. 멱등 마이그레이션이라 기존 DB 재적용 안전. 신규 부트스트랩 범위 01~13 으로 갱신
+- `create_exam_with_words` 신규 생성 시 `category_ids` 를 클라이언트 입력 대신 **실제 포함 단어들의 canonical `words.category_id` 집합으로 서버 재계산** — 직접 RPC 호출로 시험 내용과 무관한 출처/필터 라벨을 위조하는 경로 차단(sql/10 + 01_schema.sql 미러). ⚠️ DB 에 두 파일 재적용 필요
+- 네이버 웍스 콜백의 provider 표식을 `user_metadata` → **`app_metadata`(service-role 전용, 위조 불가)** 로 이동 ([src/app/api/auth/naver-works/callback/route.ts](src/app/api/auth/naver-works/callback/route.ts)). 다른 provider 우회 차단의 1차 방어선은 Supabase 대시보드에서 불필요 provider 비활성화 + RLS 도메인 제한(미적용 — 운영자 조치 필요)
+### Fixed
+- 객관식 5지선다에서 같은 표시 문자열(`word`)을 가진 단어가 여러 행(다중 카테고리)에 있을 때 정답과 똑같이 보이는 오답·중복 오답이 섞여 문항이 모호해지던 문제 — `generateChoices` 가 `word` 기준으로 방해지 중복을 제거(결정론 유지, 시험지/답안지 일치). 테스트 추가 ([src/lib/exam-choices.ts](src/lib/exam-choices.ts))
+- 시험지 보기·단어장 인쇄·대시보드 로더가 네트워크 예외(throw) 시 `setLoading(false)` 가 실행되지 않아 스피너가 무한 정지하던 문제 — `try/catch/finally` 로 감싸 실패 시 not-found/초기값 처리
+### Changed
+- 재시험 생성의 죽은 클라이언트 셔플 제거 — 서버 RPC(`create_exam_with_words`)가 부모 `exam_words` 를 `ORDER BY random()` 로 재셔플하므로 클라이언트 `shuffle(originalWords)` 결과는 무시되던 코드였음. 셔플 단일 출처를 서버로 명확화 ([src/hooks/useExamHistory.ts](src/hooks/useExamHistory.ts))
+- `exam/builder/page.tsx`(307줄, 300줄 규칙 초과)를 `useConceptList` 훅 + `ConceptSheetCard` 컴포넌트로 분리 — 조회/필터/삭제/페이지네이션 책임 분리, 모든 파일 300줄 이하
+### Performance
+- 시험 이력 조회의 과다 조회(over-fetch) 축소 — `select('*')` 가 목록에 쓰지 않는 무거운 `word_ids`(시험당 수백 UUID 배열)까지 가져오던 것을 목록/필터에 필요한 컬럼만 조회하도록 변경 ([src/hooks/useExamHistory.ts](src/hooks/useExamHistory.ts))
+### Docs
+- 코덱스 리뷰 중 즉시 적용하지 않은 아키텍처 항목(세션 쿠키화 #4, CSP nonce #3, 객관식 선지 DB 스냅샷 #6, 진짜 서버 페이지네이션 #11)의 설계를 [docs/security-roadmap.md](docs/security-roadmap.md) 로 정리
+
 ## [0.1.3] - 2026-06-16
 ### Security
 - exam_words SELECT RLS 정책에서 도메인 가드(`public.is_allowed_domain()`)가 빠지던 퇴행 수정 — 적용 순서상 마지막인 `10_migration_lock_exam_words.sql`(및 번들 `archive/00_apply_2026-05-26_security.sql`)이 도메인 조건 없이 정책을 재생성해, 앞선 `08_migration_domain_restriction.sql`의 제한을 덮어쓰고 있었음
