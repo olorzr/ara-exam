@@ -123,6 +123,24 @@ describe('sanitizeConceptHTML', () => {
     expect(out).toContain('제목');
   });
 
+  it('class 속성을 제거한다(Tailwind 유틸리티 기반 UI 주입 차단)', () => {
+    const out = sanitizeConceptHTML(
+      '<p class="fixed inset-0 z-50 bg-black">overlay</p>',
+    );
+    expect(out).not.toContain('class');
+    expect(out).not.toContain('fixed');
+    expect(out).toContain('overlay');
+  });
+
+  it('화이트리스트 밖 임의 data-* 속성을 제거한다', () => {
+    const out = sanitizeConceptHTML(
+      '<p data-evil="x" data-controller="hack">텍스트</p>',
+    );
+    expect(out).not.toContain('data-evil');
+    expect(out).not.toContain('data-controller');
+    expect(out).toContain('텍스트');
+  });
+
   it('빈 문자열을 입력하면 빈 문자열을 반환한다', () => {
     expect(sanitizeConceptHTML('')).toBe('');
   });

@@ -16,13 +16,17 @@ const ALLOWED_TAGS = [
   'span',
 ];
 
+// class 는 허용하지 않는다. TipTap 의 getHTML() 은 이 확장 셋에서 class 를
+// 직렬화하지 않으므로 정당한 마크업에는 영향이 없고, 허용하면 Tailwind/앱 CSS
+// 유틸리티(예: fixed inset-0 z-50)를 악용한 전체화면 overlay·숨김·클릭 유도
+// 같은 저장형 UI 주입이 가능해진다. 필요한 data-* 는 아래에 명시 화이트리스트한다.
 const ALLOWED_ATTR = [
   'colspan', 'rowspan', 'colwidth',
   'data-concept',
   'data-colwidth',
   'data-bg-color',
   'data-bordertop', 'data-borderbottom', 'data-borderleft', 'data-borderright',
-  'class', 'style',
+  'style',
 ];
 
 const FORBID_TAGS = [
@@ -116,7 +120,10 @@ DOMPurify.addHook('uponSanitizeAttribute', (_node, data) => {
 const CONCEPT_SHEET_SANITIZE_CONFIG = {
   ALLOWED_TAGS,
   ALLOWED_ATTR,
-  ALLOW_DATA_ATTR: true,
+  // 모든 data-* 를 허용하지 않는다. 정당한 data 속성(data-concept, data-bg-color,
+  // data-border*, data-colwidth)은 ALLOWED_ATTR 에 명시돼 있어 그대로 통과하고,
+  // 그 밖의 임의 data-* 주입은 차단한다.
+  ALLOW_DATA_ATTR: false,
   ALLOWED_URI_REGEXP: SAFE_URI_REGEXP,
   FORBID_TAGS,
   FORBID_ATTR,

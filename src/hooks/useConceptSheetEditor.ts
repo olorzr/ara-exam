@@ -95,8 +95,12 @@ export function useConceptSheetEditor() {
         unit: sheet.unit,
         subunit: sheet.subunit,
       });
-      setInitialHTML(sheet.editor_html);
-      setEditorHTML(sheet.editor_html);
+      // concept_sheets 는 authenticated 전원이 쓸 수 있는 공유 테이블이라, 저장 시
+      // sanitize 했더라도 과거 오염 데이터나 직접 DB/RPC 쓰기가 남아 있을 수 있다.
+      // 편집기 content 로 주입하기 전에 읽기 경로에서도 정화해 Stored XSS 를 차단한다.
+      const safeHTML = sanitizeConceptHTML(sheet.editor_html);
+      setInitialHTML(safeHTML);
+      setEditorHTML(safeHTML);
       setLoading(false);
     })();
   }, [isNew, sheetId, user, router]);
