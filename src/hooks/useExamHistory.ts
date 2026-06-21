@@ -206,68 +206,72 @@ export function useExamHistory() {
   const handleRetest = async (examId: string) => {
     if (!user) return;
     setRetestingId(examId);
-    const originalExam = exams.find((e) => e.id === examId);
-    if (!originalExam) { setRetestingId(null); return; }
+    // 여러 await 중 하나라도 throw 하면 재시험 버튼 스피너(retestingId)가 고착되므로
+    // finally 에서 반드시 초기화한다.
+    try {
+      const originalExam = exams.find((e) => e.id === examId);
+      if (!originalExam) return;
 
-    const { data: originalWords } = await supabase
-      .from('exam_words').select('*').eq('exam_id', examId).order('order_index');
-    if (!originalWords || originalWords.length === 0) {
-      toast.error('원본 시험지의 단어를 불러올 수 없어요');
-      setRetestingId(null);
-      return;
-    }
-    if (originalWords.length < MIN_EXAM_WORDS) {
-      toast.error(`재시험 생성에는 최소 ${MIN_EXAM_WORDS}개 단어가 필요해요 (현재 ${originalWords.length}개)`);
-      setRetestingId(null);
-      return;
-    }
+      const { data: originalWords } = await supabase
+        .from('exam_words').select('*').eq('exam_id', examId).order('order_index');
+      if (!originalWords || originalWords.length === 0) {
+        toast.error('원본 시험지의 단어를 불러올 수 없어요');
+        return;
+      }
+      if (originalWords.length < MIN_EXAM_WORDS) {
+        toast.error(`재시험 생성에는 최소 ${MIN_EXAM_WORDS}개 단어가 필요해요 (현재 ${originalWords.length}개)`);
+        return;
+      }
 
-    // 재시험은 서버(create_exam_with_words RPC)가 부모 exam_words 를 직접 읽어
-    // 재조립하고 셔플 순서·차수·제목 접미사를 모두 서버가 결정한다. 클라이언트가
-    // 보내는 p_words/p_word_ids/메타는 재시험 경로에서 전혀 사용되지 않으므로,
-    // 별도 셔플 없이 부모 단어를 그대로 전달한다(원본 제목만 넘기고
-    // p_retake_number 는 전달하지 않는다).
-    const { data: newExamId, error: rpcErr } = await supabase.rpc(
-      'create_exam_with_words',
-      {
-        p_title: originalExam.title,
-        p_pass_percentage: originalExam.pass_percentage,
-        p_total_questions: originalExam.total_questions,
-        p_pass_count: originalExam.pass_count,
-        p_category_ids: originalExam.category_ids,
-        p_word_ids: originalWords.map((w) => w.word_id),
-        p_words: originalWords.map((w, i) => ({
-          word_id: w.word_id,
-          word: w.word,
-          meaning: w.meaning,
-          order_index: i,
-        })),
-        p_parent_exam_id: examId,
-      },
-    );
+      // 재시험은 서버(create_exam_with_words RPC)가 부모 exam_words 를 직접 읽어
+      // 재조립하고 셔플 순서·차수·제목 접미사를 모두 서버가 결정한다. 클라이언트가
+      // 보내는 p_words/p_word_ids/메타는 재시험 경로에서 전혀 사용되지 않으므로,
+      // 별도 셔플 없이 부모 단어를 그대로 전달한다(원본 제목만 넘기고
+      // p_retake_number 는 전달하지 않는다).
+      const { data: newExamId, error: rpcErr } = await supabase.rpc(
+        'create_exam_with_words',
+        {
+          p_title: originalExam.title,
+          p_pass_percentage: originalExam.pass_percentage,
+          p_total_questions: originalExam.total_questions,
+          p_pass_count: originalExam.pass_count,
+          p_category_ids: originalExam.category_ids,
+          p_word_ids: originalWords.map((w) => w.word_id),
+          p_words: originalWords.map((w, i) => ({
+            word_id: w.word_id,
+            word: w.word,
+            meaning: w.meaning,
+            order_index: i,
+          })),
+          p_parent_exam_id: examId,
+        },
+      );
 
-    if (rpcErr || !newExamId) {
+      if (rpcErr || !newExamId) {
+        toast.error('재시험지 생성 중 오류가 발생했어요');
+        return;
+      }
+
+      // 서버가 결정한 차수를 토스트/로컬 상태에 반영하기 위해 새 행을 한 번 더 조회한다.
+      const { data: createdExam } = await supabase
+        .from('exams')
+        .select('*')
+        .eq('id', newExamId)
+        .single();
+
+      if (createdExam) {
+        setExams((prev) => [createdExam, ...prev]);
+        toast.success(`재시험 ${createdExam.retake_number}차가 생성되었어요!`);
+      } else {
+        toast.success('재시험지가 생성되었어요!');
+      }
+
+      router.push(`/exam/view?id=${newExamId}`);
+    } catch {
       toast.error('재시험지 생성 중 오류가 발생했어요');
+    } finally {
       setRetestingId(null);
-      return;
     }
-
-    // 서버가 결정한 차수를 토스트/로컬 상태에 반영하기 위해 새 행을 한 번 더 조회한다.
-    const { data: createdExam } = await supabase
-      .from('exams')
-      .select('*')
-      .eq('id', newExamId)
-      .single();
-
-    if (createdExam) {
-      setExams((prev) => [createdExam, ...prev]);
-      toast.success(`재시험 ${createdExam.retake_number}차가 생성되었어요!`);
-    } else {
-      toast.success('재시험지가 생성되었어요!');
-    }
-
-    setRetestingId(null);
-    router.push(`/exam/view?id=${newExamId}`);
   };
 
   return {

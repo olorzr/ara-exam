@@ -100,16 +100,24 @@ export function useWordsManager() {
 
   const handleEditSave = async () => {
     if (!editWord) return;
+    // 신규 입력 경로와 동일하게 trim 한다. 공백이 섞인 중복어("apple " 등)가 생기면
+    // 단어 중복 체크와 객관식 선지 dedupe(표시 문자열 기준)가 깨진다.
+    const word = editForm.word.trim();
+    const meaning = editForm.meaning.trim();
+    if (!word || !meaning) {
+      toast.error('단어와 뜻을 모두 입력해주세요.');
+      return;
+    }
     const { error } = await supabase
       .from('words')
-      .update({ word: editForm.word, meaning: editForm.meaning })
+      .update({ word, meaning })
       .eq('id', editWord.id);
     if (error) {
       toast.error('단어 수정에 실패했어요.');
       return;
     }
     setWords((prev) =>
-      prev.map((w) => (w.id === editWord.id ? { ...w, ...editForm } : w))
+      prev.map((w) => (w.id === editWord.id ? { ...w, word, meaning } : w))
     );
     setEditWord(null);
     toast.success('단어가 수정되었습니다.');

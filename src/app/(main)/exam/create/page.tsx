@@ -120,34 +120,42 @@ export default function ExamCreatePage() {
 
     setCreating(true);
 
-    const orderedWords = shuffleEnabled ? shuffle(words) : words;
+    // RPC 가 네트워크 오류 등으로 throw 해도 생성 스피너가 멈추지 않도록 감싼다.
+    // 성공 시에는 페이지 이동(router.push)으로 언마운트되므로 creating 을 굳이
+    // 되돌리지 않는다(언마운트 후 setState 경고 방지).
+    try {
+      const orderedWords = shuffleEnabled ? shuffle(words) : words;
 
-    const { data: examId, error: rpcErr } = await supabase.rpc(
-      'create_exam_with_words',
-      {
-        p_title: title.trim(),
-        p_pass_percentage: passPercentage,
-        p_total_questions: totalQuestions,
-        p_pass_count: passCount,
-        p_category_ids: selectedCatIds,
-        p_word_ids: orderedWords.map((w) => w.id),
-        p_words: orderedWords.map((w, i) => ({
-          word_id: w.id,
-          word: w.word,
-          meaning: w.meaning,
-          order_index: i,
-        })),
-      },
-    );
+      const { data: examId, error: rpcErr } = await supabase.rpc(
+        'create_exam_with_words',
+        {
+          p_title: title.trim(),
+          p_pass_percentage: passPercentage,
+          p_total_questions: totalQuestions,
+          p_pass_count: passCount,
+          p_category_ids: selectedCatIds,
+          p_word_ids: orderedWords.map((w) => w.id),
+          p_words: orderedWords.map((w, i) => ({
+            word_id: w.id,
+            word: w.word,
+            meaning: w.meaning,
+            order_index: i,
+          })),
+        },
+      );
 
-    if (rpcErr || !examId) {
+      if (rpcErr || !examId) {
+        toast.error('시험지 생성 중 오류가 발생했습니다.');
+        setCreating(false);
+        return;
+      }
+
+      toast.success('시험지가 생성되었습니다.');
+      router.push(`/exam/view?id=${examId}`);
+    } catch {
       toast.error('시험지 생성 중 오류가 발생했습니다.');
       setCreating(false);
-      return;
     }
-
-    toast.success('시험지가 생성되었습니다.');
-    router.push(`/exam/view?id=${examId}`);
   };
 
   return (

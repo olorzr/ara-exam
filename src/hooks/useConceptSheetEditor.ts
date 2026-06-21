@@ -44,6 +44,8 @@ export function useConceptSheetEditor() {
   const [loading, setLoading] = useState(!isNew);
   const [savedId, setSavedId] = useState<string | null>(isNew ? null : sheetId);
   const [initialHTML, setInitialHTML] = useState<string | null>(isNew ? '' : null);
+  // 낙관적 동시성 제어용. 불러올 때의 updated_at 을 기억해 저장 시 버전 충돌을 감지한다.
+  const [loadedUpdatedAt, setLoadedUpdatedAt] = useState<string | null>(null);
   const editorRef = useRef<Editor | null>(null);
 
   /** 카테고리 값으로 자동 제목을 생성한다 */
@@ -73,35 +75,43 @@ export function useConceptSheetEditor() {
         setLoading(false);
         return;
       }
-      const { data, error } = await supabase
-        .from('concept_sheets')
-        .select('*')
-        .eq('id', sheetId)
-        .single();
+      // 네트워크 예외(throw)가 나도 스피너가 멈추도록 finally 에서 loading 을 내린다.
+      try {
+        const { data, error } = await supabase
+          .from('concept_sheets')
+          .select('*')
+          .eq('id', sheetId)
+          .single();
 
-      if (error || !data) {
-        toast.error('개념지를 찾을 수 없습니다.');
+        if (error || !data) {
+          toast.error('개념지를 찾을 수 없습니다.');
+          router.push('/exam/builder');
+          return;
+        }
+
+        const sheet = data as ConceptSheet;
+        setTitle(sheet.title);
+        setCategory({
+          level: sheet.level,
+          grade: sheet.grade,
+          publisher: sheet.publisher,
+          semester: sheet.semester,
+          unit: sheet.unit,
+          subunit: sheet.subunit,
+        });
+        setLoadedUpdatedAt(sheet.updated_at);
+        // concept_sheets 는 authenticated 전원이 쓸 수 있는 공유 테이블이라, 저장 시
+        // sanitize 했더라도 과거 오염 데이터나 직접 DB/RPC 쓰기가 남아 있을 수 있다.
+        // 편집기 content 로 주입하기 전에 읽기 경로에서도 정화해 Stored XSS 를 차단한다.
+        const safeHTML = sanitizeConceptHTML(sheet.editor_html);
+        setInitialHTML(safeHTML);
+        setEditorHTML(safeHTML);
+      } catch {
+        toast.error('개념지를 불러오지 못했어요.');
         router.push('/exam/builder');
-        return;
+      } finally {
+        setLoading(false);
       }
-
-      const sheet = data as ConceptSheet;
-      setTitle(sheet.title);
-      setCategory({
-        level: sheet.level,
-        grade: sheet.grade,
-        publisher: sheet.publisher,
-        semester: sheet.semester,
-        unit: sheet.unit,
-        subunit: sheet.subunit,
-      });
-      // concept_sheets 는 authenticated 전원이 쓸 수 있는 공유 테이블이라, 저장 시
-      // sanitize 했더라도 과거 오염 데이터나 직접 DB/RPC 쓰기가 남아 있을 수 있다.
-      // 편집기 content 로 주입하기 전에 읽기 경로에서도 정화해 Stored XSS 를 차단한다.
-      const safeHTML = sanitizeConceptHTML(sheet.editor_html);
-      setInitialHTML(safeHTML);
-      setEditorHTML(safeHTML);
-      setLoading(false);
     })();
   }, [isNew, sheetId, user, router]);
 
@@ -133,37 +143,54 @@ export function useConceptSheetEditor() {
       marks: currentMarks,
     };
 
-    if (savedId) {
-      const { error } = await supabase
-        .from('concept_sheets')
-        .update(payload)
-        .eq('id', savedId);
+    // 저장 중 throw(네트워크 등)가 나도 스피너가 멈추도록 finally 에서 saving 을 내린다.
+    try {
+      if (savedId) {
+        // 낙관적 동시성 제어: concept_sheets 는 공유 테이블이라 두 사람이 동시에
+        // 편집하면 마지막 저장이 상대 변경을 통째로 덮어쓴다(last-write-wins).
+        // 불러올 때의 updated_at 과 일치할 때만 갱신하고, 어긋나면(0행 갱신) 저장을
+        // 거부해 사용자에게 새로고침을 안내한다. updated_at 은 트리거가 자동 갱신한다.
+        let query = supabase
+          .from('concept_sheets')
+          .update(payload)
+          .eq('id', savedId);
+        if (loadedUpdatedAt) {
+          query = query.eq('updated_at', loadedUpdatedAt);
+        }
+        const { data, error } = await query.select('updated_at').maybeSingle();
 
-      if (error) {
-        toast.error('저장에 실패했습니다.');
-        setSaving(false);
-        return;
-      }
-      toast.success('저장되었습니다.');
-    } else {
-      const { data, error } = await supabase
-        .from('concept_sheets')
-        .insert(payload)
-        .select('id')
-        .single();
+        if (error) {
+          toast.error('저장에 실패했습니다.');
+          return;
+        }
+        if (!data) {
+          toast.error('다른 사용자가 이 개념지를 먼저 수정했어요. 새로고침 후 다시 저장해주세요.');
+          return;
+        }
+        setLoadedUpdatedAt(data.updated_at);
+        toast.success('저장되었습니다.');
+      } else {
+        const { data, error } = await supabase
+          .from('concept_sheets')
+          .insert(payload)
+          .select('id, updated_at')
+          .single();
 
-      if (error || !data) {
-        toast.error('저장에 실패했습니다.');
-        setSaving(false);
-        return;
+        if (error || !data) {
+          toast.error('저장에 실패했습니다.');
+          return;
+        }
+        setSavedId(data.id);
+        setLoadedUpdatedAt(data.updated_at);
+        toast.success('저장되었습니다.');
+        router.replace(`/exam/builder/${data.id}`);
       }
-      setSavedId(data.id);
-      toast.success('저장되었습니다.');
-      router.replace(`/exam/builder/${data.id}`);
+    } catch {
+      toast.error('저장에 실패했습니다.');
+    } finally {
+      setSaving(false);
     }
-
-    setSaving(false);
-  }, [user, title, category, editorHTML, marks, savedId, router]);
+  }, [user, title, category, editorHTML, marks, savedId, loadedUpdatedAt, router]);
 
   /* ── 마킹 삭제 ── */
   const deleteMark = useCallback((pos: number, len: number) => {
