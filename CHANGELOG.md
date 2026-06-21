@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.5] - 2026-06-21
+### Security
+- `exams` 직접 INSERT/UPDATE 차단 → **SELECT/DELETE 전용** 정책. 이전엔 `FOR ALL` 공유라 누구나 `create_exam_with_words` RPC 를 우회해 가짜 시험지·메타데이터(합격선·출처·차수) 위조 INSERT 또는 남의 시험지 UPDATE 변조가 가능했음. 생성/수정은 SECURITY DEFINER RPC 로만 ([sql/14_migration_lock_exams_writes.sql](sql/14_migration_lock_exams_writes.sql) + 01·08 미러). ⚠️ DB 적용: **sql/14 적용 + sql/10 재적용** 필요
+- `create_exam_with_words` 신규 생성 검증 3종 — 중복 `word_id` 차단, 표시 문자열 `DISTINCT words.word ≥ 5` 강제(객관식 선지가 5개 미만으로 무너지는 우회 차단), `order_index` 를 클라이언트 입력 대신 `jsonb_array_elements ... WITH ORDINALITY` 배열 위치로 서버 canonicalize(출제 순서 조작 차단). sql/10 + 01_schema.sql 미러. ⚠️ DB 재적용 필요
+- OAuth `redirect_uri`·콜백 origin 을 Host 헤더 대신 환경변수 **`APP_ORIGIN`** 으로 고정 — Host 조작으로 인한 redirect_uri 오염/매직링크 `token_hash` 유출 차단. 프로덕션 fail-closed(미설정·오설정 시 라우트 500) ([src/lib/app-origin.ts](src/lib/app-origin.ts), naver-works `route.ts`/`callback/route.ts`). ⚠️ **배포 시 `APP_ORIGIN` 환경변수 설정 필수** ([docs/env.example](docs/env.example))
+- archive [sql/archive/00_apply_2026-05-26_security.sql](sql/archive/00_apply_2026-05-26_security.sql) 의 stale `create_exam_with_words` 정의(클라이언트 `p_category_ids` 신뢰)를 `/* */` 로 무력화 + `exams` `FOR ALL` 정책을 SELECT/DELETE 로 교체 — 실수로 재실행해도 쓰기 잠금이 풀리지 않도록(SUPERSEDED, 신규/기존은 번호 파일 01~14 적용)
+### Fixed
+- 개념지 저장 last-write-wins → `updated_at` 기반 **낙관적 동시성 제어**. 공유 테이블에서 두 사용자가 동시 편집 시 마지막 저장이 상대 변경을 통째로 덮어쓰던 문제 — 충돌 시 저장 거부 + 새로고침 안내 ([src/hooks/useConceptSheetEditor.ts](src/hooks/useConceptSheetEditor.ts))
+- 단어 편집 저장 시 `trim()` 누락 보강 — 신규 입력은 trim 하면서 편집 경로는 원문 그대로 써 `"apple "` 등 공백 포함 중복어가 생겨 중복 체크·선지 dedupe 가 깨지던 문제. 빈값 검증 추가 ([src/hooks/useWordsManager.ts](src/hooks/useWordsManager.ts))
+- 시험지 생성·재시험·개념지 저장/로드 async 핸들러를 `try/catch/finally` 로 보강 — Supabase 호출이 throw(네트워크 등) 시 `creating`/`retestingId`/`saving`/`loading` 상태가 `true` 로 고착돼 스피너가 무한 정지하던 문제 ([exam/create/page.tsx](src/app/(main)/exam/create/page.tsx), [useExamHistory.ts](src/hooks/useExamHistory.ts), [useConceptSheetEditor.ts](src/hooks/useConceptSheetEditor.ts))
+- CSP `style-src`/`font-src` 에 `https://cdn.jsdelivr.net` 허용 — `globals.css` 가 jsdelivr 에서 Pretendard/GmarketSans 폰트를 `@import` 하는데 `'self'` 만 두면 프로덕션에서 폰트가 차단되던 문제 ([next.config.ts](next.config.ts))
+
 ## [0.1.4] - 2026-06-16
 ### Security
 - 개념지 편집기 로드(읽기) 경로에서도 `editor_html` 을 `sanitizeConceptHTML` 로 정화 — 저장 시점 정화만으로는 과거 오염 데이터·직접 DB/RPC 쓰기로 남은 페이로드가 편집기 `content` 주입 시 실행될 수 있었음(Stored XSS). `useConceptSheetEditor` 기존 개념지 로드에서 정화 후 `initialHTML`/`editorHTML` 설정 ([src/hooks/useConceptSheetEditor.ts](src/hooks/useConceptSheetEditor.ts))
