@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isAllowedEmailDomain } from '@/lib/constants';
+import { resolveAppOrigin } from '@/lib/app-origin';
 
 const TOKEN_URL = 'https://auth.worksmobile.com/oauth2/v2.0/token';
 const USER_API_URL = 'https://www.worksapis.com/v1.0/users/me';
@@ -25,7 +26,18 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get('code');
   const state = url.searchParams.get('state');
-  const loginUrl = `${url.origin}/login`;
+  // origin 은 Host 헤더가 아니라 신뢰된 APP_ORIGIN 으로 고정한다. Host 조작으로
+  // redirect_uri 가 오염되거나 매직링크 token_hash 가 공격자 호스트로 새는 것을 막는다.
+  // APP_ORIGIN 미설정/오설정(프로덕션)이면 throw 하므로 제어된 500 으로 매핑한다
+  // (origin 을 모르면 로그인 페이지로의 리다이렉트 URL 도 만들 수 없다).
+  let origin: string;
+  try {
+    origin = resolveAppOrigin(request.url);
+  } catch {
+    // 내부 설정명을 응답 본문에 노출하지 않는다(일반 500).
+    return new NextResponse('Internal Server Error', { status: 500 });
+  }
+  const loginUrl = `${origin}/login`;
 
   const cookieStore = await cookies();
   const savedState = cookieStore.get('oauth_state')?.value;
@@ -48,7 +60,7 @@ export async function GET(request: Request) {
         grant_type: 'authorization_code',
         client_id: process.env.NAVER_WORKS_CLIENT_ID!,
         client_secret: process.env.NAVER_WORKS_CLIENT_SECRET!,
-        redirect_uri: `${url.origin}/api/auth/naver-works/callback`,
+        redirect_uri: `${origin}/api/auth/naver-works/callback`,
       }),
     });
 
@@ -103,7 +115,7 @@ export async function GET(request: Request) {
     }
 
     const tokenHash = linkData.properties.hashed_token;
-    const callbackUrl = `${url.origin}/auth/callback?token_hash=${encodeURIComponent(tokenHash)}&type=magiclink`;
+    const callbackUrl = `${origin}/auth/callback?token_hash=${encodeURIComponent(tokenHash)}&type=magiclink`;
 
     return NextResponse.redirect(callbackUrl);
   } catch {
