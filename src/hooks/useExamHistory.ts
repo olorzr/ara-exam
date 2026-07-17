@@ -266,6 +266,23 @@ export function useExamHistory() {
         toast.success('재시험지가 생성되었어요!');
       }
 
+      // 재시험도 학원 성적에 자동 등록(관리 시스템에서 멱등 처리). keepalive 로 이동에도 살아남게.
+      // 특권 라우트라 Supabase 액세스 토큰을 실어 인증한다.
+      // 세션 조회/전송은 await 하지 않고 격리한다 — getSession 실패가 바깥 try/catch 로 전파돼
+      // 이미 생성된 재시험을 '실패'로 오표시하거나 페이지 이동을 막지 않게 한다.
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!session?.access_token) return;
+        fetch('/api/sync-to-grades', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ examId: newExamId }),
+          keepalive: true,
+        }).catch(() => {});
+      }).catch(() => {});
+
       router.push(`/exam/view?id=${newExamId}`);
     } catch {
       toast.error('재시험지 생성 중 오류가 발생했어요');

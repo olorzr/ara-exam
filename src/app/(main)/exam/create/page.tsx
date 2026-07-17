@@ -150,6 +150,23 @@ export default function ExamCreatePage() {
         return;
       }
 
+      // 학원 성적 자동 등록: ara-system 성적에 시험 정의를 멱등 등록한다.
+      // keepalive 로 쏴서 페이지 이동에 요청이 취소되지 않게 하고, 실패해도 생성 UX 를 막지 않는다.
+      // RPC 가 만료 직전 세션을 내부 갱신했을 수 있으므로, 렌더 시점 세션이 아니라
+      // 지금 세션을 다시 읽어 최신 토큰으로 인증한다.
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!session?.access_token) return;
+        fetch('/api/sync-to-grades', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ examId }),
+          keepalive: true,
+        }).catch(() => {});
+      }).catch(() => {});
+
       toast.success('시험지가 생성되었습니다.');
       router.push(`/exam/view?id=${examId}`);
     } catch {

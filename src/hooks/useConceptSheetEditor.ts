@@ -129,6 +129,24 @@ export function useConceptSheetEditor() {
     const currentMarks = editor ? extractMarks(editor) : marks;
     const sheetTitle = title.trim() || '제목 없음';
 
+    // 저장 성공 후 학원 성적에 개념 3단계 시험 자동 등록(멱등). 마킹된 개념 단어가 있을 때만.
+    // getSession/전송은 격리해 실패가 저장 UX 를 막지 않게 하고, keepalive 로 이동에도 살아남게 한다.
+    const fireConceptSync = (id: string) => {
+      if (currentMarks.length === 0) return;
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!session?.access_token) return;
+        fetch('/api/sync-concept-to-grades', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ conceptSheetId: id }),
+          keepalive: true,
+        }).catch(() => {});
+      }).catch(() => {});
+    };
+
     setSaving(true);
 
     const payload = {
@@ -168,6 +186,7 @@ export function useConceptSheetEditor() {
           return;
         }
         setLoadedUpdatedAt(data.updated_at);
+        fireConceptSync(savedId);
         toast.success('저장되었습니다.');
       } else {
         const { data, error } = await supabase
@@ -182,6 +201,7 @@ export function useConceptSheetEditor() {
         }
         setSavedId(data.id);
         setLoadedUpdatedAt(data.updated_at);
+        fireConceptSync(data.id);
         toast.success('저장되었습니다.');
         router.replace(`/exam/builder/${data.id}`);
       }

@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.6] - 2026-07-17
+### Added
+- 학원 관리 시스템(ara-system) 성적 자동 등록 연동 — 시험 생성/재시험 직후 서버 라우트 [src/app/api/sync-to-grades/route.ts](src/app/api/sync-to-grades/route.ts) 가 `exams`+`exam_words` 스냅샷을 읽어 ara-system 인증 엔드포인트(`/api/integrations/vocab-exam`)로 전송 → 어휘 시리즈 회차로 멱등 등록됨(성적목록·어휘 대시보드 자동 노출). 채점은 ara-system 에서 그대로 ([exam/create/page.tsx](src/app/(main)/exam/create/page.tsx), [useExamHistory.ts](src/hooks/useExamHistory.ts))
+- **재시험 연동** — 재시험은 부모 exam id + 차수를 함께 보내 ara-system 에서 원본 회차와 연결(retake_of)되고 '재시험 N차' 배지로 구분됨. 부모의 등록 시리즈/학교급을 상속하므로 원본 카테고리가 삭제돼도 올바른 학교급 유지
+- **개념 시험 연동** — 개념지 저장 시 서버 라우트 [sync-concept-to-grades](src/app/api/sync-concept-to-grades/route.ts) 가 `concept_sheets` 의 개념 단어(marks)를 읽어 ara-system 개념 엔드포인트로 전송 → **3단계(초성/글자수/빈칸)** 시험으로 '개념 시험' 시리즈에 멱등 등록(각 단계 별도 채점). 마킹된 단어가 있을 때만. 학교급 매핑은 [grade-division.ts](src/lib/grade-division.ts) 로 공용화(단어 라우트와 공유)
+- 공유 시크릿은 서버 env 에만 두어 브라우저 비노출. 클라이언트는 `keepalive` fetch 로 쏴 페이지 이동에도 요청이 취소되지 않게 함. 연동 실패는 시험 생성 UX 를 막지 않음(조용히 skip)
+- 발신 라우트는 **로그인한 @araeducation.co.kr 사용자만** 호출 가능(Supabase 액세스 토큰 검증) — examId 만으로 아무나 다운스트림 등록을 트리거하지 못하게 함
+- **학교급 라우팅**: 시험 카테고리 level/grade 로 학교급(중·고등부)을 도출해 ara-system 이 학교급별 어휘 시리즈에 꽂게 함(수기 채점의 학생 필터가 학교급 기준이라 필수). 단일 학교급으로 명확할 때만 전송하고, 외부지문 등 학교급 정보가 없거나 혼합이면 미상으로 두어 기본 중등부로 등록됨(필요 시 성적에서 수동 이동)
+- ⚠️ **배포 시 env `ARA_SYSTEM_INTAKE_URL`·`ARA_SYSTEM_INTAKE_SECRET` 설정 필요**(둘 중 하나라도 비면 연동 skip). `ARA_SYSTEM_INTAKE_SECRET` 은 ara-system 의 `VOCAB_INTAKE_SECRET` 과 동일 값 ([docs/env.example](docs/env.example))
+
 ## [0.1.5] - 2026-06-21
 ### Security
 - `exams` 직접 INSERT/UPDATE 차단 → **SELECT/DELETE 전용** 정책. 이전엔 `FOR ALL` 공유라 누구나 `create_exam_with_words` RPC 를 우회해 가짜 시험지·메타데이터(합격선·출처·차수) 위조 INSERT 또는 남의 시험지 UPDATE 변조가 가능했음. 생성/수정은 SECURITY DEFINER RPC 로만 ([sql/14_migration_lock_exams_writes.sql](sql/14_migration_lock_exams_writes.sql) + 01·08 미러). ⚠️ DB 적용: **sql/14 적용 + sql/10 재적용** 필요
