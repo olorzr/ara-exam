@@ -117,9 +117,10 @@ export async function POST(request: NextRequest) {
       format: 'subjective',
       // division 미해석(null)이면 필드를 빼서 ara-system 기본 학교급(중등부)에 맡긴다
       ...(division ? { division } : {}),
-      // 재시험이면 부모 exam id + 차수를 함께 보낸다. ara-system 은 부모의 등록 시리즈/학교급을
-      // 그대로 상속하고(카테고리 삭제돼도 안전), 부모가 미등록(원본 opt-out)이면 재시험도 skip.
-      // retake_number 로 '재시험 N차' 배지를 붙인다.
+      // 재시험이면 부모 exam id + 차수를 함께 보낸다. ara-system 은 부모가 등록돼 있으면
+      // 그 등록 시리즈/학교급을 상속(retake_of 연결). 부모를 못 찾으면 skip 하지 않고
+      // division 으로 폴백 등록한다 — 이때 retake_of(원본 링크)만 생략하고 retake_seq 는
+      // 유지해 '재시험 N차' 배지는 그대로 뜬다(재시험 유실 방지).
       ...(exam.parent_exam_id
         ? { parentSourceExamId: exam.parent_exam_id, retakeNumber: exam.retake_number ?? 1 }
         : {}),
