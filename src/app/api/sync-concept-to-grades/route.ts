@@ -8,7 +8,9 @@ import { levelGradeToDivision } from '@/lib/grade-division';
  *
  * 개념지 저장 직후 클라이언트가 `{ conceptSheetId }` 로 호출하면, 서버가 concept_sheets 를 읽어
  * 개념 단어(marks)를 정답으로, level/grade 를 학교급으로 삼아 ara-system 개념 엔드포인트로 보낸다.
- * ara-system 은 3단계(초성/글자수/빈칸) 시험으로 멱등 등록한다.
+ * ara-system 은 개념지 1개당 채점 회차 1개를 '개념시험 > 교과서 > 학년+학기' 폴더에 멱등 등록한다
+ * (초성/글자수/빈칸은 인쇄물 구분일 뿐이라 회차를 나누지 않는다). 폴더 라우팅을 위해
+ * publisher/grade/semester 와 단원 기반 표시명(unitTitle)을 함께 보낸다.
  * 실패해도 throw 하지 않는다(저장 UX 방해 금지). 공유 시크릿은 서버 env 에만 둔다.
  */
 
@@ -50,7 +52,7 @@ export async function POST(request: NextRequest) {
   try {
     const { data: sheet, error: sheetErr } = await supabaseAdmin
       .from('concept_sheets')
-      .select('id, title, level, grade, marks')
+      .select('id, title, level, grade, publisher, semester, unit, subunit, marks')
       .eq('id', conceptSheetId)
       .maybeSingle();
     if (sheetErr || !sheet) {
@@ -69,10 +71,20 @@ export async function POST(request: NextRequest) {
 
     const division = levelGradeToDivision(sheet.level ?? '', sheet.grade ?? '');
 
+    // 폴더 라우팅용 카테고리 + 단원 기반 표시명 (폴더가 교과서·학년을 표현하므로 접두사 불필요)
+    const unitTitle = [sheet.unit, sheet.subunit]
+      .map((v) => (typeof v === 'string' ? v.trim() : ''))
+      .filter(Boolean)
+      .join(' ');
+
     const payload = {
       sourceExamId: sheet.id,
       title: sheet.title || '개념',
       ...(division ? { division } : {}),
+      publisher: sheet.publisher ?? '',
+      grade: sheet.grade ?? '',
+      semester: sheet.semester ?? '',
+      ...(unitTitle ? { unitTitle } : {}),
       answers,
     };
 
