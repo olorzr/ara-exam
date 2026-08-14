@@ -34,3 +34,8 @@
 - 정의: 최상위 분류 ('중등' | '고등' | '외부지문 및 프린트')
 - 코드에서의 사용: `CategoryLevel` 타입
 - 관련 파일: `src/types/index.ts`
+
+## 내신 시험범위 (Naesin Scope)
+- 정의: ara-system 수업 > 내신 관리가 (학교×학년×학년도×학기×중간/기말) 단위로 저장한 시험범위·교과서·단원 체크·시험 기간. 이 앱은 읽기 전용으로 연동해 시험지 생성 시 해당 범위의 단어 카테고리를 자동 선택한다
+- 코드에서의 사용: `ScopeSlotRow`, `fetchScopeSlot`, `matchScopeToCategories`, `publicDb()` (public 스키마 읽기 전용 — 쓰기 금지)
+- 관련 파일: `src/lib/naesin-scope/`, `src/lib/supabase-public.ts`, `src/components/exam/NaesinScopeLoader.tsx`

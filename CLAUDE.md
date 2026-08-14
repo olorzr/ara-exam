@@ -174,6 +174,8 @@
 - [2026-06-16] SQL 파일을 **적용 순서대로 번호(01~12) 접두사**를 붙여 정리했다(`sql/01_schema.sql` … `sql/12_fix_audit_log_insert_policy.sql`). 번호가 곧 신규 부트스트랩 적용 순서이며, 의존성 기반으로 결정됨(테이블 생성 → 감사/공유 → 도메인 RLS → categories 유니크 → exam_words 잠금 → 감사 함수 패치). 과거/대체된 마이그레이션(`00_apply_2026-05-26_security`, `migration_retake*`, `migration_enforce_user_id`, `migration_exam_rpc`)은 `sql/archive/` 로 이동해 이력만 보존(정의가 포인터 주석으로 무력화돼 신규 적용 대상 아님). 새 마이그레이션을 추가할 땐 다음 번호를 붙이고, 다른 SQL 파일을 참조하는 주석/문서 링크는 번호 포함 경로로 쓸 것
 - [2026-06-16] **(위 항목 정정) `migration_enforce_user_id` 는 archive 에 두면 안 되는 *실행 대상* 트리거였다** — user_id(NOT NULL) 를 채우는 유일 경로라 archive 에만 있으면 신규 환경 생성이 전부 깨진다. 그래서 `sql/13_migration_enforce_user_id.sql` 로 승격했고 **신규 부트스트랩 범위는 01~13** 이다(`sql/archive/migration_enforce_user_id.sql` 은 SUPERSEDED 헤더로 무력화). 13 은 `CREATE OR REPLACE` + `DROP TRIGGER IF EXISTS` 라 멱등 — 기존 운영 DB(이미 트리거 보유)에 재적용해도 안전. archive 의 나머지(`00_apply...`, `migration_retake*`, `migration_exam_rpc`)는 여전히 포인터 무력화된 신규 적용 비대상
 
+- [2026-08-15] **ara-system public 스키마 읽기 전용 연동 도입** — 시험지 생성 페이지에 "내신 시험범위 불러오기" 카드(`src/components/exam/NaesinScopeLoader.tsx`)를 추가. ara-system 수업 > 내신 관리가 저장한 `public.school_exam_scopes`(+ `public.schools`, `public.curriculum_textbooks`)를 `supabase.schema('public')` 체이닝(`src/lib/supabase-public.ts` `publicDb()`)으로 직접 읽어, 학교/학년/학년도/시험 선택 → 저장된 단원 키를 `src/lib/naesin-scope/match.ts`(순수 매처)로 `exam.categories`에 텍스트 매칭해 자동 체크한다. **public 스키마는 읽기 전용 — 이 클라이언트로 쓰기 금지**(원본 관리는 ara-system). 매칭은 제목 문자열 기반이라(대단원/"대단원 > 소단원" 키, 공백 정규화) 미매칭 단원은 반드시 UI에 표면화한다(조용한 유실 금지, unmatchedUnits).
+
 ## Gotchas
 - [2026-03-09] `@supabase/auth-helpers-nextjs`는 deprecated됨. 현재 직접 `@supabase/supabase-js` 사용 중
 - [2026-03-09] exam_words 테이블은 단어 스냅샷이므로 원본 단어를 수정해도 기존 시험지에는 영향 없음

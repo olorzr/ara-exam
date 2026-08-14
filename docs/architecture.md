@@ -61,6 +61,12 @@ src/
 - 의존: 없음
 - 주요 파일: `src/types/index.ts`
 
+### lib/naesin-scope (ara-system 내신 관리 연동, 읽기 전용)
+- 역할: ara-system 수업 > 내신 관리가 저장한 내신 시험범위(`public.school_exam_scopes`)를 읽어, 시험지 생성 시 해당 범위의 단어 카테고리를 자동 선택
+- 의존: `lib/supabase-public`(`publicDb()` — `supabase.schema('public')` 체이닝, **쓰기 금지**), `types`
+- 주요 파일: `src/lib/naesin-scope/{types,fetch,match}.ts`, `src/lib/supabase-public.ts`, `src/components/exam/NaesinScopeLoader.tsx`
+- 매칭 규칙: 단원 키("대단원" | "대단원 > 소단원") ↔ `exam.categories.chapter/sub_chapter` 텍스트 매칭(공백 정규화, 출판사는 공백 전제거 비교, 학기 필터). 미매칭 단원은 unmatchedUnits 로 반환해 UI 에 반드시 표면화
+
 ## 데이터 흐름
 1. 사용자 로그인 → Supabase Auth → AuthContext에 세션 저장
 2. 단어 입력 → categories + words 테이블에 저장 (RLS로 사용자별 격리)

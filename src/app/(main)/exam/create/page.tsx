@@ -5,14 +5,13 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import type { Category, Word } from '@/types';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Separator } from '@/components/ui/separator';
 import { CategoryTree } from '@/components/words';
-import { FileText, Eye } from 'lucide-react';
+import NaesinScopeLoader from '@/components/exam/NaesinScopeLoader';
+import ExamCreatePreview from '@/components/exam/ExamCreatePreview';
 import { toast } from 'sonner';
 import { DEFAULT_PASS_PERCENTAGE, PERCENTAGE_BASE, MIN_EXAM_WORDS, EXTERNAL_LEVEL } from '@/lib/constants';
 import { buildCategoryTree } from '@/lib/category-tree';
@@ -91,6 +90,17 @@ export default function ExamCreatePage() {
   const toggleCategory = (catId: string) => {
     setSelectedCatIds((prev) => {
       const next = prev.includes(catId) ? prev.filter((id) => id !== catId) : [...prev, catId];
+      if (!titleManuallyEdited) {
+        setTitle(generateTitle(next));
+      }
+      return next;
+    });
+  };
+
+  /** 내신 시험범위 불러오기 → 매칭된 카테고리를 기존 선택에 합집합으로 반영한다 */
+  const applyScopeCategories = (ids: string[]) => {
+    setSelectedCatIds((prev) => {
+      const next = [...new Set([...prev, ...ids])];
       if (!titleManuallyEdited) {
         setTitle(generateTitle(next));
       }
@@ -220,6 +230,9 @@ export default function ExamCreatePage() {
             </CardContent>
           </Card>
 
+          {/* 내신 시험범위 불러오기 (ara-system 수업 > 내신 관리 연동) */}
+          <NaesinScopeLoader categories={categories} onApply={applyScopeCategories} />
+
           {/* 카테고리 트리 선택 */}
           <Card>
             <CardHeader>
@@ -243,47 +256,13 @@ export default function ExamCreatePage() {
 
         {/* 오른쪽: 미리보기 */}
         <div className="space-y-4">
-          <Card className="sticky top-24">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Eye className="h-5 w-5 text-primary" />
-                미리보기
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="text-sm space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">총 문항 수</span>
-                  <span className="font-bold">{totalQuestions}문항</span>
-                </div>
-                {totalQuestions > 0 && totalQuestions < MIN_EXAM_WORDS && (
-                  <p className="text-xs text-red-500 text-right">
-                    최소 {MIN_EXAM_WORDS}문항 필요 (객관식 5지선다 보장)
-                  </p>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-gray-500">합격 기준</span>
-                  <span className="font-bold">{passPercentage}%</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between text-primary">
-                  <span className="font-medium">통과 기준</span>
-                  <span className="font-bold">{passCount}개 이상 / {totalQuestions}문항</span>
-                </div>
-              </div>
-
-              <Separator />
-
-              <Button
-                className="w-full bg-primary hover:bg-primary-hover text-white"
-                onClick={handleCreate}
-                disabled={creating || words.length < MIN_EXAM_WORDS}
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                {creating ? '생성 중...' : '시험지 생성'}
-              </Button>
-            </CardContent>
-          </Card>
+          <ExamCreatePreview
+            totalQuestions={totalQuestions}
+            passPercentage={passPercentage}
+            passCount={passCount}
+            creating={creating}
+            onCreate={handleCreate}
+          />
         </div>
       </div>
     </div>
