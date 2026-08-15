@@ -14,7 +14,7 @@
  * 토큰 유출 재발). 로컬 개발(NODE_ENV !== 'production')에서만 요청 origin 으로 폴백한다.
  *
  * @param requestUrl 라우트 핸들러의 `request.url`
- * @returns 트레일링 슬래시·경로를 제거한 origin (예: https://voca.example.com)
+ * @returns 트레일링 슬래시·경로를 제거한 origin (예: https://ara-exam.example.com)
  * @throws 프로덕션에서 APP_ORIGIN 미설정 시, 또는 APP_ORIGIN 값이 잘못된 URL 일 때
  */
 export function resolveAppOrigin(requestUrl: string): string {
