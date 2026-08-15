@@ -20,6 +20,12 @@ export interface ScopeSlotRow {
   exam_start_date: string | null;
   exam_end_date: string | null;
   korean_exam_date: string | null;
+  /**
+   * 이 학교가 이 시험을 보지 않음(수행평가 대체 등, ara-system mig379).
+   * ⚠️ ara-system 은 값 보존·잠금 방식이라 **true 여도 scope/units/교과서가 남아 있다** —
+   * 범위를 쓰기 전에 이 플래그를 먼저 판정할 것.
+   */
+  noExam: boolean;
 }
 
 /** public.curriculum_textbooks 행 (원본은 이 앱의 exam.publishers/major_chapters 마스터에서 동기화) */
@@ -53,3 +59,16 @@ export const EXAM_SLOT_OPTIONS: ExamSlotOption[] = [
   { key: '2-중간', semester: 2, examType: '중간', label: '2학기 중간고사' },
   { key: '2-기말', semester: 2, examType: '기말', label: '2학기 기말고사' },
 ];
+
+/** 자유학기제로 1학기 시험이 없는 학년 */
+export const FREE_SEMESTER_GRADE = '중1';
+
+/**
+ * 그 학년에서 고를 수 있는 시험 목록. 중1 은 자유학기제라 1학기 중간·기말이 없다.
+ * ⚠️ ara-system app/lib/examScope.ts 의 `isSlotHiddenForGrade` 와 **같은 규칙의 교차 저장소 복제**다
+ * (두 앱이 코드를 공유하지 않는다). 바꿀 땐 반드시 양쪽 함께 고칠 것.
+ */
+export const slotOptionsForGrade = (grade: string): ExamSlotOption[] =>
+  grade === FREE_SEMESTER_GRADE
+    ? EXAM_SLOT_OPTIONS.filter((o) => o.semester !== 1)
+    : EXAM_SLOT_OPTIONS;

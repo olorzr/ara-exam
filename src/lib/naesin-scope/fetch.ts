@@ -32,7 +32,7 @@ export async function fetchScopeSlot(
 ): Promise<ScopeSlotRow | null> {
   const { data, error } = await publicDb()
     .from('school_exam_scopes')
-    .select('scope, teacher_name, textbook_id, units, exam_start_date, exam_end_date, korean_exam_date')
+    .select('scope, teacher_name, textbook_id, units, exam_start_date, exam_end_date, korean_exam_date, no_exam')
     .eq('school_id', schoolId)
     .eq('grade', grade)
     .eq('year', year)
@@ -41,7 +41,9 @@ export async function fetchScopeSlot(
     .maybeSingle();
   if (error) throw error;
   if (!data) return null;
-  return { ...data, units: normalizeUnits(data.units) } as ScopeSlotRow;
+  // no_exam(ara-system mig379) 은 스네이크 → 카멜로 옮겨 담는다. 값이 없는 옛 행은 false.
+  const { no_exam: noExam, ...rest } = data as Record<string, unknown>;
+  return { ...rest, units: normalizeUnits(data.units), noExam: noExam === true } as ScopeSlotRow;
 }
 
 /** 교과서 단건 (출판사·학년 — 카테고리 매칭 키). 없으면 null */

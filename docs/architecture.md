@@ -14,6 +14,7 @@ src/
 │   ├── (auth)/login/        # 인증 관련 페이지
 │   └── (main)/              # 인증 필요 페이지 (레이아웃에서 가드)
 │       ├── dashboard/       # 대시보드
+│       ├── categories/      # 카테고리 관리 (최상위 메뉴 — 출판사·대단원·소단원 마스터)
 │       ├── words/           # 단어 관리
 │       │   └── new/         # 단어 입력 (직접/CSV)
 │       └── exam/            # 시험 관련
@@ -66,6 +67,8 @@ src/
 - 의존: `lib/supabase-public`(`publicDb()` — `supabase.schema('public')` 체이닝, **쓰기 금지**), `types`
 - 주요 파일: `src/lib/naesin-scope/{types,fetch,match}.ts`, `src/lib/supabase-public.ts`, `src/components/exam/NaesinScopeLoader.tsx`
 - 매칭 규칙: 단원 키("대단원" | "대단원 > 소단원") ↔ `exam.categories.chapter/sub_chapter` 텍스트 매칭(공백 정규화, 출판사는 공백 전제거 비교, 학기 필터). 미매칭 단원은 unmatchedUnits 로 반환해 UI 에 반드시 표면화
+- `noExam`(ara-system `school_exam_scopes.no_exam`, mig379): 그 학교가 안 보는 시험. **true 여도 범위·교과서가 남아 있다**(ara-system 이 값 보존·잠금 방식) → 범위를 쓰기 전에 이 플래그를 먼저 판정하고 UI 는 안내만 표시
+- `slotOptionsForGrade`: 중1 은 자유학기제라 1학기 시험 선택지를 뺀다. **ara-system `app/lib/examScope.ts` 의 `isSlotHiddenForGrade` 와 같은 규칙의 교차 저장소 복제** — 바꿀 땐 양쪽 함께(`src/lib/naesin-scope/types.test.ts` 가 규칙 고정)
 
 ## 데이터 흐름
 1. 사용자 로그인 → Supabase Auth → AuthContext에 세션 저장

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.7] - 2026-08-15
+### Changed
+- **카테고리 관리를 최상위 메뉴로 분리** — 단어 관리 하위(`/words/categories`)에 숨어 있던 것을 `/categories` 로 올리고 헤더 내비게이션(`📂 카테고리 관리`)·대시보드 빠른 실행에 추가. 여기서 만든 출판사·대단원·소단원이 ara-system 내신 관리의 교과서 목차가 되므로 진입 경로를 드러냈다. 옛 경로는 `next.config.ts` 의 `redirects()` 로 이어준다(북마크 보호, permanent:false)
+### Added
+- **내신 시험범위 불러오기 — '시험 안 봄' 인지**: ara-system 이 슬롯 단위로 표시한 `no_exam`(mig379)을 읽어 "이 학교는 이 시험을 보지 않아요"로 안내하고 자동 선택을 막는다. ara-system 은 값 보존·잠금 방식이라 true 여도 범위·교과서가 남아 있으므로 **읽는 쪽이 먼저 판정해야 한다** ([fetch.ts](src/lib/naesin-scope/fetch.ts), [NaesinScopeLoader.tsx](src/components/exam/NaesinScopeLoader.tsx))
+- **중1 자유학기제**: 중1 은 1학기 중간·기말이 없으므로 시험 선택지에서 제외(`slotOptionsForGrade`). 학년을 바꿔 선택이 무효가 되면 자동으로 비운다. ⚠️ ara-system `isSlotHiddenForGrade` 와 같은 규칙의 교차 저장소 복제라 바꿀 땐 양쪽 함께 ([types.ts](src/lib/naesin-scope/types.ts) + 테스트)
+
 ## [0.1.6] - 2026-07-17
 ### Added
 - 학원 관리 시스템(ara-system) 성적 자동 등록 연동 — 시험 생성/재시험 직후 서버 라우트 [src/app/api/sync-to-grades/route.ts](src/app/api/sync-to-grades/route.ts) 가 `exams`+`exam_words` 스냅샷을 읽어 ara-system 인증 엔드포인트(`/api/integrations/vocab-exam`)로 전송 → 어휘 시리즈 회차로 멱등 등록됨(성적목록·어휘 대시보드 자동 노출). 채점은 ara-system 에서 그대로 ([exam/create/page.tsx](src/app/(main)/exam/create/page.tsx), [useExamHistory.ts](src/hooks/useExamHistory.ts))
