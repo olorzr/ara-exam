@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { isAllowedEmailDomain } from '@/lib/constants';
+import { isAllowedEmailDomain, EXTERNAL_LEVEL } from '@/lib/constants';
 import { levelGradeToDivision } from '@/lib/grade-division';
 
 /**
@@ -11,6 +11,15 @@ import { levelGradeToDivision } from '@/lib/grade-division';
  * ara-system 은 개념지 1개당 채점 회차 1개를 '개념시험 > 교과서 > 학년+학기' 폴더에 멱등 등록한다
  * (초성/글자수/빈칸은 인쇄물 구분일 뿐이라 회차를 나누지 않는다). 폴더 라우팅을 위해
  * publisher/grade/semester 와 단원 기반 표시명(unitTitle)을 함께 보낸다.
+ *
+ * 외부지문 및 프린트는 출판사·학기가 없으므로 **publisher 슬롯에 학교명을 보낸다** —
+ * 안 보내면 학교가 무엇이든 전부 '기타' 그룹 한 곳에 뭉친다. 수신부 RPC
+ * (ara-system register_concept_exam, mig257)에서 publisher 는 그룹 폴더명,
+ * grade+semester 는 시리즈 폴더명으로 쓰이는 **표시용 문자열**이고 학교급 라우팅은
+ * 별도 division 이 담당하므로 슬롯을 이렇게 재사용해도 안전하다. 년도는 시리즈에 넣지
+ * 않는다 — ara-system 이 회차 라벨(YY-NN)을 연도별로 다시 세므로(mig343) 교과서
+ * 시리즈도 년도 없이 해마다 재사용한다.
+ *
  * 실패해도 throw 하지 않는다(저장 UX 방해 금지). 공유 시크릿은 서버 env 에만 둔다.
  */
 
@@ -52,7 +61,7 @@ export async function POST(request: NextRequest) {
   try {
     const { data: sheet, error: sheetErr } = await supabaseAdmin
       .from('concept_sheets')
-      .select('id, title, level, grade, publisher, semester, unit, subunit, marks')
+      .select('id, title, level, grade, publisher, semester, unit, subunit, school_name, marks')
       .eq('id', conceptSheetId)
       .maybeSingle();
     if (sheetErr || !sheet) {
@@ -77,11 +86,16 @@ export async function POST(request: NextRequest) {
       .filter(Boolean)
       .join(' ');
 
+    // 그룹 폴더: 중등/고등은 출판사, 외부지문은 학교명 (위 JSDoc 참조)
+    const groupName = sheet.level === EXTERNAL_LEVEL
+      ? sheet.school_name ?? ''
+      : sheet.publisher ?? '';
+
     const payload = {
       sourceExamId: sheet.id,
       title: sheet.title || '개념',
       ...(division ? { division } : {}),
-      publisher: sheet.publisher ?? '',
+      publisher: groupName,
       grade: sheet.grade ?? '',
       semester: sheet.semester ?? '',
       ...(unitTitle ? { unitTitle } : {}),

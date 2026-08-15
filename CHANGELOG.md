@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.10] - 2026-08-16
+### Fixed
+- **외부지문 개념지가 ara-system 성적의 '기타' 폴더로 뭉치던 문제** — 외부지문은 출판사가 빈 값이라 학교가 무엇이든 한 폴더에 쌓였다. 이제 학교명을 그룹 폴더로 보내 `개념 시험 > 학교명 > 학년` 으로 정리된다 ([sync-concept-to-grades](src/app/api/sync-concept-to-grades/route.ts))
+
+### Removed
+- 폐기된 교육과정 export 라우트(`src/app/api/export/curriculum`) 삭제. Supabase 프로젝트 통합 후 ara-system 이 같은 DB 의 `exam` 스키마를 직접 읽으므로(HTTP pull 폐기) 호출되지 않는 죽은 코드였다
+
+### Changed
+- `package.json` 프로젝트명을 `ara-word` → `ara-exam` 으로 정정
+
 ## [0.1.9] - 2026-08-15
 ### Added
 - **외부지문 및 프린트에 년도·학년** — 카테고리 계층이 `학교 > 프린트` → **`학교 > 년도 > 학년 > 프린트/작품명`** 이 됐다. 같은 이름의 프린트를 학년도별로 따로 둘 수 있다. 카테고리 관리·단어 등록 양쪽에서 년도/학년을 고른다 ([ExternalCategoryTab.tsx](src/components/words/ExternalCategoryTab.tsx), [CategoryForm.tsx](src/components/words/CategoryForm.tsx), [category-tree.ts](src/lib/category-tree.ts))
