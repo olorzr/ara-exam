@@ -1,0 +1,232 @@
+/* =========================================================
+   A4 낱장 인쇄 엔진 (시험지 · 답안지 · 단어장 · 개념지 공용)
+
+   낱장의 폭/높이/여백은 A4Sheet 가 src/lib/print/constants.ts 값으로 직접 지정한다.
+   여기에 숫자를 다시 적으면 측정값과 조용히 어긋나므로 크기는 이 파일에서 건드리지 말 것.
+
+   ⚠️ table + thead/tfoot 자동 반복 방식으로 되돌리지 말 것 —
+      tfoot 은 '페이지 하단'이 아니라 '내용이 끝나는 자리'에 붙어서
+      마지막 페이지 푸터가 중간에 뜬다(과거 5회 이상 재발). position:fixed 푸터도 실패 이력.
+   ========================================================= */
+
+/* 화면에서 낱장이 종이처럼 보이도록 깔아 주는 회색 바탕 (인쇄에서는 사라진다) */
+.a4-page-bg {
+  background: #f3f4f6;
+  padding: 24px 0;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+/* 화면: 회색 배경 위에 낱장이 쌓인 모습 */
+.a4-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.a4-sheet {
+  box-sizing: border-box;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+@media screen {
+  .a4-sheet {
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.1);
+    border-radius: 4px;
+  }
+}
+
+/* 측정 실패 폴백 — 페이지를 못 나눠도 내용이 잘리지 않게 한 장을 늘린다 */
+.a4-sheet--auto {
+  height: auto !important;
+  min-height: 400px;
+}
+.a4-sheet--auto .a4-sheet__body {
+  overflow: visible;
+}
+
+.a4-sheet__header {
+  flex: none;
+}
+
+/* 본문이 남은 높이를 전부 먹으므로 푸터는 언제나 바닥에 붙는다 */
+.a4-sheet__body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+}
+
+/* 컬럼은 본문 높이만큼 늘어난다 (% 높이는 Safari 에서 불안정해 flex 로 늘린다) */
+.a4-cols {
+  flex: 1;
+  display: flex;
+  gap: 24px;
+  min-height: 0;
+}
+
+/* 컬럼 자체는 일반 블록 흐름 — 측정 컨테이너와 같은 방식으로 블록이 쌓여야
+   실측 높이와 실제 높이가 어긋나지 않는다. 높이는 flex 부모가 늘려 준다(align-items: stretch) */
+.a4-col {
+  flex: none;
+  min-width: 0;
+}
+
+/* 컬럼 구분선 — 레이아웃 폭을 먹지 않도록 가상 요소로 그린다(측정 폭과 어긋나면 줄바꿈이 달라진다) */
+.a4-col--divided {
+  position: relative;
+}
+.a4-col--divided::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid #e5e7eb;
+}
+
+.a4-col__header {
+  flex: none;
+}
+
+/* 블록 래퍼 — flow-root 라 자식 마진이 빠져나가지 않아 측정 높이와 실제 높이가 같다 */
+.a4-block {
+  display: flow-root;
+}
+.a4-block--scaled {
+  transform-origin: top center;
+}
+
+/* 푸터 — 가운데 로고+학원명, 오른쪽 페이지 번호 */
+.a4-footer {
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 8px;
+  font-size: 9px;
+  color: #aaa;
+  letter-spacing: 2px;
+}
+.a4-footer__brand {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.a4-footer__page {
+  grid-column: 3;
+  justify-self: end;
+  letter-spacing: 1px;
+  color: #bbb;
+}
+
+/* 2페이지 이후 반복 헤더 */
+.a4-compact-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 6px;
+  margin-bottom: 12px;
+  border-bottom: 1.5px solid #b8ede8;
+}
+.a4-compact-header--pink {
+  border-bottom-color: #f5c6d8;
+}
+.a4-compact-header__title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #4b5563;
+}
+
+/* 측정 전용 컨테이너 — display:none 이면 높이를 못 재므로 visibility 로 숨긴다 */
+.a4-measure {
+  position: absolute;
+  left: -10000px;
+  top: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* 표를 행 단위로 쪼갠 조각 — 이어진 조각의 테두리가 겹쳐 두 줄로 보이지 않게 당긴다 */
+.a4-block + .a4-block > .sheet-table-chunk {
+  margin-top: -1px;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+  }
+  main > div,
+  .min-h-screen {
+    min-height: 0 !important;
+    height: auto !important;
+  }
+
+  header,
+  nav,
+  .no-print,
+  [data-no-print] {
+    display: none !important;
+  }
+
+  /* 인쇄 대화상자에서 측정이 돌더라도 0 높이를 읽지 않도록 훅이 방어한다 */
+  .a4-measure {
+    display: none !important;
+  }
+
+  .a4-page-bg {
+    background: none !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+  }
+
+  .a4-stack {
+    display: block !important;
+    gap: 0 !important;
+  }
+
+  /* 낱장 하나 = A4 한 장. 크기는 화면과 같은 px 를 그대로 쓴다 */
+  .a4-sheet {
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    break-after: page;
+    page-break-after: always;
+  }
+  /* 마지막 낱장 뒤에 페이지를 넘기면 빈 장이 딸려 나온다 (React 가 클래스를 붙인다) */
+  .a4-sheet--last {
+    break-after: auto;
+    page-break-after: auto;
+  }
+}

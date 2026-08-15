@@ -154,7 +154,7 @@ function ExamViewContent() {
       </div>
 
       {/* 인쇄 영역 */}
-      <div className="print-area">
+      <div className="a4-page-bg">
         {viewMode === 'wordbook' && (
           <WordBookView
             sourceText={categories.map(c => formatCategoryLabel(c, { excludePublisher: true })).join(', ')}

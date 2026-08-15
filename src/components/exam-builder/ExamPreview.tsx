@@ -71,18 +71,20 @@ export default function ExamPreview({
 
   const renderSheets = () => {
     if (activeTab === 'all') {
-      return (['concept', 'stage1', 'stage2', 'stage3', 'answer'] as const).map((key, i) => {
+      const keys = ['concept', 'stage1', 'stage2', 'stage3', 'answer'] as const;
+      return keys.map((key, i) => {
         const cfg = { ...SHEET_CONFIGS[key] };
         if (key === 'concept') cfg.mode = 'concept';
         return (
-          <div key={key} className={i > 0 ? 'mt-8' : ''}>
-            <ExamSheetRenderer
-              editorHTML={editorHTML}
-              config={cfg}
-              category={category}
-              markCount={markCount}
-            />
-          </div>
+          <ExamSheetRenderer
+            key={key}
+            editorHTML={editorHTML}
+            config={cfg}
+            category={category}
+            markCount={markCount}
+            // 마지막 시트를 뺀 나머지는 뒤에서 페이지를 넘겨 시트마다 새 장에서 시작하게 한다
+            breakAfterLast={i < keys.length - 1}
+          />
         );
       });
     }
@@ -126,7 +128,7 @@ export default function ExamPreview({
         onClick={handleConceptClick}
         onMouseUp={handlePreviewMouseUp}
       >
-        <div>{renderSheets()}</div>
+        <div className="flex flex-col items-center gap-4">{renderSheets()}</div>
       </div>
 
       {/* 하단 액션 바 */}

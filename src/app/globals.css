@@ -3,6 +3,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "../styles/print-a4.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -132,30 +133,10 @@
   }
 }
 
-/* ========================================= */
-/* A4 인쇄 전용 스타일 (단어장/시험지/답안지) */
-/* ========================================= */
-
-/* 인쇄 래퍼 — 화면에서는 A4 너비, 인쇄 시 브라우저가 자동 페이지 분할 */
-.exam-print-wrap {
-  width: 210mm;
-  margin: 0 auto;
-  background: white;
-}
-
-/* 시험지 문제 영역 — CSS columns로 자동 2단 */
-.exam-q-grid--dual {
-  columns: 2;
-  column-gap: 24px;
-  column-rule: 1px solid #e5e7eb;
-}
-.exam-q-grid--single {
-  columns: 1;
-}
-.exam-q-item {
-  break-inside: avoid;
-}
-
+/* =============================================================== */
+/* A4 인쇄 문서 스타일 (단어장/시험지/답안지/개념지)                   */
+/* 페이지 분할·헤더·푸터는 src/styles/print-a4.css 의 낱장 엔진이 맡는다 */
+/* =============================================================== */
 
 /* UNIT 배지 */
 .unit-badge {
@@ -215,7 +196,8 @@
   padding: 6px 6px;
   border-radius: 4px;
 }
-.q-row:nth-child(even) { background: #F0FAF9; }
+/* 줄무늬는 문항 인덱스로 지정한다 — 페이지가 갈려도 무늬가 이어진다 */
+.q-row--band { background: #F0FAF9; }
 .q-num {
   font-size: 11px;
   font-weight: 800;
@@ -243,18 +225,13 @@
   border-bottom: 1.5px dashed #bbb;
 }
 
-/* 객관식 시험지 — 2단 레이아웃 */
-.mc-q-grid {
-  columns: 2;
-  column-gap: 20px;
-  column-rule: 1px solid #e5e7eb;
-}
+/* 객관식 시험지 문항 */
 .mc-q-item {
   break-inside: avoid;
   padding: 5px 4px;
   border-radius: 4px;
 }
-.mc-q-item:nth-child(even) { background: #F0FAF9; }
+.mc-q-item--band { background: #F0FAF9; }
 .mc-q-header {
   display: flex;
   align-items: baseline;
@@ -279,14 +256,14 @@
   white-space: nowrap;
 }
 
-/* 객관식 답안지 — 5열 그리드 */
+/* 객관식 답안지 — 5문항이 한 줄(= 페이지네이션 블록 하나) */
 .mc-answer-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px 16px;
+  gap: 0 16px;
   width: 100%;
   max-width: 520px;
-  margin: 20px auto 0;
+  margin: 0 auto 10px;
 }
 .mc-answer-item {
   display: flex;
@@ -296,11 +273,8 @@
   border-radius: 6px;
   min-height: 34px;
 }
-.mc-answer-item:nth-child(10n+1),
-.mc-answer-item:nth-child(10n+2),
-.mc-answer-item:nth-child(10n+3),
-.mc-answer-item:nth-child(10n+4),
-.mc-answer-item:nth-child(10n+5) { background: #F0FAF9; }
+/* 줄무늬는 줄 인덱스로 지정한다 — 페이지가 갈려도 무늬가 이어진다 */
+.mc-answer-grid--band .mc-answer-item { background: #F0FAF9; }
 .mc-answer-num {
   font-size: 14px;
   font-weight: 800;
@@ -315,16 +289,6 @@
   font-weight: 700;
   color: #222;
   line-height: 1;
-}
-
-/* 단어장 2단 레이아웃 (flexbox 수동 분할) */
-.wb-grid--dual {
-  display: flex;
-  gap: 24px;
-}
-.wb-grid--dual > .wb-col {
-  flex: 1;
-  min-width: 0;
 }
 
 /* 단어장 테이블 */
@@ -353,8 +317,10 @@
   border: 1px solid #FCE8EF;
   border-top: none;
 }
-.wb-row--last { border-radius: 0 0 8px 8px; }
-.wb-row:nth-child(even) { background: #FFF8FA; }
+/* 줄무늬는 단어 인덱스로 지정한다 — 페이지가 갈려도 무늬가 이어진다 */
+.wb-row--band { background: #FFF8FA; }
+/* 컬럼 마지막 줄만 아래 모서리를 둥글게 (블록 래퍼는 페이지네이션 엔진이 만든다) */
+.a4-col > .a4-block:last-child .wb-row { border-radius: 0 0 8px 8px; }
 .wb-row__num {
   width: 24px;
   text-align: center;
@@ -385,94 +351,12 @@
   border-radius: 3px;
 }
 
-.exam-footer__source {
-  font-size: 8px;
-  color: #999;
-  letter-spacing: 0.5px;
-  margin-bottom: 4px;
-  line-height: 1.4;
-}
-
 /* 점수 박스 */
 .exam-score-box {
   display: inline-flex;
   align-items: baseline;
   gap: 2px;
   font-size: 12px;
-}
-
-/* 인쇄용 테이블 레이아웃 */
-.exam-print-table {
-  width: 210mm;
-  border-collapse: collapse;
-}
-
-/* 공통 푸터 — 화면 + 인쇄 공용 */
-.exam-print-footer {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border-top: 1px solid #e5e7eb;
-  padding: 8px 0;
-  font-size: 9px;
-  color: #aaa;
-  letter-spacing: 2px;
-}
-
-/* 상단 여백 스페이서 — 화면에서는 숨김, 인쇄 시 매 페이지 상단 반복 */
-.exam-print-header-spacer {
-  height: 0;
-}
-
-/* 인쇄 미디어 쿼리 */
-@media print {
-  @page { size: A4; margin: 15mm; }
-  body { background: white !important; }
-  .no-print, [data-no-print] { display: none !important; }
-  header, nav { display: none !important; }
-
-  /* 레이아웃 래퍼 — 인쇄 시 패딩/마진/높이 제약 완전 해제 */
-  html, body {
-    height: auto !important;
-    min-height: 0 !important;
-  }
-  main {
-    padding: 0 !important;
-    max-width: none !important;
-    margin: 0 !important;
-  }
-  main > div, /* min-h-screen wrapper */
-  .min-h-screen {
-    min-height: 0 !important;
-    height: auto !important;
-  }
-
-  .exam-print-table {
-    width: 100%;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-
-  /* thead가 매 페이지 상단에 자동 반복 — 2페이지 이후 상단 여백 확보 */
-  .exam-print-table thead {
-    display: table-header-group;
-  }
-  .exam-print-header-spacer {
-    height: 13mm;
-  }
-
-  /* tfoot이 매 페이지 하단에 자동 반복 — 콘텐츠 겹침 없음 */
-  .exam-print-table tfoot {
-    display: table-footer-group;
-  }
-}
-
-@media screen {
-  .exam-print-table {
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-    border-radius: 4px;
-  }
 }
 
 /* ========================================= */
@@ -543,7 +427,7 @@
   cursor: pointer;
 }
 
-/* 개념지 시트 테이블 — table + tfoot으로 A4 자동 페이지 넘김 */
+/* 개념지 시트 타이포그래피 (A4 낱장에 스코프로 붙는다) */
 .eb-sheet-table {
   font-size: 10pt;
   line-height: 1.7;
@@ -566,36 +450,15 @@
   font-size: 10pt;
 }
 .eb-sheet-table .sheet-body th { background: #F3F4F6; font-weight: 600; }
-.eb-sheet-table .sheet-body tr:nth-child(even) td { background: #FAFBFC; }
+/* 줄무늬는 원본 행 인덱스로 지정한다 — 표를 조각내도 nth-child 처럼 리셋되지 않는다 */
+.eb-sheet-table .sheet-body tr[data-row-even] td { background: #FAFBFC; }
 /* 셀별 인라인 스타일 우선순위 보장 (미리보기/인쇄) */
 .eb-sheet-table .sheet-body td[data-bg-color],
 .eb-sheet-table .sheet-body th[data-bg-color] { background: none; }
-.eb-sheet-table .sheet-body tr:nth-child(even) td[data-bg-color] { background: none; }
+.eb-sheet-table .sheet-body tr[data-row-even] td[data-bg-color] { background: none; }
 
-/* 개념지 본문 — 페이지 넘김 시 요소 분리 방지 */
-.sheet-body p,
-.sheet-body h3,
-.sheet-body h4,
-.sheet-body li {
-  break-inside: avoid;
-}
-.sheet-body tr {
-  break-inside: avoid;
-}
-.sheet-body h3,
-.sheet-body h4 {
-  break-after: avoid;
-}
-
-/* 개념지 본문 2단 레이아웃 */
-.sheet-body--dual {
-  columns: 2;
-  column-gap: 20px;
-  column-rule: 1px solid #e5e7eb;
-}
-.sheet-body--dual > * {
-  break-inside: avoid;
-}
+/* 블록 단위로 페이지를 배정하므로 본문 요소가 페이지 경계에 걸리지 않는다.
+   (break-* 규칙은 브라우저 자동 분할 시절의 잔재라 더 이상 필요 없다) */
 
 /* 개념지 하이라이트 */
 .eb-concept-highlight {
@@ -678,42 +541,14 @@
   text-underline-offset: 2px;
 }
 
-/* 전체 PDF 다운로드 시 개별 페이지 스타일 */
-.eb-sheet-pdf-page {
-  width: 210mm;
-  padding: 15mm;
-  font-size: 10pt;
-  line-height: 1.7;
-}
-.eb-sheet-pdf-page h3 { font-size: 12pt; font-weight: 700; margin: 10pt 0 5pt; }
-.eb-sheet-pdf-page h4 { font-size: 10pt; font-weight: 600; margin: 8pt 0 4pt; }
-.eb-sheet-pdf-page p { margin: 3pt 0; }
-.eb-sheet-pdf-page table { border-collapse: collapse; width: 100%; margin: 8pt 0; }
-.eb-sheet-pdf-page th, .eb-sheet-pdf-page td {
-  border: 1px solid #D1D5DB; padding: 5pt 8pt; text-align: left; vertical-align: top; font-size: 10pt;
-}
-.eb-sheet-pdf-page th { background: #F3F4F6; font-weight: 600; }
-.eb-sheet-pdf-page td[data-bg-color],
-.eb-sheet-pdf-page th[data-bg-color] { background: none; }
-
 /* 개념지 미리보기 드래그 선택 */
 .eb-concept-interactive ::selection {
   background: #B8EDE8;
 }
 
-/* 빌더 인쇄 — A4 최적화 */
+/* 빌더 인쇄 — 미리보기 래퍼의 화면용 높이/스크롤 제약을 해제해
+   낱장들이 잘리지 않고 그대로 인쇄되게 한다 */
 @media print {
-  .eb-section-break { page-break-before: always; }
-
-  /* 2단 레이아웃 — 인쇄 시 순차 채움 (페이지 경계에서 안정적) */
-  .sheet-body--dual { column-fill: auto; }
-
-  /* 빈 블록 안전망 — JS 에서 놓친 trailing 빈 요소를 숨겨 빈 페이지 방지 */
-  .sheet-body p:empty,
-  .eb-sheet-pdf-page p:empty { display: none !important; }
-  .sheet-body > :last-child { margin-bottom: 0 !important; }
-
-  /* 개념지 미리보기 — 인쇄 시 래퍼 div 제약 완전 해제 (테이블 제외) */
   .eb-preview-wrap {
     height: auto !important;
     margin: 0 !important;
@@ -736,5 +571,6 @@
   }
   .eb-preview-area > div {
     display: block !important;
+    gap: 0 !important;
   }
 }

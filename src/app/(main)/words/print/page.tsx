@@ -88,7 +88,7 @@ function WordsPrintContent() {
       </div>
 
       {/* 인쇄 영역 */}
-      <div className="print-area">
+      <div className="a4-page-bg">
         <WordBookView
           sourceText={formatCategoryLabel(category, { excludePublisher: true })}
           words={words}

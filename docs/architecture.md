@@ -62,6 +62,20 @@ src/
 - 의존: 없음
 - 주요 파일: `src/types/index.ts`
 
+### print (A4 낱장 인쇄 엔진 — 시험지·답안지·단어장·개념지 공용)
+- 역할: 인쇄 문서를 **고정 크기 A4 낱장 여러 장**으로 나눠 그린다. 블록 높이를 실측해 페이지·컬럼에 배정하므로 헤더/푸터가 매 페이지 제자리에 오고, 화면 미리보기와 인쇄물이 1:1로 일치한다
+- 의존: 없음(순수 계산 + DOM 측정). 문서 컴포넌트들이 이 엔진을 소비한다
+- 주요 파일:
+  - `src/lib/print/constants.ts` — A4 96dpi px 상수(210mm=793.7px), 여백, 컬럼 폭. **크기의 단일 출처**
+  - `src/lib/print/paginate.ts` — 순수 그리디 배치(블록 순서 보존, 좌→우 컬럼 채움)
+  - `src/lib/print/split-html-blocks.ts` — 개념지 HTML → 블록 분해, 긴 표의 행 단위 재분할
+  - `src/hooks/useA4Pagination.ts` — 숨김 컨테이너 실측 + 재측정(fonts.ready / ResizeObserver / img load / beforeprint)
+  - `src/hooks/useConceptSheetBlocks.ts` — 개념지 블록 상태 + 초과 표 재분할(최대 2패스)
+  - `src/components/print/{A4Document,A4Sheet,CompactPageHeader}.tsx` — 측정 컨테이너 + 낱장 렌더
+  - `src/styles/print-a4.css` — 낱장·푸터·페이지 브레이크 CSS (globals.css 에서 @import)
+- 소비자: `components/exam/{ExamPaperView,MultipleChoiceView,MultipleChoiceAnswerView,WordBookView}.tsx`, `components/exam-builder/ExamSheetRenderer.tsx`
+- 블록 단위: 시험지=문항 1개, 객관식 답안지=5문항 1줄, 단어장=단어 1줄, 개념지=본문 HTML 최상위 요소 1개
+
 ### lib/naesin-scope (ara-system 내신 관리 연동, 읽기 전용)
 - 역할: ara-system 수업 > 내신 관리가 저장한 내신 시험범위(`public.school_exam_scopes`)를 읽어, 시험지 생성 시 해당 범위의 단어 카테고리를 자동 선택
 - 의존: `lib/supabase-public`(`publicDb()` — `supabase.schema('public')` 체이닝, **쓰기 금지**), `types`
@@ -74,7 +88,7 @@ src/
 1. 사용자 로그인 → Supabase Auth → AuthContext에 세션 저장
 2. 단어 입력 → categories + words 테이블에 저장 (RLS로 사용자별 격리)
 3. 시험지 생성 → 선택된 단어를 exam_words에 스냅샷 저장 → exams 테이블에 메타 저장
-4. 시험지 보기 → exam_words에서 스냅샷 로드 → A4 레이아웃 렌더링 → 인쇄
+4. 시험지 보기 → exam_words에서 스냅샷 로드 → 문항 블록 실측 → A4 낱장 배치(`lib/print`) → 인쇄
 
 ## concept_sheets HTML 파이프라인
 - 입력 (저장): TipTap `editor.getHTML()` → `sanitizeConceptHTML` → supabase insert/update (`src/app/(main)/exam/builder/[id]/page.tsx` handleSave)

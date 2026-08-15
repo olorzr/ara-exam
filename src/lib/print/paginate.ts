@@ -1,0 +1,114 @@
+import { CAPACITY_SAFETY_PX } from './constants';
+
+/** 한 페이지의 컬럼별 블록 인덱스 배치 */
+export interface PagePlan {
+  /** columns[c] = c 번 컬럼에 들어갈 블록 인덱스들 (원본 순서 유지) */
+  columns: number[][];
+}
+
+export interface PaginateInput {
+  /** 블록별 실측 높이(px). 순서 = 문서상 순서 */
+  blockHeights: number[];
+  columns: 1 | 2;
+  /** 1페이지 본문 영역 높이 (전체 헤더가 커서 보통 더 작다) */
+  firstPageBodyHeight: number;
+  /** 2페이지 이후 본문 영역 높이 (컴팩트 헤더 기준) */
+  laterPageBodyHeight: number;
+  /** 매 페이지·매 컬럼 상단에 반복되는 헤더 높이 (단어장 컬럼 헤더 등) */
+  columnHeaderHeight?: number;
+}
+
+export interface PaginateResult {
+  pages: PagePlan[];
+  /** 한 페이지에도 통째로 안 들어가 축소 배치한 블록 인덱스 */
+  oversized: number[];
+}
+
+/**
+ * 실측 높이를 받아 블록들을 페이지·컬럼에 그리디로 채운다.
+ *
+ * 블록 순서는 절대 재배열하지 않는다 — 문항 번호와 답안지 매핑이 어긋난다.
+ * 채움 순서는 페이지 안에서 좌 → 우 컬럼, 그다음 새 페이지.
+ */
+export function paginate({
+  blockHeights,
+  columns,
+  firstPageBodyHeight,
+  laterPageBodyHeight,
+  columnHeaderHeight = 0,
+}: PaginateInput): PaginateResult {
+  const pages: PagePlan[] = [];
+  const oversized: number[] = [];
+  if (blockHeights.length === 0) return { pages, oversized };
+
+  const capFirst = Math.max(0, firstPageBodyHeight - columnHeaderHeight - CAPACITY_SAFETY_PX);
+  const capLater = Math.max(0, laterPageBodyHeight - columnHeaderHeight - CAPACITY_SAFETY_PX);
+
+  let colIdx = 0;
+  let remaining = 0;
+
+  const capOfCurrentPage = () => (pages.length <= 1 ? capFirst : capLater);
+  const currentPage = () => pages[pages.length - 1];
+  const pageHasContent = () => {
+    const page = currentPage();
+    return Boolean(page) && page.columns.some((col) => col.length > 0);
+  };
+  const openPage = () => {
+    pages.push({ columns: Array.from({ length: columns }, () => [] as number[]) });
+    colIdx = 0;
+    remaining = capOfCurrentPage();
+  };
+  const commit = (index: number, height: number) => {
+    currentPage().columns[colIdx].push(index);
+    remaining -= height;
+  };
+
+  openPage();
+
+  for (let i = 0; i < blockHeights.length; i++) {
+    const height = blockHeights[i];
+
+    if (height <= remaining) {
+      commit(i, height);
+      continue;
+    }
+
+    // 같은 페이지의 다음 컬럼들을 먼저 시도
+    let placed = false;
+    while (colIdx < columns - 1) {
+      colIdx++;
+      remaining = capOfCurrentPage();
+      if (height <= remaining) {
+        commit(i, height);
+        placed = true;
+        break;
+      }
+    }
+    if (placed) continue;
+
+    // 새 페이지 — 단, 지금 페이지가 완전히 비어 있으면 빈 장이 생기므로 열지 않는다
+    if (pageHasContent()) {
+      openPage();
+      if (height <= remaining) {
+        commit(i, height);
+        continue;
+      }
+    }
+
+    // 빈 페이지 한 장에도 안 들어가는 블록 → 단독 배치하고 렌더 단계에서 축소한다
+    oversized.push(i);
+    commit(i, height);
+    remaining = -1;
+    colIdx = columns - 1; // 다음 블록은 반드시 새 페이지에서 시작
+  }
+
+  return { pages, oversized };
+}
+
+/** 페이지네이션 결과에서 블록이 배치된 페이지 번호(0-based)를 찾는다. 없으면 -1 */
+export function findBlockPage(pages: PagePlan[], blockIndex: number): number {
+  for (let p = 0; p < pages.length; p++) {
+    if (pages[p].columns.some((col) => col.includes(blockIndex))) return p;
+  }
+  return -1;
+}
