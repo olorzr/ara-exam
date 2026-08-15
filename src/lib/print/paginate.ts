@@ -95,7 +95,9 @@ export function paginate({
       }
     }
 
-    // 빈 페이지 한 장에도 안 들어가는 블록 → 단독 배치하고 렌더 단계에서 축소한다
+    // 빈 페이지 한 장에도 안 들어가는 블록 → 단독 배치하고 렌더 단계에서 축소한다.
+    // 페이지가 비어 있는데 컬럼만 넘어와 있으면 왼쪽 컬럼이 빈 채로 남으므로 되돌린다
+    if (!pageHasContent()) colIdx = 0;
     oversized.push(i);
     commit(i, height);
     remaining = -1;

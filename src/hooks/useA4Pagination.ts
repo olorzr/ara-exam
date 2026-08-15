@@ -102,18 +102,21 @@ export function useA4Pagination({ columns, onOversized }: UseA4PaginationArgs): 
       oversizedScale[index] = Math.min(1, capacity / height);
     });
 
+    // 더 잘게 쪼갤 수 있는 블록이면 호출부가 다시 나눠 준다 (개념지의 긴 표).
+    // 배치 결과가 그대로여도 콘텐츠가 바뀌었을 수 있으므로 아래 bail-out 보다 먼저 호출한다.
+    // (핸들러는 안정적인 참조여야 하고, 쪼갤 게 없으면 state 를 그대로 두어 루프가 없다)
+    if (oversized.length > 0) {
+      // 어느 페이지에 놓이든 맞아야 하므로 더 작은 쪽 용량을 기준으로 쪼갠다
+      const capacity =
+        Math.min(firstPageBodyHeight, laterPageBodyHeight) - columnHeaderHeight - CAPACITY_SAFETY_PX;
+      onOversized?.(oversized, root, capacity);
+    }
+
     const next: A4Layout = { pages, oversizedScale, ready: true };
     const signature = JSON.stringify(next);
     if (signature === signatureRef.current) return;
     signatureRef.current = signature;
     setLayout(next);
-
-    // 더 잘게 쪼갤 수 있는 블록이면 호출부가 다시 나눠 준다 (개념지의 긴 표).
-    // 핸들러는 안정적인 참조여야 한다 — 렌더마다 새로 만들면 측정이 매번 다시 붙는다.
-    if (oversized.length > 0) {
-      const capacity = laterPageBodyHeight - columnHeaderHeight - CAPACITY_SAFETY_PX;
-      onOversized?.(oversized, root, capacity);
-    }
   }, [columns, onOversized]);
 
   // 렌더마다 확인 — 블록이 바뀌면 paint 전에 배치가 갱신된다

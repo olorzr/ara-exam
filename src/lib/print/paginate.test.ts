@@ -102,6 +102,18 @@ describe('paginate', () => {
     expect(result.oversized).toEqual([0]);
   });
 
+  it('2단에서 큰 블록을 단독 배치할 때 왼쪽 컬럼을 비워 두지 않는다', () => {
+    const result = paginate({
+      blockHeights: [500, 30],
+      columns: 2,
+      firstPageBodyHeight: body(100),
+      laterPageBodyHeight: body(100),
+    });
+    expect(result.oversized).toEqual([0]);
+    expect(result.pages[0].columns).toEqual([[0], []]);
+    expect(result.pages[1].columns[0]).toEqual([1]);
+  });
+
   it('모든 블록이 정확히 한 번씩만 배치된다', () => {
     const heights = Array.from({ length: 137 }, (_, i) => 20 + (i % 7) * 5);
     const result = paginate({
