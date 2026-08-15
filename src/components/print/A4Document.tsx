@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useA4Pagination, type OversizedHandler, type RemeasureKey } from '@/hooks/useA4Pagination';
+import { useA4Pagination, type OversizedHandler } from '@/hooks/useA4Pagination';
 import { A4_WIDTH_PX, CONTENT_WIDTH, getColumnWidth } from '@/lib/print/constants';
 import A4Sheet, { A4Footer } from './A4Sheet';
 
@@ -18,7 +18,6 @@ interface A4DocumentProps {
   showPageNumber?: boolean;
   /** 마지막 낱장 뒤에도 페이지를 넘긴다 — '전체 출력'에서 시트 사이를 가를 때 */
   breakAfterLast?: boolean;
-  remeasureKey?: RemeasureKey;
   /** 한 페이지에 안 들어가는 블록을 더 잘게 쪼갤 수 있으면 여기서 받아 처리한다 */
   onOversized?: OversizedHandler;
   /** 타이포그래피 스코프 클래스 (측정 컨테이너와 낱장 양쪽에 붙는다) */
@@ -39,11 +38,10 @@ export default function A4Document({
   columnHeader,
   showPageNumber = true,
   breakAfterLast = false,
-  remeasureKey,
   onOversized,
   className = '',
 }: A4DocumentProps) {
-  const { measureRootRef, layout } = useA4Pagination({ columns, remeasureKey, onOversized });
+  const { measureRootRef, layout } = useA4Pagination({ columns, onOversized });
   const columnWidth = getColumnWidth(columns);
 
   const renderBlock = (index: number) => {
@@ -68,19 +66,21 @@ export default function A4Document({
         aria-hidden="true"
         style={{ width: A4_WIDTH_PX }}
       >
-        <div data-measure="first-header" style={{ width: CONTENT_WIDTH }}>
+        {/* a4-block(flow-root) 로 감싸야 실제 낱장(flex item)과 마진 처리가 같아진다.
+            일반 블록으로 재면 헤더 끝의 mb-* 가 상쇄돼 본문 용량을 그만큼 크게 잡는다 */}
+        <div data-measure="first-header" className="a4-block" style={{ width: CONTENT_WIDTH }}>
           {firstPageHeader}
         </div>
         {laterPageHeader ? (
-          <div data-measure="later-header" style={{ width: CONTENT_WIDTH }}>
+          <div data-measure="later-header" className="a4-block" style={{ width: CONTENT_WIDTH }}>
             {laterPageHeader}
           </div>
         ) : null}
-        <div data-measure="footer" style={{ width: CONTENT_WIDTH }}>
+        <div data-measure="footer" className="a4-block" style={{ width: CONTENT_WIDTH }}>
           <A4Footer page={1} total={1} showPageNumber={showPageNumber} />
         </div>
         {columnHeader ? (
-          <div data-measure="column-header" style={{ width: columnWidth }}>
+          <div data-measure="column-header" className="a4-block" style={{ width: columnWidth }}>
             {columnHeader}
           </div>
         ) : null}

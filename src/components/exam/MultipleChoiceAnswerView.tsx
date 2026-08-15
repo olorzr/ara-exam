@@ -50,7 +50,6 @@ export default function MultipleChoiceAnswerView({ exam, words, categories }: Mu
     <A4Document
       blocks={blocks}
       columns={1}
-      remeasureKey={`${exam.title}|${words.length}`}
       firstPageHeader={
         <ExamPrintHeader
           title={title}

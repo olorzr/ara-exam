@@ -53,7 +53,6 @@ export default function WordBookView({ sourceText, words }: WordBookViewProps) {
     <A4Document
       blocks={blocks}
       columns={useSingleCol ? 1 : 2}
-      remeasureKey={`${sourceText ?? ''}|${words.length}`}
       columnHeader={<WordHeader />}
       firstPageHeader={
         <>

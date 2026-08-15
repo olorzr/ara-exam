@@ -50,6 +50,16 @@ describe('splitTableByRows', () => {
     expect(chunks).toHaveLength(1);
   });
 
+  it('세로 병합(rowspan)이 있으면 쪼개지 않는다 — 끊으면 열이 밀린다', () => {
+    const merged =
+      '<table><tbody>' +
+      '<tr><th>구분</th><th>내용</th></tr>' +
+      '<tr><td rowspan="2">묶음</td><td>가</td></tr>' +
+      '<tr><td>나</td></tr>' +
+      '</tbody></table>';
+    expect(splitTableByRows(merged, [20, 30, 30], 25)).toEqual([merged]);
+  });
+
   it('행이 하나뿐인 표는 그대로 둔다', () => {
     const single = '<table><tbody><tr><td>가</td></tr></tbody></table>';
     expect(splitTableByRows(single, [30], 10)).toEqual([single]);

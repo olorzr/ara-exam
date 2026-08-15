@@ -46,13 +46,21 @@ export function useConceptSheetBlocks(bodyHTML: string): UseConceptSheetBlocksRe
     // DOM 읽기는 업데이터 밖에서 끝낸다 (업데이터는 순수해야 한다)
     const blockEls = measureRoot.querySelectorAll<HTMLElement>('[data-measure="block"]');
     const rowHeights = new Map<number, number[]>();
+    /** 행 높이 합 말고도 표가 먹는 높이(표 상하 마진·테두리)를 뺀 실제 행 예산 */
+    const rowBudget = new Map<number, number>();
+
     indices.forEach((index) => {
-      const table = blockEls[index]?.querySelector('table');
-      if (!table) return;
-      rowHeights.set(
-        index,
-        Array.from(table.querySelectorAll('tr')).map((row) => row.getBoundingClientRect().height),
+      const blockEl = blockEls[index];
+      const table = blockEl?.querySelector('table');
+      if (!blockEl || !table) return;
+      const heights = Array.from(table.querySelectorAll('tr')).map(
+        (row) => row.getBoundingClientRect().height,
       );
+      const rowsTotal = heights.reduce((sum, h) => sum + h, 0);
+      // 블록 높이 - 행 높이 합 = 표 바깥 여백. 이걸 안 빼면 쪼갠 조각이 또 넘친다
+      const chrome = Math.max(0, blockEl.getBoundingClientRect().height - rowsTotal);
+      rowHeights.set(index, heights);
+      rowBudget.set(index, capacity - chrome);
     });
     if (rowHeights.size === 0) return;
 
@@ -63,11 +71,12 @@ export function useConceptSheetBlocks(bodyHTML: string): UseConceptSheetBlocksRe
 
       prev.blocks.forEach((html, index) => {
         const heights = rowHeights.get(index);
-        if (!heights) {
+        const budget = rowBudget.get(index) ?? 0;
+        if (!heights || budget <= 0) {
           blocks.push(html);
           return;
         }
-        const chunks = splitTableByRows(html, heights, capacity);
+        const chunks = splitTableByRows(html, heights, budget);
         if (chunks.length > 1) changed = true;
         blocks.push(...chunks);
       });

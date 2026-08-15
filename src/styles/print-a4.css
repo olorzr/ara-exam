@@ -89,8 +89,10 @@
   border-left: 1px solid #e5e7eb;
 }
 
+/* 측정 래퍼와 같은 마진 처리를 위해 BFC 로 둔다 */
 .a4-col__header {
   flex: none;
+  display: flow-root;
 }
 
 /* 블록 래퍼 — flow-root 라 자식 마진이 빠져나가지 않아 측정 높이와 실제 높이가 같다 */
@@ -154,8 +156,10 @@
   pointer-events: none;
 }
 
-/* 표를 행 단위로 쪼갠 조각 — 이어진 조각의 테두리가 겹쳐 두 줄로 보이지 않게 당긴다 */
-.a4-block + .a4-block > .sheet-table-chunk {
+/* 표를 행 단위로 쪼갠 조각이 같은 컬럼에 이어질 때, 겹친 테두리가 두 줄로 보이지 않게 당긴다.
+   (조각은 보통 서로 다른 페이지에 놓이므로 이 보정이 필요한 경우는 드물다)
+   개념지 블록은 .a4-block > .sheet-body > table 구조라 .sheet-body 를 반드시 거쳐야 한다 */
+.a4-block + .a4-block > .sheet-body > .sheet-table-chunk {
   margin-top: -1px;
 }
 

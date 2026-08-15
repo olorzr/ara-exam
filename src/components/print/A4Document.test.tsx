@@ -54,7 +54,6 @@ function renderDocument(blockCount: number) {
     <A4Document
       blocks={blocks}
       columns={1}
-      remeasureKey={blockCount}
       firstPageHeader={<div data-h={FIRST_HEADER_H}>전체 헤더</div>}
       laterPageHeader={<div data-h={LATER_HEADER_H}>컴팩트 헤더</div>}
     />,
@@ -130,6 +129,23 @@ describe('A4Document', () => {
     );
     expect(texts).toHaveLength(total);
     expect(texts).toEqual(Array.from({ length: total }, (_, i) => `문항 ${i + 1}`));
+  });
+
+  it('페이지보다 훨씬 큰 블록은 잘리지 않고 페이지에 맞게 축소된다', () => {
+    const huge = 5000;
+    const { container } = render(
+      <A4Document
+        blocks={[<div key="huge" data-h={huge}>아주 긴 지문</div>]}
+        firstPageHeader={<div data-h={FIRST_HEADER_H}>헤더</div>}
+      />,
+    );
+    const scaled = container.querySelector<HTMLElement>('.a4-stack .a4-block--scaled');
+    expect(scaled).not.toBeNull();
+    const scale = Number(scaled!.style.transform.match(/scale\(([\d.]+)\)/)![1]);
+    const capacity = A4_HEIGHT_PX - PAGE_PAD_TOP - PAGE_PAD_BOTTOM - FOOTER_H - FIRST_HEADER_H;
+    // 하한에 걸려 덜 줄어들면 넘친 부분이 인쇄에서 사라진다
+    expect(scale * huge).toBeLessThanOrEqual(capacity + 1);
+    expect(scaled!.textContent).toBe('아주 긴 지문');
   });
 
   it('블록이 없어도 헤더·푸터가 있는 낱장 한 장은 나온다', () => {

@@ -49,6 +49,16 @@ function isHeaderRow(row: HTMLTableRowElement): boolean {
   return cells.length > 0 && cells.every((cell) => cell.tagName === 'TH');
 }
 
+/**
+ * 세로 병합(rowspan)이 있으면 행 단위로 못 자른다 — 병합 셀이 걸친 행에서 끊으면
+ * 다음 조각에 그 셀이 없어 나머지 셀이 앞 열로 밀려 표가 어긋난다.
+ */
+function hasRowSpan(table: HTMLTableElement): boolean {
+  return Array.from(table.querySelectorAll('th, td')).some(
+    (cell) => Number(cell.getAttribute('rowspan') ?? 1) > 1,
+  );
+}
+
 function buildChunk(
   table: HTMLTableElement,
   colgroup: HTMLElement | null,
@@ -78,7 +88,7 @@ export function splitTableByRows(tableHtml: string, rowHeights: number[], capaci
   if (!table) return [tableHtml];
 
   const allRows = Array.from(table.querySelectorAll('tr')) as HTMLTableRowElement[];
-  if (allRows.length <= 1) return [tableHtml];
+  if (allRows.length <= 1 || hasRowSpan(table)) return [tableHtml];
 
   const colgroup = table.querySelector('colgroup');
   const hasHeader = isHeaderRow(allRows[0]);

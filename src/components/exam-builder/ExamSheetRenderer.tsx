@@ -78,7 +78,6 @@ export default function ExamSheetRenderer({
     <A4Document
       blocks={renderedBlocks}
       columns={useDualCol ? 2 : 1}
-      remeasureKey={`${config.mode}|${bodyHTML.length}|${blocks.length}`}
       onOversized={handleOversized}
       breakAfterLast={breakAfterLast}
       className={`eb-sheet-table ${interactive ? 'eb-concept-interactive' : ''}`.trim()}

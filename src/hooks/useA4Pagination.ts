@@ -4,7 +4,6 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import {
   A4_HEIGHT_PX,
   CAPACITY_SAFETY_PX,
-  OVERSIZED_MIN_SCALE,
   PAGE_PAD_BOTTOM,
   PAGE_PAD_TOP,
 } from '@/lib/print/constants';
@@ -26,8 +25,6 @@ export interface A4Layout {
 
 const EMPTY_LAYOUT: A4Layout = { pages: [], oversizedScale: {}, ready: false };
 
-export type RemeasureKey = string | number | boolean | undefined;
-
 /**
  * 한 페이지에 통째로 담기지 않는 블록이 나왔을 때 호출된다.
  * 블록을 더 잘게 쪼갤 수 있는 쪽(개념지의 긴 표 등)이 받아서 블록 목록을 갱신한다.
@@ -41,8 +38,6 @@ export type OversizedHandler = (
 
 interface UseA4PaginationArgs {
   columns: 1 | 2;
-  /** 값이 바뀌면 캐시를 무시하고 다시 측정한다 (본문 HTML, 문항 수 등) */
-  remeasureKey?: RemeasureKey;
   onOversized?: OversizedHandler;
 }
 
@@ -58,24 +53,14 @@ interface UseA4PaginationResult {
  * 폰트(CDN)·이미지 로딩으로 높이가 나중에 바뀌므로 fonts.ready / ResizeObserver /
  * beforeprint 로 재측정한다. 결과가 같으면 state 를 갱신하지 않아 렌더 루프가 없다.
  */
-export function useA4Pagination({
-  columns,
-  remeasureKey,
-  onOversized,
-}: UseA4PaginationArgs): UseA4PaginationResult {
+export function useA4Pagination({ columns, onOversized }: UseA4PaginationArgs): UseA4PaginationResult {
   const measureRootRef = useRef<HTMLDivElement | null>(null);
   const [layout, setLayout] = useState<A4Layout>(EMPTY_LAYOUT);
   const signatureRef = useRef('');
-  const fingerprintRef = useRef('');
 
   const measure = useCallback(() => {
     const root = measureRootRef.current;
     if (!root) return;
-
-    // 값이 그대로면 비싼 DOM 읽기를 건너뛴다 (부모 리렌더마다 전체 측정 방지)
-    const fingerprint = `${String(remeasureKey)}|${columns}|${root.getBoundingClientRect().height}`;
-    if (fingerprint === fingerprintRef.current) return;
-    fingerprintRef.current = fingerprint;
 
     const heightOf = (selector: string) => {
       const el = root.querySelector<HTMLElement>(selector);
@@ -94,10 +79,9 @@ export function useA4Pagination({
     const firstPageBodyHeight = A4_HEIGHT_PX - shell - firstHeaderHeight;
     const laterPageBodyHeight = A4_HEIGHT_PX - shell - laterHeaderHeight;
 
-    if (footerHeight <= 0 || firstPageBodyHeight < MIN_SANE_BODY_PX) {
-      fingerprintRef.current = '';
-      return;
-    }
+    // 인쇄 대화상자에서는 측정 컨테이너가 display:none 이라 전부 0 으로 읽힌다.
+    // 그때는 직전 배치를 그대로 유지해야 한다 (0 으로 다시 계산하면 페이지가 무너진다).
+    if (footerHeight <= 0 || firstPageBodyHeight < MIN_SANE_BODY_PX) return;
 
     const { pages, oversized } = paginate({
       blockHeights,
@@ -114,7 +98,8 @@ export function useA4Pagination({
       const capacity = body - columnHeaderHeight;
       const height = blockHeights[index] ?? 0;
       if (height <= 0 || capacity <= 0) return;
-      oversizedScale[index] = Math.max(OVERSIZED_MIN_SCALE, Math.min(1, capacity / height));
+      // 하한을 두면 덜 줄어든 만큼이 overflow:hidden 에 잘려 사라진다 — 반드시 페이지에 맞춘다
+      oversizedScale[index] = Math.min(1, capacity / height);
     });
 
     const next: A4Layout = { pages, oversizedScale, ready: true };
@@ -129,7 +114,7 @@ export function useA4Pagination({
       const capacity = laterPageBodyHeight - columnHeaderHeight - CAPACITY_SAFETY_PX;
       onOversized?.(oversized, root, capacity);
     }
-  }, [columns, remeasureKey, onOversized]);
+  }, [columns, onOversized]);
 
   // 렌더마다 확인 — 블록이 바뀌면 paint 전에 배치가 갱신된다
   useIsoLayoutEffect(measure);
@@ -138,11 +123,7 @@ export function useA4Pagination({
     const root = measureRootRef.current;
     if (!root) return;
 
-    // 측정을 강제로 다시 하려면 지문을 비워야 한다
-    const remeasure = () => {
-      fingerprintRef.current = '';
-      measure();
-    };
+    const remeasure = () => measure();
 
     let frame = 0;
     const scheduleRemeasure = () => {

@@ -40,7 +40,6 @@ export default function ExamPaperView({ exam, words, categories, showAnswer }: E
     <A4Document
       blocks={blocks}
       columns={useSingleCol ? 1 : 2}
-      remeasureKey={`${exam.title}|${words.length}|${showAnswer}`}
       firstPageHeader={
         <>
           <ExamPrintHeader

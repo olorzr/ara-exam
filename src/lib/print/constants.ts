@@ -33,8 +33,11 @@ export const COLUMN_GAP = 24;
  */
 export const CAPACITY_SAFETY_PX = 3;
 
-/** 한 페이지에 못 담는 블록을 축소할 때의 하한 — 이보다 작아지면 읽을 수 없다 */
-export const OVERSIZED_MIN_SCALE = 0.55;
+/**
+ * 한 페이지에 못 담는 블록의 축소 배율에는 **하한을 두지 않는다**.
+ * 본문이 overflow:hidden 이라 하한에 걸려 덜 줄어들면 넘친 만큼이 인쇄에서 잘려 사라진다.
+ * 작게 인쇄되는 것보다 내용이 사라지는 쪽이 훨씬 나쁘다.
+ */
 
 /** 측정·렌더 공통 컬럼 폭. 두 곳이 어긋나면 줄바꿈이 달라져 페이지 계산이 틀어진다 */
 export function getColumnWidth(columns: 1 | 2): number {
