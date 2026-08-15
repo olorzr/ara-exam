@@ -62,6 +62,18 @@ src/
 - 의존: 없음
 - 주요 파일: `src/types/index.ts`
 
+### lib/category-master (카테고리 마스터 CRUD + 선택 가능 카테고리 집계)
+- 역할: 출판사/대단원/소단원/학교/프린트 마스터의 CRUD 와, **앱에서 선택 가능한 모든 카테고리**의 단일 출처(`getAllSelectableCategories`) 제공
+- 의존: `lib/supabase`, `lib/constants`, `types`
+- 주요 파일: `src/lib/category-master/{publishers,major-chapters,sub-chapters,schools,school-materials,aggregate}.ts`
+- `getAllSelectableCategories`: **마스터 중등/고등 전개 ∪ 마스터 외부지문 전개 ∪ `categories` 테이블** 을 자연키로 dedupe(중복 시 `categories` 행 우선 — 실제 UUID 를 가진 쪽). 단어 등록 여부와 무관하게 빈 카테고리도 포함하므로 개념지 편집기가 그대로 쓴다. 소단원이 있는 대단원도 `sub_chapter: ''` 단독 행을 함께 만들어 "대단원 전체"를 고를 수 있다
+- rename 동기화: 마스터 이름 수정은 DB 트리거(`sync_*_name`)가 `categories` + `concept_sheets` 를 갱신하고, 각 CRUD 모듈이 앱 레벨에서도 **같은 두 테이블**을 갱신한다(트리거 누락 환경 안전장치). 한쪽만 고치면 단어지와 개념지 표기가 갈라진다
+
+### lib/external-category (외부지문 년도·학년)
+- 역할: 년도/학년 Select 옵션 생성과 `'미지정'` ↔ `''` 변환을 한 곳에 모은다
+- 의존: `lib/constants`, `lib/kst-year`
+- 주요 파일: `src/lib/external-category.ts`, `src/lib/kst-year.ts`
+
 ### print (A4 낱장 인쇄 엔진 — 시험지·답안지·단어장·개념지 공용)
 - 역할: 인쇄 문서를 **고정 크기 A4 낱장 여러 장**으로 나눠 그린다. 블록 높이를 실측해 페이지·컬럼에 배정하므로 헤더/푸터가 매 페이지 제자리에 오고, 화면 미리보기와 인쇄물이 1:1로 일치한다
 - 의존: 없음(순수 계산 + DOM 측정). 문서 컴포넌트들이 이 엔진을 소비한다
@@ -91,7 +103,7 @@ src/
 4. 시험지 보기 → exam_words에서 스냅샷 로드 → 문항 블록 실측 → A4 낱장 배치(`lib/print`) → 인쇄
 
 ## concept_sheets HTML 파이프라인
-- 입력 (저장): TipTap `editor.getHTML()` → `sanitizeConceptHTML` → supabase insert/update (`src/app/(main)/exam/builder/[id]/page.tsx` handleSave)
+- 입력 (저장): TipTap `editor.getHTML()` → `sanitizeConceptHTML` → supabase insert/update (`src/hooks/useConceptSheetEditor.ts` 의 `handleSave`)
 - 출력 (렌더): supabase select → `src/lib/exam-transform.ts` 의 `transformHTML` / `stripTrailingEmpty` / `extractMarkedWords` 각 함수 entry 에서 `sanitizeConceptHTML` 호출 → `ExamSheetRenderer` 의 `dangerouslySetInnerHTML`
 - 화이트리스트 위치: `src/lib/sanitize-html.ts` (`ALLOWED_TAGS`, `ALLOWED_ATTR`). 새 TipTap 확장 추가 시 같이 갱신 필수
 - 네트워크 계층 방어: `next.config.ts` 의 CSP — `object-src 'none'`, `frame-ancestors 'none'`, `connect-src` 화이트리스트(Supabase, NaverWorks)

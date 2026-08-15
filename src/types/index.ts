@@ -11,6 +11,8 @@ export interface Word {
 export interface Category {
   id: string;
   level: '중등' | '고등' | '외부지문 및 프린트';
+  /** 학년도. 외부지문에서만 사용하며 '' 는 미지정 */
+  year: string;
   grade: string;
   publisher: string;
   semester: string;
@@ -94,24 +96,37 @@ export interface School {
   created_at: string;
 }
 
-/** 프린트/작품명 마스터 (학교별) */
+/** 프린트/작품명 마스터 (학교 + 년도 + 학년별) */
 export interface SchoolMaterial {
   id: string;
   name: string;
   school_id: string;
+  /** 학년도. '' 는 미지정 */
+  year: string;
+  /** 학년(중1~고3). '' 는 미지정 */
+  grade: string;
   created_at: string;
 }
 
-/** 개념지 저장 데이터 */
+/**
+ * 개념지 저장 데이터.
+ * 카테고리는 `categories` 를 FK 로 참조하지 않고 텍스트로 복사 저장한다
+ * (rename 은 sync_*_name 트리거가 따라온다 — CLAUDE.md 2026-06-16 참조).
+ * 외부지문은 publisher/semester 대신 school_name/year 를 쓰고 unit 에 프린트/작품명이 들어간다.
+ */
 export interface ConceptSheet {
   id: string;
   title: string;
-  level: '중등' | '고등';
+  level: CategoryLevel;
+  /** 학년도. 외부지문에서만 사용하며 '' 는 미지정 */
+  year: string;
   grade: string;
   publisher: string;
   semester: string;
   unit: string;
   subunit: string;
+  /** 학교명. 외부지문에서만 사용 */
+  school_name: string;
   editor_html: string;
   marks: { text: string; pos: number; len: number }[];
   user_id: string;

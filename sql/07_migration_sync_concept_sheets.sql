@@ -14,8 +14,10 @@
 --   기존 rename 트리거 3개에 concept_sheets 갱신을 추가해, 마스터 이름을 한 번
 --   바꾸면 단어지(categories)·개념지(concept_sheets) 가 동시에 따라오게 한다.
 --   concept_sheets 는 categories 와 컬럼명이 다르다: chapter→unit, sub_chapter→subunit.
---   외부지문(schools/school_materials) 트리거는 concept_sheets 가 중등/고등만
---   다루므로 대상이 아니다.
+--   [2026-08-15 갱신] 외부지문(schools/school_materials) 트리거는 이 파일 작성 시점에는
+--   concept_sheets 가 중등/고등만 다뤄 대상이 아니었으나, 개념지가 외부지문도 담게 되면서
+--   sql/15_migration_external_year_grade.sql 이 sync_school_name / sync_school_material_name
+--   에도 concept_sheets 갱신을 추가했다. 그 둘의 정식 정의는 sql/15 + 01_schema.sql 미러다.
 --
 -- 주의:
 --   - concept_sheets 에는 자연키 유니크 제약이 없어, categories 와 달리 동일 표기로

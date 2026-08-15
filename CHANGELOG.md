@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.1.9] - 2026-08-15
+### Added
+- **외부지문 및 프린트에 년도·학년** — 카테고리 계층이 `학교 > 프린트` → **`학교 > 년도 > 학년 > 프린트/작품명`** 이 됐다. 같은 이름의 프린트를 학년도별로 따로 둘 수 있다. 카테고리 관리·단어 등록 양쪽에서 년도/학년을 고른다 ([ExternalCategoryTab.tsx](src/components/words/ExternalCategoryTab.tsx), [CategoryForm.tsx](src/components/words/CategoryForm.tsx), [category-tree.ts](src/lib/category-tree.ts))
+  - **기존 프린트는 그대로 보존**된다 — 년도·학년이 `미지정` 인 항목으로 뜨고, 필요할 때 하나씩 정리하면 된다
+  - 년도 선택지는 올해 기준 롤링 윈도(내년~4년 전)에 **데이터에 실제로 있는 년도를 합집합**으로 더한다(오래된 년도의 프린트가 목록에서 사라지지 않게)
+  - ⚠️ **[sql/15_migration_external_year_grade.sql](sql/15_migration_external_year_grade.sql) 을 앱 배포보다 먼저 적용**해야 한다. `categories` 자연키 유니크 인덱스가 바뀌므로 순서가 뒤바뀌면 단어 저장이 전부 실패한다
+- **개념지에서 외부지문 및 프린트 선택 가능** — `concept_sheets` 에 `school_name`/`year` 를 추가하고 저장 검증을 level 인지형으로 바꿨다. 외부지문은 `publisher` 가 빈 값이라 예전 검증(`grade` + `publisher` 필수)으로는 저장 자체가 막혔다
+
+### Fixed
+- **헤더 메뉴가 2줄로 접히던 문제** — 데스크톱 이메일 표시를 없애고(모바일 메뉴에는 유지) 브랜드명을 `아라국어논술` 로 줄였다. 데스크톱 내비 임계값을 `md:`→`lg:`, 브랜드 텍스트는 `xl:` 부터 표시. 관리자 계정(메뉴 7개)에서도 한 줄에 들어간다 ([Header.tsx](src/components/layout/Header.tsx))
+- **개념지에서만 카테고리가 다르게 동작하던 문제** — 개념지 편집기가 마스터 3테이블 조합을 따로 읽어 `schools`/`school_materials` 를 아예 조회하지 않았고(외부지문이 트리에 없었다), 소단원이 있는 대단원은 "대단원 단독" 행을 만들지 않아 단어 등록에서는 되는 선택이 개념지에서는 불가능했다. `getAllSelectableCategories()` 로 출처를 단어지와 통일했다 ([aggregate.ts](src/lib/category-master/aggregate.ts))
+- 개념지 편집기에서 **외부지문 카테고리가 경고 없이 '중등'으로 강등**되던 삼항식 제거 ([ExamCategoryBar.tsx](src/components/exam-builder/ExamCategoryBar.tsx))
+- 기존 개념지를 열면 **트리에 현재 카테고리가 선택돼 보인다**(개념지는 id 가 아니라 텍스트를 저장하므로 자연키로 대조). 카테고리 **검색 중에는 트리를 펼친 상태**로 표시 — 기본 접힘(depth<2) 때문에 매칭된 단원이 3단계 아래에 숨어 "검색이 안 먹는다"로 보였다
+- 카테고리 **조회 실패를 더 이상 삼키지 않는다**. RLS/네트워크 오류가 "카테고리가 없습니다" 한 줄로만 보였다. 행 상한(5,000)을 넘으면 조용히 자르지 않고 에러를 낸다
+- 마스터 이름 변경의 **앱 레벨 fallback 이 `concept_sheets` 를 빼먹던 문제** — `categories` 만 갱신해서, DB 트리거가 없는 환경에서는 단어지만 새 이름이 되고 개념지는 옛 이름으로 갈라졌다(단어지가 멀쩡해 보여 눈치채기 어려웠다)
+- 개념지 **인쇄 제목이 `"2026  국어 "` 처럼 공백만 남던 버그** — `filter(Boolean)` 앞 원소가 템플릿 리터럴이라 항상 truthy 였다. 외부지문 제목 분기도 추가 ([ExamSheetRenderer.tsx](src/components/exam-builder/ExamSheetRenderer.tsx))
+- 외부지문 단어의 **학년이 항상 빈 값으로 저장**되던 문제(`ensureCategoryId`) — 그 탓에 `levelGradeToDivision` 이 판정 불가가 되어 ara-system 이 외부지문을 전부 중등부로 등록했다
+
+### Changed
+- 프린트/작품명 rename 동기화가 `year`/`grade` 로 좁혀진다 — 없으면 다른 년도·학년의 동명 카테고리까지 함께 바뀐다
+- 햄버거 버튼에 `type`/`aria-label`/`aria-expanded` 추가
+
 ## [0.1.8] - 2026-08-15
 ### Changed
 - **인쇄물 A4 전면 재설계 — 2페이지 이상에서 헤더·푸터가 깨지던 문제 해결.** 시험지·답안지·객관식·단어장·개념지 5종이 모두 브라우저 자동 분할 대신 **실측 기반 A4 낱장 배치**를 쓴다([src/lib/print/](src/lib/print/), [src/components/print/](src/components/print/)). 페이지마다 딱 A4 한 장이 나오고, 푸터는 **마지막 페이지에서도 종이 아래에 고정**된다

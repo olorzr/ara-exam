@@ -7,6 +7,7 @@ import type { PublicTextbook } from './types';
 const cat = (over: Partial<Category>): Category => ({
   id: 'id',
   level: '중등',
+  year: '',
   grade: '중2',
   publisher: '비상교육',
   semester: '1학기',

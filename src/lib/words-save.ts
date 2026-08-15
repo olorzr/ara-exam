@@ -5,6 +5,8 @@ import type { WordEntry } from '@/components/words';
 
 export interface CategoryMatchInput {
   level: CategoryLevel;
+  /** 학년도. 외부지문에서만 사용하며 '' 는 미지정 */
+  year: string;
   grade: string;
   publisher: string;
   semester: string;
@@ -30,9 +32,13 @@ interface InsertWordsRpcRow {
   skipped_duplicates: string[] | null;
 }
 
-/** categories 자연키 유니크 인덱스(idx_categories_natural_key)와 일치하는 충돌 컬럼 */
+/**
+ * categories 자연키 유니크 인덱스(idx_categories_natural_key)와 일치하는 충돌 컬럼.
+ * ⚠️ sql/15_migration_external_year_grade.sql 의 인덱스 컬럼 목록과 **글자 그대로**
+ * 일치해야 한다. 어긋나면 upsert 가 실패해 단어 저장이 전부 막힌다.
+ */
 const CATEGORY_NATURAL_KEY =
-  'level,grade,publisher,semester,chapter,sub_chapter,school_name';
+  'level,year,grade,publisher,semester,chapter,sub_chapter,school_name';
 
 /**
  * 입력된 카테고리 메타데이터로 단원을 보장한다(있으면 재사용, 없으면 생성).
@@ -47,7 +53,12 @@ export async function ensureCategoryId(input: CategoryMatchInput): Promise<strin
   // 매칭에도 user_id 를 빼서 학원 내 모든 사용자가 같은 단원을 공유하도록 한다.
   const row = {
     level: input.level,
-    grade: isExternal ? '' : input.grade,
+    // 년도는 외부지문 전용, 학교명도 마찬가지. 반대로 출판사/학기는 중등·고등 전용이다.
+    // 학년(grade)은 이제 양쪽 모두 저장한다 — 예전엔 외부지문을 '' 로 강제해
+    // levelGradeToDivision 이 항상 null 을 반환했고, ara-system 이 외부지문을
+    // 전부 중등부로 등록하는 부작용이 있었다.
+    year: isExternal ? input.year : '',
+    grade: input.grade,
     publisher: isExternal ? '' : input.publisher,
     semester: isExternal ? '' : input.semester,
     chapter: input.chapter,

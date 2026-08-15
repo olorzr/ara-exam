@@ -3,12 +3,16 @@ create table concept_sheets (
   id uuid primary key default gen_random_uuid(),
   title text not null default '제목 없음',
   -- 카테고리 정보 (BuilderCategory 필드)
+  -- level 은 '중등' | '고등' | '외부지문 및 프린트'.
+  -- 외부지문은 publisher/semester 대신 school_name/year 를 쓰고 unit 에 프린트/작품명이 들어간다.
   level text not null default '중등',
+  year text not null default '',
   grade text not null default '',
   publisher text not null default '',
   semester text not null default '',
   unit text not null default '',
   subunit text not null default '',
+  school_name text not null default '',
   -- 에디터 콘텐츠
   editor_html text not null default '',
   marks jsonb not null default '[]'::jsonb,

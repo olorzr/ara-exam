@@ -12,6 +12,7 @@ import {
   insertWordsToCategory,
   type DuplicateWordsResult,
 } from '@/lib/words-save';
+import { toStoredValue } from '@/lib/external-category';
 import type { CategoryLevel } from '@/types';
 import type { WordEntry } from '@/components/words';
 import { CategoryForm, WordEntryTable, DuplicateWordsDialog } from '@/components/words';
@@ -21,6 +22,7 @@ import { toast } from 'sonner';
 
 interface DraftShape {
   level: CategoryLevel;
+  year: string;
   grade: string;
   publisher: string;
   semester: string;
@@ -54,6 +56,7 @@ export default function NewWordsPage() {
   const router = useRouter();
 
   const [level, setLevel] = useState<CategoryLevel>('중등');
+  const [year, setYear] = useState('');
   const [grade, setGrade] = useState('');
   const [publisher, setPublisher] = useState('');
   const [semester, setSemester] = useState('');
@@ -76,8 +79,8 @@ export default function NewWordsPage() {
       toast.error('학년, 출판사, 학기, 대단원을 모두 입력해주세요.');
       return false;
     }
-    if (level === EXTERNAL_LEVEL && !chapter) {
-      toast.error('단원명을 입력해주세요.');
+    if (level === EXTERNAL_LEVEL && (!schoolName || !year || !grade || !chapter)) {
+      toast.error('학교, 년도, 학년, 프린트/작품명을 모두 선택해주세요.');
       return false;
     }
     return true;
@@ -112,8 +115,12 @@ export default function NewWordsPage() {
 
     setSaving(true);
 
+    // 년도/학년의 '미지정' 은 DB 에 빈 문자열로 저장한다(external-category.ts 참조)
     const categoryId = await ensureCategoryId({
-      level, grade, publisher, semester, chapter, subChapter, schoolName,
+      level,
+      year: toStoredValue(year),
+      grade: toStoredValue(grade),
+      publisher, semester, chapter, subChapter, schoolName,
     });
     if (!categoryId) {
       toast.error('카테고리 저장 중 오류가 발생했습니다.');
@@ -167,7 +174,7 @@ export default function NewWordsPage() {
   };
 
   const handleSaveDraft = () => {
-    const draft = { level, grade, publisher, semester, chapter, subChapter, schoolName, wordEntries };
+    const draft = { level, year, grade, publisher, semester, chapter, subChapter, schoolName, wordEntries };
     localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
     toast.success('임시 저장되었습니다.');
   };
@@ -195,6 +202,7 @@ export default function NewWordsPage() {
     }
 
     setLevel(parsed.level);
+    setYear(parsed.year ?? '');
     setGrade(parsed.grade ?? '');
     setPublisher(parsed.publisher ?? '');
     setSemester(parsed.semester ?? '');
@@ -219,6 +227,7 @@ export default function NewWordsPage() {
 
       <CategoryForm
         level={level}
+        year={year}
         grade={grade}
         publisher={publisher}
         semester={semester}
@@ -226,6 +235,7 @@ export default function NewWordsPage() {
         subChapter={subChapter}
         schoolName={schoolName}
         onLevelChange={setLevel}
+        onYearChange={setYear}
         onGradeChange={setGrade}
         onPublisherChange={setPublisher}
         onSemesterChange={setSemester}

@@ -12,7 +12,7 @@ const PAGE_SIZE = 24;
 
 /** 목록/트리에 필요한 컬럼만 조회한다(무거운 editor_html 제외) */
 const LIST_COLUMNS =
-  'id,title,level,grade,publisher,semester,unit,subunit,marks,user_id,created_at,updated_at';
+  'id,title,level,year,grade,publisher,semester,unit,subunit,school_name,marks,user_id,created_at,updated_at';
 
 /**
  * 개념지 목록 페이지의 상태·데이터·트리·필터·삭제·렌더 페이지네이션을 캡슐화한 훅.
@@ -53,16 +53,19 @@ export function useConceptList() {
   const tree = useMemo(() => {
     const seen = new Map<string, Category>();
     for (const s of sheets) {
-      const key = [s.level, s.grade, s.publisher, s.semester, s.unit, s.subunit].join('|');
+      // 학교명/년도를 빼면 학교·년도가 다른 외부지문 개념지가 한 노드로 뭉친다
+      const key = [s.level, s.year, s.grade, s.publisher, s.semester, s.unit, s.subunit, s.school_name].join('|');
       if (!seen.has(key)) {
         seen.set(key, {
           id: key,
           level: s.level as Category['level'],
+          year: s.year,
           grade: s.grade,
           publisher: s.publisher,
           semester: s.semester,
           chapter: s.unit,
           sub_chapter: s.subunit,
+          school_name: s.school_name,
           user_id: s.user_id,
           created_at: s.created_at,
         });
@@ -105,11 +108,13 @@ export function useConceptList() {
       result = result.filter(
         (s) =>
           s.level === selectedCategory.level &&
+          s.year === selectedCategory.year &&
           s.grade === selectedCategory.grade &&
           s.publisher === selectedCategory.publisher &&
           s.semester === selectedCategory.semester &&
           s.unit === selectedCategory.chapter &&
-          s.subunit === selectedCategory.sub_chapter,
+          s.subunit === selectedCategory.sub_chapter &&
+          s.school_name === (selectedCategory.school_name ?? ''),
       );
     }
     if (searchQuery) {

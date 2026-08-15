@@ -1,11 +1,14 @@
 -- =============================================
--- Voca Master - Supabase 테이블 스키마
+-- Ara Exam - Supabase 테이블 스키마
 -- =============================================
 
 -- 1. 카테고리 테이블 (중등/고등 > 학년 > 출판사 > 학기 > 대단원 > 소단원)
+--    외부지문 및 프린트: 학교 > 년도 > 학년 > 프린트/작품명
 CREATE TABLE categories (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   level TEXT NOT NULL CHECK (level IN ('중등', '고등', '외부지문 및 프린트')),
+  -- 학년도. 외부지문에서만 사용하며 '' 는 미지정 (sql/15 참조)
+  year TEXT NOT NULL DEFAULT '',
   grade TEXT NOT NULL DEFAULT '',
   publisher TEXT NOT NULL DEFAULT '',
   semester TEXT NOT NULL DEFAULT '',
@@ -88,13 +91,16 @@ CREATE TABLE schools (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 9. 프린트/작품명 마스터 (학교별)
+-- 9. 프린트/작품명 마스터 (학교 + 년도 + 학년별)
 CREATE TABLE school_materials (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL,
   school_id UUID NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+  -- 둘 다 '' 는 미지정. 같은 이름 프린트를 학년도/학년별로 따로 둘 수 있어야 한다 (sql/15 참조)
+  year TEXT NOT NULL DEFAULT '',
+  grade TEXT NOT NULL DEFAULT '',
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(name, school_id)
+  UNIQUE(name, school_id, year, grade)
 );
 
 -- 인덱스
@@ -117,7 +123,7 @@ CREATE INDEX idx_school_materials_school ON school_materials(school_id);
 -- ensureCategoryId 의 upsert(onConflict) 가 이 인덱스에 의존한다.
 -- (기존 DB 의 중복 병합은 sql/09_migration_categories_unique.sql 참조)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_categories_natural_key
-  ON categories (level, grade, publisher, semester, chapter, sub_chapter, school_name)
+  ON categories (level, year, grade, publisher, semester, chapter, sub_chapter, school_name)
   NULLS NOT DISTINCT;
 
 -- 허용 도메인 판정 헬퍼. 모든 공유 테이블 정책의 USING/WITH CHECK 에서 호출해
@@ -318,12 +324,17 @@ CREATE TRIGGER sync_sub_chapter_name_trigger
   FOR EACH ROW
   EXECUTE FUNCTION sync_sub_chapter_name();
 
--- 학교명 변경 → categories.school_name 동기화
+-- 학교명 변경 → categories.school_name + concept_sheets.school_name 동기화
 CREATE OR REPLACE FUNCTION sync_school_name()
 RETURNS TRIGGER AS $$
 BEGIN
   IF OLD.name != NEW.name THEN
     UPDATE categories
+    SET school_name = NEW.name
+    WHERE school_name = OLD.name
+      AND level = '외부지문 및 프린트';
+
+    UPDATE concept_sheets
     SET school_name = NEW.name
     WHERE school_name = OLD.name
       AND level = '외부지문 및 프린트';
@@ -337,7 +348,8 @@ CREATE TRIGGER sync_school_name_trigger
   FOR EACH ROW
   EXECUTE FUNCTION sync_school_name();
 
--- 프린트/작품명 변경 → categories.chapter 동기화 (외부지문)
+-- 프린트/작품명 변경 → categories.chapter + concept_sheets.unit 동기화 (외부지문)
+-- year/grade 조건이 없으면 다른 년도·학년의 동명 카테고리까지 함께 바뀐다.
 CREATE OR REPLACE FUNCTION sync_school_material_name()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -348,6 +360,18 @@ BEGIN
     WHERE categories.chapter = OLD.name
       AND categories.school_name = s.name
       AND categories.level = '외부지문 및 프린트'
+      AND categories.year = OLD.year
+      AND categories.grade = OLD.grade
+      AND s.id = OLD.school_id;
+
+    UPDATE concept_sheets
+    SET unit = NEW.name
+    FROM schools s
+    WHERE concept_sheets.unit = OLD.name
+      AND concept_sheets.school_name = s.name
+      AND concept_sheets.level = '외부지문 및 프린트'
+      AND concept_sheets.year = OLD.year
+      AND concept_sheets.grade = OLD.grade
       AND s.id = OLD.school_id;
   END IF;
   RETURN NEW;

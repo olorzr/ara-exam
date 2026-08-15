@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { CategoryLevel, Publisher, MajorChapter, SubChapter, School, SchoolMaterial } from '@/types';
 import { EXTERNAL_LEVEL, MIDDLE_SCHOOL_GRADES, HIGH_SCHOOL_GRADES } from '@/lib/constants';
+import { EXTERNAL_GRADE_OPTIONS, buildYearOptions, toStoredValue } from '@/lib/external-category';
 import {
   getPublishers, getMajorChapters, getSubChapters,
   getSchools, getSchoolMaterials,
@@ -10,6 +11,8 @@ import {
 
 export interface CategoryFormProps {
   level: CategoryLevel;
+  /** 학년도(외부지문 전용). Select 표시값이며 '미지정' 은 저장 시 '' 로 변환된다 */
+  year: string;
   grade: string;
   publisher: string;
   semester: string;
@@ -17,6 +20,7 @@ export interface CategoryFormProps {
   subChapter: string;
   schoolName: string;
   onLevelChange: (value: CategoryLevel) => void;
+  onYearChange: (value: string) => void;
   onGradeChange: (value: string) => void;
   onPublisherChange: (value: string) => void;
   onSemesterChange: (value: string) => void;
@@ -32,8 +36,8 @@ export interface CategoryFormProps {
  */
 export function useCategoryFormState(props: CategoryFormProps) {
   const {
-    level, grade, publisher, semester, chapter, subChapter, schoolName,
-    onLevelChange, onGradeChange, onPublisherChange, onSemesterChange,
+    level, year, grade, publisher, semester, chapter, subChapter, schoolName,
+    onLevelChange, onYearChange, onGradeChange, onPublisherChange, onSemesterChange,
     onChapterChange, onSubChapterChange, onSchoolNameChange,
   } = props;
 
@@ -49,7 +53,21 @@ export function useCategoryFormState(props: CategoryFormProps) {
   const [schoolId, setSchoolId] = useState('');
   const [materialId, setMaterialId] = useState('');
 
-  const gradeOptions = level === '중등' ? MIDDLE_SCHOOL_GRADES : level === '고등' ? HIGH_SCHOOL_GRADES : [];
+  // 외부지문은 학교가 중학교일 수도 고등학교일 수도 있어 중등·고등 학년을 모두 제공한다
+  const gradeOptions: readonly string[] =
+    level === '중등' ? MIDDLE_SCHOOL_GRADES
+      : level === '고등' ? HIGH_SCHOOL_GRADES
+        : EXTERNAL_GRADE_OPTIONS;
+
+  const yearOptions = useMemo(() => buildYearOptions(materials.map((m) => m.year)), [materials]);
+
+  // 프린트 목록은 학교 단위로 받아 년도/학년으로 클라이언트에서 거른다(ExternalCategoryTab 과 동일)
+  const visibleMaterials = useMemo(
+    () => (year && grade
+      ? materials.filter((m) => m.year === toStoredValue(year) && m.grade === toStoredValue(grade))
+      : []),
+    [materials, year, grade],
+  );
 
   // 출판사/학교 목록 로드
   useEffect(() => {
@@ -125,22 +143,32 @@ export function useCategoryFormState(props: CategoryFormProps) {
   // 프린트/작품명 이름 → ID 역추적
   useEffect(() => {
     (async () => {
-      if (!chapter || materials.length === 0) return;
-      const found = materials.find((m) => m.name === chapter);
+      if (!chapter || visibleMaterials.length === 0) return;
+      const found = visibleMaterials.find((m) => m.name === chapter);
       if (found && found.id !== materialId) setMaterialId(found.id);
     })();
-  }, [chapter, materials, materialId]);
+  }, [chapter, visibleMaterials, materialId]);
 
   const handleLevelChange = (v: CategoryLevel) => {
     onLevelChange(v);
-    onGradeChange(''); onPublisherChange(''); onSemesterChange('');
+    onYearChange(''); onGradeChange(''); onPublisherChange(''); onSemesterChange('');
     onChapterChange(''); onSubChapterChange(''); onSchoolNameChange('');
     setPublisherId(''); setChapterId(''); setSubChapterId('');
     setSchoolId(''); setMaterialId('');
   };
 
+  const handleYearChange = (v: string) => {
+    onYearChange(v);
+    onChapterChange(''); setMaterialId('');
+  };
+
   const handleGradeChange = (v: string) => {
     onGradeChange(v);
+    if (level === EXTERNAL_LEVEL) {
+      // 외부지문은 학년이 바뀌면 프린트 선택만 초기화된다(출판사/학기를 쓰지 않음)
+      onChapterChange(''); setMaterialId('');
+      return;
+    }
     onPublisherChange(''); onSemesterChange('');
     onChapterChange(''); onSubChapterChange('');
     setPublisherId(''); setChapterId(''); setSubChapterId('');
@@ -182,7 +210,7 @@ export function useCategoryFormState(props: CategoryFormProps) {
 
   const handleMaterialSelect = (matId: string) => {
     setMaterialId(matId);
-    const mat = materials.find((m) => m.id === matId);
+    const mat = visibleMaterials.find((m) => m.id === matId);
     onChapterChange(mat?.name ?? '');
   };
 
@@ -190,10 +218,11 @@ export function useCategoryFormState(props: CategoryFormProps) {
   const noSchools = schools.length === 0 && level === EXTERNAL_LEVEL;
 
   return {
-    publishers, chapters, subChaptersList, schools, materials,
+    publishers, chapters, subChaptersList, schools,
+    materials: visibleMaterials,
     publisherId, chapterId, subChapterId, schoolId, materialId,
-    gradeOptions,
-    handleLevelChange, handleGradeChange, handlePublisherSelect,
+    gradeOptions, yearOptions,
+    handleLevelChange, handleYearChange, handleGradeChange, handlePublisherSelect,
     handleSemesterChange, handleChapterSelect, handleSubChapterSelect,
     handleSchoolSelect, handleMaterialSelect,
     noPublishers, noSchools,

@@ -1,11 +1,12 @@
 import type { Category } from '@/types';
 import { EXTERNAL_LEVEL } from './constants';
+import { UNSPECIFIED_OPTION } from './external-category';
 
 /** 카테고리 트리 노드 타입 */
 export interface CategoryTreeNode {
   id: string;
   label: string;
-  type: 'level' | 'grade' | 'publisher' | 'semester' | 'chapter' | 'sub_chapter' | 'school' | 'material';
+  type: 'level' | 'year' | 'grade' | 'publisher' | 'semester' | 'chapter' | 'sub_chapter' | 'school' | 'material';
   children: CategoryTreeNode[];
   category?: Category;
 }
@@ -13,7 +14,7 @@ export interface CategoryTreeNode {
 /**
  * 카테고리 배열을 계층 트리 구조로 변환한다.
  * 중등/고등: level > grade > publisher > semester > chapter > sub_chapter
- * 외부지문: level > school > material
+ * 외부지문: level > school > year > grade > material
  */
 export function buildCategoryTree(categories: Category[]): CategoryTreeNode[] {
   const byLevel = groupBy(categories, (c) => c.level);
@@ -35,18 +36,37 @@ function buildExternalTree(level: string, cats: Category[]): CategoryTreeNode {
     id: `level-${level}`,
     label: level,
     type: 'level',
-    children: Object.entries(bySchool).map(([school, schoolCats]) => ({
-      id: `school-${school}`,
-      label: school,
-      type: 'school' as const,
-      children: schoolCats.map((cat) => ({
-        id: cat.id,
-        label: cat.chapter || '(미분류)',
-        type: 'material' as const,
-        children: [],
-        category: cat,
-      })),
-    })),
+    children: Object.entries(bySchool).map(([school, schoolCats]) => {
+      // 년도/학년이 비어 있는(미지정) 과거 데이터도 자기 노드 아래에 그대로 노출한다.
+      const byYear = groupBy(schoolCats, (c) => c.year || UNSPECIFIED_OPTION);
+
+      return {
+        id: `school-${school}`,
+        label: school,
+        type: 'school' as const,
+        children: Object.entries(byYear).map(([year, yearCats]) => {
+          const byGrade = groupBy(yearCats, (c) => c.grade || UNSPECIFIED_OPTION);
+
+          return {
+            id: `school-${school}-${year}`,
+            label: year === UNSPECIFIED_OPTION ? year : `${year}학년도`,
+            type: 'year' as const,
+            children: Object.entries(byGrade).map(([grade, gradeCats]) => ({
+              id: `school-${school}-${year}-${grade}`,
+              label: grade,
+              type: 'grade' as const,
+              children: gradeCats.map((cat) => ({
+                id: cat.id,
+                label: cat.chapter || '(미분류)',
+                type: 'material' as const,
+                children: [],
+                category: cat,
+              })),
+            })),
+          };
+        }),
+      };
+    }),
   };
 }
 

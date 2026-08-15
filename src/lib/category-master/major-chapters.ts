@@ -15,7 +15,7 @@ export async function createMajorChapter(name: string, publisherId: string, grad
   return supabase.from('major_chapters').insert({ name, publisher_id: publisherId, grade, semester }).select().single();
 }
 
-/** 대단원명을 수정하고, 관련 categories의 chapter도 동기화한다 */
+/** 대단원명을 수정하고, 관련 categories.chapter / concept_sheets.unit 도 동기화한다 */
 export async function updateMajorChapter(id: string, name: string) {
   const { data: old, error: selectErr } = await supabase
     .from('major_chapters')
@@ -41,6 +41,17 @@ export async function updateMajorChapter(id: string, name: string) {
       .eq('grade', old.grade)
       .eq('semester', old.semester);
     if (syncErr) return { error: syncErr };
+
+    // concept_sheets 는 컬럼명이 다르다: categories.chapter ↔ concept_sheets.unit
+    const { error: sheetSyncErr } = await supabase
+      .from('concept_sheets')
+      .update({ unit: name })
+      .eq('unit', old.name)
+      .eq('publisher', pub.name)
+      .eq('level', pub.level)
+      .eq('grade', old.grade)
+      .eq('semester', old.semester);
+    if (sheetSyncErr) return { error: sheetSyncErr };
   }
 
   return { error: null };
