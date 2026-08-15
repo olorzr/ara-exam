@@ -31,7 +31,7 @@ export default function CategoryForm(props: CategoryFormProps) {
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-lg">카테고리 설정</CardTitle>
         <Link
-          href="/words/categories"
+          href="/categories"
           className="flex items-center gap-1 text-xs text-gray-500 hover:text-primary transition-colors"
         >
           <Settings className="h-3.5 w-3.5" />
@@ -141,7 +141,7 @@ export default function CategoryForm(props: CategoryFormProps) {
         {(s.noPublishers || s.noSchools) && (
           <p className="mt-3 text-xs text-gray-500">
             등록된 항목이 없습니다.{' '}
-            <Link href="/words/categories" className="text-primary underline">카테고리 관리</Link>
+            <Link href="/categories" className="text-primary underline">카테고리 관리</Link>
             에서 먼저 등록해주세요.
           </p>
         )}

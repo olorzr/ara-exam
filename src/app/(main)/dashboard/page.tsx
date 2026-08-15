@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BookOpen, FileText, PlusCircle, History, Upload, FolderOpen, Lightbulb } from 'lucide-react';
+import { BookOpen, FileText, PlusCircle, History, Upload, FolderOpen, FolderCog, Lightbulb } from 'lucide-react';
 
 /**
  * 대시보드 페이지. 통계 요약과 빠른 실행 메뉴를 표시한다.
@@ -44,6 +44,7 @@ export default function DashboardPage() {
     { href: '/exam/builder', icon: Lightbulb, label: '개념 관리', desc: '개념지를 만들고 관리해요 💡' },
     { href: '/words/new', icon: PlusCircle, label: '단어 입력', desc: '새 단어를 추가해요 ✨' },
     { href: '/words', icon: FolderOpen, label: '단어 관리', desc: '저장된 단어를 관리해요 📖' },
+    { href: '/categories', icon: FolderCog, label: '카테고리 관리', desc: '출판사·단원을 정리해요 📂' },
     { href: '/exam/create', icon: FileText, label: '시험지 생성', desc: '시험지를 만들어요 ✏️' },
     { href: '/exam/history', icon: History, label: '시험 이력', desc: '이전 시험지를 확인해요 🔍' },
   ];
@@ -98,7 +99,7 @@ export default function DashboardPage() {
       {/* 빠른 실행 */}
       <div>
         <h2 className="text-lg font-semibold text-gray-900 mb-4">⚡ 빠른 실행</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
           {quickActions.map((action) => (
             <Link key={action.href} href={action.href}>
               <Card className="hover:border-primary/50 hover:shadow-md hover:shadow-primary/10 transition-all cursor-pointer h-full">

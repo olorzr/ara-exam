@@ -42,6 +42,13 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async redirects() {
+    return [
+      // 카테고리 관리가 단어 관리 하위에서 최상위 메뉴로 올라갔다. 북마크·옛 링크 보호용.
+      // permanent:false — 브라우저가 영구 캐시하지 않게 해서 되돌릴 여지를 남긴다.
+      { source: '/words/categories', destination: '/categories', permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;
