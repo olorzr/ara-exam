@@ -14,7 +14,7 @@ export async function createSubChapter(name: string, majorChapterId: string) {
   return supabase.from('sub_chapters').insert({ name, major_chapter_id: majorChapterId }).select().single();
 }
 
-/** 소단원명을 수정하고, 관련 categories의 sub_chapter도 동기화한다 */
+/** 소단원명을 수정하고, 관련 categories.sub_chapter / concept_sheets.subunit 도 동기화한다 */
 export async function updateSubChapter(id: string, name: string) {
   const { data: old, error: selectErr } = await supabase
     .from('sub_chapters')
@@ -44,6 +44,18 @@ export async function updateSubChapter(id: string, name: string) {
       .eq('grade', mc.grade)
       .eq('semester', mc.semester);
     if (syncErr) return { error: syncErr };
+
+    // concept_sheets 는 컬럼명이 다르다: chapter ↔ unit, sub_chapter ↔ subunit
+    const { error: sheetSyncErr } = await supabase
+      .from('concept_sheets')
+      .update({ subunit: name })
+      .eq('subunit', old.name)
+      .eq('unit', mc.name)
+      .eq('publisher', mc.publishers.name)
+      .eq('level', mc.publishers.level)
+      .eq('grade', mc.grade)
+      .eq('semester', mc.semester);
+    if (sheetSyncErr) return { error: sheetSyncErr };
   }
 
   return { error: null };

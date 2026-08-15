@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -11,21 +11,26 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
-import { getAllSchoolLevelCategories } from '@/lib/category-master';
+import { getAllSelectableCategories } from '@/lib/category-master';
 import { buildCategoryTree } from '@/lib/category-tree';
 import CategoryTree from '@/components/words/CategoryTree';
 import { formatCategoryLabel } from '@/lib/format';
 import { FolderOpen, Search } from 'lucide-react';
-import type { Category } from '@/types';
+import { toast } from 'sonner';
+import type { Category, CategoryLevel } from '@/types';
 
 /** 빌더 카테고리 정보 */
 export interface BuilderCategory {
-  level: '중등' | '고등';
+  level: CategoryLevel;
+  /** 학년도(외부지문 전용). '' 는 미지정 */
+  year: string;
   grade: string;
   publisher: string;
   semester: string;
   unit: string;
   subunit: string;
+  /** 학교명(외부지문 전용) */
+  schoolName: string;
 }
 
 interface ExamCategoryBarProps {
@@ -39,49 +44,86 @@ interface ExamCategoryBarProps {
  */
 function toBuilderCategory(cat: Category): BuilderCategory {
   return {
-    level: cat.level === '고등' ? '고등' : '중등',
+    level: cat.level,
+    year: cat.year,
     grade: cat.grade,
     publisher: cat.publisher,
     semester: cat.semester,
     unit: cat.chapter,
     subunit: cat.sub_chapter || '',
+    schoolName: cat.school_name || '',
   };
+}
+
+/** BuilderCategory → Category 변환(라벨 포맷·자연키 비교용 어댑터) */
+function toCategory(cat: BuilderCategory): Category {
+  return {
+    id: '',
+    level: cat.level,
+    year: cat.year,
+    grade: cat.grade,
+    publisher: cat.publisher,
+    semester: cat.semester,
+    chapter: cat.unit,
+    sub_chapter: cat.subunit,
+    school_name: cat.schoolName,
+    user_id: '',
+    created_at: '',
+  };
+}
+
+/** 자연키 — 개념지는 카테고리 id 를 저장하지 않으므로 텍스트 조합으로 대조한다 */
+function naturalKey(cat: Category): string {
+  return [
+    cat.level, cat.year ?? '', cat.grade, cat.publisher,
+    cat.semester, cat.chapter, cat.sub_chapter, cat.school_name ?? '',
+  ].join('|');
 }
 
 /**
  * 개념지 빌더 상단 카테고리 선택 바.
- * 단어관리와 동일한 CategoryTree에서 카테고리를 선택한다.
+ * 단어관리·시험지 생성과 동일한 카테고리 소스(getAllSelectableCategories)에서 선택한다.
  */
 export default function ExamCategoryBar({ category, onChange }: ExamCategoryBarProps) {
   const [open, setOpen] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>();
 
   useEffect(() => {
     (async () => {
-      const all = await getAllSchoolLevelCategories();
-      setCategories(all);
+      try {
+        setCategories(await getAllSelectableCategories());
+      } catch {
+        // 예전엔 에러를 삼켜서 RLS/네트워크 실패가 "카테고리가 없습니다" 로만 보였다.
+        toast.error('카테고리를 불러오지 못했어요.');
+      }
     })();
   }, []);
 
-  const filtered = searchQuery
-    ? categories.filter((c) =>
-        formatCategoryLabel(c).toLowerCase().includes(searchQuery.toLowerCase()),
-      )
-    : categories;
+  // 개념지는 카테고리 id 가 아니라 텍스트를 복사 저장하므로, 현재 카테고리를 자연키로
+  // 대조해 트리의 선택 상태를 파생시킨다(예전엔 초기화가 없어 기존 개념지를 열면
+  // 아무것도 선택돼 있지 않은 것처럼 보였다).
+  const selectedCategoryId = useMemo(() => {
+    const key = naturalKey(toCategory(category));
+    return categories.find((c) => naturalKey(c) === key)?.id;
+  }, [categories, category]);
 
-  const tree = buildCategoryTree(filtered);
+  const filtered = useMemo(
+    () => (searchQuery
+      ? categories.filter((c) =>
+        formatCategoryLabel(c).toLowerCase().includes(searchQuery.toLowerCase()))
+      : categories),
+    [categories, searchQuery],
+  );
+
+  const tree = useMemo(() => buildCategoryTree(filtered), [filtered]);
 
   const handleSelect = (cat: Category) => {
     onChange(toBuilderCategory(cat));
-    setSelectedCategoryId(cat.id);
     setOpen(false);
   };
 
-  const label = category.unit
-    ? `${category.grade} ${category.publisher} ${category.semester} ${category.unit}${category.subunit ? ` — ${category.subunit}` : ''}`
-    : '카테고리를 선택하세요';
+  const label = category.unit ? formatCategoryLabel(toCategory(category)) : '카테고리를 선택하세요';
 
   return (
     <div className="bg-white border-b-2 border-primary p-4 flex items-center gap-3 sticky top-16 z-40" data-no-print>
@@ -97,7 +139,7 @@ export default function ExamCategoryBar({ category, onChange }: ExamCategoryBarP
         <SheetContent side="left" className="w-[380px] sm:max-w-[380px]">
           <SheetHeader>
             <SheetTitle>카테고리 선택</SheetTitle>
-            <SheetDescription>학년 · 출판사 · 단원을 선택하세요.</SheetDescription>
+            <SheetDescription>학년 · 출판사 · 단원 또는 외부지문을 선택하세요.</SheetDescription>
           </SheetHeader>
           <div className="px-4 pb-2">
             <div className="relative">
@@ -111,10 +153,13 @@ export default function ExamCategoryBar({ category, onChange }: ExamCategoryBarP
             </div>
           </div>
           <div className="flex-1 overflow-y-auto px-4 pb-4">
+            {/* 검색 중에는 트리를 펼쳐 둔다 — 기본 접힘(depth<2)이라 매칭된 단원이
+                3단계 아래에 숨어 "검색이 안 먹는다"로 보였다. */}
             <CategoryTree
               nodes={tree}
               selectedId={selectedCategoryId}
               onSelect={handleSelect}
+              forceExpanded={!!searchQuery}
             />
           </div>
         </SheetContent>

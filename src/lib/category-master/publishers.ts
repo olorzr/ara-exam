@@ -14,7 +14,7 @@ export async function createPublisher(name: string, level: string) {
   return supabase.from('publishers').insert({ name, level }).select().single();
 }
 
-/** 출판사명을 수정하고, 관련 categories의 publisher도 동기화한다 */
+/** 출판사명을 수정하고, 관련 categories/concept_sheets 의 publisher 도 동기화한다 */
 export async function updatePublisher(id: string, name: string) {
   const { data: old, error: selectErr } = await supabase
     .from('publishers').select('name, level').eq('id', id).single();
@@ -26,7 +26,9 @@ export async function updatePublisher(id: string, name: string) {
     .from('publishers').update({ name }).eq('id', id);
   if (updateErr) return { error: updateErr };
 
-  // DB 트리거가 있어도 앱 레벨에서도 동기화 시도 (안전장치)
+  // DB 트리거가 있어도 앱 레벨에서도 동기화 시도 (안전장치).
+  // 개념지(concept_sheets)도 반드시 함께 갱신해야 한다 — categories 만 고치면
+  // 트리거가 없는 환경에서 단어지는 새 이름, 개념지는 옛 이름으로 갈라진다.
   if (old.name !== name) {
     const { error: syncErr } = await supabase
       .from('categories')
@@ -34,6 +36,13 @@ export async function updatePublisher(id: string, name: string) {
       .eq('publisher', old.name)
       .eq('level', old.level);
     if (syncErr) return { error: syncErr };
+
+    const { error: sheetSyncErr } = await supabase
+      .from('concept_sheets')
+      .update({ publisher: name })
+      .eq('publisher', old.name)
+      .eq('level', old.level);
+    if (sheetSyncErr) return { error: sheetSyncErr };
   }
 
   return { error: null };

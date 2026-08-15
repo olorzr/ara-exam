@@ -6,6 +6,9 @@ import type { CategoryTreeNode } from '@/lib/category-tree';
 import { ChevronRight, ChevronDown, FolderOpen, FileText } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 
+/** 이 깊이 미만의 노드는 기본으로 펼쳐 둔다 */
+const DEFAULT_EXPANDED_DEPTH = 2;
+
 interface CategoryTreeProps {
   nodes: CategoryTreeNode[];
   selectedId?: string;
@@ -13,6 +16,8 @@ interface CategoryTreeProps {
   selectedIds?: string[];
   onToggle?: (categoryId: string) => void;
   multiSelect?: boolean;
+  /** 모든 노드를 펼친 상태로 렌더한다(검색 결과 표시용) */
+  forceExpanded?: boolean;
 }
 
 /**
@@ -20,7 +25,7 @@ interface CategoryTreeProps {
  * 단일 선택 또는 체크박스 다중 선택 모드를 지원한다.
  */
 export default function CategoryTree({
-  nodes, selectedId, onSelect, selectedIds, onToggle, multiSelect,
+  nodes, selectedId, onSelect, selectedIds, onToggle, multiSelect, forceExpanded,
 }: CategoryTreeProps) {
   if (nodes.length === 0) {
     return <p className="text-sm text-gray-400 text-center py-4">카테고리가 없습니다.</p>;
@@ -37,6 +42,7 @@ export default function CategoryTree({
           selectedIds={selectedIds}
           onToggle={onToggle}
           multiSelect={multiSelect}
+          forceExpanded={forceExpanded}
           depth={0}
         />
       ))}
@@ -51,13 +57,16 @@ interface TreeNodeItemProps {
   selectedIds?: string[];
   onToggle?: (catId: string) => void;
   multiSelect?: boolean;
+  forceExpanded?: boolean;
   depth: number;
 }
 
 function TreeNodeItem({
-  node, selectedId, onSelect, selectedIds, onToggle, multiSelect, depth,
+  node, selectedId, onSelect, selectedIds, onToggle, multiSelect, forceExpanded, depth,
 }: TreeNodeItemProps) {
-  const [expanded, setExpanded] = useState(depth < 2);
+  const [collapsed, setCollapsed] = useState(depth >= DEFAULT_EXPANDED_DEPTH);
+  // 검색 중에는 사용자가 접어둔 상태를 무시하고 전부 펼친다.
+  const expanded = forceExpanded || !collapsed;
   const isLeaf = node.children.length === 0;
   const isSelected = node.category && selectedId === node.category.id;
   const isChecked = node.category && selectedIds?.includes(node.category.id);
@@ -70,7 +79,7 @@ function TreeNodeItem({
         onSelect(node.category);
       }
     } else {
-      setExpanded(!expanded);
+      setCollapsed(expanded);
     }
   };
 
@@ -122,6 +131,7 @@ function TreeNodeItem({
               selectedIds={selectedIds}
               onToggle={onToggle}
               multiSelect={multiSelect}
+              forceExpanded={forceExpanded}
               depth={depth + 1}
             />
           ))}

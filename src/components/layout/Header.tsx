@@ -31,27 +31,33 @@ export default function Header() {
     <header className="border-b border-gray-200 bg-white/80 backdrop-blur-sm sticky top-0 z-50" data-no-print>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <Link href="/dashboard" className="flex items-center gap-2">
+          <Link href="/dashboard" className="flex items-center gap-2 shrink-0">
             <Image src="/logo.png" alt="아라국어논술" width={36} height={36} />
-            <span className="text-lg font-bold text-gray-900" style={{ fontFamily: "'Gmarket Sans', sans-serif" }}>아라국어논술 시험 관리 시스템</span>
+            <span
+              className="hidden xl:inline text-lg font-bold text-gray-900 whitespace-nowrap"
+              style={{ fontFamily: "'Gmarket Sans', sans-serif" }}
+            >
+              아라국어논술
+            </span>
           </Link>
 
           {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden lg:flex items-center gap-1">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className="px-3 py-2 text-sm font-medium text-gray-600 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors"
+                className="px-3 py-2 text-sm font-medium text-gray-600 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors whitespace-nowrap"
               >
                 {link.label}
               </Link>
             ))}
           </nav>
 
-          <div className="hidden md:flex items-center gap-3">
-            <span className="text-sm text-gray-500">{user?.email}</span>
-            <Button variant="outline" size="sm" onClick={signOut}>
+          {/* 로그인 이메일은 데스크톱에서 표시하지 않는다 — 메뉴 7개 + 브랜드까지 한 줄에
+              들어가야 해서 폭이 부족했고, 텍스트가 접혀 헤더가 2줄이 됐다(모바일 메뉴에는 유지). */}
+          <div className="hidden lg:flex items-center shrink-0">
+            <Button variant="outline" size="sm" onClick={signOut} className="whitespace-nowrap">
               <LogOut className="h-4 w-4 mr-1" />
               로그아웃
             </Button>
@@ -59,7 +65,10 @@ export default function Header() {
 
           {/* Mobile menu button */}
           <button
-            className="md:hidden p-2"
+            type="button"
+            className="lg:hidden p-2"
+            aria-label={mobileOpen ? '메뉴 닫기' : '메뉴 열기'}
+            aria-expanded={mobileOpen}
             onClick={() => setMobileOpen(!mobileOpen)}
           >
             {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
@@ -68,7 +77,7 @@ export default function Header() {
 
         {/* Mobile nav */}
         {mobileOpen && (
-          <div className="md:hidden pb-4 space-y-1">
+          <div className="lg:hidden pb-4 space-y-1">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
@@ -82,6 +91,7 @@ export default function Header() {
             <div className="pt-2 border-t">
               <span className="block px-3 py-1 text-sm text-gray-500">{user?.email}</span>
               <button
+                type="button"
                 onClick={signOut}
                 className="block px-3 py-2 text-sm font-medium text-red-600"
               >

@@ -5,6 +5,8 @@ import { transformHTML, stripTrailingEmpty } from '@/lib/exam-transform';
 import type { TransformMode } from '@/lib/exam-transform';
 import { A4Document, CompactPageHeader } from '@/components/print';
 import { useConceptSheetBlocks } from '@/hooks/useConceptSheetBlocks';
+import { EXTERNAL_LEVEL } from '@/lib/constants';
+import { kstYear } from '@/lib/kst-year';
 import type { BuilderCategory } from './ExamCategoryBar';
 
 /** 1단 최대 글자 수 — 초과 시 2단 레이아웃 */
@@ -52,10 +54,19 @@ export default function ExamSheetRenderer({
   interactive,
   breakAfterLast,
 }: ExamSheetRendererProps) {
-  const year = new Date().getFullYear();
   const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
   const unitText = category.subunit ? `${category.unit} — ${category.subunit}` : category.unit;
-  const title = [`${year} ${category.grade} 국어 ${category.publisher}`, unitText].filter(Boolean).join(' ');
+  // 예전엔 앞부분이 템플릿 리터럴이라 filter(Boolean) 이 못 걸러, 카테고리가 비면
+  // `"2026  국어 "` 같은 공백 제목이 인쇄됐다. 조각을 나눠 조립한다.
+  const titleParts = category.level === EXTERNAL_LEVEL
+    ? [category.year || String(kstYear()), category.grade, category.schoolName]
+    : [
+      String(kstYear()),
+      category.grade,
+      category.grade || category.publisher ? '국어' : '',
+      category.publisher,
+    ];
+  const title = [...titleParts, unitText].filter(Boolean).join(' ');
 
   const bodyHTML = useMemo(
     () => transformHTML(stripTrailingEmpty(editorHTML), config.mode),

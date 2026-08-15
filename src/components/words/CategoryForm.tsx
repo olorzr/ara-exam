@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import type { CategoryLevel } from '@/types';
 import { EXTERNAL_LEVEL, SEMESTER_OPTIONS } from '@/lib/constants';
+import { UNSPECIFIED_OPTION } from '@/lib/external-category';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -23,7 +24,7 @@ const toSelectItems = (list: { id: string; name: string }[]) =>
  * useCategoryFormState 훅이 담당하고, 이 컴포넌트는 화면만 그린다.
  */
 export default function CategoryForm(props: CategoryFormProps) {
-  const { level, grade, semester } = props;
+  const { level, year, grade, semester } = props;
   const s = useCategoryFormState(props);
 
   return (
@@ -124,8 +125,30 @@ export default function CategoryForm(props: CategoryFormProps) {
                 </Select>
               </div>
               <div className="space-y-2">
+                <Label>년도</Label>
+                <Select value={year} onValueChange={(v) => { if (v) s.handleYearChange(v); }} disabled={!s.schoolId}>
+                  <SelectTrigger><SelectValue placeholder="년도 선택" /></SelectTrigger>
+                  <SelectContent>
+                    {s.yearOptions.map((y) => (
+                      <SelectItem key={y} value={y}>{y === UNSPECIFIED_OPTION ? y : `${y}학년도`}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>학년</Label>
+                <Select value={grade} onValueChange={(v) => { if (v) s.handleGradeChange(v); }} disabled={!year}>
+                  <SelectTrigger><SelectValue placeholder="학년 선택" /></SelectTrigger>
+                  <SelectContent>
+                    {s.gradeOptions.map((g) => (
+                      <SelectItem key={g} value={g}>{g}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
                 <Label>프린트/작품명</Label>
-                <Select value={s.materialId} items={toSelectItems(s.materials)} onValueChange={(v) => { if (v) s.handleMaterialSelect(v); }} disabled={!s.schoolId}>
+                <Select value={s.materialId} items={toSelectItems(s.materials)} onValueChange={(v) => { if (v) s.handleMaterialSelect(v); }} disabled={!grade}>
                   <SelectTrigger><SelectValue placeholder="프린트/작품명 선택" /></SelectTrigger>
                   <SelectContent>
                     {s.materials.map((m) => (

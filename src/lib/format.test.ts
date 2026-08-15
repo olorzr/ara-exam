@@ -5,6 +5,7 @@ import type { Category } from '@/types';
 const makeCategory = (overrides: Partial<Category> = {}): Category => ({
   id: '1',
   level: '중등',
+  year: '',
   grade: '중1',
   publisher: '비상',
   semester: '1학기',
@@ -25,6 +26,20 @@ describe('formatCategoryLabel', () => {
     const cat = makeCategory({
       level: '외부지문 및 프린트',
       school_name: 'OO중학교',
+      year: '2026',
+      grade: '중2',
+      chapter: '프린트1',
+      sub_chapter: '',
+    });
+    expect(formatCategoryLabel(cat)).toBe('OO중학교 2026 중2 - 프린트1');
+  });
+
+  it('외부지문의 년도·학년이 미지정이면 생략한다', () => {
+    const cat = makeCategory({
+      level: '외부지문 및 프린트',
+      school_name: 'OO중학교',
+      year: '',
+      grade: '',
       chapter: '프린트1',
       sub_chapter: '',
     });
@@ -35,6 +50,8 @@ describe('formatCategoryLabel', () => {
     const cat = makeCategory({
       level: '외부지문 및 프린트',
       school_name: '',
+      year: '',
+      grade: '',
       chapter: '프린트1',
       sub_chapter: '',
     });

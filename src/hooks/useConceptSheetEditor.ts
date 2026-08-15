@@ -9,15 +9,18 @@ import type { Editor } from '@tiptap/react';
 import type { BuilderCategory, MarkItem } from '@/components/exam-builder';
 import { extractMarks } from '@/lib/concept-marks';
 import { sanitizeConceptHTML } from '@/lib/sanitize-html';
+import { EXTERNAL_LEVEL } from '@/lib/constants';
 import type { ConceptSheet } from '@/types';
 
 const DEFAULT_CATEGORY: BuilderCategory = {
   level: '중등',
+  year: '',
   grade: '',
   publisher: '',
   semester: '',
   unit: '',
   subunit: '',
+  schoolName: '',
 };
 
 /**
@@ -50,8 +53,11 @@ export function useConceptSheetEditor() {
 
   /** 카테고리 값으로 자동 제목을 생성한다 */
   const generateTitle = useCallback((cat: BuilderCategory) => {
-    const parts = [cat.grade, cat.publisher, cat.semester, cat.unit, cat.subunit].filter(Boolean);
-    return parts.length > 0 ? `${parts.join(' ')} 개념지` : '';
+    const parts = cat.level === EXTERNAL_LEVEL
+      ? [cat.schoolName, cat.year, cat.grade, cat.unit]
+      : [cat.grade, cat.publisher, cat.semester, cat.unit, cat.subunit];
+    const filled = parts.filter(Boolean);
+    return filled.length > 0 ? `${filled.join(' ')} 개념지` : '';
   }, []);
 
   /** 카테고리 변경 시 자동 제목도 갱신한다 */
@@ -93,11 +99,13 @@ export function useConceptSheetEditor() {
         setTitle(sheet.title);
         setCategory({
           level: sheet.level,
+          year: sheet.year ?? '',
           grade: sheet.grade,
           publisher: sheet.publisher,
           semester: sheet.semester,
           unit: sheet.unit,
           subunit: sheet.subunit,
+          schoolName: sheet.school_name ?? '',
         });
         setLoadedUpdatedAt(sheet.updated_at);
         // concept_sheets 는 authenticated 전원이 쓸 수 있는 공유 테이블이라, 저장 시
@@ -119,7 +127,12 @@ export function useConceptSheetEditor() {
   const handleSave = useCallback(async () => {
     if (!user) return;
 
-    if (!category.grade || !category.publisher) {
+    // 외부지문은 출판사/학기를 쓰지 않으므로 필수 항목이 다르다.
+    // 예전엔 grade + publisher 를 무조건 요구해, 외부지문을 고를 수 있게 해도 저장이 막혔다.
+    const missingCategory = category.level === EXTERNAL_LEVEL
+      ? !category.schoolName || !category.unit
+      : !category.grade || !category.publisher || !category.unit;
+    if (missingCategory) {
       toast.error('카테고리를 먼저 설정해주세요.');
       return;
     }
@@ -152,11 +165,13 @@ export function useConceptSheetEditor() {
     const payload = {
       title: sheetTitle,
       level: category.level,
+      year: category.year,
       grade: category.grade,
       publisher: category.publisher,
       semester: category.semester,
       unit: category.unit,
       subunit: category.subunit,
+      school_name: category.schoolName,
       editor_html: html,
       marks: currentMarks,
     };

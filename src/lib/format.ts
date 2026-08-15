@@ -14,7 +14,9 @@ interface FormatCategoryOptions {
  */
 export function formatCategoryLabel(cat: Category, options?: FormatCategoryOptions): string {
   if (cat.level === EXTERNAL_LEVEL) {
-    return [cat.school_name || '외부', cat.chapter].filter(Boolean).join(' - ');
+    // 년도/학년은 미지정('')이면 생략된다 — 예: `상현중 2026 중2 - 소나기`
+    const scope = [cat.school_name || '외부', cat.year, cat.grade].filter(Boolean).join(' ');
+    return [scope, cat.chapter].filter(Boolean).join(' - ');
   }
   if (options?.excludePublisher) {
     return [cat.grade, cat.semester, cat.chapter, cat.sub_chapter].filter(Boolean).join(' ');

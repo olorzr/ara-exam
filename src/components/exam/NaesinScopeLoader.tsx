@@ -9,13 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { School } from 'lucide-react';
 import { toast } from 'sonner';
 import { MIDDLE_SCHOOL_GRADES, HIGH_SCHOOL_GRADES } from '@/lib/constants';
+import { kstYear } from '@/lib/kst-year';
 import { fetchNaesinSchools, fetchPublicTextbook, fetchScopeSlot } from '@/lib/naesin-scope/fetch';
 import { matchScopeToCategories } from '@/lib/naesin-scope/match';
 import { EXAM_SLOT_OPTIONS, slotOptionsForGrade, type NaesinSchool, type PublicTextbook, type ScopeSlotRow } from '@/lib/naesin-scope/types';
-
-/** KST 기준 올해 학년도 */
-const kstYear = (): number =>
-  Number(new Intl.DateTimeFormat('en', { timeZone: 'Asia/Seoul', year: 'numeric' }).format(new Date()));
 
 interface NaesinScopeLoaderProps {
   /** exam/create 페이지가 이미 로드한 전체 카테고리 */

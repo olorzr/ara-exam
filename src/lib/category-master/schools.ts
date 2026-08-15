@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { EXTERNAL_LEVEL } from '../constants';
 import type { School } from '@/types';
 
 /** 학교 목록을 조회한다 */
@@ -12,7 +13,7 @@ export async function createSchool(name: string) {
   return supabase.from('schools').insert({ name }).select().single();
 }
 
-/** 학교명을 수정하고, 관련 categories의 school_name도 동기화한다 */
+/** 학교명을 수정하고, 관련 categories/concept_sheets 의 school_name 도 동기화한다 */
 export async function updateSchool(id: string, name: string) {
   const { data: old, error: selectErr } = await supabase
     .from('schools').select('name').eq('id', id).single();
@@ -29,8 +30,15 @@ export async function updateSchool(id: string, name: string) {
       .from('categories')
       .update({ school_name: name })
       .eq('school_name', old.name)
-      .eq('level', '외부지문 및 프린트');
+      .eq('level', EXTERNAL_LEVEL);
     if (syncErr) return { error: syncErr };
+
+    const { error: sheetSyncErr } = await supabase
+      .from('concept_sheets')
+      .update({ school_name: name })
+      .eq('school_name', old.name)
+      .eq('level', EXTERNAL_LEVEL);
+    if (sheetSyncErr) return { error: sheetSyncErr };
   }
 
   return { error: null };

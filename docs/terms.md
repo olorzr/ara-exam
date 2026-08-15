@@ -26,9 +26,19 @@
 - 관련 파일: `src/lib/constants.ts`, `src/app/(main)/exam/create/page.tsx`
 
 ## 외부지문 및 프린트 (External Level)
-- 정의: 교과서 외 학교별 특이 지문/프린트물의 단어를 관리하는 별도 카테고리
-- 코드에서의 사용: `EXTERNAL_LEVEL` 상수, `CategoryLevel` 타입
-- 관련 파일: `src/lib/constants.ts`, `src/types/index.ts`
+- 정의: 교과서 외 학교별 특이 지문/프린트물의 단어를 관리하는 별도 카테고리. 계층은 `학교 > 년도 > 학년 > 프린트/작품명`
+- 코드에서의 사용: `EXTERNAL_LEVEL` 상수, `CategoryLevel` 타입, `buildExternalTree`
+- 관련 파일: `src/lib/constants.ts`, `src/types/index.ts`, `src/lib/category-tree.ts`, `src/components/words/ExternalCategoryTab.tsx`
+
+## 년도 / 학년 (외부지문의 year · grade)
+- 정의: 프린트/작품명이 어느 **학년도**의 어느 **학년** 것인지. 같은 이름의 프린트를 해마다 따로 둘 수 있게 하는 구분자다. 중등/고등 교과 카테고리는 `year` 를 쓰지 않는다(학기가 그 역할)
+- 코드에서의 사용: `school_materials.year/grade`, `categories.year/grade`, `concept_sheets.year/grade`. 값은 TEXT(`'2026'`, `'중2'`)이고 **빈 문자열 `''` 이 "미지정"** 이다. UI 표시값 `'미지정'` ↔ 저장값 `''` 변환은 `toStoredValue`/`toOptionValue` 한 곳에서만 한다
+- 관련 파일: `src/lib/external-category.ts`, `src/lib/kst-year.ts`, `sql/15_migration_external_year_grade.sql`
+
+## 미지정 (UNSPECIFIED_OPTION)
+- 정의: 년도·학년이 정해지지 않은 상태. Select 에는 `'미지정'` 으로 보이고 DB 에는 `''` 로 저장된다. base-ui Select 가 빈 문자열 value 를 다루기 까다로워 센티널을 쓴다
+- 코드에서의 사용: `UNSPECIFIED_OPTION`, `toStoredValue`, `toOptionValue`
+- 관련 파일: `src/lib/external-category.ts`
 
 ## 카테고리 레벨 (CategoryLevel)
 - 정의: 최상위 분류 ('중등' | '고등' | '외부지문 및 프린트')
