@@ -32,6 +32,25 @@
 --   `public` 에는 ara-system 의 동명 테이블(schools 등)이 따로 존재한다. search_path 를
 --   지정하지 않고 실행하면 public 을 향해 엉뚱한 테이블을 건드리거나 함수가 public 에
 --   중복 생성된다(exam 쪽은 그대로 남아 조용히 무효). 반드시 아래 설정과 함께 실행할 것.
+-- ---------------------------------------------
+-- 실행 대상 확인 (가장 먼저)
+-- ---------------------------------------------
+-- 이 앱의 테이블은 ara-system 과 공유하는 Supabase 프로젝트의 exam 스키마에 있다.
+-- exam 이 없는 DB 에서 실행하면 `SET search_path = exam, public` 의 exam 이 조용히
+-- 건너뛰어지고 무자격 객체가 전부 public 을 향한다 — 남의 스키마를 오염시키거나
+-- `column "year" does not exist` 같은 엉뚱한 에러가 난다(실제로 겪었다).
+-- 그래서 시작 전에 명확히 멈춘다.
+DO $guard$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'exam') THEN
+    RAISE EXCEPTION
+      'exam 스키마가 없습니다 (현재 DB: %). SQL Editor 가 다른 Supabase 프로젝트에 '
+      '연결돼 있을 가능성이 높습니다 — 앱의 NEXT_PUBLIC_SUPABASE_URL 이 가리키는 '
+      '프로젝트(ara-system 과 공유하는 쪽)에서 실행하세요.', current_database();
+  END IF;
+END
+$guard$;
+
 SET search_path = exam, public;
 
 -- ---------------------------------------------

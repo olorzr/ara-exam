@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { normalizeCategoryName } from '../category-name';
 import type { Publisher } from '@/types';
 
 /** 출판사 목록을 조회한다 */
@@ -9,13 +10,19 @@ export async function getPublishers(level?: string): Promise<Publisher[]> {
   return (data as Publisher[]) ?? [];
 }
 
-/** 출판사를 추가한다 */
+/** 출판사를 추가한다 (이름은 표준 표기로 정규화해 저장한다) */
 export async function createPublisher(name: string, level: string) {
-  return supabase.from('publishers').insert({ name, level }).select().single();
+  return supabase
+    .from('publishers')
+    .insert({ name: normalizeCategoryName(name), level })
+    .select().single();
 }
 
 /** 출판사명을 수정하고, 관련 categories/concept_sheets 의 publisher 도 동기화한다 */
-export async function updatePublisher(id: string, name: string) {
+export async function updatePublisher(id: string, rawName: string) {
+  // 표기 변형(공백·전각 괄호 등)을 그대로 저장하면 트리에서 같은 이름이 두 폴더로 갈라진다
+  const name = normalizeCategoryName(rawName);
+
   const { data: old, error: selectErr } = await supabase
     .from('publishers').select('name, level').eq('id', id).single();
   if (selectErr || !old) {

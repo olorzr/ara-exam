@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { normalizeCategoryName } from '../category-name';
 import type { MajorChapter } from '@/types';
 
 /** 대단원 목록을 조회한다 (출판사 + 학년 + 학기 필터) */
@@ -12,11 +13,17 @@ export async function getMajorChapters(publisherId: string, grade?: string, seme
 
 /** 대단원을 추가한다 */
 export async function createMajorChapter(name: string, publisherId: string, grade: string, semester: string) {
-  return supabase.from('major_chapters').insert({ name, publisher_id: publisherId, grade, semester }).select().single();
+  return supabase
+    .from('major_chapters')
+    .insert({ name: normalizeCategoryName(name), publisher_id: publisherId, grade, semester })
+    .select().single();
 }
 
 /** 대단원명을 수정하고, 관련 categories.chapter / concept_sheets.unit 도 동기화한다 */
-export async function updateMajorChapter(id: string, name: string) {
+export async function updateMajorChapter(id: string, rawName: string) {
+  // 표기 변형(공백·전각 괄호 등)을 그대로 저장하면 트리에서 같은 이름이 두 폴더로 갈라진다
+  const name = normalizeCategoryName(rawName);
+
   const { data: old, error: selectErr } = await supabase
     .from('major_chapters')
     .select('name, grade, semester, publisher_id, publishers(name, level)')

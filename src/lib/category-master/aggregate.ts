@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { categoryNaturalKey, withNormalizedCategoryNames } from '../category-key';
 import { EXTERNAL_LEVEL } from '../constants';
 import type { Publisher, MajorChapter, SubChapter, School, SchoolMaterial, Category } from '@/types';
 
@@ -9,19 +10,15 @@ import type { Publisher, MajorChapter, SubChapter, School, SchoolMaterial, Categ
 const SELECT_LIMIT = 5000;
 
 /**
- * 자연키 — categories 의 idx_categories_natural_key 와 같은 조합.
- * `?? ''` 는 sql/15 적용 전 DB 에서 읽은 행(year 없음)이 'undefined' 키가 되는 것을 막는다.
+ * 마스터 전개용 Category 골격 (id 는 호출처가 지정).
+ *
+ * 이름 필드는 `withNormalizedCategoryNames` 로 정규화해서 내보낸다. 마스터 테이블에
+ * `천재(정호웅)` 과 `천재 (정호웅)` 이 둘 다 남아 있으면 트리의 `groupBy` 가 이름
+ * 완전 일치로 묶기 때문에 출판사 폴더가 두 개로 갈라진다(그 아래 대단원·소단원도
+ * 각각 나뉘어 붙는다). 값까지 정규화해야 한 노드로 합쳐진다.
  */
-function naturalKey(cat: Category): string {
-  return [
-    cat.level, cat.year ?? '', cat.grade, cat.publisher,
-    cat.semester, cat.chapter, cat.sub_chapter, cat.school_name ?? '',
-  ].join('|');
-}
-
-/** 마스터 전개용 Category 골격 (id 는 호출처가 지정) */
 function makeCategory(id: string, fields: Partial<Category> & Pick<Category, 'level'>): Category {
-  return {
+  return withNormalizedCategoryNames({
     id,
     level: fields.level,
     year: fields.year ?? '',
@@ -33,7 +30,7 @@ function makeCategory(id: string, fields: Partial<Category> & Pick<Category, 'le
     school_name: fields.school_name ?? '',
     user_id: '',
     created_at: '',
-  };
+  });
 }
 
 /**
@@ -120,9 +117,14 @@ export async function getAllSelectableCategories(): Promise<Category[]> {
   }
 
   // 3. categories 테이블 (같은 자연키면 이쪽이 이긴다 — 실제 UUID 를 가진 행)
+  //    저장된 행도 정규화해서 담는다 — 마스터와 표기가 갈리면 dedupe 를 통과해
+  //    두 행이 살아남고, 트리에서 다시 두 폴더로 보인다.
   const byKey = new Map<string, Category>();
-  for (const cat of result) byKey.set(naturalKey(cat), cat);
-  for (const cat of saved) byKey.set(naturalKey(cat), cat);
+  for (const cat of result) byKey.set(categoryNaturalKey(cat), cat);
+  for (const cat of saved) {
+    const normalized = withNormalizedCategoryNames(cat);
+    byKey.set(categoryNaturalKey(normalized), normalized);
+  }
 
   return [...byKey.values()];
 }

@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { EXTERNAL_LEVEL } from './constants';
+import { normalizeCategoryName } from './category-name';
 import type { CategoryLevel } from '@/types';
 import type { WordEntry } from '@/components/words';
 
@@ -59,11 +60,14 @@ export async function ensureCategoryId(input: CategoryMatchInput): Promise<strin
     // 전부 중등부로 등록하는 부작용이 있었다.
     year: isExternal ? input.year : '',
     grade: input.grade,
-    publisher: isExternal ? '' : input.publisher,
+    // 이름 필드는 표준 표기로 정규화해 저장한다. 자연키 유니크 인덱스는 바이트 비교라
+    // `천재(정호웅)` 과 `천재 (정호웅)` 을 다른 단원으로 보고 둘 다 만들어 버린다.
+    // (level/grade/semester/year 는 Select 고정값이라 정규화 대상이 아니다.)
+    publisher: isExternal ? '' : normalizeCategoryName(input.publisher),
     semester: isExternal ? '' : input.semester,
-    chapter: input.chapter,
-    sub_chapter: input.subChapter,
-    school_name: isExternal ? input.schoolName : '',
+    chapter: normalizeCategoryName(input.chapter),
+    sub_chapter: normalizeCategoryName(input.subChapter),
+    school_name: isExternal ? normalizeCategoryName(input.schoolName) : '',
   };
 
   const { data: upserted, error: upsertErr } = await supabase

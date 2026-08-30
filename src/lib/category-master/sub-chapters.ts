@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { normalizeCategoryName } from '../category-name';
 import type { SubChapter } from '@/types';
 
 /** 소단원 목록을 조회한다 */
@@ -11,11 +12,17 @@ export async function getSubChapters(majorChapterId: string): Promise<SubChapter
 
 /** 소단원을 추가한다 */
 export async function createSubChapter(name: string, majorChapterId: string) {
-  return supabase.from('sub_chapters').insert({ name, major_chapter_id: majorChapterId }).select().single();
+  return supabase
+    .from('sub_chapters')
+    .insert({ name: normalizeCategoryName(name), major_chapter_id: majorChapterId })
+    .select().single();
 }
 
 /** 소단원명을 수정하고, 관련 categories.sub_chapter / concept_sheets.subunit 도 동기화한다 */
-export async function updateSubChapter(id: string, name: string) {
+export async function updateSubChapter(id: string, rawName: string) {
+  // 표기 변형(공백·전각 괄호 등)을 그대로 저장하면 트리에서 같은 이름이 두 폴더로 갈라진다
+  const name = normalizeCategoryName(rawName);
+
   const { data: old, error: selectErr } = await supabase
     .from('sub_chapters')
     .select('name, major_chapter_id, major_chapters(name, grade, semester, publisher_id, publishers(name, level))')
