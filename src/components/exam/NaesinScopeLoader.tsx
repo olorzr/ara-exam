@@ -91,7 +91,7 @@ export default function NaesinScopeLoader({ categories, onApply }: NaesinScopeLo
     // 안 보는 시험엔 잠긴 옛 범위가 남아 있을 수 있다 — 버튼은 안 그려지지만 안전망으로 막는다
     if (slot.noExam) return;
     if (slot.units.length === 0) {
-      toast.info('저장된 단원 체크가 없어 자동 선택할 수 없어요. 아래 범위 텍스트를 참고해 직접 선택해주세요.');
+      toast.info('저장된 단원 체크가 없어 자동 선택할 수 없어요. 아래 프린트·외부지문 메모를 참고해 직접 선택해주세요.');
       return;
     }
     if (!textbook) {
@@ -199,7 +199,9 @@ export default function NaesinScopeLoader({ categories, onApply }: NaesinScopeLo
           </p>
         ) : (
           <div className="rounded-md border bg-gray-50 p-3 text-sm space-y-1">
-            {slot.scope && <p><span className="text-gray-500">범위</span> {slot.scope}</p>}
+            {/* ara-system 은 2026-08부터 교과서 범위(units 체크)와 프린트·외부지문(scope)을 나눠 저장한다 —
+               자동 선택은 units 로만 하고, 이 칸은 사람이 보고 직접 고를 참고 정보다. */}
+            {slot.scope && <p><span className="text-gray-500">프린트·외부지문</span> {slot.scope}</p>}
             {textbook && (
               <p><span className="text-gray-500">교과서</span> {textbook.publisher} {textbook.book_title}</p>
             )}
