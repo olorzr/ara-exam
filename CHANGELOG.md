@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.1.12] - 2026-08-30
+### Fixed
+- **개념 관리 트리에 `천재(정호웅)` 이 여전히 두 개로 보이던 문제** — 0.1.11 의 정규화는 **쓰기 경로에만** 걸려 있어 새로 저장하는 값만 고쳤고, 이미 저장된 행은 sql/16 을 실행해야 합쳐졌다. 그런데 개념지 목록 트리는 `concept_sheets` 의 **저장 텍스트를 원시 문자열 그대로 `groupBy`** 하므로, 마이그레이션 전에는 화면이 계속 갈라져 보였다
+  - 트리 키와 목록 필터를 같은 정규화 키로 통일했다([src/lib/concept-category.ts](src/lib/concept-category.ts) 의 `conceptCategoryKey` / `conceptSheetToCategory`) → **마이그레이션 없이도 한 노드로 합쳐진다**. 개념지 필터는 UUID 가 아니라 값 비교라 이 방식이 안전하다 — 트리와 필터가 같은 키를 쓰므로 **양쪽 표기로 저장된 개념지가 모두 보인다**(표시만 합쳐 한쪽을 가리는 방식이 아니다). sql/16 적용 후에는 값이 이미 정규형이라 no-op
+  - ⚠️ **단어 관리·시험지 생성·시험 기록 트리는 여전히 sql/16 이 필요하다** — 그쪽은 선택이 실제 UUID 기준이라 표시만 합치면 한쪽 행의 단어가 조용히 가려진다
+- **sql/16 이 `42703 column "year" does not exist` 로 실패하던 문제** — sql/15 가 `categories.year` 를 추가하면서 재생성하는 유니크 인덱스가 **바로 그 중복 행 때문에** 실패하고, 한 트랜잭션이라 `ADD COLUMN` 까지 롤백되어 `year` 없는 상태가 됐다. 중복을 지우려면 sql/16 이 필요한데 sql/16 은 `year` 를 요구하는 닭-달걀이었다
+  - sql/16 을 **pre-15 스키마에서도 실행되도록** 고쳤다 — `categories.year` / `school_materials.year·grade` / `concept_sheets.school_name` 의 존재를 확인해 없으면 키에서 빼고 `EXECUTE format()` 으로 조립한다. 권장 순서는 **16 → 15**
+  - 상태 진단용 읽기 전용 스크립트 추가 ([sql/diagnose_category_state.sql](sql/diagnose_category_state.sql)) — 스키마 단계와 표기 변형(hex)을 한 번에 확인한다
+- **마이그레이션이 엉뚱한 Supabase 프로젝트에 적용되던 문제** — `sql/15`·`sql/16` 은 `exam` 스키마를 대상으로 하는데(`sql/01~14` 는 `public`), `exam` 이 없는 DB 에서 실행해도 `SET search_path` 가 **에러 없이 그 스키마를 건너뛰어** 무자격 객체가 전부 `public` 으로 갔다. 그 결과 `normalize_category_name` 이 ara-system 의 `public` 스키마에 생성되고, `public.categories` 에 `year` 가 없어 `42703` 이 났다
+  - 15/16 첫머리에 `exam` 스키마 존재를 확인하는 `DO $guard$` 가드 추가 — 없으면 "다른 프로젝트에 연결됐을 가능성" 을 알리며 즉시 중단한다
+  - 코덱스 리뷰가 잡은 결함 2건 반영 — (1) `CREATE OR REPLACE FUNCTION` / `COMMENT ON FUNCTION` 을 `exam.` 으로 명시(무자격이면 public 오염), (2) 자연키를 `join('|')` → `JSON.stringify` 로 변경(이름에 `|` 가 섞이면 서로 다른 카테고리가 같은 키가 됐다)
+
+## [0.1.11] - 2026-08-22
+### Fixed
+- **같은 출판사가 트리에 두 번 나오던 문제** (`천재(정호웅)` 등) — 카테고리 트리는 이름 문자열 완전 일치로 노드를 묶는데([category-tree.ts](src/lib/category-tree.ts) 의 `groupBy`), 눈에는 똑같지만 바이트가 다른 표기가 섞여 있어 폴더가 갈라졌다. 원인이 되는 변형은 괄호 앞뒤 공백, 붙여넣기로 들어온 NBSP·폭 없는 문자(U+200B/U+FEFF), 한글 IME 의 전각 괄호`（）`, 자모 분리(NFD) 다. `publishers` 의 `UNIQUE(name, level)` 도 `categories` 의 자연키 유니크 인덱스도 **바이트 비교**라 이 변형들을 막지 못했다
+  - **표준 정규화 규칙 도입** — [src/lib/category-name.ts](src/lib/category-name.ts) 의 `normalizeCategoryName` 이 출판사·대단원·소단원·학교·프린트명 **모든 쓰기 경로**(마스터 CRUD 5개, `ensureCategoryId`, 개념지 저장)에서 표기를 통일한다. 표준 표기는 `천재(정호웅)` — 괄호 주변 공백 없음
+  - **기존 데이터 일괄 정리** — [sql/16_migration_normalize_category_names.sql](sql/16_migration_normalize_category_names.sql) 이 `categories`(단어·시험지 참조를 canonical 로 이관 후 중복 행 병합) → `concept_sheets` → 마스터 5테이블 순으로 병합·정규화한다. 화면에서만 합치지 않고 **데이터를 실제로 병합**한다 — 표시만 합치면 한쪽 행에 붙은 단어가 조용히 가려진다
+  - CHANGELOG 0.1.2 에서 `concept_sheets` 만 일회성으로 정리한 적이 있으나, 마스터·`categories` 는 대상이 아니었고 쓰기 경로 방어도 없어 재발했다. 이번엔 양쪽을 함께 막는다
+  - ⚠️ **sql/16 을 앱 배포보다 먼저 적용**할 것. 신규 부트스트랩 범위는 이제 **01~16**
+
+### Changed
+- **`useConceptSheetEditor` 분리 (315줄 → 210줄)** — 300줄 제한을 넘긴 데다 상태·로딩·저장·마킹·성적연동이 한 파일에 섞여 있었다. 역할별로 갈랐다(동작 변경 없음, 훅 반환 형태 동일)
+  - [src/lib/concept-sheet-form.ts](src/lib/concept-sheet-form.ts) — 자동 제목 생성·카테고리 검증·저장 payload 조립. 순수 함수라 테스트로 고정했다([concept-sheet-form.test.ts](src/lib/concept-sheet-form.test.ts), 15케이스). 특히 **외부지문은 출판사가 항상 빈 값**이라 검증이 level 인지형이어야 하는 규칙이 이제 테스트로 박혀 있다
+  - [src/hooks/useConceptMarkActions.ts](src/hooks/useConceptMarkActions.ts) — 마킹 붙이기/떼기 4종(편집기 문서 조작 전담)
+  - [src/lib/concept-grade-sync.ts](src/lib/concept-grade-sync.ts) — ara-system 성적 등록 fire-and-forget 브릿지
+
 ## [0.1.10] - 2026-08-16
 ### Fixed
 - **외부지문 개념지가 ara-system 성적의 '기타' 폴더로 뭉치던 문제** — 외부지문은 출판사가 빈 값이라 학교가 무엇이든 한 폴더에 쌓였다. 이제 학교명을 그룹 폴더로 보내 `개념 시험 > 학교명 > 학년` 으로 정리된다 ([sync-concept-to-grades](src/app/api/sync-concept-to-grades/route.ts))

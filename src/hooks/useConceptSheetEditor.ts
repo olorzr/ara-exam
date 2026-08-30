@@ -9,25 +9,25 @@ import type { Editor } from '@tiptap/react';
 import type { BuilderCategory, MarkItem } from '@/components/exam-builder';
 import { extractMarks } from '@/lib/concept-marks';
 import { sanitizeConceptHTML } from '@/lib/sanitize-html';
-import { EXTERNAL_LEVEL } from '@/lib/constants';
+import { fireConceptGradeSync } from '@/lib/concept-grade-sync';
+import {
+  DEFAULT_CONCEPT_CATEGORY,
+  buildConceptSheetPayload,
+  generateConceptTitle,
+  isCategoryIncomplete,
+} from '@/lib/concept-sheet-form';
+import { useConceptMarkActions } from './useConceptMarkActions';
 import type { ConceptSheet } from '@/types';
 
-const DEFAULT_CATEGORY: BuilderCategory = {
-  level: '중등',
-  year: '',
-  grade: '',
-  publisher: '',
-  semester: '',
-  unit: '',
-  subunit: '',
-  schoolName: '',
-};
-
 /**
- * 개념지 에디터 페이지의 상태·로딩·저장·마킹 조작 로직을 캡슐화한 훅.
+ * 개념지 에디터 페이지의 상태·로딩·저장을 캡슐화한 훅.
  * [id]가 'new'이면 새 개념지, UUID이면 기존 개념지를 불러와 편집한다.
  *
- * 보안: 저장 시 editor_html 은 반드시 sanitizeConceptHTML 로 정화한다(Stored XSS 방어).
+ * 마킹 조작은 `useConceptMarkActions`, 제목·검증·payload 조립은
+ * `@/lib/concept-sheet-form` 이 담당한다.
+ *
+ * 보안: editor_html 은 저장 시에도 불러올 때도 `sanitizeConceptHTML` 로 정화한다
+ * (Stored XSS 방어 — concept_sheets 는 authenticated 전원이 쓰는 공유 테이블이다).
  */
 export function useConceptSheetEditor() {
   const params = useParams();
@@ -39,7 +39,7 @@ export function useConceptSheetEditor() {
   const [screen, setScreen] = useState<'editor' | 'preview'>(isNew ? 'editor' : 'preview');
   const [title, setTitle] = useState('');
   const [titleManuallyEdited, setTitleManuallyEdited] = useState(!isNew);
-  const [category, setCategory] = useState<BuilderCategory>(DEFAULT_CATEGORY);
+  const [category, setCategory] = useState<BuilderCategory>(DEFAULT_CONCEPT_CATEGORY);
   const [editorHTML, setEditorHTML] = useState('');
   const [marks, setMarks] = useState<MarkItem[]>([]);
   const [previewTab, setPreviewTab] = useState('concept');
@@ -51,22 +51,15 @@ export function useConceptSheetEditor() {
   const [loadedUpdatedAt, setLoadedUpdatedAt] = useState<string | null>(null);
   const editorRef = useRef<Editor | null>(null);
 
-  /** 카테고리 값으로 자동 제목을 생성한다 */
-  const generateTitle = useCallback((cat: BuilderCategory) => {
-    const parts = cat.level === EXTERNAL_LEVEL
-      ? [cat.schoolName, cat.year, cat.grade, cat.unit]
-      : [cat.grade, cat.publisher, cat.semester, cat.unit, cat.subunit];
-    const filled = parts.filter(Boolean);
-    return filled.length > 0 ? `${filled.join(' ')} 개념지` : '';
-  }, []);
+  const markActions = useConceptMarkActions(editorRef, setEditorHTML);
 
   /** 카테고리 변경 시 자동 제목도 갱신한다 */
   const handleCategoryChange = useCallback((next: BuilderCategory) => {
     setCategory(next);
     if (!titleManuallyEdited) {
-      setTitle(generateTitle(next));
+      setTitle(generateConceptTitle(next));
     }
-  }, [titleManuallyEdited, generateTitle]);
+  }, [titleManuallyEdited]);
 
   /** 제목 직접 입력 */
   const handleTitleChange = useCallback((value: string) => {
@@ -108,9 +101,8 @@ export function useConceptSheetEditor() {
           schoolName: sheet.school_name ?? '',
         });
         setLoadedUpdatedAt(sheet.updated_at);
-        // concept_sheets 는 authenticated 전원이 쓸 수 있는 공유 테이블이라, 저장 시
-        // sanitize 했더라도 과거 오염 데이터나 직접 DB/RPC 쓰기가 남아 있을 수 있다.
-        // 편집기 content 로 주입하기 전에 읽기 경로에서도 정화해 Stored XSS 를 차단한다.
+        // 저장 시 sanitize 했더라도 과거 오염 데이터나 직접 DB/RPC 쓰기가 남아 있을 수
+        // 있다. 편집기 content 로 주입하기 전에 읽기 경로에서도 정화한다.
         const safeHTML = sanitizeConceptHTML(sheet.editor_html);
         setInitialHTML(safeHTML);
         setEditorHTML(safeHTML);
@@ -127,54 +119,21 @@ export function useConceptSheetEditor() {
   const handleSave = useCallback(async () => {
     if (!user) return;
 
-    // 외부지문은 출판사/학기를 쓰지 않으므로 필수 항목이 다르다.
-    // 예전엔 grade + publisher 를 무조건 요구해, 외부지문을 고를 수 있게 해도 저장이 막혔다.
-    const missingCategory = category.level === EXTERNAL_LEVEL
-      ? !category.schoolName || !category.unit
-      : !category.grade || !category.publisher || !category.unit;
-    if (missingCategory) {
+    if (isCategoryIncomplete(category)) {
       toast.error('카테고리를 먼저 설정해주세요.');
       return;
     }
 
     const editor = editorRef.current;
-    const html = sanitizeConceptHTML(editor ? editor.getHTML() : editorHTML);
     const currentMarks = editor ? extractMarks(editor) : marks;
-    const sheetTitle = title.trim() || '제목 없음';
-
-    // 저장 성공 후 학원 성적에 개념 3단계 시험 자동 등록(멱등). 마킹된 개념 단어가 있을 때만.
-    // getSession/전송은 격리해 실패가 저장 UX 를 막지 않게 하고, keepalive 로 이동에도 살아남게 한다.
-    const fireConceptSync = (id: string) => {
-      if (currentMarks.length === 0) return;
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (!session?.access_token) return;
-        fetch('/api/sync-concept-to-grades', {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ conceptSheetId: id }),
-          keepalive: true,
-        }).catch(() => {});
-      }).catch(() => {});
-    };
+    const payload = buildConceptSheetPayload({
+      title,
+      category,
+      html: sanitizeConceptHTML(editor ? editor.getHTML() : editorHTML),
+      marks: currentMarks,
+    });
 
     setSaving(true);
-
-    const payload = {
-      title: sheetTitle,
-      level: category.level,
-      year: category.year,
-      grade: category.grade,
-      publisher: category.publisher,
-      semester: category.semester,
-      unit: category.unit,
-      subunit: category.subunit,
-      school_name: category.schoolName,
-      editor_html: html,
-      marks: currentMarks,
-    };
 
     // 저장 중 throw(네트워크 등)가 나도 스피너가 멈추도록 finally 에서 saving 을 내린다.
     try {
@@ -201,7 +160,7 @@ export function useConceptSheetEditor() {
           return;
         }
         setLoadedUpdatedAt(data.updated_at);
-        fireConceptSync(savedId);
+        fireConceptGradeSync(savedId, currentMarks.length);
         toast.success('저장되었습니다.');
       } else {
         const { data, error } = await supabase
@@ -216,7 +175,7 @@ export function useConceptSheetEditor() {
         }
         setSavedId(data.id);
         setLoadedUpdatedAt(data.updated_at);
-        fireConceptSync(data.id);
+        fireConceptGradeSync(data.id, currentMarks.length);
         toast.success('저장되었습니다.');
         router.replace(`/exam/builder/${data.id}`);
       }
@@ -226,64 +185,6 @@ export function useConceptSheetEditor() {
       setSaving(false);
     }
   }, [user, title, category, editorHTML, marks, savedId, loadedUpdatedAt, router]);
-
-  /* ── 마킹 삭제 ── */
-  const deleteMark = useCallback((pos: number, len: number) => {
-    const editor = editorRef.current;
-    if (!editor) return;
-    editor.chain().focus().setTextSelection({ from: pos, to: pos + len }).unsetMark('concept').run();
-  }, []);
-
-  const clearAllMarks = useCallback(() => {
-    const editor = editorRef.current;
-    if (!editor) return;
-    editor.chain().focus().selectAll().unsetMark('concept').run();
-    toast.success('모든 마킹이 해제되었습니다');
-  }, []);
-
-  /* ── 개념지 미리보기 인터랙션 ── */
-  const removeMarkByText = useCallback((text: string) => {
-    const editor = editorRef.current;
-    if (!editor) return;
-    let found = false;
-    editor.state.doc.descendants((node, pos) => {
-      if (found) return false;
-      if (node.isText && node.marks.some((m) => m.type.name === 'concept')) {
-        if (node.text === text) {
-          editor.chain().setTextSelection({ from: pos, to: pos + node.nodeSize }).unsetMark('concept').run();
-          found = true;
-          return false;
-        }
-      }
-    });
-    if (!found) {
-      const merged = extractMarks(editor);
-      const match = merged.find((m) => m.text === text);
-      if (match) {
-        editor.chain().setTextSelection({ from: match.pos, to: match.pos + match.len }).unsetMark('concept').run();
-      }
-    }
-    setEditorHTML(editor.getHTML());
-  }, []);
-
-  const addMarkByText = useCallback((text: string) => {
-    const editor = editorRef.current;
-    if (!editor) return;
-    let found = false;
-    editor.state.doc.descendants((node, pos) => {
-      if (found) return false;
-      if (node.isText) {
-        const idx = (node.text ?? '').indexOf(text);
-        if (idx !== -1) {
-          const from = pos + idx;
-          editor.chain().setTextSelection({ from, to: from + text.length }).setMark('concept').run();
-          found = true;
-          return false;
-        }
-      }
-    });
-    setEditorHTML(editor.getHTML());
-  }, []);
 
   return {
     router,
@@ -304,9 +205,6 @@ export function useConceptSheetEditor() {
     initialHTML,
     editorRef,
     handleSave,
-    deleteMark,
-    clearAllMarks,
-    removeMarkByText,
-    addMarkByText,
+    ...markActions,
   };
 }

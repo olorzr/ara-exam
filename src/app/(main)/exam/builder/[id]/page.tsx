@@ -13,8 +13,8 @@ import { useConceptSheetEditor } from '@/hooks/useConceptSheetEditor';
 
 /**
  * 개념지 에디터 페이지.
- * 상태·로딩·저장(sanitize)·마킹 로직은 useConceptSheetEditor 훅이 담당하고,
- * 이 컴포넌트는 에디터/미리보기 화면 구성만 한다.
+ * 상태·로딩·저장(sanitize)은 useConceptSheetEditor 훅이 담당하고(마킹 조작은 그 훅이
+ * 다시 useConceptMarkActions 로 위임), 이 컴포넌트는 에디터/미리보기 화면 구성만 한다.
  */
 export default function ConceptEditorPage() {
   const e = useConceptSheetEditor();
