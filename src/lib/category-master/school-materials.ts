@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { normalizeCategoryName } from '../category-name';
 import { EXTERNAL_LEVEL } from '../constants';
 import type { SchoolMaterial } from '@/types';
 
@@ -22,12 +23,15 @@ export async function getSchoolMaterials(schoolId: string): Promise<SchoolMateri
 export async function createSchoolMaterial(name: string, schoolId: string, year: string, grade: string) {
   return supabase
     .from('school_materials')
-    .insert({ name, school_id: schoolId, year, grade })
+    .insert({ name: normalizeCategoryName(name), school_id: schoolId, year, grade })
     .select().single();
 }
 
 /** 프린트/작품명을 수정하고, 관련 categories/concept_sheets 도 동기화한다 */
-export async function updateSchoolMaterial(id: string, name: string) {
+export async function updateSchoolMaterial(id: string, rawName: string) {
+  // 표기 변형(공백·전각 괄호 등)을 그대로 저장하면 트리에서 같은 이름이 두 폴더로 갈라진다
+  const name = normalizeCategoryName(rawName);
+
   const { data: old, error: selectErr } = await supabase
     .from('school_materials')
     .select('name, school_id, year, grade, schools(name)')

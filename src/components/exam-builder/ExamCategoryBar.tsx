@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/sheet';
 import { getAllSelectableCategories } from '@/lib/category-master';
 import { buildCategoryTree } from '@/lib/category-tree';
+import { categoryNaturalKey } from '@/lib/category-key';
 import CategoryTree from '@/components/words/CategoryTree';
 import { formatCategoryLabel } from '@/lib/format';
 import { FolderOpen, Search } from 'lucide-react';
@@ -72,14 +73,6 @@ function toCategory(cat: BuilderCategory): Category {
   };
 }
 
-/** 자연키 — 개념지는 카테고리 id 를 저장하지 않으므로 텍스트 조합으로 대조한다 */
-function naturalKey(cat: Category): string {
-  return [
-    cat.level, cat.year ?? '', cat.grade, cat.publisher,
-    cat.semester, cat.chapter, cat.sub_chapter, cat.school_name ?? '',
-  ].join('|');
-}
-
 /**
  * 개념지 빌더 상단 카테고리 선택 바.
  * 단어관리·시험지 생성과 동일한 카테고리 소스(getAllSelectableCategories)에서 선택한다.
@@ -104,8 +97,10 @@ export default function ExamCategoryBar({ category, onChange }: ExamCategoryBarP
   // 대조해 트리의 선택 상태를 파생시킨다(예전엔 초기화가 없어 기존 개념지를 열면
   // 아무것도 선택돼 있지 않은 것처럼 보였다).
   const selectedCategoryId = useMemo(() => {
-    const key = naturalKey(toCategory(category));
-    return categories.find((c) => naturalKey(c) === key)?.id;
+    // 정규화 키로 대조한다 — 개념지에 옛 표기(`천재 (정호웅)`)로 저장돼 있어도
+    // 정규형 트리 노드와 매칭되어 선택 상태가 살아난다.
+    const key = categoryNaturalKey(toCategory(category));
+    return categories.find((c) => categoryNaturalKey(c) === key)?.id;
   }, [categories, category]);
 
   const filtered = useMemo(

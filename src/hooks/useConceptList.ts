@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { buildCategoryTree } from '@/lib/category-tree';
+import { conceptCategoryKey, conceptSheetToCategory } from '@/lib/concept-category';
 import { toast } from 'sonner';
 import type { ConceptSheetListItem, Category } from '@/types';
 
@@ -49,26 +50,18 @@ export function useConceptList() {
     })();
   }, [user]);
 
-  /** 개념지 카테고리 필드로 합성 Category를 생성하여 트리를 구성한다 */
+  /**
+   * 개념지 카테고리 필드로 합성 Category를 생성하여 트리를 구성한다.
+   * 키는 `conceptCategoryKey` 가 정규화하므로 `천재(정호웅)` / `천재 (정호웅)` 처럼
+   * 표기만 다른 개념지가 한 노드로 합쳐진다. 키에 학교명·년도를 포함하는 것은
+   * 그대로다 — 빼면 학교·년도가 다른 외부지문 개념지가 한 노드로 뭉친다.
+   */
   const tree = useMemo(() => {
     const seen = new Map<string, Category>();
     for (const s of sheets) {
-      // 학교명/년도를 빼면 학교·년도가 다른 외부지문 개념지가 한 노드로 뭉친다
-      const key = [s.level, s.year, s.grade, s.publisher, s.semester, s.unit, s.subunit, s.school_name].join('|');
-      if (!seen.has(key)) {
-        seen.set(key, {
-          id: key,
-          level: s.level as Category['level'],
-          year: s.year,
-          grade: s.grade,
-          publisher: s.publisher,
-          semester: s.semester,
-          chapter: s.unit,
-          sub_chapter: s.subunit,
-          school_name: s.school_name,
-          user_id: s.user_id,
-          created_at: s.created_at,
-        });
+      const cat = conceptSheetToCategory(s);
+      if (!seen.has(cat.id)) {
+        seen.set(cat.id, cat);
       }
     }
     return buildCategoryTree(Array.from(seen.values()));
@@ -105,17 +98,10 @@ export function useConceptList() {
   const filtered = useMemo(() => {
     let result = sheets;
     if (selectedCategory) {
-      result = result.filter(
-        (s) =>
-          s.level === selectedCategory.level &&
-          s.year === selectedCategory.year &&
-          s.grade === selectedCategory.grade &&
-          s.publisher === selectedCategory.publisher &&
-          s.semester === selectedCategory.semester &&
-          s.unit === selectedCategory.chapter &&
-          s.subunit === selectedCategory.sub_chapter &&
-          s.school_name === (selectedCategory.school_name ?? ''),
-      );
+      // 트리 노드와 같은 정규화 키로 비교한다. 원시 문자열로 비교하면 합쳐진 노드를
+      // 눌렀을 때 다른 표기로 저장된 개념지가 조용히 빠진다.
+      const targetKey = conceptCategoryKey(selectedCategory);
+      result = result.filter((s) => conceptSheetToCategory(s).id === targetKey);
     }
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
