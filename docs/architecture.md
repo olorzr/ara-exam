@@ -80,13 +80,17 @@ src/
 - 주요 파일:
   - `src/lib/print/constants.ts` — A4 96dpi px 상수(210mm=793.7px), 여백, 컬럼 폭. **크기의 단일 출처**
   - `src/lib/print/paginate.ts` — 순수 그리디 배치(블록 순서 보존, 좌→우 컬럼 채움)
-  - `src/lib/print/split-html-blocks.ts` — 개념지 HTML → 블록 분해, 긴 표의 행 단위 재분할
+  - `src/lib/print/split-html-blocks.ts` — 개념지 HTML → 블록 분해, 긴 표의 행 단위 재분할(rowspan 경계 인식 · 제목 행 반복 · 조각 열 폭 고정)
+  - `src/lib/print/table-row-plan.ts` — 순수 계산: 절단 가능 행 판정(`legalCutFlags`) + 조각 범위 배정(`planRowChunks`)
+  - `src/lib/print/table-measure.ts` — 측정 컨테이너의 표에서 행 높이·기준 열 폭 실측
+  - `src/lib/print/sheet-columns.ts` — 개념지 단 수 결정(글자 수 + 표 열 수). 열 3개 이상 표가 있으면 1단
   - `src/hooks/useA4Pagination.ts` — 숨김 컨테이너 실측 + 재측정(fonts.ready / ResizeObserver / img load / beforeprint)
   - `src/hooks/useConceptSheetBlocks.ts` — 개념지 블록 상태 + 초과 표 재분할(최대 2패스)
   - `src/components/print/{A4Document,A4Sheet,CompactPageHeader}.tsx` — 측정 컨테이너 + 낱장 렌더
   - `src/styles/print-a4.css` — 낱장·푸터·페이지 브레이크 CSS (globals.css 에서 @import)
 - 소비자: `components/exam/{ExamPaperView,MultipleChoiceView,MultipleChoiceAnswerView,WordBookView}.tsx`, `components/exam-builder/ExamSheetRenderer.tsx`
 - 블록 단위: 시험지=문항 1개, 객관식 답안지=5문항 1줄, 단어장=단어 1줄, 개념지=본문 HTML 최상위 요소 1개
+- 개념지 단 수: 본문 글자 수 300 초과면 2단이지만, **열 3개 이상인 표가 하나라도 있으면 1단**으로 되돌린다(2단 칸 ≈328px 에 넓은 표가 안 들어간다). 표 셀은 `overflow-wrap: anywhere` + 박스 묶음 줄바꿈 허용으로 칸을 넘지 않는다
 
 ### lib/naesin-scope (ara-system 내신 관리 연동, 읽기 전용)
 - 역할: ara-system 수업 > 내신 관리가 저장한 내신 시험범위(`public.school_exam_scopes`)를 읽어, 시험지 생성 시 해당 범위의 단어 카테고리를 자동 선택

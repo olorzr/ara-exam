@@ -13,6 +13,13 @@ const HANGUL_RANGE = 11172;
 const CHOSUNG_FACTOR = 588;
 
 /**
+ * 1·2단계 박스 묶음 래퍼 클래스.
+ * 줄바꿈 정책은 CSS 가 맡는다 — 본문에서는 한 단어의 박스를 붙여 두고(nowrap),
+ * 표 셀 안에서는 박스 사이 줄바꿈을 허용해 표가 컬럼 폭을 뚫지 않게 한다.
+ */
+export const BLANK_RUN_CLASS = 'eb-blank-run';
+
+/**
  * 한글 문자의 초성을 추출한다.
  * @returns 초성 문자열, 한글이 아니면 null
  */
@@ -138,8 +145,7 @@ function makeSpan(text: string, className: string): HTMLSpanElement {
 /** 1단계: 한글 → 초성 박스, 비한글 → 그대로 */
 function buildChosungBoxes(text: string): HTMLSpanElement {
   const wrapper = document.createElement('span');
-  wrapper.style.display = 'inline';
-  wrapper.style.whiteSpace = 'nowrap';
+  wrapper.className = BLANK_RUN_CLASS;
 
   for (const char of text) {
     if (isKorean(char)) {
@@ -160,8 +166,7 @@ function buildChosungBoxes(text: string): HTMLSpanElement {
 /** 2단계: 글자 수만큼 빈 핑크 박스 (공백은 박스 대신 띄어쓰기로 보존) */
 function buildStage2Boxes(text: string): HTMLSpanElement {
   const wrapper = document.createElement('span');
-  wrapper.style.display = 'inline';
-  wrapper.style.whiteSpace = 'nowrap';
+  wrapper.className = BLANK_RUN_CLASS;
 
   for (const char of text) {
     if (char === ' ') {

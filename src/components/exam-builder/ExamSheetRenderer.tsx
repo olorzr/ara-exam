@@ -5,12 +5,10 @@ import { transformHTML, stripTrailingEmpty } from '@/lib/exam-transform';
 import type { TransformMode } from '@/lib/exam-transform';
 import { A4Document, CompactPageHeader } from '@/components/print';
 import { useConceptSheetBlocks } from '@/hooks/useConceptSheetBlocks';
+import { decideSheetColumns, maxTableColumns } from '@/lib/print/sheet-columns';
 import { EXTERNAL_LEVEL } from '@/lib/constants';
 import { kstYear } from '@/lib/kst-year';
 import type { BuilderCategory } from './ExamCategoryBar';
-
-/** 1단 최대 글자 수 — 초과 시 2단 레이아웃 */
-const SINGLE_COL_CHAR_THRESHOLD = 300;
 
 /** 시트 설정 */
 export interface SheetConfig {
@@ -73,11 +71,11 @@ export default function ExamSheetRenderer({
     [editorHTML, config.mode],
   );
 
-  /** HTML 태그 제거 후 글자 수로 2단 여부 판단 */
-  const useDualCol = useMemo(() => {
+  /** 글자 수는 원본 기준(단계 모드는 글자가 박스로 바뀐다), 표 열 수는 실제 렌더되는 본문 기준 */
+  const columns = useMemo(() => {
     const textLength = editorHTML.replace(/<[^>]*>/g, '').trim().length;
-    return textLength > SINGLE_COL_CHAR_THRESHOLD;
-  }, [editorHTML]);
+    return decideSheetColumns(textLength, maxTableColumns(bodyHTML));
+  }, [editorHTML, bodyHTML]);
 
   const { blocks, handleOversized } = useConceptSheetBlocks(bodyHTML);
 
@@ -88,7 +86,7 @@ export default function ExamSheetRenderer({
   return (
     <A4Document
       blocks={renderedBlocks}
-      columns={useDualCol ? 2 : 1}
+      columns={columns}
       onOversized={handleOversized}
       breakAfterLast={breakAfterLast}
       className={`eb-sheet-table ${interactive ? 'eb-concept-interactive' : ''}`.trim()}
