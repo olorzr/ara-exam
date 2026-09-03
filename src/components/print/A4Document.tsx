@@ -1,7 +1,11 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useA4Pagination, type OversizedHandler } from '@/hooks/useA4Pagination';
+import {
+  useA4Pagination,
+  type BeforePaginateHandler,
+  type SplitRequestHandler,
+} from '@/hooks/useA4Pagination';
 import { A4_WIDTH_PX, CONTENT_WIDTH, getColumnWidth } from '@/lib/print/constants';
 import A4Sheet, { A4Footer } from './A4Sheet';
 
@@ -18,8 +22,12 @@ interface A4DocumentProps {
   showPageNumber?: boolean;
   /** 마지막 낱장 뒤에도 페이지를 넘긴다 — '전체 출력'에서 시트 사이를 가를 때 */
   breakAfterLast?: boolean;
-  /** 한 페이지에 안 들어가는 블록을 더 잘게 쪼갤 수 있으면 여기서 받아 처리한다 */
-  onOversized?: OversizedHandler;
+  /** 블록별 '행 단위로 더 쪼갤 수 있음' 표시 (개념지의 표). 참조가 안정적이어야 한다 */
+  splittable?: readonly boolean[];
+  /** 배치 직전 손질 훅 — 블록을 갱신했으면 true (개념지 표 열 폭 맞춤) */
+  onBeforePaginate?: BeforePaginateHandler;
+  /** 남은 자리에 안 들어간 블록을 더 잘게 쪼갤 수 있으면 여기서 받아 처리한다 */
+  onSplitRequest?: SplitRequestHandler;
   /** 타이포그래피 스코프 클래스 (측정 컨테이너와 낱장 양쪽에 붙는다) */
   className?: string;
 }
@@ -38,10 +46,17 @@ export default function A4Document({
   columnHeader,
   showPageNumber = true,
   breakAfterLast = false,
-  onOversized,
+  splittable,
+  onBeforePaginate,
+  onSplitRequest,
   className = '',
 }: A4DocumentProps) {
-  const { measureRootRef, layout } = useA4Pagination({ columns, onOversized });
+  const { measureRootRef, layout } = useA4Pagination({
+    columns,
+    splittable,
+    onBeforePaginate,
+    onSplitRequest,
+  });
   const columnWidth = getColumnWidth(columns);
 
   const renderBlock = (index: number) => {

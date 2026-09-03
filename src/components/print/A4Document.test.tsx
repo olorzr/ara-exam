@@ -7,6 +7,7 @@ import {
   PAGE_PAD_BOTTOM,
   PAGE_PAD_TOP,
 } from '@/lib/print/constants';
+import type { SplitRequest } from '@/lib/print/paginate';
 
 const FOOTER_H = 20;
 const FIRST_HEADER_H = 60;
@@ -148,21 +149,51 @@ describe('A4Document', () => {
     expect(scaled!.textContent).toBe('아주 긴 지문');
   });
 
-  it('쪼갤 수 있는 블록은 onOversized 로 알려 준다 — 용량은 좁은 쪽(1페이지) 기준', () => {
-    const calls: Array<{ indices: number[]; capacity: number }> = [];
+  it('쪼갤 수 있는 블록은 onSplitRequest 로 알려 준다 — 앞 조각은 남은 자리, 뒤는 2페이지 용량', () => {
+    const calls: SplitRequest[][] = [];
     render(
       <A4Document
         blocks={[<div key="huge" data-h={5000}>긴 표</div>]}
         firstPageHeader={<div data-h={FIRST_HEADER_H}>헤더</div>}
         laterPageHeader={<div data-h={LATER_HEADER_H}>컴팩트</div>}
-        onOversized={(indices, _root, capacity) => calls.push({ indices, capacity })}
+        splittable={[true]}
+        onSplitRequest={(requests) => calls.push(requests)}
       />,
     );
     expect(calls.length).toBeGreaterThan(0);
-    expect(calls[0].indices).toEqual([0]);
-    const firstPageBody = A4_HEIGHT_PX - PAGE_PAD_TOP - PAGE_PAD_BOTTOM - FOOTER_H - FIRST_HEADER_H;
-    // 2페이지 용량(더 큼)으로 쪼개면 1페이지에 놓인 첫 조각이 또 넘친다
-    expect(calls[0].capacity).toBe(firstPageBody - CAPACITY_SAFETY_PX);
+    const first = A4_HEIGHT_PX - PAGE_PAD_TOP - PAGE_PAD_BOTTOM - FOOTER_H - FIRST_HEADER_H;
+    const later = A4_HEIGHT_PX - PAGE_PAD_TOP - PAGE_PAD_BOTTOM - FOOTER_H - LATER_HEADER_H;
+    expect(calls[0]).toEqual([
+      { index: 0, firstCapacity: first - CAPACITY_SAFETY_PX, laterCapacity: later - CAPACITY_SAFETY_PX },
+    ]);
+  });
+
+  it('앞 블록이 채운 뒤 남은 자리를 앞 조각 용량으로 알려 준다', () => {
+    const calls: SplitRequest[][] = [];
+    render(
+      <A4Document
+        blocks={[<div key="intro" data-h={BLOCK_H}>서문</div>, <div key="table" data-h={5000}>긴 표</div>]}
+        firstPageHeader={<div data-h={FIRST_HEADER_H}>헤더</div>}
+        laterPageHeader={<div data-h={LATER_HEADER_H}>컴팩트</div>}
+        splittable={[false, true]}
+        onSplitRequest={(requests) => calls.push(requests)}
+      />,
+    );
+    const first = A4_HEIGHT_PX - PAGE_PAD_TOP - PAGE_PAD_BOTTOM - FOOTER_H - FIRST_HEADER_H;
+    expect(calls[0][0].index).toBe(1);
+    expect(calls[0][0].firstCapacity).toBe(first - CAPACITY_SAFETY_PX - BLOCK_H);
+  });
+
+  it('쪼갤 수 없는 블록은 분할을 요청하지 않는다', () => {
+    const calls: SplitRequest[][] = [];
+    render(
+      <A4Document
+        blocks={[<div key="huge" data-h={5000}>긴 지문</div>]}
+        firstPageHeader={<div data-h={FIRST_HEADER_H}>헤더</div>}
+        onSplitRequest={(requests) => calls.push(requests)}
+      />,
+    );
+    expect(calls).toHaveLength(0);
   });
 
   it('블록이 없어도 헤더·푸터가 있는 낱장 한 장은 나온다', () => {

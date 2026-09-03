@@ -52,11 +52,13 @@ function sumRange(values: readonly number[], from: number, to: number): number {
  * @param heights 본문 행 높이(px), 문서 순서
  * @param legalCut legalCutFlags 결과 (heights 와 같은 길이)
  * @param capacity 한 조각이 쓸 수 있는 최대 높이(px)
+ * @param firstCapacity 0행에서 시작하는 첫 조각만의 용량 — 페이지의 남은 자리를 채울 때 더 작다
  */
 export function planRowChunks(
   heights: readonly number[],
   legalCut: readonly boolean[],
   capacity: number,
+  firstCapacity: number = capacity,
 ): RowRange[] {
   if (heights.length === 0) return [];
 
@@ -65,12 +67,13 @@ export function planRowChunks(
   let used = 0;
   /** 현재 조각 안의 가장 최근 합법 절단점. start 보다 클 때만 후보다 */
   let lastLegal = 0;
+  const capacityOf = (chunkStart: number) => (chunkStart === 0 ? firstCapacity : capacity);
 
   for (let row = 0; row < heights.length; row++) {
     if (row > start && legalCut[row]) lastLegal = row;
     const height = heights[row] ?? 0;
 
-    if (row > start && used + height > capacity && lastLegal > start) {
+    if (row > start && used + height > capacityOf(start) && lastLegal > start) {
       chunks.push({ start, end: lastLegal - 1 });
       // lastLegal..row-1 행은 새 조각으로 넘어간다
       used = sumRange(heights, lastLegal, row);

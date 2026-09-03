@@ -43,7 +43,7 @@ describe('splitTableByRows', () => {
 
   it('용량에 맞춰 조각 테이블로 나누고 헤더 행을 반복한다', () => {
     // 헤더 20 + 본문 각 30, 용량 55 → 조각당 본문 1행씩
-    const chunks = splitTableByRows(table, [20, 30, 30, 30], 55);
+    const chunks = splitTableByRows(table, [20, 30, 30, 30], { capacity: 55 });
     expect(chunks).toHaveLength(3);
     chunks.forEach((chunk) => {
       const rows = rowsOf(chunk);
@@ -53,17 +53,17 @@ describe('splitTableByRows', () => {
   });
 
   it('용량이 넉넉하면 한 조각으로 둔다', () => {
-    const chunks = splitTableByRows(table, [20, 30, 30, 30], 500);
+    const chunks = splitTableByRows(table, [20, 30, 30, 30], { capacity: 500 });
     expect(chunks).toEqual([table]);
   });
 
   it('행이 하나뿐인 표는 그대로 둔다', () => {
     const single = '<table><tbody><tr><td>가</td></tr></tbody></table>';
-    expect(splitTableByRows(single, [30], 10)).toEqual([single]);
+    expect(splitTableByRows(single, [30], { capacity: 10 })).toEqual([single]);
   });
 
   it('조각을 합치면 원래 본문 행이 모두 남아 있다', () => {
-    const chunks = splitTableByRows(table, [20, 30, 30, 30], 55);
+    const chunks = splitTableByRows(table, [20, 30, 30, 30], { capacity: 55 });
     const cells = chunks.flatMap((chunk) => {
       const host = document.createElement('div');
       host.innerHTML = chunk;
@@ -80,7 +80,7 @@ describe('splitTableByRows', () => {
       '<tr><td>나</td></tr>' +
       '<tr><td>따로</td><td>다</td></tr>' +
       '</tbody></table>';
-    const chunks = splitTableByRows(merged, [20, 30, 30, 30], 85);
+    const chunks = splitTableByRows(merged, [20, 30, 30, 30], { capacity: 85 });
     expect(chunks).toHaveLength(2);
     // 병합 묶음(묶음/가 + 나)이 한 조각에 통째로 들어간다
     expect(rowsOf(chunks[0])).toEqual([['구분', '내용'], ['묶음', '가'], ['나']]);
@@ -95,7 +95,7 @@ describe('splitTableByRows', () => {
       '<tr><td>가</td><td>1</td></tr>' +
       '<tr><td>나</td><td>2</td></tr>' +
       '</tbody></table>';
-    const chunks = splitTableByRows(strongHeader, [20, 30, 30], 55);
+    const chunks = splitTableByRows(strongHeader, [20, 30, 30], { capacity: 55 });
     expect(chunks).toHaveLength(2);
     chunks.forEach((chunk) => expect(rowsOf(chunk)[0]).toEqual(['단어', '뜻']));
   });
@@ -107,7 +107,7 @@ describe('splitTableByRows', () => {
       '<tr><td><strong>성격</strong></td><td>서사적</td></tr>' +
       '<tr><td><strong>주제</strong></td><td>그리움</td></tr>' +
       '</tbody></table>';
-    const chunks = splitTableByRows(keyValue, [30, 30, 30], 65);
+    const chunks = splitTableByRows(keyValue, [30, 30, 30], { capacity: 65 });
     expect(chunks).toHaveLength(2);
     expect(rowsOf(chunks[0])).toEqual([['갈래', '서정시'], ['성격', '서사적']]);
     expect(rowsOf(chunks[1])).toEqual([['주제', '그리움']]);
@@ -120,7 +120,7 @@ describe('splitTableByRows', () => {
       '<tr><td>가</td></tr>' +
       '<tr><td>나</td><td>다</td></tr>' +
       '</tbody></table>';
-    const chunks = splitTableByRows(spanningHeader, [30, 30, 30], 65);
+    const chunks = splitTableByRows(spanningHeader, [30, 30, 30], { capacity: 65 });
     expect(chunks).toHaveLength(2);
     expect(rowsOf(chunks[0])).toEqual([['구분', '내용'], ['가']]);
     expect(rowsOf(chunks[1])).toEqual([['나', '다']]);
@@ -134,7 +134,7 @@ describe('splitTableByRows', () => {
       '<tr><td>1</td><td>가</td><td>나</td></tr>' +
       '<tr><td>2</td><td>다</td><td>라</td></tr>' +
       '</tbody></table>';
-    const chunks = splitTableByRows(twoRowHeader, [20, 20, 30, 30], 75);
+    const chunks = splitTableByRows(twoRowHeader, [20, 20, 30, 30], { capacity: 75 });
     expect(chunks).toHaveLength(2);
     chunks.forEach((chunk) => {
       const rows = rowsOf(chunk);
@@ -145,7 +145,7 @@ describe('splitTableByRows', () => {
 
   it('표가 블록 루트가 아니면 손대지 않는다 (래퍼가 사라진다)', () => {
     const wrapped = `<blockquote>${table}</blockquote>`;
-    expect(splitTableByRows(wrapped, [20, 30, 30, 30], 55)).toEqual([wrapped]);
+    expect(splitTableByRows(wrapped, [20, 30, 30, 30], { capacity: 55 })).toEqual([wrapped]);
   });
 
   it('thead/tbody 로 나뉜 표도 행을 모두 보존한다', () => {
@@ -154,7 +154,7 @@ describe('splitTableByRows', () => {
       '<thead><tr><th>단어</th><th>뜻</th></tr></thead>' +
       '<tbody><tr><td>가</td><td>1</td></tr><tr><td>나</td><td>2</td></tr></tbody>' +
       '</table>';
-    const chunks = splitTableByRows(sectioned, [20, 30, 30], 55);
+    const chunks = splitTableByRows(sectioned, [20, 30, 30], { capacity: 55 });
     expect(chunks).toHaveLength(2);
     chunks.forEach((chunk) => {
       const host = document.createElement('div');
@@ -168,7 +168,7 @@ describe('splitTableByRows', () => {
 
   it('줄무늬 표시가 조각에도 그대로 남는다', () => {
     const [marked] = splitHtmlBlocks(table);
-    const chunks = splitTableByRows(marked, [20, 30, 30, 30], 55);
+    const chunks = splitTableByRows(marked, [20, 30, 30, 30], { capacity: 55 });
     const striped = chunks.map((chunk) => {
       const host = document.createElement('div');
       host.innerHTML = chunk;
@@ -185,11 +185,67 @@ describe('splitTableByRows', () => {
       '<tr><td>나</td></tr>' +
       '<tr><td>다</td></tr>' +
       '</tbody></table>';
-    expect(splitTableByRows(unbreakable, [200, 200, 200], 100)).toEqual([unbreakable]);
+    expect(splitTableByRows(unbreakable, [200, 200, 200], { capacity: 100 })).toEqual([unbreakable]);
+  });
+
+  it('앞 조각을 페이지에 남은 자리에 맞춘다 (남은 자리를 채우고 이어진다)', () => {
+    // 제목 20 + 본문 30×3, 남은 자리 90 → 앞 조각은 본문 2행, 나머지는 용량 500 에 담긴다
+    const chunks = splitTableByRows(table, [20, 30, 30, 30], { capacity: 500, firstCapacity: 90 });
+    expect(chunks).toHaveLength(2);
+    expect(rowsOf(chunks[0])).toEqual([['단어', '뜻'], ['가', '1'], ['나', '2']]);
+    expect(rowsOf(chunks[1])).toEqual([['단어', '뜻'], ['다', '3']]);
+  });
+
+  it('앞 조각에 본문이 한 행뿐이면 새 장에서 시작한다 (고아 방지)', () => {
+    const chunks = splitTableByRows(table, [20, 30, 30, 30], { capacity: 500, firstCapacity: 60 });
+    expect(chunks).toEqual([table]);
+  });
+
+  it('남은 자리가 없으면(0 이하) 새 장 기준으로 계획한다', () => {
+    const chunks = splitTableByRows(table, [20, 30, 30, 30], { capacity: 55, firstCapacity: -1 });
+    expect(chunks).toHaveLength(3);
+    chunks.forEach((chunk) => expect(rowsOf(chunk)[0]).toEqual(['단어', '뜻']));
+  });
+
+  it('남은 자리가 용량보다 크면 새 장 기준과 같다', () => {
+    const filled = splitTableByRows(table, [20, 30, 30, 30], { capacity: 55, firstCapacity: 999 });
+    expect(filled).toEqual(splitTableByRows(table, [20, 30, 30, 30], { capacity: 55 }));
+  });
+
+  it('앞 조각이 병합 묶음 때문에 남은 자리를 넘기면 새 장에서 시작한다', () => {
+    const merged =
+      '<table><tbody>' +
+      '<tr><th>구분</th><th>내용</th></tr>' +
+      '<tr><td rowspan="2">묶음</td><td>가</td></tr>' +
+      '<tr><td>나</td></tr>' +
+      '<tr><td>따로</td><td>다</td></tr>' +
+      '</tbody></table>';
+    // 남은 자리 90 에는 제목 20 + 묶음 60 이 안 들어간다 → 새 장 기준(용량 85)으로 두 조각
+    const chunks = splitTableByRows(merged, [20, 30, 30, 30], { capacity: 85, firstCapacity: 90 });
+    expect(chunks).toHaveLength(2);
+    expect(rowsOf(chunks[0])).toEqual([['구분', '내용'], ['묶음', '가'], ['나']]);
+  });
+
+  it('표에 colgroup 이 있으면 그것을 조각에 그대로 복제한다 (열 폭 맞춤 결과 유지)', () => {
+    const withColgroup =
+      '<table style="table-layout: fixed"><colgroup><col style="width: 80%"><col style="width: 20%"></colgroup><tbody>' +
+      '<tr><th>단어</th><th>뜻</th></tr>' +
+      '<tr><td>가</td><td>1</td></tr>' +
+      '<tr><td>나</td><td>2</td></tr>' +
+      '</tbody></table>';
+    const chunks = splitTableByRows(withColgroup, [20, 30, 30], { capacity: 55, colWidths: [100, 900] });
+    expect(chunks).toHaveLength(2);
+    chunks.forEach((chunk) => {
+      const host = document.createElement('div');
+      host.innerHTML = chunk;
+      const widths = Array.from(host.querySelectorAll('col')).map((col) => (col as HTMLElement).style.width);
+      expect(widths).toEqual(['80%', '20%']);
+      expect(host.querySelector('table')?.style.tableLayout).toBe('fixed');
+    });
   });
 
   it('열 너비를 주면 조각의 열 폭을 비율로 고정한다', () => {
-    const chunks = splitTableByRows(table, [20, 30, 30, 30], 55, [300, 100]);
+    const chunks = splitTableByRows(table, [20, 30, 30, 30], { capacity: 55, colWidths: [300, 100] });
     const host = document.createElement('div');
     host.innerHTML = chunks[0];
     // 브라우저 CSSOM 이 끝자리 0 을 지우므로 문자열이 아니라 값으로 비교한다
@@ -199,7 +255,7 @@ describe('splitTableByRows', () => {
   });
 
   it('열 너비를 안 주면 colgroup 을 넣지 않는다', () => {
-    const chunks = splitTableByRows(table, [20, 30, 30, 30], 55);
+    const chunks = splitTableByRows(table, [20, 30, 30, 30], { capacity: 55 });
     expect(chunks[0]).not.toContain('<colgroup>');
     expect(chunks[0]).not.toContain('table-layout');
   });
@@ -214,7 +270,7 @@ describe('splitTableByRows', () => {
       '<tr><td>나</td><td>2</td></tr>' +
       '<tr><td>다</td><td>3</td></tr>' +
       '</tbody></table>';
-    const chunks = splitTableByRows(marked, [20, 30, 30, 30], 55);
+    const chunks = splitTableByRows(marked, [20, 30, 30, 30], { capacity: 55 });
     expect(chunks.length).toBeGreaterThan(1);
     chunks.forEach((chunk) => {
       const host = document.createElement('div');
@@ -231,7 +287,7 @@ describe('splitTableByRows', () => {
       '<tr><td>가</td><td>1</td></tr>' +
       '<tr><td>나</td><td>2</td></tr>' +
       '</tbody></table>';
-    const chunks = splitTableByRows(marked, [20, 30, 30], 55);
+    const chunks = splitTableByRows(marked, [20, 30, 30], { capacity: 55 });
     expect(chunks).toHaveLength(2);
     chunks.forEach((chunk) => {
       const host = document.createElement('div');
@@ -248,7 +304,7 @@ describe('splitTableByRows', () => {
       '<tr><td>가</td><td>1</td></tr>' +
       '<tr><td>나</td><td>2</td></tr>' +
       '</tbody></table>';
-    const chunks = splitTableByRows(marked, [20, 30, 30], 55);
+    const chunks = splitTableByRows(marked, [20, 30, 30], { capacity: 55 });
     // 제목으로 안 보므로 첫 행도 본문으로 배정된다 → 조각마다 반복되지 않는다
     const firstRowRepeats = chunks.filter((chunk) => chunk.includes('eb-stage2-box')).length;
     expect(firstRowRepeats).toBe(1);
@@ -261,7 +317,7 @@ describe('splitTableByRows', () => {
       '<tr><td>가</td><td>1</td></tr>' +
       '<tr><td>나</td><td>2</td></tr>' +
       '</tbody></table>';
-    const chunks = splitTableByRows(empty, [20, 30, 30], 55);
+    const chunks = splitTableByRows(empty, [20, 30, 30], { capacity: 55 });
     const host = document.createElement('div');
     host.innerHTML = chunks[chunks.length - 1];
     expect(host.querySelectorAll('tr')).toHaveLength(1);
@@ -275,7 +331,7 @@ describe('splitTableByRows', () => {
       '<tr><td>가</td><td>1</td></tr>' +
       '<tr><td>나</td><td>2</td></tr>' +
       '</tbody></table>';
-    const chunks = splitTableByRows(grouped, [20, 20, 30, 30], 55);
+    const chunks = splitTableByRows(grouped, [20, 20, 30, 30], { capacity: 55 });
     expect(chunks.length).toBeGreaterThan(1);
     chunks.forEach((chunk) => {
       const host = document.createElement('div');
@@ -292,7 +348,7 @@ describe('splitTableByRows', () => {
       '<thead><tr><td>묶음</td></tr><tr><td>이름</td></tr></thead>' +
       '<tbody><tr><td>가</td></tr><tr><td>나</td></tr></tbody>' +
       '</table>';
-    const chunks = splitTableByRows(withThead, [20, 20, 30, 30], 55);
+    const chunks = splitTableByRows(withThead, [20, 20, 30, 30], { capacity: 55 });
     expect(chunks.length).toBeGreaterThan(1);
     chunks.forEach((chunk) => {
       const host = document.createElement('div');
@@ -309,7 +365,7 @@ describe('splitTableByRows', () => {
       '<tr><td>나</td><td>2</td></tr>' +
       '<tr><td>다</td><td>3</td></tr>' +
       '</tbody></table>';
-    const chunks = splitTableByRows(t, [20, 30, 30, 30], 55);
+    const chunks = splitTableByRows(t, [20, 30, 30, 30], { capacity: 55 });
     const withBold = chunks.filter((chunk) => chunk.includes('<strong>가</strong>')).length;
     expect(withBold).toBe(1);
   });
@@ -325,7 +381,7 @@ describe('splitTableByRows', () => {
       '<tr><td>나</td><td>2</td></tr>' +
       '<tr><td>다</td><td>3</td></tr>' +
       '</tbody></table>';
-    const chunks = splitTableByRows(t, [20, 20, 20, 30, 30, 30], 65);
+    const chunks = splitTableByRows(t, [20, 20, 20, 30, 30, 30], { capacity: 65 });
     expect(chunks.length).toBeGreaterThan(1);
     chunks.forEach((chunk) => {
       const host = document.createElement('div');
@@ -343,7 +399,7 @@ describe('splitTableByRows', () => {
       '<tr><td>다</td><td>3</td></tr>' +
       '<tr><td>라</td><td>4</td></tr>' +
       '</tbody></table>';
-    const chunks = splitTableByRows(t, [20, 20, 30, 30, 30], 65);
+    const chunks = splitTableByRows(t, [20, 20, 30, 30, 30], { capacity: 65 });
     const withData = chunks.filter((chunk) => chunk.includes('<strong>가</strong>')).length;
     expect(withData).toBe(1);
   });
