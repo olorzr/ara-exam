@@ -73,18 +73,34 @@ function parseRowSpan(cell: Element): number {
 
 const stripSpaces = (text: string) => text.replace(/\s+/g, '');
 
-function isEmptyCell(cell: Element): boolean {
-  return stripSpaces(cell.textContent ?? '') === '';
+/**
+ * 단계 변환이 텍스트를 지운 개념 표시 — 1·2단계 박스 묶음과 3단계 밑줄.
+ * 2단계 박스는 빈 span 이고 3단계 밑줄은 `&nbsp;` 뿐이라(`\s` 가 NBSP 까지 지운다)
+ * 텍스트만 보면 개념어로만 이뤄진 제목 행이 '빈 행' 으로 오판된다.
+ */
+const BLANK_MARK_SELECTOR = '.eb-blank-run, .eb-stage3-blank';
+
+function countBlankMarks(el: Element): number {
+  return el.querySelectorAll(BLANK_MARK_SELECTOR).length;
 }
 
-/** 셀 텍스트 전체가 <strong> 안에 있는가 (빈 셀은 false) */
+function isEmptyCell(cell: Element): boolean {
+  return stripSpaces(cell.textContent ?? '') === '' && countBlankMarks(cell) === 0;
+}
+
+/**
+ * 셀 내용 전체가 <strong> 안에 있는가 (빈 셀은 false).
+ * 텍스트와 개념 표시 개수를 따로 비교한다 — 이어 붙여 비교하면 굵은 조각이 여러 개일 때
+ * 순서가 어긋나 굵은 제목을 놓친다.
+ */
 function isStrongOnly(cell: Element): boolean {
   const text = stripSpaces(cell.textContent ?? '');
-  if (text === '') return false;
-  const strong = Array.from(cell.querySelectorAll('strong'))
-    .map((el) => el.textContent ?? '')
-    .join('');
-  return stripSpaces(strong) === text;
+  const marks = countBlankMarks(cell);
+  if (text === '' && marks === 0) return false;
+  const strongs = Array.from(cell.querySelectorAll('strong'));
+  const strongText = stripSpaces(strongs.map((el) => el.textContent ?? '').join(''));
+  const strongMarks = strongs.reduce((total, el) => total + countBlankMarks(el), 0);
+  return strongText === text && strongMarks === marks;
 }
 
 /**
@@ -94,23 +110,45 @@ function isStrongOnly(cell: Element): boolean {
 function isHeaderLikeRow(row: HTMLTableRowElement): boolean {
   const cells = cellsOf(row);
   if (cells.length === 0) return false;
-  if (cells.every((cell) => cell.tagName === 'TH')) return true;
+  if (isExplicitHeaderRow(row)) return true;
   const filled = cells.filter((cell) => !isEmptyCell(cell));
   return filled.length > 0 && filled.every(isStrongOnly);
 }
 
 /**
+ * 작성자가 제목이라고 **명시한** 행 — 셀이 전부 `<th>` 이거나 `<thead>` 안에 있다.
+ * 굵은 글씨 판정과 달리 추측이 아니므로 여러 행을 이어 가져와도 안전하다.
+ */
+function isExplicitHeaderRow(row: HTMLTableRowElement | undefined): boolean {
+  if (!row) return false;
+  if (row.parentElement?.tagName === 'THEAD') return true;
+  const cells = cellsOf(row);
+  return cells.length > 0 && cells.every((cell) => cell.tagName === 'TH');
+}
+
+/**
  * 앞에서부터 제목 행 개수를 센다.
- * 조각마다 반복해야 하므로 제목 묶음의 끝은 합법 절단점이어야 한다 — 제목 셀이 본문으로
- * rowspan 되어 있으면 반복할 수 없어 0 을 돌려준다. 첫 합법 절단점에서 멈춰 굵은 데이터 행을 끌어들이지 않는다.
+ *
+ * 조각마다 반복해야 하므로 제목 묶음의 끝은 **합법 절단점이어야 한다** — 제목 셀이 본문으로
+ * rowspan 되어 있으면 그 자리에서 끊을 수 없어 반복할 수 없다. 그래서 합법 절단점으로
+ * 끝나는 마지막 후보(`best`)만 확정하고, 더 가져가려다 실패해도 거기로 후퇴한다.
+ *
+ * 다음 행으로 이어 가는 것은 그 행이 **명시 제목(th/thead)** 일 때만이다. 이 규칙 하나가
+ * 두 가지를 동시에 막는다 — (1) 굵은 데이터 행이 제목으로 승격되는 것, (2) 제목 셀이
+ * rowspan 으로 뻗은 첫 데이터 행이 제목 묶음에 끌려와 매 페이지 반복되는 것.
+ * 반대로 '묶음명 + 열 이름' 처럼 둘째 행도 th 인 2행 제목은 끝까지 가져와야 한다 —
+ * 안 그러면 둘째 행이 본문으로 밀려 2페이지부터 열 이름이 빠진다.
  */
 function detectHeaderRows(rows: HTMLTableRowElement[], legalCut: boolean[]): number {
+  /** 합법 절단점으로 끝나는 마지막 제목 행 수. 여기까지는 언제나 반복할 수 있다 */
+  let best = 0;
   let count = 0;
   while (count < rows.length - 1 && count < MAX_HEADER_ROWS && isHeaderLikeRow(rows[count])) {
     count++;
-    if (legalCut[count]) break;
+    if (legalCut[count]) best = count;
+    if (!isExplicitHeaderRow(rows[count])) break;
   }
-  return legalCut[count] ? count : 0;
+  return best;
 }
 
 /**

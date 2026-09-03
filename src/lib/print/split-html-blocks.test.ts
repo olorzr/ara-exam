@@ -203,4 +203,148 @@ describe('splitTableByRows', () => {
     expect(chunks[0]).not.toContain('<colgroup>');
     expect(chunks[0]).not.toContain('table-layout');
   });
+
+  it('2단계 빈 박스로만 이뤄진 굵은 제목 행도 조각마다 반복한다', () => {
+    // 개념어 전체가 마킹된 제목 행은 stage2 변환 뒤 텍스트가 비어 있다
+    const box = '<span class="eb-blank-run"><span class="eb-stage2-box"></span></span>';
+    const marked =
+      '<table><tbody>' +
+      `<tr><td><strong>${box}</strong></td><td><strong>${box}</strong></td></tr>` +
+      '<tr><td>가</td><td>1</td></tr>' +
+      '<tr><td>나</td><td>2</td></tr>' +
+      '<tr><td>다</td><td>3</td></tr>' +
+      '</tbody></table>';
+    const chunks = splitTableByRows(marked, [20, 30, 30, 30], 55);
+    expect(chunks.length).toBeGreaterThan(1);
+    chunks.forEach((chunk) => {
+      const host = document.createElement('div');
+      host.innerHTML = chunk;
+      expect(host.querySelectorAll('tr')[0].querySelectorAll('.eb-stage2-box')).toHaveLength(2);
+    });
+  });
+
+  it('3단계 밑줄(&nbsp;)만 있는 굵은 제목 행도 반복한다', () => {
+    const blank = '<span class="eb-stage3-blank">\u00a0</span>';
+    const marked =
+      '<table><tbody>' +
+      `<tr><td><strong>${blank}</strong></td><td><strong>${blank}</strong></td></tr>` +
+      '<tr><td>가</td><td>1</td></tr>' +
+      '<tr><td>나</td><td>2</td></tr>' +
+      '</tbody></table>';
+    const chunks = splitTableByRows(marked, [20, 30, 30], 55);
+    expect(chunks).toHaveLength(2);
+    chunks.forEach((chunk) => {
+      const host = document.createElement('div');
+      host.innerHTML = chunk;
+      expect(host.querySelectorAll('.eb-stage3-blank')).toHaveLength(2);
+    });
+  });
+
+  it('개념 표시가 굵은 글씨 밖에 있으면 제목 행이 아니다', () => {
+    const box = '<span class="eb-blank-run"><span class="eb-stage2-box"></span></span>';
+    const marked =
+      '<table><tbody>' +
+      `<tr><td><strong>구분</strong>${box}</td><td><strong>뜻</strong></td></tr>` +
+      '<tr><td>가</td><td>1</td></tr>' +
+      '<tr><td>나</td><td>2</td></tr>' +
+      '</tbody></table>';
+    const chunks = splitTableByRows(marked, [20, 30, 30], 55);
+    // 제목으로 안 보므로 첫 행도 본문으로 배정된다 → 조각마다 반복되지 않는다
+    const firstRowRepeats = chunks.filter((chunk) => chunk.includes('eb-stage2-box')).length;
+    expect(firstRowRepeats).toBe(1);
+  });
+
+  it('내용이 전혀 없는 행은 여전히 제목으로 보지 않는다', () => {
+    const empty =
+      '<table><tbody>' +
+      '<tr><td></td><td></td></tr>' +
+      '<tr><td>가</td><td>1</td></tr>' +
+      '<tr><td>나</td><td>2</td></tr>' +
+      '</tbody></table>';
+    const chunks = splitTableByRows(empty, [20, 30, 30], 55);
+    const host = document.createElement('div');
+    host.innerHTML = chunks[chunks.length - 1];
+    expect(host.querySelectorAll('tr')).toHaveLength(1);
+  });
+
+  it('rowspan 없는 2행 th 제목도 두 행을 함께 반복한다 (묶음명 + 열 이름)', () => {
+    const grouped =
+      '<table><tbody>' +
+      '<tr><th colspan="2">묶음</th></tr>' +
+      '<tr><th>이름</th><th>값</th></tr>' +
+      '<tr><td>가</td><td>1</td></tr>' +
+      '<tr><td>나</td><td>2</td></tr>' +
+      '</tbody></table>';
+    const chunks = splitTableByRows(grouped, [20, 20, 30, 30], 55);
+    expect(chunks.length).toBeGreaterThan(1);
+    chunks.forEach((chunk) => {
+      const host = document.createElement('div');
+      host.innerHTML = chunk;
+      const rows = host.querySelectorAll('tr');
+      expect(rows[0].textContent).toContain('묶음');
+      expect(rows[1].textContent).toContain('이름');
+    });
+  });
+
+  it('thead 안의 제목 행들도 함께 반복한다', () => {
+    const withThead =
+      '<table>' +
+      '<thead><tr><td>묶음</td></tr><tr><td>이름</td></tr></thead>' +
+      '<tbody><tr><td>가</td></tr><tr><td>나</td></tr></tbody>' +
+      '</table>';
+    const chunks = splitTableByRows(withThead, [20, 20, 30, 30], 55);
+    expect(chunks.length).toBeGreaterThan(1);
+    chunks.forEach((chunk) => {
+      const host = document.createElement('div');
+      host.innerHTML = chunk;
+      expect(host.querySelectorAll('tr')[1].textContent).toContain('이름');
+    });
+  });
+
+  it('th 제목 뒤의 굵은 데이터 행은 제목으로 끌어오지 않는다', () => {
+    const t =
+      '<table><tbody>' +
+      '<tr><th>구분</th><th>뜻</th></tr>' +
+      '<tr><td><strong>가</strong></td><td><strong>1</strong></td></tr>' +
+      '<tr><td>나</td><td>2</td></tr>' +
+      '<tr><td>다</td><td>3</td></tr>' +
+      '</tbody></table>';
+    const chunks = splitTableByRows(t, [20, 30, 30, 30], 55);
+    const withBold = chunks.filter((chunk) => chunk.includes('<strong>가</strong>')).length;
+    expect(withBold).toBe(1);
+  });
+
+  it('제목을 더 가져가려다 실패하면 마지막 합법 지점으로 후퇴한다', () => {
+    // row1 이 전부 th 라 이어가려 하지만 row2 까지 뻗어 있다 → row0 만 제목으로 남아야 한다
+    const t =
+      '<table><tbody>' +
+      '<tr><th>구분</th><th>뜻</th></tr>' +
+      '<tr><th rowspan="2">묶음</th><th>이름</th></tr>' +
+      '<tr><th>값</th></tr>' +
+      '<tr><td>가</td><td>1</td></tr>' +
+      '<tr><td>나</td><td>2</td></tr>' +
+      '<tr><td>다</td><td>3</td></tr>' +
+      '</tbody></table>';
+    const chunks = splitTableByRows(t, [20, 20, 20, 30, 30, 30], 65);
+    expect(chunks.length).toBeGreaterThan(1);
+    chunks.forEach((chunk) => {
+      const host = document.createElement('div');
+      host.innerHTML = chunk;
+      expect(host.querySelectorAll('tr')[0].textContent).toContain('구분');
+    });
+  });
+
+  it('제목이 rowspan 으로 뻗은 첫 데이터 행(굵음)은 제목으로 승격하지 않는다', () => {
+    const t =
+      '<table><tbody>' +
+      '<tr><th rowspan="2">구분</th><th>뜻</th></tr>' +
+      '<tr><td><strong>가</strong></td></tr>' +
+      '<tr><td>나</td><td>2</td></tr>' +
+      '<tr><td>다</td><td>3</td></tr>' +
+      '<tr><td>라</td><td>4</td></tr>' +
+      '</tbody></table>';
+    const chunks = splitTableByRows(t, [20, 20, 30, 30, 30], 65);
+    const withData = chunks.filter((chunk) => chunk.includes('<strong>가</strong>')).length;
+    expect(withData).toBe(1);
+  });
 });
