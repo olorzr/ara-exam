@@ -86,7 +86,7 @@ src/
   - `src/lib/print/table-col-fit.ts` — 열 폭 배분(짧은 열 보호 + 긴 열 비례, 하한은 칸 폭의 1/5·최대 96px) → 퍼센트 colgroup 주입
   - `src/lib/print/table-grid.ts` — 순수 계산: rowspan/colspan 격자 걷기(셀 → 열 인덱스)
   - `src/lib/print/table-dom.ts` — 표 HTML 공용 DOM 헬퍼(루트 표·셀·span 파싱)
-  - `src/lib/print/sheet-columns.ts` — 개념지 단 수 결정(글자 수 300자 초과 → 2단). 표 열 수는 보지 않는다(열 폭 맞춤이 칸에 맞춘다)
+  - `src/lib/print/sheet-columns.ts` — 개념지 단 수 결정(글자 수 300자 초과 → 2단). 루트 표 열 수는 보지 않고(열 폭 맞춤이 칸에 맞춘다), 래퍼 안의 넓은 표만 1단 폴백
   - `src/hooks/useA4Pagination.ts` — 숨김 컨테이너 실측 + 재측정(fonts.ready / ResizeObserver / img load / beforeprint)
   - `src/hooks/useConceptSheetBlocks.ts` — 개념지 블록 상태 + 표 열 폭 맞춤(배치 전) + 남은 자리를 채우는 표 재분할(패스당 표 하나, 최대 32)
   - `src/components/print/{A4Document,A4Sheet,CompactPageHeader}.tsx` — 측정 컨테이너 + 낱장 렌더
