@@ -129,6 +129,75 @@ describe('paginate', () => {
   });
 });
 
+describe('paginate — 분할 요청', () => {
+  it('남은 자리에 안 들어가면 그 자리 크기로 분할을 요청한다', () => {
+    const result = paginate({
+      blockHeights: [40, 80],
+      columns: 1,
+      firstPageBodyHeight: body(100),
+      laterPageBodyHeight: body(120),
+      splittable: [false, true],
+    });
+    // 40 을 쓰고 남은 60 이 앞 조각 용량, 뒤 조각은 2페이지 용량 120
+    expect(result.splitRequests).toEqual([{ index: 1, firstCapacity: 60, laterCapacity: 120 }]);
+  });
+
+  it('쪼갤 수 없는 블록은 요청하지 않는다', () => {
+    const result = paginate({
+      blockHeights: [40, 80],
+      columns: 1,
+      firstPageBodyHeight: body(100),
+      laterPageBodyHeight: body(120),
+    });
+    expect(result.splitRequests).toEqual([]);
+  });
+
+  it('다 들어가면 요청이 없다', () => {
+    const result = paginate({
+      blockHeights: [40, 40],
+      columns: 1,
+      firstPageBodyHeight: body(100),
+      laterPageBodyHeight: body(100),
+      splittable: [true, true],
+    });
+    expect(result.splitRequests).toEqual([]);
+  });
+
+  it('2단에서는 어느 칸에 놓여도 맞도록 작은 쪽 용량을 준다', () => {
+    const result = paginate({
+      blockHeights: [200],
+      columns: 2,
+      firstPageBodyHeight: body(100),
+      laterPageBodyHeight: body(150),
+      splittable: [true],
+    });
+    expect(result.splitRequests).toEqual([{ index: 0, firstCapacity: 100, laterCapacity: 100 }]);
+  });
+
+  it('한 페이지에도 안 들어가는 표는 축소 대상이면서 분할 요청도 남긴다', () => {
+    const result = paginate({
+      blockHeights: [500],
+      columns: 1,
+      firstPageBodyHeight: body(100),
+      laterPageBodyHeight: body(100),
+      splittable: [true],
+    });
+    expect(result.oversized).toEqual([0]);
+    expect(result.splitRequests).toEqual([{ index: 0, firstCapacity: 100, laterCapacity: 100 }]);
+  });
+
+  it('요청은 문서 순서다', () => {
+    const result = paginate({
+      blockHeights: [80, 80, 80],
+      columns: 1,
+      firstPageBodyHeight: body(100),
+      laterPageBodyHeight: body(100),
+      splittable: [true, true, true],
+    });
+    expect(result.splitRequests.map((request) => request.index)).toEqual([1, 2]);
+  });
+});
+
 describe('findBlockPage', () => {
   it('블록이 놓인 페이지 번호를 찾는다', () => {
     const { pages } = paginate({

@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { render } from '@testing-library/react';
 import { A4Document } from '@/components/print';
-import { useConceptSheetBlocks } from './useConceptSheetBlocks';
+import { SHEET_BODY_CLASS, useConceptSheetBlocks } from './useConceptSheetBlocks';
 
 const FOOTER_H = 20;
 const HEADER_H = 60;
@@ -34,14 +34,16 @@ beforeAll(() => {
 
 /** 개념지 렌더러와 같은 구조 — 훅이 만든 블록을 A4Document 에 넘긴다 */
 function Sheet({ html }: { html: string }) {
-  const { blocks, handleOversized } = useConceptSheetBlocks(html);
+  const { blocks, splittable, handleBeforePaginate, handleSplitRequest } = useConceptSheetBlocks(html);
   return (
     <A4Document
       blocks={blocks.map((chunk, i) => (
-        <div key={i} className="sheet-body" dangerouslySetInnerHTML={{ __html: chunk }} />
+        <div key={i} className={SHEET_BODY_CLASS} dangerouslySetInnerHTML={{ __html: chunk }} />
       ))}
       columns={1}
-      onOversized={handleOversized}
+      splittable={splittable}
+      onBeforePaginate={handleBeforePaginate}
+      onSplitRequest={handleSplitRequest}
       firstPageHeader={<div data-h={HEADER_H}>헤더</div>}
       laterPageHeader={<div data-h={HEADER_H}>컴팩트</div>}
     />
@@ -74,6 +76,35 @@ describe('useConceptSheetBlocks', () => {
       Array.from(sheet.querySelectorAll('td')).map((cell) => cell.textContent),
     );
     expect(bodyCells.filter((text) => text?.startsWith('단어'))).toHaveLength(30);
+  });
+
+  it('앞 블록이 남긴 자리를 표로 채우고 나머지를 다음 장으로 넘긴다', () => {
+    const intro = `<p data-h="300">서문</p>`;
+    const { container } = render(<Sheet html={`${intro}${longTable(30)}`} />);
+    const rendered = sheets(container);
+    expect(rendered.length).toBeGreaterThan(1);
+
+    // 1페이지에 서문과 표가 함께 있고, 표 본문이 고아 한 줄이 아니다
+    const firstPage = rendered[0];
+    expect(firstPage.textContent).toContain('서문');
+    const firstPageRows = Array.from(firstPage.querySelectorAll('td')).filter((cell) =>
+      cell.textContent?.startsWith('단어'),
+    );
+    expect(firstPageRows.length).toBeGreaterThanOrEqual(2);
+
+    // 본문 행이 유실되거나 중복되지 않는다
+    const allRows = rendered.flatMap((sheet) =>
+      Array.from(sheet.querySelectorAll('td'))
+        .map((cell) => cell.textContent)
+        .filter((text) => text?.startsWith('단어')),
+    );
+    expect(allRows).toHaveLength(30);
+    expect(new Set(allRows).size).toBe(30);
+    // 모든 낱장의 표는 제목 행으로 시작한다
+    rendered.slice(1).forEach((sheet) => {
+      const headerCells = Array.from(sheet.querySelectorAll('tr')[0]?.children ?? []).map((c) => c.textContent);
+      expect(headerCells).toEqual(['단어', '뜻']);
+    });
   });
 
   it('쪼갤 수 없는 병합 묶음은 축소해서 담고 렌더가 끝난다', () => {

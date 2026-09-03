@@ -6,7 +6,9 @@
  * 어디서 잘라도 되는지(rowspan 경계)·어디서 자를지는 `table-row-plan.ts` 의 순수 계산이 맡는다.
  */
 
-import { legalCutFlags, planRowChunks } from './table-row-plan';
+import { colgroupFromWidths } from './table-col-fit';
+import { cellsOf, createHost, parseRowSpan, rootTable } from './table-dom';
+import { legalCutFlags, planRowChunks, type RowRange } from './table-row-plan';
 
 /** 조각 테이블 식별용 클래스 — 인접 조각의 테두리 겹침 보정에 쓴다 */
 export const TABLE_CHUNK_CLASS = 'sheet-table-chunk';
@@ -17,15 +19,11 @@ export const ROW_EVEN_ATTR = 'data-row-even';
 /** 조각마다 반복할 제목 행 최대 개수 — 2행 병합 제목(대분류/소분류)까지 */
 const MAX_HEADER_ROWS = 2;
 
-/** 조각 열 너비 퍼센트의 소수 자릿수 */
-const COL_WIDTH_DECIMALS = 3;
-
-function createHost(html: string): HTMLElement | null {
-  if (typeof document === 'undefined') return null;
-  const host = document.createElement('div');
-  host.innerHTML = html;
-  return host;
-}
+/**
+ * 페이지의 남은 자리를 채울 때 앞 조각에 있어야 할 최소 본문 행 수.
+ * 한 행만 걸치면 페이지 바닥에 제목+한 줄만 남아 오히려 보기 나쁘다 — 그럴 바엔 다음 장에서 시작한다.
+ */
+export const MIN_LEAD_BODY_ROWS = 2;
 
 /** 표의 모든 행에 원본 순서 기반 줄무늬 표시를 남긴다 (nth-child 리셋 대비) */
 function markRowStripes(host: HTMLElement): void {
@@ -50,25 +48,6 @@ export function splitHtmlBlocks(html: string): string[] {
   return Array.from(host.children)
     .map((el) => el.outerHTML)
     .filter((chunk) => chunk.trim().length > 0);
-}
-
-/** 블록 루트가 표 자체일 때만 돌려준다 — blockquote/li 안의 표를 쪼개면 래퍼와 형제 내용이 사라진다 */
-function rootTable(host: HTMLElement): HTMLTableElement | null {
-  const first = host.firstElementChild;
-  if (host.children.length !== 1 || !(first instanceof HTMLTableElement)) return null;
-  return first;
-}
-
-function cellsOf(row: HTMLTableRowElement): Element[] {
-  return Array.from(row.children).filter((el) => el.tagName === 'TD' || el.tagName === 'TH');
-}
-
-/** rowspan 속성 → 숫자. 없거나 이상하면 1. "0" 은 HTML 규격대로 표 끝까지(ROWSPAN_TO_END) */
-function parseRowSpan(cell: Element): number {
-  const raw = cell.getAttribute('rowspan');
-  if (raw === null) return 1;
-  const value = Number.parseInt(raw, 10);
-  return Number.isNaN(value) || value < 0 ? 1 : value;
 }
 
 const stripSpaces = (text: string) => text.replace(/\s+/g, '');
@@ -151,23 +130,6 @@ function detectHeaderRows(rows: HTMLTableRowElement[], legalCut: boolean[]): num
   return best;
 }
 
-/**
- * 실측 열 너비를 퍼센트 colgroup 으로 만든다.
- * 조각은 각자 독립된 표라 auto 레이아웃이면 페이지마다 열 폭이 흔들리므로 같은 비율로 고정한다.
- */
-function colgroupFromWidths(colWidths?: readonly number[]): HTMLElement | null {
-  if (!colWidths || colWidths.length === 0) return null;
-  const total = colWidths.reduce((sum, width) => sum + width, 0);
-  if (total <= 0) return null;
-  const colgroup = document.createElement('colgroup');
-  colWidths.forEach((width) => {
-    const col = document.createElement('col');
-    col.style.width = `${((width / total) * 100).toFixed(COL_WIDTH_DECIMALS)}%`;
-    colgroup.appendChild(col);
-  });
-  return colgroup;
-}
-
 function buildChunk(
   table: HTMLTableElement,
   colgroup: HTMLElement | null,
@@ -188,8 +150,41 @@ function buildChunk(
 
 const sum = (values: readonly number[]) => values.reduce((acc, value) => acc + value, 0);
 
+/** 조각 계획 입력 */
+export interface SplitTableOptions {
+  /** 한 조각이 쓸 수 있는 최대 높이(px) */
+  capacity: number;
+  /**
+   * 첫 조각만의 용량 — 지금 페이지에 남은 자리. 없으면 `capacity` 와 같다.
+   * 이 자리에 제목+본문 2행도 못 넣으면 새 페이지에서 시작하는 계획으로 되돌린다.
+   */
+  firstCapacity?: number;
+  /** 기준 행의 셀 실측 폭 — 표에 colgroup 이 없을 때 조각의 열 폭을 같은 비율로 고정한다 */
+  colWidths?: readonly number[];
+}
+
 /**
- * 표를 행 단위로 쪼개 각각 `capacity` 안에 들어가는 조각 테이블 배열로 만든다.
+ * 앞 조각을 페이지의 남은 자리에 맞춰 계획한다.
+ * 남은 자리가 없거나, 계획한 앞 조각이 그 자리를 넘거나(병합 묶음이 커서), 본문 행이 너무 적으면
+ * 페이지 바닥에 고아 행만 남으므로 새 페이지에서 시작하는 계획으로 되돌린다.
+ */
+function planRanges(
+  heights: readonly number[],
+  legalCut: readonly boolean[],
+  capacity: number,
+  leadCapacity: number,
+): RowRange[] {
+  if (leadCapacity <= 0 || leadCapacity >= capacity) return planRowChunks(heights, legalCut, capacity);
+  const ranges = planRowChunks(heights, legalCut, capacity, leadCapacity);
+  const lead = ranges[0];
+  const leadRows = lead.end - lead.start + 1;
+  const leadHeight = sum(heights.slice(lead.start, lead.end + 1));
+  if (ranges.length > 1 && leadRows >= MIN_LEAD_BODY_ROWS && leadHeight <= leadCapacity) return ranges;
+  return planRowChunks(heights, legalCut, capacity);
+}
+
+/**
+ * 표를 행 단위로 쪼개 각각 용량 안에 들어가는 조각 테이블 배열로 만든다.
  *
  * rowspan 으로 묶인 행은 가르지 않고 묶음 경계에서만 자른다(끊으면 다음 조각에서 열이 밀린다).
  * 묶음 하나가 용량보다 크면 그 조각은 용량을 넘긴 채 나가고 인쇄 엔진이 축소해서 담는다.
@@ -198,14 +193,11 @@ const sum = (values: readonly number[]) => values.reduce((acc, value) => acc + v
  *
  * @param tableHtml 표 하나의 HTML (블록 루트가 표가 아니면 손대지 않는다)
  * @param rowHeights 표의 모든 `tr` 실측 높이 (문서 순서, 제목 행 포함)
- * @param capacity 한 조각이 쓸 수 있는 최대 높이(px)
- * @param colWidths 기준 행의 셀 실측 폭 — 있으면 조각의 열 폭을 같은 비율로 고정한다
  */
 export function splitTableByRows(
   tableHtml: string,
   rowHeights: readonly number[],
-  capacity: number,
-  colWidths?: readonly number[],
+  { capacity, firstCapacity, colWidths }: SplitTableOptions,
 ): string[] {
   const host = createHost(tableHtml);
   const table = host ? rootTable(host) : null;
@@ -216,17 +208,23 @@ export function splitTableByRows(
 
   const legalCut = legalCutFlags(allRows.map((row) => cellsOf(row).map(parseRowSpan)));
   const headerCount = detectHeaderRows(allRows, legalCut);
-  const chunkCapacity = capacity - sum(rowHeights.slice(0, headerCount));
+  const headerHeight = sum(rowHeights.slice(0, headerCount));
+  const chunkCapacity = capacity - headerHeight;
   if (chunkCapacity <= 0) return [tableHtml];
 
-  const ranges = planRowChunks(rowHeights.slice(headerCount), legalCut.slice(headerCount), chunkCapacity);
+  const bodyHeights = rowHeights.slice(headerCount);
+  const bodyLegal = legalCut.slice(headerCount);
+  const leadCapacity = firstCapacity === undefined ? chunkCapacity : firstCapacity - headerHeight;
+  const ranges = planRanges(bodyHeights, bodyLegal, chunkCapacity, leadCapacity);
   if (ranges.length <= 1) return [tableHtml];
 
   const headerRows = allRows.slice(0, headerCount);
   const bodyRows = allRows.slice(headerCount);
-  const widthColgroup = colgroupFromWidths(colWidths);
+  // 열 폭 맞춤이 박아 둔 colgroup 이 있으면 그것을 복제한다 — 조각 열 폭이 원본과 정확히 같아
+  // 실측한 행 높이가 조각에서도 그대로다. 맞춤에 실패한 표만 실측 셀 폭으로 고정한다
   const existingColgroup = table.querySelector('colgroup');
-  const colgroup = widthColgroup ?? (existingColgroup ? (existingColgroup.cloneNode(true) as HTMLElement) : null);
+  const widthColgroup = existingColgroup ? null : colgroupFromWidths(colWidths);
+  const colgroup = existingColgroup ? (existingColgroup.cloneNode(true) as HTMLElement) : widthColgroup;
 
   return ranges.map((range) =>
     buildChunk(table, colgroup, headerRows, bodyRows.slice(range.start, range.end + 1), widthColgroup !== null),

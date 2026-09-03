@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { transformHTML, stripTrailingEmpty } from '@/lib/exam-transform';
 import type { TransformMode } from '@/lib/exam-transform';
 import { A4Document, CompactPageHeader } from '@/components/print';
-import { useConceptSheetBlocks } from '@/hooks/useConceptSheetBlocks';
+import { SHEET_BODY_CLASS, useConceptSheetBlocks } from '@/hooks/useConceptSheetBlocks';
 import { decideSheetColumns, maxTableColumns } from '@/lib/print/sheet-columns';
 import { EXTERNAL_LEVEL } from '@/lib/constants';
 import { kstYear } from '@/lib/kst-year';
@@ -77,17 +77,19 @@ export default function ExamSheetRenderer({
     return decideSheetColumns(textLength, maxTableColumns(bodyHTML));
   }, [editorHTML, bodyHTML]);
 
-  const { blocks, handleOversized } = useConceptSheetBlocks(bodyHTML);
+  const { blocks, splittable, handleBeforePaginate, handleSplitRequest } = useConceptSheetBlocks(bodyHTML);
 
   const renderedBlocks = blocks.map((html, i) => (
-    <div key={i} className="sheet-body" dangerouslySetInnerHTML={{ __html: html }} />
+    <div key={i} className={SHEET_BODY_CLASS} dangerouslySetInnerHTML={{ __html: html }} />
   ));
 
   return (
     <A4Document
       blocks={renderedBlocks}
       columns={columns}
-      onOversized={handleOversized}
+      splittable={splittable}
+      onBeforePaginate={handleBeforePaginate}
+      onSplitRequest={handleSplitRequest}
       breakAfterLast={breakAfterLast}
       className={`eb-sheet-table ${interactive ? 'eb-concept-interactive' : ''}`.trim()}
       firstPageHeader={
