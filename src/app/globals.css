@@ -448,6 +448,9 @@
   text-align: left;
   vertical-align: top;
   font-size: 10pt;
+  /* 자동 표 레이아웃에서 표 폭의 하한은 셀 min-content 합이라 width:100% 로는 못 막는다.
+     overflow-wrap 은 `anywhere` 만 min-content 계산에 반영된다(break-word 는 아님) */
+  overflow-wrap: anywhere;
 }
 .eb-sheet-table .sheet-body th { background: #F3F4F6; font-weight: 600; }
 /* 줄무늬는 원본 행 인덱스로 지정한다 — 표를 조각내도 nth-child 처럼 리셋되지 않는다 */
@@ -486,6 +489,16 @@
 .eb-concept-preview-mark:hover {
   background: #81D8D0;
   color: white;
+}
+
+/* 1·2단계 박스 묶음 — 본문에서는 한 단어의 박스가 줄 사이에서 갈리지 않게 붙여 둔다 */
+.eb-blank-run {
+  white-space: nowrap;
+}
+/* 표 셀 안에서는 묶음을 통째로 두면 표가 컬럼 폭을 뚫고 나가 overflow:hidden 에 잘린다 → 박스 사이 줄바꿈 허용 */
+.eb-sheet-table .sheet-body th .eb-blank-run,
+.eb-sheet-table .sheet-body td .eb-blank-run {
+  white-space: normal;
 }
 
 /* 1단계 — 초성 박스 */
