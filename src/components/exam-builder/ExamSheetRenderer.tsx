@@ -5,7 +5,7 @@ import { transformHTML, stripTrailingEmpty } from '@/lib/exam-transform';
 import type { TransformMode } from '@/lib/exam-transform';
 import { A4Document, CompactPageHeader } from '@/components/print';
 import { SHEET_BODY_CLASS, useConceptSheetBlocks } from '@/hooks/useConceptSheetBlocks';
-import { decideSheetColumns, maxTableColumns } from '@/lib/print/sheet-columns';
+import { decideSheetColumns } from '@/lib/print/sheet-columns';
 import { EXTERNAL_LEVEL } from '@/lib/constants';
 import { kstYear } from '@/lib/kst-year';
 import type { BuilderCategory } from './ExamCategoryBar';
@@ -71,11 +71,11 @@ export default function ExamSheetRenderer({
     [editorHTML, config.mode],
   );
 
-  /** 글자 수는 원본 기준(단계 모드는 글자가 박스로 바뀐다), 표 열 수는 실제 렌더되는 본문 기준 */
-  const columns = useMemo(() => {
-    const textLength = editorHTML.replace(/<[^>]*>/g, '').trim().length;
-    return decideSheetColumns(textLength, maxTableColumns(bodyHTML));
-  }, [editorHTML, bodyHTML]);
+  /** 글자 수는 원본 기준(단계 모드는 글자가 박스로 바뀐다). 넓은 표는 열 폭 맞춤이 칸에 맞추므로 단 수에 영향 없다 */
+  const columns = useMemo(
+    () => decideSheetColumns(editorHTML.replace(/<[^>]*>/g, '').trim().length),
+    [editorHTML],
+  );
 
   const { blocks, splittable, handleBeforePaginate, handleSplitRequest } = useConceptSheetBlocks(bodyHTML);
 

@@ -4,8 +4,13 @@ import {
   colgroupFromWidths,
   fitColumnWidths,
   LONG_COL_MIN_PX,
+  LONG_COL_MIN_SHARE,
+  longColumnFloor,
   COLUMN_SLACK_PX,
 } from './table-col-fit';
+
+/** 2단 시트의 칸 폭 (constants.getColumnWidth(2)) */
+const NARROW = (679.7 - 24) / 2;
 
 const total = (values: number[]) => values.reduce((sum, value) => sum + value, 0);
 
@@ -60,6 +65,35 @@ describe('fitColumnWidths', () => {
     expect(widths[8]).toBeGreaterThanOrEqual(LONG_COL_MIN_PX);
     expect(total(widths)).toBeCloseTo(680, 6);
     widths.forEach((width) => expect(width).toBeGreaterThan(0));
+  });
+
+  it('좁은 칸(2단)에서 긴 열이 둘이어도 짧은 열은 보호한다', () => {
+    // 절대 하한 96px 이면 2×96 을 못 채워 전부 비례 → 짧은 열이 18px 로 눌렸다
+    const widths = fitColumnWidths([45, 45, 45, 300, 400], NARROW)!;
+    [0, 1, 2].forEach((index) => expect(widths[index]).toBe(45 + COLUMN_SLACK_PX));
+    const floor = longColumnFloor(NARROW);
+    expect(widths[3]).toBeGreaterThanOrEqual(floor);
+    expect(widths[4]).toBeGreaterThanOrEqual(floor);
+    expect(widths[3] / widths[4]).toBeCloseTo(302 / 402, 6);
+    expect(total(widths)).toBeCloseTo(NARROW, 6);
+  });
+
+  it('하한은 칸 폭의 1/5 를 넘지 않는다 — 1단은 96, 2단 칸은 그보다 낮다', () => {
+    expect(longColumnFloor(680)).toBe(LONG_COL_MIN_PX);
+    expect(longColumnFloor(NARROW)).toBeCloseTo(NARROW * LONG_COL_MIN_SHARE, 9);
+    expect(longColumnFloor(NARROW)).toBeLessThan(LONG_COL_MIN_PX);
+    // 짧은 열 하나 보호 + 긴 열 셋이 하한(60) 이상으로 나눠 갖는다
+    const widths = fitColumnWidths([50, 500, 500, 500], 300)!;
+    expect(widths[0]).toBe(50 + COLUMN_SLACK_PX);
+    widths.slice(1).forEach((width) => expect(width).toBeCloseTo((300 - 52) / 3, 6));
+  });
+
+  it('보호할 열이 없어도 하한이 긴 열을 짧은 열과 같은 폭으로 누르지 않는다 (2단계 박스 표 회귀)', () => {
+    // 박스 열 셋(88·88·120)은 균등 몫(82)보다 넓어 보호되지 않는다. 하한을 균등 몫까지 올리면 82×4 가 됐다
+    const widths = fitColumnWidths([88, 88, 120, 332], NARROW)!;
+    expect(widths[3]).toBeGreaterThan(widths[2] * 1.5);
+    widths.forEach((width) => expect(width).toBeGreaterThanOrEqual(longColumnFloor(NARROW) - 1e-9));
+    expect(total(widths)).toBeCloseTo(NARROW, 6);
   });
 
   it('모든 열이 비슷하게 넓으면 균등에 가깝게 비례로 나눈다', () => {
