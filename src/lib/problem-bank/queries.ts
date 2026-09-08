@@ -10,8 +10,8 @@ import type { Passage, Problem, ProblemSource } from '@/types/problem-bank';
 
 /** 목록에 필요한 컬럼만 — 본문 HTML 은 무겁다 */
 const PROBLEM_LIST_COLUMNS =
-  'id, source_id, passage_id, number, question_type, stem_html, choices, answer, score, '
-  + 'area_path, work_title, page_no, image_path, render_mode, status, created_at';
+  'id, source_id, passage_id, number, question_type, stem_html, choices, answer, '
+  + 'area_path, unit_path, work_title, page_no, image_path, render_mode, status, created_at';
 
 /** 한 화면에 보여 줄 문항 수 */
 export const PROBLEM_PAGE_SIZE = 60;
@@ -160,8 +160,12 @@ export interface ProblemQuery {
   year?: string;
   grade?: string;
   exam_type?: string;
+  /** 교과서 (출처의 textbook) */
+  textbook?: string;
   /** 영역 이름 경로 — 배열 포함(@>) 으로 찾는다 */
   area_path?: string[];
+  /** 교과서 단원 경로 — 대단원만 주면 그 아래 소단원 문항까지 걸린다 */
+  unit_path?: string[];
   work_title?: string;
   /** 발문·선지·작품명 평문 검색 */
   search?: string;
@@ -207,11 +211,16 @@ export async function fetchProblemPage(query: ProblemQuery): Promise<ProblemPage
   if (query.year) request = request.eq('source.year', query.year);
   if (query.grade) request = request.eq('source.grade', query.grade);
   if (query.exam_type) request = request.eq('source.exam_type', query.exam_type);
+  if (query.textbook) request = request.eq('source.textbook', query.textbook);
   if (query.work_title) request = request.eq('work_title', query.work_title);
   if (query.verifiedOnly) request = request.eq('status', '검수완료');
   if (query.area_path && query.area_path.length > 0) {
     // 배열 포함 — '문학' 으로 찾으면 '문학 > 현대시' 문항도 걸린다
     request = request.contains('area_path', query.area_path);
+  }
+  if (query.unit_path && query.unit_path.length > 0) {
+    // 같은 이유로 대단원만 골라도 그 아래 소단원 문항이 함께 걸린다
+    request = request.contains('unit_path', query.unit_path);
   }
   if (query.search?.trim()) {
     // .or() 를 쓰지 않는다 — 백슬래시·괄호 이스케이프가 인용을 통과하며 풀린다.

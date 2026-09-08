@@ -5,6 +5,7 @@ import { GripVertical, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { areaPathLabel } from '@/lib/problem-bank/area-tree';
 import { sourceLabel } from '@/lib/problem-bank/source-label';
+import { unitPathLabel } from '@/lib/problem-bank/unit-tree';
 import type { Problem, ProblemSource } from '@/types/problem-bank';
 
 /** 목록 카드에서 보여 줄 발문 길이 */
@@ -82,6 +83,7 @@ export default function ProblemCard({
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-500">
           <span>{sourceLabel(problem.source)}</span>
           {problem.work_title && <span>· {problem.work_title}</span>}
+          {problem.unit_path.length > 0 && <span>· {unitPathLabel(problem.unit_path)}</span>}
           {problem.area_path.length > 0 && <span>· {areaPathLabel(problem.area_path)}</span>}
           {showEditLink && (
             <Link

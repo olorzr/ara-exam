@@ -14,15 +14,19 @@ export interface ProblemFilters {
   year: string;
   grade: string;
   exam_type: string;
+  /** 교과서(= 출처의 textbook) */
+  textbook: string;
   area_path: string[];
+  /** 교과서 단원 이름 경로 [대단원, 소단원] */
+  unit_path: string[];
   search: string;
   verifiedOnly: boolean;
   page: number;
 }
 
 export const EMPTY_FILTERS: ProblemFilters = {
-  source_type: '', school_name: '', year: '', grade: '', exam_type: '',
-  area_path: [], search: '', verifiedOnly: false, page: 0,
+  source_type: '', school_name: '', year: '', grade: '', exam_type: '', textbook: '',
+  area_path: [], unit_path: [], search: '', verifiedOnly: false, page: 0,
 };
 
 /** 영역 경로를 주소에 실을 때 쓰는 구분자 — 이름에 들어갈 일이 없는 글자 */
@@ -40,7 +44,9 @@ export function filtersToQueryString(filters: ProblemFilters): string {
   if (filters.year) params.set('year', filters.year);
   if (filters.grade) params.set('grade', filters.grade);
   if (filters.exam_type) params.set('exam', filters.exam_type);
+  if (filters.textbook) params.set('book', filters.textbook);
   if (filters.area_path.length > 0) params.set('area', filters.area_path.join(AREA_SEPARATOR));
+  if (filters.unit_path.length > 0) params.set('unit', filters.unit_path.join(AREA_SEPARATOR));
   if (filters.search) params.set('q', filters.search);
   if (filters.verifiedOnly) params.set('verified', '1');
   if (filters.page > 0) params.set('page', String(filters.page + 1));
@@ -56,13 +62,16 @@ export function filtersToQueryString(filters: ProblemFilters): string {
 export function filtersFromParams(params: URLSearchParams): ProblemFilters {
   const rawPage = Number.parseInt(params.get('page') ?? '', 10);
   const area = params.get('area') ?? '';
+  const unit = params.get('unit') ?? '';
   return {
     source_type: params.get('type') ?? '',
     school_name: params.get('school') ?? '',
     year: params.get('year') ?? '',
     grade: params.get('grade') ?? '',
     exam_type: params.get('exam') ?? '',
+    textbook: params.get('book') ?? '',
     area_path: area ? area.split(AREA_SEPARATOR).filter(Boolean) : [],
+    unit_path: unit ? unit.split(AREA_SEPARATOR).filter(Boolean) : [],
     search: params.get('q') ?? '',
     verifiedOnly: params.get('verified') === '1',
     // 주소는 사람이 읽는 1-based, 내부는 0-based
@@ -82,7 +91,9 @@ export function toProblemQuery(filters: ProblemFilters): ProblemQuery {
     ...(filters.year ? { year: filters.year } : {}),
     ...(filters.grade ? { grade: filters.grade } : {}),
     ...(filters.exam_type ? { exam_type: filters.exam_type } : {}),
+    ...(filters.textbook ? { textbook: filters.textbook } : {}),
     ...(filters.area_path.length > 0 ? { area_path: filters.area_path } : {}),
+    ...(filters.unit_path.length > 0 ? { unit_path: filters.unit_path } : {}),
     ...(filters.search.trim() ? { search: filters.search.trim() } : {}),
     ...(filters.verifiedOnly ? { verifiedOnly: true } : {}),
     page: filters.page,
@@ -97,6 +108,7 @@ export function toProblemQuery(filters: ProblemFilters): ProblemQuery {
 export function hasActiveFilters(filters: ProblemFilters): boolean {
   return Boolean(
     filters.source_type || filters.school_name || filters.year || filters.grade
-    || filters.exam_type || filters.area_path.length > 0 || filters.search || filters.verifiedOnly,
+    || filters.exam_type || filters.textbook || filters.area_path.length > 0
+    || filters.unit_path.length > 0 || filters.search || filters.verifiedOnly,
   );
 }

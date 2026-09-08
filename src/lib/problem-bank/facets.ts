@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
  * 아카이브 필터 선택지(패싯) 모으기.
  *
  * ⚠️ **1,000행에서 자르면 안 된다.** PostgREST 기본 상한만 믿으면 업로드가 쌓였을 때
- *    그 뒤에만 있는 학교·학년도·영역이 **선택지에서 조용히 사라진다**
+ *    그 뒤에만 있는 학교·학년도·교과서·영역·단원이 **선택지에서 조용히 사라진다**
  *    (문항은 목록에 있는데 고를 수가 없다 — 코덱스 리뷰 6R·15R).
  *    한두 컬럼만 읽으므로 끝까지 훑어도 가볍다.
  */
@@ -20,18 +20,20 @@ export interface SourceFacets {
   schools: string[];
   years: string[];
   grades: string[];
+  /** 교과서(= exam.publishers.name 스냅샷) */
+  textbooks: string[];
 }
 
 /**
  * 출처 컬럼에서 실제로 존재하는 값들을 모은다.
- * @returns 학교·학년도·학년 (빈 값 제외, 정렬됨)
+ * @returns 학교·학년도·학년·교과서 (빈 값 제외, 정렬됨)
  */
 export async function fetchSourceFacets(): Promise<SourceFacets> {
-  const rows: { school_name: string; year: string; grade: string }[] = [];
+  const rows: { school_name: string; year: string; grade: string; textbook: string }[] = [];
   for (let from = 0; from < FACET_MAX_ROWS; from += FACET_CHUNK) {
     const { data, error } = await supabase
       .from('problem_sources')
-      .select('school_name, year, grade')
+      .select('school_name, year, grade, textbook')
       .order('id')
       .range(from, from + FACET_CHUNK - 1);
     if (error) throw error;
@@ -45,15 +47,16 @@ export async function fetchSourceFacets(): Promise<SourceFacets> {
     schools: uniq(rows.map((r) => r.school_name)),
     years: uniq(rows.map((r) => r.year)).reverse(),
     grades: uniq(rows.map((r) => r.grade)),
+    textbooks: uniq(rows.map((r) => r.textbook)),
   };
 }
 
 /**
  * 이름 경로 배열 컬럼에 실제로 쓰인 경로들 — 필터 선택지를 만든다.
- * @param column - 이름 경로 배열 컬럼
+ * @param column - 이름 경로 배열 컬럼 ('area_path' 영역 · 'unit_path' 교과서 단원)
  * @returns 중복 없는 경로 목록 (사전순)
  */
-async function collectPathFacets(column: 'area_path'): Promise<string[][]> {
+async function collectPathFacets(column: 'area_path' | 'unit_path'): Promise<string[][]> {
   const seen = new Set<string>();
   const out: string[][] = [];
 
@@ -87,3 +90,9 @@ async function collectPathFacets(column: 'area_path'): Promise<string[][]> {
  */
 export const fetchAreaFacets = (): Promise<string[][]> => collectPathFacets('area_path');
 
+
+/**
+ * 아카이브에 쓰인 교과서 단원 경로 목록.
+ * @returns 중복 없는 경로 목록
+ */
+export const fetchUnitFacets = (): Promise<string[][]> => collectPathFacets('unit_path');

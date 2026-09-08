@@ -7,14 +7,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { SOURCE_TYPE_OPTIONS, EXAM_TYPE_OPTIONS } from '@/lib/problem-bank/source-form';
 import { areaPathLabel } from '@/lib/problem-bank/area-tree';
 import { hasActiveFilters, type ProblemFilters } from '@/lib/problem-bank/filters';
+import { unitPathLabel } from '@/lib/problem-bank/unit-tree';
 
 /** '전체'를 뜻하는 센티널 — base-ui Select 는 빈 문자열 value 를 싫어한다 */
 const ALL = '__all__';
 
 interface ProblemFilterBarProps {
   filters: ProblemFilters;
-  facets: { schools: string[]; years: string[]; grades: string[] };
+  facets: { schools: string[]; years: string[]; grades: string[]; textbooks: string[] };
   areaFacets: string[][];
+  unitFacets: string[][];
   total: number;
   onChange: (patch: Partial<ProblemFilters>) => void;
   onReset: () => void;
@@ -27,7 +29,7 @@ interface ProblemFilterBarProps {
  * 문항이 하나도 없는 영역이 잔뜩 나온다.
  */
 export default function ProblemFilterBar({
-  filters, facets, areaFacets, total, onChange, onReset,
+  filters, facets, areaFacets, unitFacets, total, onChange, onReset,
 }: ProblemFilterBarProps) {
   // base-ui Select 의 onValueChange 는 `string | null` 을 준다(CLAUDE.md Known Issues)
   const pick = (key: keyof ProblemFilters) => (v: string | null) => {
@@ -76,6 +78,35 @@ export default function ProblemFilterBar({
             {EXAM_TYPE_OPTIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
           </SelectContent>
         </Select>
+
+        {facets.textbooks.length > 0 && (
+          <Select value={filters.textbook || ALL} onValueChange={pick('textbook')}>
+            <SelectTrigger className="h-9 w-40 text-sm"><SelectValue placeholder="교과서" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>교과서 전체</SelectItem>
+              {facets.textbooks.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
+
+        {unitFacets.length > 0 && (
+          <Select
+            value={filters.unit_path.length > 0 ? filters.unit_path.join('>') : ALL}
+            onValueChange={(v) => {
+              if (v) onChange({ unit_path: v === ALL ? [] : v.split('>'), page: 0 });
+            }}
+          >
+            <SelectTrigger className="h-9 w-48 text-sm"><SelectValue placeholder="단원" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>단원 전체</SelectItem>
+              {unitFacets.map((path) => (
+                <SelectItem key={path.join('>')} value={path.join('>')}>
+                  {unitPathLabel(path)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         {areaFacets.length > 0 && (
           <Select

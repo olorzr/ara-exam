@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import ProblemCard from '@/components/problem-bank/ProblemCard';
 import ProblemFilterBar from '@/components/problem-bank/ProblemFilterBar';
+import UnitTreePanel from '@/components/problem-bank/UnitTreePanel';
 import { useProblemArchive } from '@/hooks/useProblemArchive';
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls';
 import { filtersFromParams, filtersToQueryString } from '@/lib/problem-bank/filters';
@@ -40,7 +41,7 @@ function ArchiveContent() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">🗂️ 문제 아카이브</h1>
           <p className="mt-1 text-sm text-gray-500">
-            읽어 둔 기출 문항입니다. 골라서 새 문제지를 만들 수 있어요.
+            읽어 둔 기출 문항입니다. 왼쪽에서 교과서 단원을 고르거나 조건으로 찾아 새 문제지를 만들 수 있어요.
           </p>
         </div>
         <div className="flex gap-2">
@@ -59,58 +60,67 @@ function ArchiveContent() {
         </div>
       </div>
 
-      <ProblemFilterBar
-        filters={archive.filters}
-        facets={archive.facets}
-        areaFacets={archive.areaFacets}
-        total={archive.total}
-        onChange={archive.patch}
-        onReset={archive.reset}
-      />
+      <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <div className="lg:sticky lg:top-4 lg:self-start">
+          <UnitTreePanel filters={archive.filters} onChange={archive.patch} />
+        </div>
 
-      {archive.loading ? (
-        <div className="flex justify-center py-16">
-          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
-        </div>
-      ) : archive.rows.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center text-sm text-gray-500">
-            조건에 맞는 문항이 없어요.
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-2">
-          {archive.rows.map((row) => (
-            <ProblemCard
-              key={row.id}
-              problem={row}
-              thumbnailUrl={thumbnails.urls.get(row.image_path) ?? null}
-            />
-          ))}
-        </div>
-      )}
+        <div className="space-y-4">
+          <ProblemFilterBar
+            filters={archive.filters}
+            facets={archive.facets}
+            areaFacets={archive.areaFacets}
+            unitFacets={archive.unitFacets}
+            total={archive.total}
+            onChange={archive.patch}
+            onReset={archive.reset}
+          />
 
-      {archive.pageCount > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          <Button
-            type="button" variant="outline" size="sm"
-            onClick={() => archive.patch({ page: archive.filters.page - 1 })}
-            disabled={archive.filters.page <= 0}
-          >
-            이전
-          </Button>
-          <span className="text-sm text-gray-500">
-            {archive.filters.page + 1} / {archive.pageCount}
-          </span>
-          <Button
-            type="button" variant="outline" size="sm"
-            onClick={() => archive.patch({ page: archive.filters.page + 1 })}
-            disabled={archive.filters.page >= archive.pageCount - 1}
-          >
-            다음
-          </Button>
+          {archive.loading ? (
+            <div className="flex justify-center py-16">
+              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
+            </div>
+          ) : archive.rows.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center text-sm text-gray-500">
+                조건에 맞는 문항이 없어요.
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-2">
+              {archive.rows.map((row) => (
+                <ProblemCard
+                  key={row.id}
+                  problem={row}
+                  thumbnailUrl={thumbnails.urls.get(row.image_path) ?? null}
+                />
+              ))}
+            </div>
+          )}
+
+          {archive.pageCount > 1 && (
+            <div className="flex items-center justify-center gap-2">
+              <Button
+                type="button" variant="outline" size="sm"
+                onClick={() => archive.patch({ page: archive.filters.page - 1 })}
+                disabled={archive.filters.page <= 0}
+              >
+                이전
+              </Button>
+              <span className="text-sm text-gray-500">
+                {archive.filters.page + 1} / {archive.pageCount}
+              </span>
+              <Button
+                type="button" variant="outline" size="sm"
+                onClick={() => archive.patch({ page: archive.filters.page + 1 })}
+                disabled={archive.filters.page >= archive.pageCount - 1}
+              >
+                다음
+              </Button>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
