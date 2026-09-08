@@ -1,7 +1,6 @@
 import {
   BookOpen,
   ClipboardCheck,
-  FileText,
   FolderCog,
   FolderOpen,
   History,
@@ -114,14 +113,13 @@ export function buildNavSections(isAdmin: boolean): NavSection[] {
       items: [
         // /words/new(단어 입력), /words/print(단어장)도 이 항목에 속한다
         { href: '/words', label: '단어 관리', icon: FolderOpen },
-        { href: '/exam/create', label: '단어 시험지 생성', icon: FileText },
-        // 위에서 만든 시험지가 쌓이는 곳. 저장된 시험지 보기(/exam/view)는
-        // 이 목록에서만 들어가므로 활성 표시를 여기에 붙인다
+        // 만든 시험지가 쌓이는 곳. 시험지 생성(/exam/create)은 이 목록의 버튼으로만,
+        // 저장된 시험지 보기(/exam/view)도 목록에서만 들어가므로 활성 표시를 여기에 붙인다
         {
           href: '/exam/history',
-          label: '단어 시험지 목록',
+          label: '단어 시험지',
           icon: History,
-          extraPrefixes: ['/exam/view'],
+          extraPrefixes: ['/exam/view', '/exam/create'],
         },
       ],
     },

@@ -36,21 +36,23 @@ describe('isNavItemActive', () => {
   });
 
   it('형제 경로를 잡지 않는다', () => {
-    // 접두사 매칭이라 /exam/create 가 /exam/builder 를 켜면 안 된다
+    // 접두사 매칭이라 같은 /exam 아래의 다른 메뉴를 서로 켜면 안 된다
     expect(isNavItemActive('/exam/create', findItem(sections, '/exam/builder'))).toBe(false);
-    expect(isNavItemActive('/exam/builder', findItem(sections, '/exam/create'))).toBe(false);
+    expect(isNavItemActive('/exam/builder', findItem(sections, '/exam/history'))).toBe(false);
   });
 
   it('세그먼트 경계를 지킨다 — /wordsomething 은 /words 가 아니다', () => {
     expect(isNavItemActive('/wordsomething', findItem(sections, '/words'))).toBe(false);
   });
 
-  it('extraPrefixes 로 저장된 시험지 보기가 단어 시험지 목록에 붙는다', () => {
+  it('extraPrefixes 로 저장된 시험지 보기·시험지 생성이 단어 시험지에 붙는다', () => {
     const history = findItem(sections, '/exam/history');
     expect(isNavItemActive('/exam/view', history)).toBe(true);
+    // 생성은 메뉴 항목이 아니라 목록 안 버튼이므로 활성 표시가 목록에 붙는다
+    expect(isNavItemActive('/exam/create', history)).toBe(true);
     expect(isNavItemActive('/exam/history', history)).toBe(true);
     // 같은 /exam 아래여도 다른 메뉴는 켜지지 않는다
-    expect(isNavItemActive('/exam/view', findItem(sections, '/exam/create'))).toBe(false);
+    expect(isNavItemActive('/exam/view', findItem(sections, '/exam/builder'))).toBe(false);
   });
 });
 
@@ -98,11 +100,8 @@ describe('buildNavSections', () => {
 
     const words = sections.find((s) => s.id === 'words')!;
     expect(words.kind).toBe('group');
-    expect(words.items.map((i) => i.label)).toEqual([
-      '단어 관리',
-      '단어 시험지 생성',
-      '단어 시험지 목록',
-    ]);
+    // 시험지 생성은 메뉴가 아니라 단어 시험지 화면의 버튼이다
+    expect(words.items.map((i) => i.label)).toEqual(['단어 관리', '단어 시험지']);
 
     const problems = sections.find((s) => s.id === 'problems')!;
     expect(problems.kind).toBe('group');
