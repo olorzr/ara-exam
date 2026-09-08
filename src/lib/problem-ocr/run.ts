@@ -124,6 +124,18 @@ export async function runProblemOcr(
     const cropped = await cropRegions(doc, merged, signal, onProgress);
     merged.warnings.push(...cropped.warnings);
 
+    // ⚠️ 여러 쪽에 걸친 그림 지문은 **어느 쪽으로도 온전하지 않다** —
+    //    글만 쓰면 그림이 빠지고, 이미지로 쓰면 잘라 둔 시작 쪽만 나가 뒷부분이 사라진다.
+    //    자동으로 고를 수 없으니 검수에서 사람이 보게 드러낸다(코덱스 리뷰 20R).
+    const splitFigures = merged.passages.filter((p) => p.has_figure && p.pageSpan > 1);
+    if (splitFigures.length > 0) {
+      merged.warnings.push(
+        `그림·표가 있으면서 여러 쪽에 걸친 지문이 ${splitFigures.length}개 있어요`
+        + `(${splitFigures.map((p) => `${p.page_no}쪽`).slice(0, 5).join(', ')}). `
+        + '글만으로는 그림이 빠지고 이미지로 두면 뒷부분이 빠지니, 검수에서 직접 확인해 주세요.',
+      );
+    }
+
     onProgress?.({ phase: 'save', done: 0, total: 1 });
     // 묶음 하나라도 들어가면 곧바로 표시한다 — 중간에 실패해도 앞 묶음은 남아 있어서,
     // "하나도 안 들어갔다" 고 안내하면 거짓말이 된다(트랜잭션이 아니다)

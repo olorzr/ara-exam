@@ -4,6 +4,7 @@ import {
   buildPaperBlocks,
   imagePathsOf,
   longestPassageChars,
+  renumberedImageItems,
   MISSING_ANSWER_LABEL,
   totalScore,
 } from './blocks';
@@ -109,6 +110,26 @@ describe('buildPaperBlocks', () => {
 
   it('빈 목록이면 블록도 없다', () => {
     expect(build([])).toEqual([]);
+  });
+});
+
+describe('renumberedImageItems', () => {
+  it('자리가 바뀐 이미지 문항을 찾아낸다 — 이미지에 원본 번호가 찍혀 있다', () => {
+    const rows = renumberedImageItems([
+      snap({ number: 17, render_mode: 'image', image_path: 'a.jpg' }),
+      snap({ number: 2, render_mode: 'image', image_path: 'b.jpg' }),
+    ]);
+    expect(rows).toEqual([{ printed: 1, original: 17 }]);
+  });
+
+  it('글로 출제한 문항은 세지 않는다 — 번호를 우리가 그린다', () => {
+    expect(renumberedImageItems([snap({ number: 17, render_mode: 'text' })])).toEqual([]);
+  });
+
+  it('원본 번호를 모르면 알릴 것이 없다', () => {
+    expect(renumberedImageItems([
+      snap({ number: null, render_mode: 'image', image_path: 'a.jpg' }),
+    ])).toEqual([]);
   });
 });
 

@@ -13,7 +13,7 @@ import ProblemAnswerSheetView from '@/components/problem-paper/ProblemAnswerShee
 import { supabase } from '@/lib/supabase';
 import { useImagesReady } from '@/hooks/useImagesReady';
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls';
-import { imagePathsOf } from '@/lib/problem-paper/blocks';
+import { imagePathsOf, renumberedImageItems } from '@/lib/problem-paper/blocks';
 import { normalizePaperSettings } from '@/lib/problem-paper/settings';
 import type { PaperItemSnapshot, ProblemPaper } from '@/types/problem-bank';
 
@@ -47,6 +47,8 @@ export default function ProblemPaperViewPage() {
   const ready = useImagesReady(useMemo(() => [...images.urls.values()], [images.urls]));
   const brokenCount = images.missing.length + ready.failed.length;
   const imagesBlocked = images.loading || ready.loading || brokenCount > 0;
+  // 이미지에는 원본 시험지의 번호가 그대로 찍혀 있다 — 자리가 바뀌면 두 번호가 함께 보인다
+  const renumbered = useMemo(() => renumberedImageItems(items), [items]);
 
   useEffect(() => {
     let alive = true;
@@ -141,6 +143,21 @@ export default function ProblemPaperViewPage() {
           <Button type="button" variant="outline" size="sm" onClick={images.reload}>
             다시 시도
           </Button>
+        </div>
+      )}
+
+      {mode === 'paper' && renumbered.length > 0 && (
+        <div
+          className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
+          data-no-print
+        >
+          <p className="font-semibold">이미지로 출제한 문항의 번호가 달라요.</p>
+          <p className="mt-0.5">
+            잘라 둔 이미지에는 원본 번호가 찍혀 있어 인쇄 번호와 함께 보입니다
+            ({renumbered.slice(0, 5).map((r) => `${r.printed}번(원본 ${r.original}번)`).join(', ')}
+            {renumbered.length > 5 && ` 외 ${renumbered.length - 5}개`}).
+            자리를 원래 번호에 맞추거나, 검수에서 그 문항을 글로 출제하도록 바꿔 주세요.
+          </p>
         </div>
       )}
 

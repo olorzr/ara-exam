@@ -167,6 +167,28 @@ export function totalScore(items: readonly PaperItemSnapshot[]): number | null {
   return Math.round(sum * 100) / 100;
 }
 
+/**
+ * 이미지로 출제한 문항 중 **인쇄 번호와 원본 번호가 다른** 것들.
+ *
+ * ⚠️ 잘라 둔 이미지에는 원본 시험지의 문항 번호가 그대로 찍혀 있다(그래야 선지까지
+ *    안 잘린다). 문제지에서 자리가 바뀌면 이미지의 '17' 과 우리가 찍는 '01' 이 함께
+ *    보여 학생이 답안지와 맞추기 어렵다. 자동으로 지울 방법이 없으므로
+ *    화면에서 알려 선생님이 판단하게 한다(코덱스 리뷰 20R).
+ * @param items - 문제지 항목
+ * @returns `{ printed, original }` 목록
+ */
+export function renumberedImageItems(
+  items: readonly PaperItemSnapshot[],
+): { printed: number; original: number }[] {
+  const out: { printed: number; original: number }[] = [];
+  items.forEach((item, i) => {
+    if (item.render_mode !== 'image' || !item.image_path) return;
+    if (item.number === null || item.number === i + 1) return;
+    out.push({ printed: i + 1, original: item.number });
+  });
+  return out;
+}
+
 /** 가장 긴 지문의 글자 수 — 1단 권유 판단에 쓴다 */
 export function longestPassageChars(items: readonly PaperItemSnapshot[]): number {
   let longest = 0;
