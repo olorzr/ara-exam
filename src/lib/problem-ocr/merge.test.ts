@@ -71,6 +71,31 @@ describe('mergeOcrDrafts — 겹쳐 읽은 중복', () => {
     expect(res.problems[0].answer).toBe('3');
   });
 
+  it('같은 길이의 지문이라도 나중에 알아본 작품·단원은 채운다', () => {
+    const res = mergeOcrDrafts([
+      batch([passage({ page: 3, title: '', unit_path: [], area_path: [] })], [1, 2, 3]),
+      batch([passage({ page: 3, title: '소나기', unit_path: ['1. 문학'], area_path: ['문학'] })], [3, 4, 5]),
+    ], { newId });
+    expect(res.passages).toHaveLength(1);
+    expect(res.passages[0].title).toBe('소나기');
+    expect(res.passages[0].unit_path).toEqual(['1. 문학']);
+    expect(res.passages[0].area_path).toEqual(['문학']);
+  });
+
+  it('이어지는 조각에서 알아본 분류도 앞 지문에 붙인다', () => {
+    const res = mergeOcrDrafts([
+      batch([passage({ page: 3, label: '[1~3]', continues: true, unit_path: [] })], [3]),
+      batch([passage({
+        page: 4, label: null, continued: true, html: '<p>뒷부분</p>',
+        title: '소나기', unit_path: ['1. 문학', '(1) 시'],
+      })], [4]),
+    ], { newId });
+    expect(res.passages).toHaveLength(1);
+    expect(res.passages[0].unit_path).toEqual(['1. 문학', '(1) 시']);
+    expect(res.passages[0].title).toBe('소나기');
+    expect(res.passages[0].pageSpan).toBe(2);
+  });
+
   it('나중 묶음이 빈 단원도 채운다 — 앞 묶음에서는 작품을 못 알아봤을 수 있다', () => {
     const res = mergeOcrDrafts([
       batch([problem({ page: 3, number: 5, unit_path: [] })], [1, 2, 3]),

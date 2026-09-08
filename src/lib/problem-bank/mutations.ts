@@ -208,3 +208,21 @@ export async function setSourceStatus(id: string, status: string): Promise<void>
   const { error } = await supabase.from('problem_sources').update({ status }).eq('id', id);
   if (error) throw error;
 }
+
+/**
+ * 출처의 교과서를 바꾼다.
+ *
+ * 업로드 때 못 골랐거나 잘못 고른 것을 검수에서 고칠 수 있어야 한다 — 교과서가 없으면
+ * 단원 칸 자체가 안 뜨므로, 이 경로가 없으면 옛 출처는 **영영 분류할 수 없다**
+ * (코덱스 리뷰).
+ * @param id - 출처 id
+ * @param textbook - 교과서 이름 ('' 는 미지정)
+ * @returns 정규화해서 저장한 이름
+ */
+export async function setSourceTextbook(id: string, textbook: string): Promise<string> {
+  const value = normalizeCategoryName(textbook);
+  const { error } = await supabase
+    .from('problem_sources').update({ textbook: value }).eq('id', id);
+  if (error) throw error;
+  return value;
+}

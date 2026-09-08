@@ -20,6 +20,9 @@ import { fetchUnitTree } from '@/lib/problem-bank/unit-master';
  * ⚠️ 학교급을 빠르게 오가면 먼저 보낸 요청이 늦게 도착해 현재 목록을 덮을 수 있어
  *    취소 가드를 둔다(NaesinScopeLoader 와 같은 방식).
  */
+/** 아직 못 읽었을 때 돌려줄 빈 트리 — 참조가 바뀌지 않게 하나만 둔다 */
+const EMPTY_TREE: AreaTreeNode[] = [];
+
 export interface SourceMasters {
   /** 그 학교급의 학교 (관리자시스템 등록분) */
   schools: NaesinSchool[];
@@ -42,8 +45,16 @@ export function useSourceMasters(
 ): SourceMasters {
   const [schools, setSchools] = useState<NaesinSchool[]>([]);
   const [textbooks, setTextbooks] = useState<string[]>([]);
-  const [areaTree, setAreaTree] = useState<AreaTreeNode[]>([]);
-  const [unitTree, setUnitTree] = useState<AreaTreeNode[]>([]);
+  /**
+   * 마지막으로 읽은 트리와 **그때의 조회 키**.
+   *
+   * ⚠️ 그냥 배열로 들고 있으면 교과서·학년을 바꾼 직후 옛 트리가 남는다. 그 상태로
+   *    '읽기 시작'을 누르면 **바뀐 출처 정보에 옛 분류표**를 붙여 OCR 이 돈다
+   *    (코덱스 리뷰). 키가 어긋나면 빈 트리로 파생시켜, 아직 못 읽었을 땐
+   *    분류를 아예 안 하게 한다(틀린 분류보다 낫다).
+   */
+  const [loadedArea, setLoadedArea] = useState<{ key: string; tree: AreaTreeNode[] } | null>(null);
+  const [loadedUnit, setLoadedUnit] = useState<{ key: string; tree: AreaTreeNode[] } | null>(null);
   /**
    * 마지막으로 읽은 시험범위와 **그때의 조회 키**.
    *
@@ -81,24 +92,28 @@ export function useSourceMasters(
   }, [level]);
 
   // 학년 → 영역 세트. 못 읽어도(정책 미적용 환경) 화면을 막지 않는다
+  const areaKey = `${grade}|${level}`;
   useEffect(() => {
     let alive = true;
-    fetchAreaSets().then(async (sets) => {
-      const setId = pickAreaSetForGrade(sets, grade || level);
-      const tree = setId ? await fetchAreaTree(setId) : [];
-      if (alive) setAreaTree(tree);
-    });
+    fetchAreaSets()
+      .then(async (sets) => {
+        const setId = pickAreaSetForGrade(sets, grade || level);
+        const tree = setId ? await fetchAreaTree(setId) : [];
+        if (alive) setLoadedArea({ key: areaKey, tree });
+      })
+      .catch(() => { if (alive) setLoadedArea({ key: areaKey, tree: [] }); });
     return () => { alive = false; };
-  }, [grade, level]);
+  }, [areaKey, grade, level]);
 
   // 교과서 → 단원 트리
+  const unitKey = `${grade}|${semester}|${textbook}`;
   useEffect(() => {
     let alive = true;
     fetchUnitTree({ grade, semester, textbook })
-      .then((tree) => { if (alive) setUnitTree(tree); })
-      .catch(() => { if (alive) setUnitTree([]); });
+      .then((tree) => { if (alive) setLoadedUnit({ key: unitKey, tree }); })
+      .catch(() => { if (alive) setLoadedUnit({ key: unitKey, tree: [] }); });
     return () => { alive = false; };
-  }, [grade, semester, textbook]);
+  }, [unitKey, grade, semester, textbook]);
 
   // 내신 기출이면 관리자시스템에 등록된 시험범위에서 교과서를 찾아 준다
   const scopeKey = [sourceType, schoolId, grade, year, semester, examType].join('|');
@@ -117,6 +132,8 @@ export function useSourceMasters(
   }, [scopeKey, sourceType, schoolId, grade, year, semester, examType, textbooks]);
 
   const scope = loadedScope?.key === scopeKey ? loadedScope.hint : null;
+  const areaTree = loadedArea?.key === areaKey ? loadedArea.tree : EMPTY_TREE;
+  const unitTree = loadedUnit?.key === unitKey ? loadedUnit.tree : EMPTY_TREE;
 
   return { schools, textbooks, areaTree, unitTree, scope };
 }

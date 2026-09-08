@@ -14,6 +14,7 @@ import { sourceLabel } from '@/lib/problem-bank/source-label';
 import PageImageWithBoxes, { type BoxOverlay } from '@/components/problem-review/PageImageWithBoxes';
 import PassageEditorCard from '@/components/problem-review/PassageEditorCard';
 import ProblemEditorCard from '@/components/problem-review/ProblemEditorCard';
+import SourceTextbookPicker from '@/components/problem-review/SourceTextbookPicker';
 import OcrProgress from '@/components/problem-ocr/OcrProgress';
 import { toBbox } from '@/lib/problem-bank/bbox';
 
@@ -159,9 +160,17 @@ export default function ProblemSourceReviewPage() {
             <span>· 문항 {review.problems.length}개 (검수 {review.verifiedCount})</span>
           </p>
         </div>
-        <Button type="button" onClick={finish} disabled={source.status === '완료'}>
-          {source.status === '완료' ? '검수 완료됨' : '검수 마치기'}
-        </Button>
+        <div className="flex items-end gap-3">
+          {/* 교과서가 있어야 단원 칸이 뜬다 — 여기서 고칠 수 있어야 옛 출처도 분류된다 */}
+          <SourceTextbookPicker
+            value={source.textbook}
+            grade={source.grade}
+            onChange={review.changeTextbook}
+          />
+          <Button type="button" onClick={finish} disabled={source.status === '완료'}>
+            {source.status === '완료' ? '검수 완료됨' : '검수 마치기'}
+          </Button>
+        </div>
       </div>
 
       <OcrProgress progress={null} label="" warnings={source.ocr_meta?.warnings ?? []} />

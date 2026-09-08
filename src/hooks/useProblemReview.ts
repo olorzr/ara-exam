@@ -6,7 +6,7 @@ import {
   fetchPassages, fetchProblemsOfSource, fetchSource,
 } from '@/lib/problem-bank/queries';
 import {
-  ConflictError, deletePassage, deleteProblem, setProblemVerified,
+  ConflictError, deletePassage, deleteProblem, setProblemVerified, setSourceTextbook,
   updatePassage, updateProblem, type PassagePatch, type ProblemPatch,
 } from '@/lib/problem-bank/mutations';
 import { signProblemFiles } from '@/lib/problem-bank/storage';
@@ -177,6 +177,20 @@ export function useProblemReview(sourceId: string) {
     }
   }, [problems, sourceId]);
 
+  /**
+   * 교과서를 바꾼다 — 단원 트리가 여기에 달려 있어 검수 중에도 고칠 수 있어야 한다.
+   * @param textbook - 교과서 이름 ('' 는 미지정)
+   */
+  const changeTextbook = useCallback(async (textbook: string) => {
+    try {
+      const saved = await setSourceTextbook(sourceId, textbook);
+      setSource((prev) => (prev ? { ...prev, textbook: saved } : prev));
+      toast.success(saved ? `교과서를 '${saved}' 로 바꿨어요.` : '교과서를 지웠어요.');
+    } catch (e) {
+      reportError(e);
+    }
+  }, [sourceId]);
+
   const verifiedCount = useMemo(
     () => problems.filter((p) => p.status === '검수완료').length,
     [problems],
@@ -189,7 +203,7 @@ export function useProblemReview(sourceId: string) {
 
   return {
     source, passages, problems, loading, error, verifiedCount, reloadSeq,
-    reload: load, saveProblem, savePassage, toggleVerified,
+    reload: load, saveProblem, savePassage, toggleVerified, changeTextbook,
     removeProblem, removePassage, pageUrlFor,
   };
 }

@@ -145,6 +145,23 @@ function toProblem(item: OcrItem, id: string, passageId: string | null): Problem
   };
 }
 
+/**
+ * 이미 담은 지문의 빈 칸만 채운다.
+ *
+ * 겹쳐 읽은 조각과 이어지는 조각 **양쪽에서** 부른다 — 어느 쪽이든 나중 묶음에서만
+ * 작품명·영역·단원을 알아볼 수 있고, 그때 채우지 않으면 분류가 사라진다.
+ */
+function fillPassageGaps(draft: PassageDraft, item: OcrItem): void {
+  draft.lastPage = Math.max(draft.lastPage, item.page);
+  if (!draft.label && item.label) draft.label = item.label;
+  if (!draft.title && item.title) draft.title = item.title;
+  if (!draft.author && item.author) draft.author = item.author;
+  if (!draft.box && item.box) draft.box = item.box;
+  if (draft.area_path.length === 0 && item.area_path.length > 0) draft.area_path = item.area_path;
+  if (draft.unit_path.length === 0 && item.unit_path.length > 0) draft.unit_path = item.unit_path;
+  if (item.has_figure) draft.has_figure = true;
+}
+
 /** 이미 담은 문항의 빈 칸만 채운다 */
 function fillGaps(target: ProblemDraft, item: OcrItem): void {
   if (!textOf(target.stem_html) && item.stem_html) target.stem_html = item.stem_html;
@@ -213,20 +230,15 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
         const current = existing.work.fragments[existing.index] ?? '';
         if (textOf(item.html).length > textOf(current).length) {
           existing.work.fragments[existing.index] = item.html;
-          const draft = existing.work.draft;
           // 이 조각이 마지막이었다면 '아직 이어지는가'도 새 값으로 바꾼다
           if (existing.index === existing.work.fragments.length - 1) {
-            draft.open = item.continues;
+            existing.work.draft.open = item.continues;
           }
-          draft.lastPage = Math.max(draft.lastPage, item.page);
-          if (!draft.label && item.label) draft.label = item.label;
-          if (!draft.title && item.title) draft.title = item.title;
-          if (!draft.author && item.author) draft.author = item.author;
-          if (!draft.box && item.box) draft.box = item.box;
-          if (draft.area_path.length === 0 && item.area_path.length > 0) draft.area_path = item.area_path;
-          if (draft.unit_path.length === 0 && item.unit_path.length > 0) draft.unit_path = item.unit_path;
-          if (item.has_figure) draft.has_figure = true;
         }
+        // ⚠️ 빈 칸 채우기는 **글 길이와 상관없이** 한다. 같은 글을 두 번 읽었는데
+        //    두 번째에만 작품·영역·단원을 알아본 경우가 흔한데, 길이 비교 안에 두면
+        //    그 분류가 통째로 버려진다(코덱스 리뷰).
+        fillPassageGaps(existing.work.draft, item);
         refToId.set(item.ref, existing.work.draft.id);
         continue;
       }
@@ -236,10 +248,10 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
         const open = findOpenPassage(works, item.page);
         if (open) {
           open.fragments.push(item.html);
-          open.draft.lastPage = item.page;
           open.draft.open = item.continues;
           open.draft.pageSpan += 1;
-          if (item.has_figure) open.draft.has_figure = true;
+          // 이어지는 조각에서만 작품명·영역·단원을 알아볼 때가 있다(앞 쪽은 머리글이 없다)
+          fillPassageGaps(open.draft, item);
           fragmentByKey.set(key, { work: open, index: open.fragments.length - 1 });
           refToId.set(item.ref, open.draft.id);
           continue;
