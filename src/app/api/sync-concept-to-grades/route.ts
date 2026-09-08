@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { isAllowedEmailDomain, EXTERNAL_LEVEL } from '@/lib/constants';
+import { requireSession } from '@/lib/require-session';
+import { EXTERNAL_LEVEL } from '@/lib/constants';
 import { levelGradeToDivision } from '@/lib/grade-division';
 
 /**
@@ -37,15 +38,8 @@ export async function POST(request: NextRequest) {
   }
 
   // 호출자 인증 — 로그인한 @araeducation.co.kr 사용자만.
-  const authHeader = request.headers.get('authorization') || '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-  if (!token) {
-    return NextResponse.json({ ok: false, reason: 'unauthorized' }, { status: 401 });
-  }
-  const { data: authData, error: authErr } = await supabaseAdmin.auth.getUser(token);
-  if (authErr || !authData?.user || !isAllowedEmailDomain(authData.user.email)) {
-    return NextResponse.json({ ok: false, reason: 'unauthorized' }, { status: 401 });
-  }
+  const session = await requireSession(request);
+  if (!session.ok) return session.response;
 
   let conceptSheetId: string | undefined;
   try {

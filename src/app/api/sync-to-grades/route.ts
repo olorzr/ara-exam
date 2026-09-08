@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { isAllowedEmailDomain } from '@/lib/constants';
+import { requireSession } from '@/lib/require-session';
 import { resolveSingleDivision } from '@/lib/grade-division';
 
 /**
@@ -48,15 +48,8 @@ export async function POST(request: NextRequest) {
 
   // 호출자 인증 — service-role + 공유 시크릿으로 다운스트림 쓰기를 하는 특권 라우트이므로,
   // 반드시 로그인한 @araeducation.co.kr 사용자만 호출하게 한다(examId 만으로 아무나 트리거 방지).
-  const authHeader = request.headers.get('authorization') || '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-  if (!token) {
-    return NextResponse.json({ ok: false, reason: 'unauthorized' }, { status: 401 });
-  }
-  const { data: authData, error: authErr } = await supabaseAdmin.auth.getUser(token);
-  if (authErr || !authData?.user || !isAllowedEmailDomain(authData.user.email)) {
-    return NextResponse.json({ ok: false, reason: 'unauthorized' }, { status: 401 });
-  }
+  const session = await requireSession(request);
+  if (!session.ok) return session.response;
 
   let examId: string | undefined;
   try {

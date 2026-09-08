@@ -139,3 +139,6 @@ export interface ConceptSheet {
  * (목록·카드·트리에서 쓰지 않으며, 상세 페이지 진입 시에만 별도 조회).
  */
 export type ConceptSheetListItem = Omit<ConceptSheet, 'editor_html'>;
+
+// 기출 문제 은행 (sql/17)
+export * from './problem-bank';

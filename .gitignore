@@ -41,3 +41,6 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# pdfjs wasm 자산 (predev/prebuild 훅이 node_modules 에서 복사)
+/public/pdfjs-wasm/
