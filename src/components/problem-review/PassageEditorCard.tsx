@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Image as ImageIcon, Trash2, Type } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,8 @@ interface PassageEditorCardProps {
   onSelect: () => void;
   onSave: (patch: PassagePatch) => Promise<boolean>;
   onDelete: () => void;
+  /** 저장하지 않은 수정이 생기거나 사라질 때 알린다 — '검수 마치기' 를 막는 데 쓴다 */
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 /**
@@ -29,13 +31,23 @@ interface PassageEditorCardProps {
  * ⚠️ 호출부는 `key={passage.id}` 를 준다(ProblemEditorCard 와 같은 이유).
  */
 export default function PassageEditorCard({
-  passage, problemCount, areaTree, selected, onSelect, onSave, onDelete,
+  passage, problemCount, areaTree, selected, onSelect, onSave, onDelete, onDirtyChange,
 }: PassageEditorCardProps) {
   const [html, setHtml] = useState(passage.html);
   const [title, setTitle] = useState(passage.title);
   const [author, setAuthor] = useState(passage.author);
   const [area, setArea] = useState<string[]>(passage.area_path);
   const [saving, setSaving] = useState(false);
+
+  /** 저장하지 않은 수정이 있는가 — 문항 카드와 같은 이유로 화면에 알린다 */
+  const dirty = html !== passage.html
+    || title !== passage.title
+    || author !== passage.author
+    || area.join('>') !== passage.area_path.join('>');
+
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -64,6 +76,7 @@ export default function PassageEditorCard({
         <Badge variant="outline">{passage.page_no}쪽</Badge>
         <Badge variant="outline">문항 {problemCount}개</Badge>
         {passage.render_mode === 'image' && <Badge variant="outline">이미지 출제</Badge>}
+        {dirty && <Badge className="bg-sky-500 text-white">저장 안 됨</Badge>}
 
         <div className="ml-auto flex items-center gap-1">
           {passage.image_path && (

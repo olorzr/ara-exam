@@ -140,7 +140,7 @@ export default function ProblemSourceReviewPage() {
   const finish = async () => {
     if (dirtyIds.size > 0) {
       const ok = window.confirm(
-        `저장하지 않은 문항이 ${dirtyIds.size}개 있어요.\n`
+        `저장하지 않은 문항·지문이 ${dirtyIds.size}개 있어요.\n`
         + '지금 마치면 그 수정은 사라지고 옛 내용이 검수한 자료로 남습니다. 계속할까요?',
       );
       if (!ok) return;
@@ -253,6 +253,7 @@ export default function ProblemSourceReviewPage() {
                     setSelectedId(passage.id);
                   }}
                   onSave={(patch) => review.savePassage(passage.id, patch)}
+                  onDirtyChange={(dirty) => markDirty(passage.id, dirty)}
                   onDelete={() => review.removePassage(passage.id)}
                 />
               );

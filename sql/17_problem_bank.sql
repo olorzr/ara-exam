@@ -406,6 +406,13 @@ BEGIN
     RAISE EXCEPTION '같은 문항이 두 번 들어 있습니다' USING ERRCODE = 'check_violation';
   END IF;
 
+  -- ⚠️ **검사 전에 잠근다.** 기본 격리 수준(READ COMMITTED)에서는 문(statement)마다
+  --    다른 스냅샷을 보므로, 검사와 스냅샷 INSERT 사이에 남이 문항을 지우거나 지문을
+  --    바꾸면 조용히 어긋난다 — 지워진 문항은 INSERT 에서 빠지는데 total_questions 는
+  --    그대로 남고, 지문이 바뀌면 연속성 검사를 통과한 배치가 실제로는 흩어진다.
+  --    잠금은 이 트랜잭션이 끝날 때까지 유지되어 아래 조립까지 같은 상태를 본다.
+  PERFORM 1 FROM exam.problems WHERE id = ANY (p_problem_ids) FOR UPDATE;
+
   SELECT COUNT(*) INTO v_found FROM exam.problems WHERE id = ANY (p_problem_ids);
   IF v_found <> v_count THEN
     RAISE EXCEPTION '존재하지 않는 문항이 있습니다 (%/%)', v_found, v_count
