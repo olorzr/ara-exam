@@ -6,6 +6,7 @@ import { buildCategoryTree } from '@/lib/category-tree';
 import { getAllSelectableCategories } from '@/lib/category-master';
 import { EXTERNAL_LEVEL } from '@/lib/constants';
 import type { ProblemFilters } from '@/lib/problem-bank/filters';
+import { SCHOOL_AXES_CLEARED } from '@/lib/problem-bank/school-exam-tree';
 import type { Category } from '@/types';
 
 interface UnitTreePanelProps {
@@ -25,11 +26,11 @@ interface UnitTreePanelProps {
  *
  * ⚠️ 외부지문·프린트 폴더는 뺀다(교과서 단원이 없다).
  * ⚠️ 트리를 못 읽어도 아무것도 그리지 않을 뿐이다 — 위쪽 필터로 계속 찾을 수 있다.
- * ⚠️ **학기는 필터 축이 아니다.** 저장되는 것은 단원 **이름**이고 학기는 출처 행에 있다.
+ * ⚠️ **이 트리는 학기를 걸지 않는다.** `ProblemFilters` 에 학기 축은 생겼지만(학교 기출
+ *    트리가 쓴다), 여기서 저장되는 것은 단원 **이름**이고 학기는 출처 행에 있다.
  *    1·2학기에 같은 이름의 대단원이 등록된 경우가 실제로 있어(2026-09-08 운영 데이터
  *    2건, 미래엔(신유식) 중2) 두 폴더가 같은 결과를 낸다 — 같은 단원을 두 학기에
- *    걸쳐 등록한 것이라 결과가 같은 편이 맞다. 학기로 갈라 찾고 싶어지면 그때
- *    `ProblemFilters` 에 축을 하나 더 두는 것이 정공법이다.
+ *    걸쳐 등록한 것이라 결과가 같은 편이 맞다.
  */
 export default function UnitTreePanel({ filters, onChange }: UnitTreePanelProps) {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -68,6 +69,9 @@ export default function UnitTreePanel({ filters, onChange }: UnitTreePanelProps)
       key: [category.grade, category.publisher, unitPath.join('>')].join('|'),
     });
     onChange({
+      // 학교 기출 트리에서 걸어 둔 조건은 비운다 — 두 트리는 탭으로 갈린 대안 경로라
+      // 남겨 두면 '상현중 기출 ∩ 이 단원' 이 조용히 0건이 되고 화면에 이유가 안 보인다
+      ...SCHOOL_AXES_CLEARED,
       grade: category.grade,
       textbook: category.publisher,
       // 소단원이 없는 '(전체)' 잎은 대단원만 — 그 아래 문항이 모두 걸린다

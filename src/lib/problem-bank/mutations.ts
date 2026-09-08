@@ -161,6 +161,25 @@ export async function deleteProblem(id: string): Promise<void> {
 }
 
 /**
+ * 문항 여러 개를 한 번에 지운다 (아카이브의 선택 삭제).
+ *
+ * ⚠️ **Storage 는 건드리지 않는다.** 이미 만든 문제지가 `render_mode:'image'` 항목의
+ *    `image_path` 를 스냅샷에 들고 있어서, 잘라 둔 이미지를 지우면 **인쇄물에서 그 문항이
+ *    빈칸이 된다**(problem-paper/blocks.ts). 단건 삭제도 같은 이유로 파일을 남긴다.
+ *
+ * 감사 트리거가 행마다 `audit_log` 를 남기므로 호출부는 **한 쪽 분량**(PROBLEM_PAGE_SIZE)
+ * 이하로만 넘긴다 — 그래야 URL 길이와 감사 로그가 모두 감당할 수준에 머문다.
+ * @param ids - 문항 id 들 (중복은 알아서 걸러낸다)
+ * @throws 삭제 실패 시
+ */
+export async function deleteProblems(ids: string[]): Promise<void> {
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) return;
+  const { error } = await supabase.from('problems').delete().in('id', unique);
+  if (error) throw error;
+}
+
+/**
  * 지문을 지운다. 딸린 문항은 남고 `passage_id` 만 비워진다(FK ON DELETE SET NULL).
  * @param id - 지문 id
  * @throws 삭제 실패 시

@@ -159,6 +159,8 @@ export interface ProblemQuery {
   school_name?: string;
   year?: string;
   grade?: string;
+  /** 학기 ('1학기'·'2학기') */
+  semester?: string;
   exam_type?: string;
   /** 교과서 (출처의 textbook) */
   textbook?: string;
@@ -206,12 +208,15 @@ export async function fetchProblemPage(query: ProblemQuery): Promise<ProblemPage
 
   // ⚠️ 임베드에 별칭(`source:`)을 주면 필터 경로도 **별칭**을 써야 한다.
   //    `problem_sources.year` 로 쓰면 PostgREST 가 "그런 임베드 없음" 으로 요청을 거부한다.
-  if (query.source_type) request = request.eq('source.source_type', query.source_type);
-  if (query.school_name) request = request.eq('source.school_name', query.school_name);
-  if (query.year) request = request.eq('source.year', query.year);
-  if (query.grade) request = request.eq('source.grade', query.grade);
-  if (query.exam_type) request = request.eq('source.exam_type', query.exam_type);
-  if (query.textbook) request = request.eq('source.textbook', query.textbook);
+  // ⚠️ 있고 없음은 `undefined` 로 가른다. `''` 은 **'미지정인 행만'** 이라는 뜻이라
+  //    참거짓으로 거르면 그 조건이 통째로 사라진다(filters.ts 의 UNSPECIFIED_AXIS).
+  if (query.source_type !== undefined) request = request.eq('source.source_type', query.source_type);
+  if (query.school_name !== undefined) request = request.eq('source.school_name', query.school_name);
+  if (query.year !== undefined) request = request.eq('source.year', query.year);
+  if (query.grade !== undefined) request = request.eq('source.grade', query.grade);
+  if (query.semester !== undefined) request = request.eq('source.semester', query.semester);
+  if (query.exam_type !== undefined) request = request.eq('source.exam_type', query.exam_type);
+  if (query.textbook !== undefined) request = request.eq('source.textbook', query.textbook);
   if (query.work_title) request = request.eq('work_title', query.work_title);
   if (query.verifiedOnly) request = request.eq('status', '검수완료');
   if (query.area_path && query.area_path.length > 0) {

@@ -13,6 +13,8 @@ export interface ProblemFilters {
   school_name: string;
   year: string;
   grade: string;
+  /** 학기 ('1학기'·'2학기'). '' 는 전체 */
+  semester: string;
   exam_type: string;
   /** 교과서(= 출처의 textbook) */
   textbook: string;
@@ -25,12 +27,42 @@ export interface ProblemFilters {
 }
 
 export const EMPTY_FILTERS: ProblemFilters = {
-  source_type: '', school_name: '', year: '', grade: '', exam_type: '', textbook: '',
+  source_type: '', school_name: '', year: '', grade: '', semester: '', exam_type: '', textbook: '',
   area_path: [], unit_path: [], search: '', verifiedOnly: false, page: 0,
 };
 
 /** 영역 경로를 주소에 실을 때 쓰는 구분자 — 이름에 들어갈 일이 없는 글자 */
 const AREA_SEPARATOR = '>';
+
+/**
+ * '미지정인 것만' 을 뜻하는 값.
+ *
+ * ⚠️ 빈 문자열은 이 필터에서 **'전체'** 다(조건을 만들지 않는다). 그래서 저장값이 실제로
+ *    `''` 인 행만 고르려면 따로 표시할 값이 필요하다 — 없으면 학교 기출 트리의
+ *    '미지정' 갈래가 그 축 **전체**를 불러온다(코덱스 리뷰 2R).
+ *    ⚠️ **자유 텍스트 축(학교·교과서)에는 쓰지 않는다.** 저장값이 우연히 `'__none__'` 인
+ *    학교가 있으면 그 학교 대신 '이름 없는 출처' 를 찾게 된다. 선택지가 정해진 축
+ *    (학년도·학년·학기·시험)에서만 쓴다.
+ */
+export const UNSPECIFIED_AXIS = '__none__';
+
+/**
+ * 값이 있는 조건만 남긴다.
+ * @param key - 조회 조건 이름
+ * @param value - 필터 값
+ * @param allowUnspecified - '미지정만'(빈 값인 행만)을 고를 수 있는 축인지
+ * @returns 조건 한 칸, 또는 빈 객체
+ */
+function axisEntry<K extends string>(
+  key: K,
+  value: string,
+  allowUnspecified = false,
+): Partial<Record<K, string>> {
+  if (!value) return {};
+  // '' 도 '미지정만' 이라는 뜻이라 살려야 한다 — queries.ts 가 undefined 로만 유무를 가른다
+  const query = allowUnspecified && value === UNSPECIFIED_AXIS ? '' : value;
+  return { [key]: query } as Partial<Record<K, string>>;
+}
 
 /**
  * 필터를 주소 쿼리 문자열로.
@@ -43,6 +75,7 @@ export function filtersToQueryString(filters: ProblemFilters): string {
   if (filters.school_name) params.set('school', filters.school_name);
   if (filters.year) params.set('year', filters.year);
   if (filters.grade) params.set('grade', filters.grade);
+  if (filters.semester) params.set('sem', filters.semester);
   if (filters.exam_type) params.set('exam', filters.exam_type);
   if (filters.textbook) params.set('book', filters.textbook);
   if (filters.area_path.length > 0) params.set('area', filters.area_path.join(AREA_SEPARATOR));
@@ -68,6 +101,7 @@ export function filtersFromParams(params: URLSearchParams): ProblemFilters {
     school_name: params.get('school') ?? '',
     year: params.get('year') ?? '',
     grade: params.get('grade') ?? '',
+    semester: params.get('sem') ?? '',
     exam_type: params.get('exam') ?? '',
     textbook: params.get('book') ?? '',
     area_path: area ? area.split(AREA_SEPARATOR).filter(Boolean) : [],
@@ -86,12 +120,14 @@ export function filtersFromParams(params: URLSearchParams): ProblemFilters {
  */
 export function toProblemQuery(filters: ProblemFilters): ProblemQuery {
   return {
-    ...(filters.source_type ? { source_type: filters.source_type } : {}),
-    ...(filters.school_name ? { school_name: filters.school_name } : {}),
-    ...(filters.year ? { year: filters.year } : {}),
-    ...(filters.grade ? { grade: filters.grade } : {}),
-    ...(filters.exam_type ? { exam_type: filters.exam_type } : {}),
-    ...(filters.textbook ? { textbook: filters.textbook } : {}),
+    ...axisEntry('source_type', filters.source_type),
+    ...axisEntry('school_name', filters.school_name),
+    // 선택지가 정해진 축만 '미지정만' 을 받는다(자유 텍스트는 값과 겹칠 수 있다)
+    ...axisEntry('year', filters.year, true),
+    ...axisEntry('grade', filters.grade, true),
+    ...axisEntry('semester', filters.semester, true),
+    ...axisEntry('exam_type', filters.exam_type, true),
+    ...axisEntry('textbook', filters.textbook),
     ...(filters.area_path.length > 0 ? { area_path: filters.area_path } : {}),
     ...(filters.unit_path.length > 0 ? { unit_path: filters.unit_path } : {}),
     ...(filters.search.trim() ? { search: filters.search.trim() } : {}),
@@ -108,7 +144,7 @@ export function toProblemQuery(filters: ProblemFilters): ProblemQuery {
 export function hasActiveFilters(filters: ProblemFilters): boolean {
   return Boolean(
     filters.source_type || filters.school_name || filters.year || filters.grade
-    || filters.exam_type || filters.textbook || filters.area_path.length > 0
+    || filters.semester || filters.exam_type || filters.textbook || filters.area_path.length > 0
     || filters.unit_path.length > 0 || filters.search || filters.verifiedOnly,
   );
 }

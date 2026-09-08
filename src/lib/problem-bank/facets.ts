@@ -1,4 +1,7 @@
 import { supabase } from '@/lib/supabase';
+import {
+  SCHOOL_EXAM_SOURCE_TYPE, schoolExamKey, type SchoolExamFacet,
+} from './school-exam-tree';
 
 /**
  * 아카이브 필터 선택지(패싯) 모으기.
@@ -22,18 +25,36 @@ export interface SourceFacets {
   grades: string[];
   /** 교과서(= exam.publishers.name 스냅샷) */
   textbooks: string[];
+  /** 학기 ('1학기'·'2학기') */
+  semesters: string[];
+  /** 학교 기출 트리를 만들 갈래 (내신기출만, 중복 없음) */
+  schoolExams: SchoolExamFacet[];
+}
+
+/** 아직 못 읽었을 때 쓰는 빈 선택지 */
+export const EMPTY_SOURCE_FACETS: SourceFacets = {
+  schools: [], years: [], grades: [], textbooks: [], semesters: [], schoolExams: [],
+};
+
+/** 패싯 스캔이 읽는 출처 컬럼 */
+interface SourceFacetRow extends SchoolExamFacet {
+  textbook: string;
+  source_type: string;
 }
 
 /**
  * 출처 컬럼에서 실제로 존재하는 값들을 모은다.
- * @returns 학교·학년도·학년·교과서 (빈 값 제외, 정렬됨)
+ *
+ * 학교 기출 트리의 갈래도 **같은 스캔**에서 뽑는다 — 컬럼 몇 개를 더 고르는 것뿐이라
+ * 왕복을 늘릴 이유가 없다.
+ * @returns 학교·학년도·학년·교과서·학기 목록과 학교 기출 갈래
  */
 export async function fetchSourceFacets(): Promise<SourceFacets> {
-  const rows: { school_name: string; year: string; grade: string; textbook: string }[] = [];
+  const rows: SourceFacetRow[] = [];
   for (let from = 0; from < FACET_MAX_ROWS; from += FACET_CHUNK) {
     const { data, error } = await supabase
       .from('problem_sources')
-      .select('school_name, year, grade, textbook')
+      .select('school_name, year, grade, textbook, source_type, semester, exam_type')
       .order('id')
       .range(from, from + FACET_CHUNK - 1);
     if (error) throw error;
@@ -48,7 +69,27 @@ export async function fetchSourceFacets(): Promise<SourceFacets> {
     years: uniq(rows.map((r) => r.year)).reverse(),
     grades: uniq(rows.map((r) => r.grade)),
     textbooks: uniq(rows.map((r) => r.textbook)),
+    semesters: uniq(rows.map((r) => r.semester)),
+    schoolExams: collectSchoolExams(rows),
   };
+}
+
+/** 내신기출 행에서 학교 기출 갈래를 중복 없이 모은다 */
+function collectSchoolExams(rows: SourceFacetRow[]): SchoolExamFacet[] {
+  const seen = new Set<string>();
+  const out: SchoolExamFacet[] = [];
+  for (const row of rows) {
+    if (row.source_type !== SCHOOL_EXAM_SOURCE_TYPE || !row.school_name) continue;
+    const facet: SchoolExamFacet = {
+      school_name: row.school_name, year: row.year, grade: row.grade,
+      semester: row.semester, exam_type: row.exam_type,
+    };
+    const key = schoolExamKey(facet);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(facet);
+  }
+  return out;
 }
 
 /**

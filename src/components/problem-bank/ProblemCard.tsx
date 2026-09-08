@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { GripVertical, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { areaPathLabel } from '@/lib/problem-bank/area-tree';
 import { sourceLabel } from '@/lib/problem-bank/source-label';
 import { unitPathLabel } from '@/lib/problem-bank/unit-tree';
@@ -29,6 +30,12 @@ interface ProblemCardProps {
   dragHandlers?: React.HTMLAttributes<HTMLElement>;
   /** 편집 링크를 보일지 (문제지 조합 화면에서는 숨긴다) */
   showEditLink?: boolean;
+  /** 선택 모드 — 체크박스가 붙고 카드를 눌러도 선택이 토글된다 (조합 화면은 쓰지 않는다) */
+  selectMode?: boolean;
+  /** 이 문항이 선택됐는가 */
+  selected?: boolean;
+  /** 선택 토글 */
+  onToggleSelect?: () => void;
 }
 
 /**
@@ -39,14 +46,30 @@ interface ProblemCardProps {
  */
 export default function ProblemCard({
   problem, thumbnailUrl, onAdd, added, dragHandlers, showEditLink = true,
+  selectMode, selected, onToggleSelect,
 }: ProblemCardProps) {
+  const selectable = Boolean(selectMode && onToggleSelect);
   return (
     <div
       data-drag-item
       className={`flex gap-3 rounded-lg border p-3 transition ${
-        added ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'
-      }`}
+        added ? 'border-primary bg-primary/5'
+          : selected ? 'border-primary ring-1 ring-primary/30'
+            : 'border-gray-200 hover:border-gray-300'
+      } ${selectable ? 'cursor-pointer' : ''}`}
+      onClick={selectable ? onToggleSelect : undefined}
     >
+      {selectable && (
+        // 체크박스 자체의 클릭이 카드 클릭으로 두 번 세지 않게 막는다
+        <div className="shrink-0 self-start pt-0.5" onClick={(e) => e.stopPropagation()}>
+          <Checkbox
+            checked={!!selected}
+            onCheckedChange={onToggleSelect}
+            aria-label={`${problem.number !== null ? `${problem.number}번 ` : ''}문항 선택`}
+          />
+        </div>
+      )}
+
       {dragHandlers && (
         <button
           type="button"
@@ -85,7 +108,7 @@ export default function ProblemCard({
           {problem.work_title && <span>· {problem.work_title}</span>}
           {problem.unit_path.length > 0 && <span>· {unitPathLabel(problem.unit_path)}</span>}
           {problem.area_path.length > 0 && <span>· {areaPathLabel(problem.area_path)}</span>}
-          {showEditLink && (
+          {showEditLink && !selectMode && (
             <Link
               href={`/problems/edit/${problem.id}`}
               className="ml-auto text-primary underline underline-offset-2"

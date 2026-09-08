@@ -5,7 +5,10 @@ import { toast } from 'sonner';
 import {
   EMPTY_FILTERS, toProblemQuery, type ProblemFilters,
 } from '@/lib/problem-bank/filters';
-import { fetchAreaFacets, fetchSourceFacets, fetchUnitFacets } from '@/lib/problem-bank/facets';
+import {
+  EMPTY_SOURCE_FACETS, fetchAreaFacets, fetchSourceFacets, fetchUnitFacets,
+  type SourceFacets,
+} from '@/lib/problem-bank/facets';
 import { fetchProblemPage, PROBLEM_PAGE_SIZE } from '@/lib/problem-bank/queries';
 import type { Problem, ProblemSource } from '@/types/problem-bank';
 
@@ -25,9 +28,9 @@ export function useProblemArchive(initial: ProblemFilters = EMPTY_FILTERS) {
   // 로딩을 state 로 두고 효과에서 켜면 렌더가 한 번 더 돈다.
   // "무엇을 이미 불러왔는가"만 기억하고 로딩은 **파생**한다.
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
-  const [facets, setFacets] = useState({
-    schools: [] as string[], years: [] as string[], grades: [] as string[], textbooks: [] as string[],
-  });
+  /** 조건이 같아도 다시 읽게 하는 세대 번호 (지운 뒤 목록 갱신) */
+  const [reloadSeq, setReloadSeq] = useState(0);
+  const [facets, setFacets] = useState<SourceFacets>(EMPTY_SOURCE_FACETS);
   const [areaFacets, setAreaFacets] = useState<string[][]>([]);
   const [unitFacets, setUnitFacets] = useState<string[][]>([]);
 
@@ -38,7 +41,9 @@ export function useProblemArchive(initial: ProblemFilters = EMPTY_FILTERS) {
   }, []);
 
   const queryKey = JSON.stringify(toProblemQuery(filters));
-  const loading = loadedKey !== queryKey;
+  // 세대를 키에 접어 넣는다 — 조건이 그대로여도 reload() 하면 다시 읽는다
+  const fetchKey = `${reloadSeq}:${queryKey}`;
+  const loading = loadedKey !== fetchKey;
 
   useEffect(() => {
     let alive = true;
@@ -52,12 +57,12 @@ export function useProblemArchive(initial: ProblemFilters = EMPTY_FILTERS) {
         if (alive) toast.error(e instanceof Error ? e.message : '불러오지 못했어요.');
       })
       .finally(() => {
-        if (alive) setLoadedKey(queryKey);
+        if (alive) setLoadedKey(fetchKey);
       });
     return () => {
       alive = false;
     };
-  }, [queryKey]);
+  }, [queryKey, fetchKey]);
 
   const patch = useCallback((next: Partial<ProblemFilters>) => {
     setFilters((f) => ({ ...f, ...next }));
@@ -65,7 +70,13 @@ export function useProblemArchive(initial: ProblemFilters = EMPTY_FILTERS) {
 
   const reset = useCallback(() => setFilters(EMPTY_FILTERS), []);
 
+  /** 조건은 그대로 두고 목록만 다시 읽는다 (선택 삭제 뒤) */
+  const reload = useCallback(() => setReloadSeq((n) => n + 1), []);
+
   const pageCount = Math.max(1, Math.ceil(total / PROBLEM_PAGE_SIZE));
 
-  return { filters, rows, total, loading, facets, areaFacets, unitFacets, pageCount, patch, reset };
+  return {
+    filters, rows, total, loading, facets, areaFacets, unitFacets, pageCount,
+    patch, reset, reload,
+  };
 }

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   EMPTY_FILTERS, filtersFromParams, filtersToQueryString, hasActiveFilters, toProblemQuery,
+  UNSPECIFIED_AXIS,
 } from './filters';
 
 describe('filters ↔ 주소', () => {
@@ -24,11 +25,17 @@ describe('filters ↔ 주소', () => {
     const source = {
       ...EMPTY_FILTERS,
       source_type: '내신기출', school_name: '상현중', year: '2026', grade: '중2',
-      exam_type: '중간', textbook: '천재(노미숙)', area_path: ['문학', '현대시'],
+      semester: '1학기', exam_type: '중간', textbook: '천재(노미숙)', area_path: ['문학', '현대시'],
       unit_path: ['1. 문학', '(1) 시'], search: '심상', verifiedOnly: true, page: 2,
     };
     const back = filtersFromParams(new URLSearchParams(filtersToQueryString(source).slice(1)));
     expect(back).toEqual(source);
+  });
+
+  it('학기는 sem 으로 싣고 되읽는다', () => {
+    const q = filtersToQueryString({ ...EMPTY_FILTERS, semester: '2학기' });
+    expect(q).toContain('sem=');
+    expect(filtersFromParams(new URLSearchParams(q.slice(1))).semester).toBe('2학기');
   });
 
   it('쪽 번호는 주소에서 1부터, 내부에서 0부터', () => {
@@ -66,6 +73,37 @@ describe('toProblemQuery', () => {
     expect(q.textbook).toBe('동아');
     expect(q.unit_path).toEqual(['1. 문학']);
   });
+
+  it("'미지정만' 은 빈 문자열 조건으로 나간다 — 빈 값(전체)과 반드시 구분돼야 한다", () => {
+    const q = toProblemQuery({ ...EMPTY_FILTERS, semester: UNSPECIFIED_AXIS });
+    expect(q.semester).toBe('');
+    expect('semester' in q).toBe(true);
+    // 전체는 아예 조건을 만들지 않는다
+    expect('semester' in toProblemQuery(EMPTY_FILTERS)).toBe(false);
+  });
+
+  it('학년도·학년·시험도 미지정만 고를 수 있다', () => {
+    const q = toProblemQuery({
+      ...EMPTY_FILTERS,
+      year: UNSPECIFIED_AXIS, grade: UNSPECIFIED_AXIS, exam_type: UNSPECIFIED_AXIS,
+    });
+    expect(q.year).toBe('');
+    expect(q.grade).toBe('');
+    expect(q.exam_type).toBe('');
+  });
+
+  it("자유 텍스트 축은 '__none__' 을 값 그대로 본다 — 그 이름의 학교·교과서가 있을 수 있다", () => {
+    const q = toProblemQuery({
+      ...EMPTY_FILTERS, school_name: UNSPECIFIED_AXIS, textbook: UNSPECIFIED_AXIS,
+    });
+    expect(q.school_name).toBe(UNSPECIFIED_AXIS);
+    expect(q.textbook).toBe(UNSPECIFIED_AXIS);
+  });
+
+  it('학기도 조건이 된다', () => {
+    expect(toProblemQuery({ ...EMPTY_FILTERS, semester: '1학기' }).semester).toBe('1학기');
+    expect(toProblemQuery(EMPTY_FILTERS).semester).toBeUndefined();
+  });
 });
 
 describe('hasActiveFilters', () => {
@@ -76,6 +114,8 @@ describe('hasActiveFilters', () => {
     expect(hasActiveFilters({ ...EMPTY_FILTERS, area_path: ['문학'] })).toBe(true);
     expect(hasActiveFilters({ ...EMPTY_FILTERS, textbook: '동아' })).toBe(true);
     expect(hasActiveFilters({ ...EMPTY_FILTERS, unit_path: ['1. 문학'] })).toBe(true);
+    expect(hasActiveFilters({ ...EMPTY_FILTERS, semester: '1학기' })).toBe(true);
+    expect(hasActiveFilters({ ...EMPTY_FILTERS, semester: UNSPECIFIED_AXIS })).toBe(true);
   });
 
   it('쪽 번호만으로는 조건이 아니다', () => {
