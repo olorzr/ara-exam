@@ -7,7 +7,7 @@ import { ExamHistoryCard, ExamHistoryFilter } from '@/components/exam';
 import { useExamHistory } from '@/hooks/useExamHistory';
 
 /**
- * 시험 이력 페이지. 원본 시험 아래에 재시험이 스레드로 표시된다.
+ * 단어 시험지 목록 페이지. 원본 시험 아래에 재시험이 스레드로 표시된다.
  * 상태·필터·재시험 생성 로직은 useExamHistory 훅이 담당한다.
  */
 export default function ExamHistoryPage() {
@@ -25,7 +25,7 @@ export default function ExamHistoryPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">시험 이력</h1>
+        <h1 className="text-2xl font-bold text-gray-900">단어 시험지 목록</h1>
         <Link href="/exam/create">
           <Button className="bg-primary hover:bg-primary-hover text-white">
             <FileText className="h-4 w-4 mr-2" />

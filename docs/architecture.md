@@ -19,7 +19,7 @@ src/
 │       │   └── new/         # 단어 입력 (직접/CSV)
 │       └── exam/            # 시험 관련
 │           ├── create/      # 단어 시험지 생성
-│           ├── history/     # 시험 이력
+│           ├── history/     # 단어 시험지 목록
 │           └── view/        # 시험지/답안지/단어장 보기
 ├── components/
 │   ├── layout/              # 앱 셸 (AppShell·Sidebar·nav-items — 좌측 사이드바 네비게이션)

@@ -45,7 +45,7 @@ describe('isNavItemActive', () => {
     expect(isNavItemActive('/wordsomething', findItem(sections, '/words'))).toBe(false);
   });
 
-  it('extraPrefixes 로 저장된 시험지 보기가 시험 이력에 붙는다', () => {
+  it('extraPrefixes 로 저장된 시험지 보기가 단어 시험지 목록에 붙는다', () => {
     const history = findItem(sections, '/exam/history');
     expect(isNavItemActive('/exam/view', history)).toBe(true);
     expect(isNavItemActive('/exam/history', history)).toBe(true);
@@ -98,7 +98,11 @@ describe('buildNavSections', () => {
 
     const words = sections.find((s) => s.id === 'words')!;
     expect(words.kind).toBe('group');
-    expect(words.items.map((i) => i.label)).toEqual(['단어 관리', '단어 시험지 생성']);
+    expect(words.items.map((i) => i.label)).toEqual([
+      '단어 관리',
+      '단어 시험지 생성',
+      '단어 시험지 목록',
+    ]);
 
     const problems = sections.find((s) => s.id === 'problems')!;
     expect(problems.kind).toBe('group');
@@ -107,7 +111,7 @@ describe('buildNavSections', () => {
     ]);
 
     const etc = sections.find((s) => s.id === 'etc')!;
-    expect(etc.items.map((i) => i.label)).toEqual(['카테고리 관리', '시험 이력', 'AI 연결']);
+    expect(etc.items.map((i) => i.label)).toEqual(['카테고리 관리', 'AI 연결']);
   });
 
   it('감사 로그는 관리자에게만, 하단 구간으로 나온다', () => {
