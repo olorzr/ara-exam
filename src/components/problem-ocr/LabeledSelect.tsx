@@ -17,6 +17,8 @@ interface LabeledSelectProps {
   error?: string;
   /** 칸 아래에 붙일 안내 (시험범위 힌트 등) */
   hint?: React.ReactNode;
+  /** 저장 중처럼 잠깐 못 고르게 할 때 */
+  disabled?: boolean;
   onChange: (value: string) => void;
 }
 
@@ -32,7 +34,7 @@ function toOptions(options: readonly SelectOption[] | readonly string[]): Select
  * `onValueChange` 가 `string | null` 을 주는 것(CLAUDE.md Known Issues)도 여기서 흡수한다.
  */
 export default function LabeledSelect({
-  label, value, options, placeholder, error, hint, onChange,
+  label, value, options, placeholder, error, hint, disabled, onChange,
 }: LabeledSelectProps) {
   const items = toOptions(options);
 
@@ -42,6 +44,7 @@ export default function LabeledSelect({
       <Select
         value={value}
         items={items}
+        disabled={disabled}
         onValueChange={(v) => { if (v) onChange(v); }}
       >
         <SelectTrigger className="w-full"><SelectValue placeholder={placeholder} /></SelectTrigger>

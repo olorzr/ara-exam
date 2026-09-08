@@ -25,14 +25,21 @@ interface UnitTreePanelProps {
  *
  * ⚠️ 외부지문·프린트 폴더는 뺀다(교과서 단원이 없다).
  * ⚠️ 트리를 못 읽어도 아무것도 그리지 않을 뿐이다 — 위쪽 필터로 계속 찾을 수 있다.
- * ⚠️ 학기는 필터 축이 아니다. 저장되는 것은 **단원 이름**이라, 1·2학기에 같은 이름의
- *    대단원이 있으면 두 폴더가 같은 결과를 낸다(교과서 안에서 단원 이름은 보통 유일하다).
- *    그래서 '어디를 눌렀는가'는 필터에서 되짚지 않고 눌린 잎을 그대로 기억한다.
+ * ⚠️ **학기는 필터 축이 아니다.** 저장되는 것은 단원 **이름**이고 학기는 출처 행에 있다.
+ *    1·2학기에 같은 이름의 대단원이 등록된 경우가 실제로 있어(2026-09-08 운영 데이터
+ *    2건, 미래엔(신유식) 중2) 두 폴더가 같은 결과를 낸다 — 같은 단원을 두 학기에
+ *    걸쳐 등록한 것이라 결과가 같은 편이 맞다. 학기로 갈라 찾고 싶어지면 그때
+ *    `ProblemFilters` 에 축을 하나 더 두는 것이 정공법이다.
  */
 export default function UnitTreePanel({ filters, onChange }: UnitTreePanelProps) {
   const [categories, setCategories] = useState<Category[]>([]);
-  /** 방금 누른 잎 — 표시용이다(필터에서 되짚으면 같은 이름의 다른 학기를 켤 수 있다) */
-  const [pickedId, setPickedId] = useState<string | undefined>(undefined);
+  /**
+   * 방금 누른 잎과 **그때 건 조건**.
+   * 필터에서 되짚지 않는 이유는 같은 이름의 단원이 두 학기에 있을 수 있어서고,
+   * 조건을 함께 들고 있는 이유는 위쪽 필터를 따로 바꿨을 때 옛 잎이 켜진 채로 남지
+   * 않게 하기 위해서다(코덱스 리뷰 2R).
+   */
+  const [picked, setPicked] = useState<{ id: string; key: string } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -46,20 +53,25 @@ export default function UnitTreePanel({ filters, onChange }: UnitTreePanelProps)
 
   const nodes = useMemo(() => buildCategoryTree(categories), [categories]);
 
-  // 필터에서 단원이 빠지면(조건 지우기·해제) 표시도 함께 지운다
-  const selectedId = filters.unit_path.length > 0 ? pickedId : undefined;
+  // 지금 필터가 그때 건 조건 그대로일 때만 강조한다
+  const filterKey = [filters.grade, filters.textbook, filters.unit_path.join('>')].join('|');
+  const selectedId = picked?.key === filterKey ? picked.id : undefined;
 
   if (nodes.length === 0) return null;
 
   const handleSelect = (category: Category) => {
-    setPickedId(category.id);
+    const unitPath = category.sub_chapter
+      ? [category.chapter, category.sub_chapter]
+      : [category.chapter];
+    setPicked({
+      id: category.id,
+      key: [category.grade, category.publisher, unitPath.join('>')].join('|'),
+    });
     onChange({
       grade: category.grade,
       textbook: category.publisher,
       // 소단원이 없는 '(전체)' 잎은 대단원만 — 그 아래 문항이 모두 걸린다
-      unit_path: category.sub_chapter
-        ? [category.chapter, category.sub_chapter]
-        : [category.chapter],
+      unit_path: unitPath,
       page: 0,
     });
   };

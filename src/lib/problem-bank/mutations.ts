@@ -214,7 +214,7 @@ export async function setSourceStatus(id: string, status: string): Promise<void>
  *
  * 업로드 때 못 골랐거나 잘못 고른 것을 검수에서 고칠 수 있어야 한다 — 교과서가 없으면
  * 단원 칸 자체가 안 뜨므로, 이 경로가 없으면 옛 출처는 **영영 분류할 수 없다**
- * (코덱스 리뷰).
+ * (코덱스 리뷰 1R).
  * @param id - 출처 id
  * @param textbook - 교과서 이름 ('' 는 미지정)
  * @returns 정규화해서 저장한 이름
@@ -225,4 +225,37 @@ export async function setSourceTextbook(id: string, textbook: string): Promise<s
     .from('problem_sources').update({ textbook: value }).eq('id', id);
   if (error) throw error;
   return value;
+}
+
+/**
+ * 이 출처에서 단원이 붙어 있는 문항·지문 수를 센다.
+ * @param sourceId - 출처 id
+ * @returns 태깅된 행 수
+ */
+export async function countTaggedUnits(sourceId: string): Promise<number> {
+  const counts = await Promise.all(['problems', 'passages'].map(async (table) => {
+    const { count, error } = await supabase
+      .from(table)
+      .select('id', { count: 'exact', head: true })
+      .eq('source_id', sourceId)
+      .not('unit_path', 'eq', '{}');
+    if (error) throw error;
+    return count ?? 0;
+  }));
+  return counts[0] + counts[1];
+}
+
+/**
+ * 이 출처의 단원 태그를 모두 지운다.
+ *
+ * 교과서를 바꾸면 이미 붙은 단원은 **다른 책의 단원**이라 그대로 두면 아카이브가
+ * 'B 교과서 + A 단원' 으로 잘못 묶인다(코덱스 리뷰 2R). 지우고 다시 붙이는 편이 낫다.
+ * @param sourceId - 출처 id
+ */
+export async function clearSourceUnits(sourceId: string): Promise<void> {
+  for (const table of ['problems', 'passages']) {
+    const { error } = await supabase
+      .from(table).update({ unit_path: [] }).eq('source_id', sourceId).not('unit_path', 'eq', '{}');
+    if (error) throw error;
+  }
 }

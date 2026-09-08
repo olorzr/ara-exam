@@ -156,7 +156,9 @@ function fillPassageGaps(draft: PassageDraft, item: OcrItem): void {
   if (!draft.label && item.label) draft.label = item.label;
   if (!draft.title && item.title) draft.title = item.title;
   if (!draft.author && item.author) draft.author = item.author;
-  if (!draft.box && item.box) draft.box = item.box;
+  // ⚠️ 좌표는 **같은 쪽에서 읽은 것만** 받는다. box 와 page_no 는 짝이라(크롭이 둘을 함께
+  //    쓴다) 이어지는 쪽의 좌표를 첫 쪽에 붙이면 엉뚱한 자리를 잘라 낸다(코덱스 리뷰 2R)
+  if (!draft.box && item.box && item.page === draft.page_no) draft.box = item.box;
   if (draft.area_path.length === 0 && item.area_path.length > 0) draft.area_path = item.area_path;
   if (draft.unit_path.length === 0 && item.unit_path.length > 0) draft.unit_path = item.unit_path;
   if (item.has_figure) draft.has_figure = true;

@@ -82,6 +82,18 @@ describe('mergeOcrDrafts — 겹쳐 읽은 중복', () => {
     expect(res.passages[0].area_path).toEqual(['문학']);
   });
 
+  it('이어지는 쪽의 좌표는 앞 지문에 붙이지 않는다 — 좌표와 쪽 번호는 짝이다', () => {
+    const res = mergeOcrDrafts([
+      batch([passage({ page: 3, label: '[1~3]', continues: true, box: null })], [3]),
+      batch([passage({
+        page: 4, label: null, continued: true, html: '<p>뒷부분</p>',
+        box: { column: 1, top: 0.1, bottom: 0.5 },
+      })], [4]),
+    ], { newId });
+    expect(res.passages[0].page_no).toBe(3);
+    expect(res.passages[0].box).toBeNull();
+  });
+
   it('이어지는 조각에서 알아본 분류도 앞 지문에 붙인다', () => {
     const res = mergeOcrDrafts([
       batch([passage({ page: 3, label: '[1~3]', continues: true, unit_path: [] })], [3]),
