@@ -254,7 +254,20 @@ export default function ProblemSourceReviewPage() {
                   }}
                   onSave={(patch) => review.savePassage(passage.id, patch)}
                   onDirtyChange={(dirty) => markDirty(passage.id, dirty)}
-                  onDelete={() => review.removePassage(passage.id)}
+                  onDelete={() => {
+                    // 지문을 지우면 딸린 문항을 다시 읽어 오면서 **모든 카드가 다시
+                    // 마운트된다** — 다른 카드에서 고치던 내용까지 사라진다.
+                    // 지우는 카드 자신은 어차피 없어지므로 셈에서 뺀다(코덱스 리뷰 16R)
+                    const others = [...dirtyIds].filter((id) => id !== passage.id);
+                    if (others.length > 0) {
+                      const ok = window.confirm(
+                        `다른 카드에 저장하지 않은 수정이 ${others.length}개 있어요.\n`
+                        + '지문을 지우면 문항을 다시 읽어 오면서 그 수정이 사라집니다. 계속할까요?',
+                      );
+                      if (!ok) return;
+                    }
+                    review.removePassage(passage.id);
+                  }}
                 />
               );
             }

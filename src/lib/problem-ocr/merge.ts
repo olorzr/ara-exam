@@ -95,12 +95,30 @@ function textOf(html: string): string {
  *    붙는다. 쪽 경계에서 잘릴 수 있는 지문은 그 쪽의 **마지막 하나뿐**이므로
  *    (쪽 하나에 이어지는 조각이 둘일 수 없다) 쪽 번호만으로 충분하다.
  */
-function passageKey(item: OcrItem): string {
+function passageKeyBase(item: OcrItem): string {
   if (item.continued) return `${item.page}|C`;
   const label = (item.label ?? '').trim();
   return label
     ? `${item.page}|L|${label}`
     : `${item.page}|H|${textOf(item.html).slice(0, 40)}`;
+}
+
+/**
+ * 묶음 안 등장 순번까지 더한 지문 키 (문항의 `problemKeyIn` 과 같은 이유).
+ *
+ * 한 쪽에 `[1~2]` 같은 라벨이 두 번 나오는 자료(문제집·프린트의 절 구분)에서
+ * 두 지문이 같은 키를 받으면 하나로 합쳐지고, **문항이 엉뚱한 글에 붙는다**
+ * (코덱스 리뷰 16R). 이어지는 조각은 쪽마다 하나뿐이라 순번이 늘 0 이고
+ * 묶음을 넘나드는 병합도 그대로 동작한다.
+ * @param item - 검증된 항목
+ * @param seenInBatch - 이 묶음에서 기본 키가 몇 번 나왔는지 (호출하며 증가시킨다)
+ * @returns 순번이 붙은 키
+ */
+function passageKeyIn(item: OcrItem, seenInBatch: Map<string, number>): string {
+  const base = passageKeyBase(item);
+  const nth = seenInBatch.get(base) ?? 0;
+  seenInBatch.set(base, nth + 1);
+  return `${base}#${nth}`;
 }
 
 /**
@@ -239,10 +257,11 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
     const refToId = new Map<string, string>();
 
     // 1) 지문 먼저 — 문항이 참조를 풀 수 있어야 한다
+    const seenPassages = new Map<string, number>();
     for (const item of draft.items) {
       if (item.kind !== 'passage') continue;
 
-      const key = passageKey(item);
+      const key = passageKeyIn(item, seenPassages);
       const existing = fragmentByKey.get(key);
       if (existing) {
         // 겹쳐 읽은 **같은 조각** — 더 완전한(긴) 쪽을 남긴다.

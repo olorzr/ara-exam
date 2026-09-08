@@ -129,6 +129,31 @@ describe('mergeOcrDrafts — 겹쳐 읽은 중복', () => {
 });
 
 describe('mergeOcrDrafts — 지문 합치기', () => {
+  it('한 쪽에 같은 라벨의 지문이 둘이면 각각 남는다 — 합치면 문항이 엉뚱한 글에 붙는다', () => {
+    // 코덱스 리뷰 16R: 문제집·프린트는 절마다 [1~2] 를 다시 쓴다
+    const res = mergeOcrDrafts([
+      batch([
+        passage({ ref: 'P1', page: 2, label: '[1~2]', html: '<p>가 지문</p>' }),
+        passage({ ref: 'P2', page: 2, label: '[1~2]', html: '<p>나 지문</p>' }),
+        problem({ ref: 'Q1', page: 2, number: 1, passage_ref: 'P2' }),
+      ], [2]),
+    ], { newId });
+
+    expect(res.passages).toHaveLength(2);
+    expect(res.passages[1].html).toContain('나 지문');
+    // 문항은 자기가 가리킨 지문에 붙어야 한다
+    expect(res.problems[0].passage_id).toBe(res.passages[1].id);
+  });
+
+  it('겹쳐 읽어도 같은 자리 지문끼리만 합쳐진다', () => {
+    const two = () => [
+      passage({ ref: 'P1', page: 2, label: '[1~2]', html: '<p>가 지문</p>' }),
+      passage({ ref: 'P2', page: 2, label: '[1~2]', html: '<p>나 지문 더 길게</p>' }),
+    ];
+    const res = mergeOcrDrafts([batch(two(), [1, 2]), batch(two(), [2, 3])], { newId });
+    expect(res.passages).toHaveLength(2);
+  });
+
   it('겹쳐 읽어 더 완전한 지문이 이긴다 — 잘린 쪽을 남기면 안 된다', () => {
     const res = mergeOcrDrafts([
       // 첫 묶음은 쪽 끝에서 잘렸다
