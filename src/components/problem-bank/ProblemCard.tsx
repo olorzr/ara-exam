@@ -75,9 +75,6 @@ export default function ProblemCard({
           )}
           {problem.render_mode === 'image' && <Badge variant="outline">이미지</Badge>}
           {!problem.answer && <Badge className="bg-amber-500 text-white">정답 없음</Badge>}
-          {problem.score !== null && (
-            <span className="text-xs text-gray-500">{problem.score}점</span>
-          )}
         </div>
 
         <p className="mt-1 text-sm text-gray-800">{excerpt(problem.stem_html)}</p>

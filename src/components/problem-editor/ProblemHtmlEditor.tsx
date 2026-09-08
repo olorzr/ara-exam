@@ -3,13 +3,12 @@
 import { useEffect, useRef } from 'react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
 import { Table, TableRow } from '@tiptap/extension-table';
 import { Extension } from '@tiptap/core';
-import { Bold, Italic, Table as TableIcon, Underline as UnderlineIcon } from 'lucide-react';
 import { CustomTableCell, CustomTableHeader } from '@/components/exam-builder/CustomTableCell';
 import { sanitizeProblemHTML } from '@/lib/sanitize-problem';
+import ProblemEditorToolbar from './ProblemEditorToolbar';
 
 /**
  * 〈보기〉 상자를 살려 두는 blockquote.
@@ -75,9 +74,10 @@ export default function ProblemHtmlEditor({
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
+      // 밑줄·줄바꿈(<br>)·구분선(<hr>)은 StarterKit 3.x 에 이미 들어 있다.
+      // @tiptap/extension-underline 을 따로 등록하면 확장이 두 벌이 된다
       StarterKit.configure({ heading: { levels: [3, 4] } }),
       BoxAttribute,
-      Underline,
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Table.configure({ resizable: true }),
       TableRow,
@@ -113,38 +113,9 @@ export default function ProblemHtmlEditor({
 
   if (!editor) return null;
 
-  const buttonClass = (active: boolean) =>
-    `rounded px-2 py-1 text-xs ${active ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700'}`;
-
   return (
-    <div className="rounded-md border border-gray-200">
-      <div className="flex items-center gap-1 border-b border-gray-200 bg-gray-50 px-2 py-1">
-        <button
-          type="button" className={buttonClass(editor.isActive('bold'))}
-          onClick={() => editor.chain().focus().toggleBold().run()} aria-label="굵게"
-        >
-          <Bold className="h-3.5 w-3.5" />
-        </button>
-        <button
-          type="button" className={buttonClass(editor.isActive('italic'))}
-          onClick={() => editor.chain().focus().toggleItalic().run()} aria-label="기울임"
-        >
-          <Italic className="h-3.5 w-3.5" />
-        </button>
-        <button
-          type="button" className={buttonClass(editor.isActive('underline'))}
-          onClick={() => editor.chain().focus().toggleUnderline().run()} aria-label="밑줄"
-        >
-          <UnderlineIcon className="h-3.5 w-3.5" />
-        </button>
-        <button
-          type="button" className={buttonClass(editor.isActive('table'))}
-          onClick={() => editor.chain().focus().insertTable({ rows: 2, cols: 2 }).run()}
-          aria-label="표 넣기"
-        >
-          <TableIcon className="h-3.5 w-3.5" />
-        </button>
-      </div>
+    <div className="pb-editor rounded-md border border-gray-200">
+      <ProblemEditorToolbar editor={editor} />
       <EditorContent editor={editor} className="px-3 py-2" style={{ minHeight }} />
     </div>
   );

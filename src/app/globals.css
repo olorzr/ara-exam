@@ -605,3 +605,104 @@
     gap: 0 !important;
   }
 }
+/* ========================================= */
+/* 기출 문항 편집기 (검수 화면)                 */
+/* ========================================= */
+/*
+ * 개념지 편집기 스타일은 전부 `.eb-editor-wrap` 스코프라 문항 편집기에는 닿지 않는다.
+ * 그대로 두면 〈보기〉 상자·구역 표시가 편집 중에는 **맨 글로 보여서**, 선생님이
+ * 상자가 붙었는지 알 수가 없다. 인쇄와 같은 모양을 연한 색으로 보여 준다.
+ */
+.pb-editor .ProseMirror { outline: none; }
+.pb-editor .ProseMirror p { margin: 4px 0; }
+.pb-editor .ProseMirror p:empty::before { content: '\00a0'; }
+.pb-editor .ProseMirror u { text-decoration: underline; text-underline-offset: 2px; }
+.pb-editor .ProseMirror hr {
+  border: 0;
+  border-top: 1px solid #d1d5db;
+  margin: 8px 0;
+}
+.pb-editor .ProseMirror table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 6px 0;
+}
+.pb-editor .ProseMirror th,
+.pb-editor .ProseMirror td {
+  border: 1px solid #d1d5db;
+  padding: 3px 6px;
+}
+.pb-editor .ProseMirror th { background: #f3f4f6; font-weight: 600; }
+
+/* 구역 상자 3종 — 인쇄(problem-paper.css)와 같은 규칙, 색만 연하다 */
+.pb-editor .ProseMirror blockquote[data-box] {
+  --pb-box-open: '〈';
+  --pb-box-close: '〉';
+  position: relative;
+  border: 1px solid #d1d5db;
+  padding: 12px 8px 6px;
+  margin: 8px 0;
+}
+.pb-editor .ProseMirror blockquote[data-box]::before {
+  content: var(--pb-box-open) attr(data-box) var(--pb-box-close);
+  position: absolute;
+  top: -1px;
+  left: 8px;
+  transform: translateY(-50%);
+  background: #fff;
+  padding: 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+}
+.pb-editor .ProseMirror blockquote[data-box='가'],
+.pb-editor .ProseMirror blockquote[data-box='나'],
+.pb-editor .ProseMirror blockquote[data-box='다'],
+.pb-editor .ProseMirror blockquote[data-box='라'],
+.pb-editor .ProseMirror blockquote[data-box='마'] {
+  --pb-box-open: '(';
+  --pb-box-close: ')';
+  border: 0;
+  padding: 0;
+  margin: 8px 0 0;
+}
+.pb-editor .ProseMirror blockquote[data-box='가']::before,
+.pb-editor .ProseMirror blockquote[data-box='나']::before,
+.pb-editor .ProseMirror blockquote[data-box='다']::before,
+.pb-editor .ProseMirror blockquote[data-box='라']::before,
+.pb-editor .ProseMirror blockquote[data-box='마']::before {
+  position: static;
+  display: block;
+  transform: none;
+  padding: 0;
+}
+.pb-editor .ProseMirror blockquote[data-box='A'],
+.pb-editor .ProseMirror blockquote[data-box='B'],
+.pb-editor .ProseMirror blockquote[data-box='C'],
+.pb-editor .ProseMirror blockquote[data-box='D'],
+.pb-editor .ProseMirror blockquote[data-box='E'] {
+  --pb-box-open: '[';
+  --pb-box-close: ']';
+  border: 0;
+  border-left: 2px solid #d1d5db;
+  padding: 0 0 0 8px;
+  margin: 8px 0 8px 24px;
+}
+.pb-editor .ProseMirror blockquote[data-box='A']::before,
+.pb-editor .ProseMirror blockquote[data-box='B']::before,
+.pb-editor .ProseMirror blockquote[data-box='C']::before,
+.pb-editor .ProseMirror blockquote[data-box='D']::before,
+.pb-editor .ProseMirror blockquote[data-box='E']::before {
+  top: 0;
+  left: -26px;
+  transform: none;
+  background: transparent;
+  padding: 0;
+}
+
+/* 상자가 아닌 맨 blockquote 도 보이게 — OCR 이 말머리 없이 낼 때가 있다 */
+.pb-editor .ProseMirror blockquote:not([data-box]) {
+  border-left: 2px solid #e5e7eb;
+  padding-left: 8px;
+  margin: 8px 0;
+}

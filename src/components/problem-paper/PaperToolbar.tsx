@@ -58,15 +58,6 @@ export default function PaperToolbar({
 
         <label className="flex items-center gap-1.5 text-gray-600">
           <input
-            type="checkbox" checked={settings.showScore}
-            onChange={(e) => onSettings({ showScore: e.target.checked })}
-            className="h-4 w-4 accent-[color:var(--primary)]"
-          />
-          배점 표시
-        </label>
-
-        <label className="flex items-center gap-1.5 text-gray-600">
-          <input
             type="checkbox" checked={settings.showSource}
             onChange={(e) => onSettings({ showSource: e.target.checked })}
             className="h-4 w-4 accent-[color:var(--primary)]"

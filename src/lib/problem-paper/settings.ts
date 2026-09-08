@@ -8,10 +8,14 @@ import type { PaperSettings } from '@/types/problem-bank';
  * 들고 있게 되므로 양쪽 다 필요하다.
  */
 
-/** 기본값 — 2단이 A4 를 가장 덜 쓴다 */
+/**
+ * 기본값 — 2단이 A4 를 가장 덜 쓴다.
+ * `showScore` 는 더 이상 쓰지 않는다(배점을 인쇄하지 않는다). RPC 화이트리스트가
+ * 이 키를 계속 조립하므로 자리만 남기고 false 로 둔다.
+ */
 export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
   columns: 2,
-  showScore: true,
+  showScore: false,
   showSource: false,
 };
 
@@ -25,7 +29,8 @@ export function normalizePaperSettings(raw: unknown): PaperSettings {
   const value = raw as Record<string, unknown>;
   return {
     columns: value.columns === 1 ? 1 : 2,
-    showScore: value.showScore !== false,
+    // 옛 문제지에 true 로 저장돼 있어도 인쇄에는 쓰지 않는다(렌더러가 보지 않는다)
+    showScore: value.showScore === true,
     showSource: value.showSource === true,
   };
 }

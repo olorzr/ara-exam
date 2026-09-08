@@ -1,4 +1,5 @@
 import DOMPurify from 'isomorphic-dompurify';
+import { isBoxLabel } from './box-labels';
 import { FORBID_ATTR, FORBID_TAGS, SAFE_URI_REGEXP } from './sanitize-html';
 import { withProfile, type SanitizeProfile } from './sanitize-profile';
 
@@ -27,13 +28,6 @@ const ALLOWED_TAGS = [
 
 const ALLOWED_ATTR = ['colspan', 'rowspan', 'data-box', 'style'];
 
-/**
- * 〈보기〉 상자의 라벨로 허용하는 값.
- * 시험지에 실제로 인쇄되는 것들만 둔다 — 자유 문자열을 허용하면 인쇄 CSS 의
- * `::before` content 로 임의 문구가 들어간다.
- */
-const BOX_LABELS = new Set(['보기', '자료', '조건', '가', '나', '다', '라', '마', 'A', 'B']);
-
 /** inline style 은 개념지와 같은 좁은 집합만 — 표 셀 정렬·색이 전부다 */
 const ALLOWED_CSS_PROPS = new Set([
   'text-align',
@@ -46,7 +40,10 @@ const ALLOWED_CSS_PROPS = new Set([
 
 const PROBLEM_PROFILE: SanitizeProfile = {
   allowedCss: ALLOWED_CSS_PROPS,
-  allowedDataAttrs: new Map([['data-box', (v: string) => BOX_LABELS.has(v)]]),
+  // 허용 말머리는 box-labels.ts 가 단일 출처다(인쇄 CSS 선택자와 짝이다).
+  // ⚠️ 여기서 걸린 값은 **되돌릴 수 없이** 사라진다 — 시험지 표기('(가)')를 살리려면
+  //    파서가 정화 **전에** normalizeBoxAttributes 로 다듬어야 한다
+  allowedDataAttrs: new Map([['data-box', isBoxLabel]]),
 };
 
 const PROBLEM_SANITIZE_CONFIG = {

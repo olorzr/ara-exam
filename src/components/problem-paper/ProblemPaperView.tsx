@@ -28,7 +28,7 @@ interface ProblemPaperViewProps {
 export default function ProblemPaperView({ paper, items, imageUrls }: ProblemPaperViewProps) {
   const blocks = useMemo(
     () => renderPaperBlocks({
-      blocks: buildPaperBlocks(items, paper.settings),
+      blocks: buildPaperBlocks(items),
       settings: paper.settings,
       imageUrls,
     }),

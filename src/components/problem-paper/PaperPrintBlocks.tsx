@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { sanitizeInlineHTML, sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import type { PaperBlock } from '@/lib/problem-paper/blocks';
+import { stripTrailingEmptyParagraphs } from '@/lib/problem-paper/html-trim';
 import type { PaperItemSnapshot, PaperSettings } from '@/types/problem-bank';
 
 /** 선지 기호 — 인쇄에서 React 가 붙인다(본문에는 기호를 저장하지 않는다) */
@@ -56,7 +57,6 @@ export function renderPaperBlocks({ blocks, settings, imageUrls }: RenderArgs): 
           <div key={block.key} className="pb-q">
             <div className="pb-q__head">
               <span className="q-num q-num--mint">{String(block.number).padStart(2, '0')}</span>
-              {block.score !== null && <span className="pb-q__score">[{block.score}점]</span>}
             </div>
             <PrintImage path={block.path} urls={imageUrls} alt={`${block.number}번 문항`} />
             {/* 출처 표시는 글 문항과 같아야 한다 — 그림 문항만 빠지면 표기가 들쭉날쭉해진다 */}
@@ -124,11 +124,11 @@ function ProblemBlock({ number, snapshot, settings, imageUrls }: ProblemBlockPro
         <span className="q-num q-num--mint">{String(number).padStart(2, '0')}</span>
         <div
           className="pb-q__stem"
-          dangerouslySetInnerHTML={{ __html: sanitizeProblemHTML(snapshot.stem_html) }}
+          // 끝에 붙은 빈 문단을 걷어낸다 — 그대로 두면 선지 앞에 빈 줄이 생긴다
+          dangerouslySetInnerHTML={{
+            __html: stripTrailingEmptyParagraphs(sanitizeProblemHTML(snapshot.stem_html)),
+          }}
         />
-        {settings.showScore && snapshot.score !== null && (
-          <span className="pb-q__score">[{snapshot.score}점]</span>
-        )}
       </div>
 
       {snapshot.figure_paths.length > 0 && (
@@ -169,7 +169,7 @@ function SourceLine({ source }: { source: PaperItemSnapshot['source'] }) {
     .join(' ');
   if (!text) return null;
   return (
-    <p className="pb-q__score" style={{ paddingLeft: 20, marginTop: 2 }}>
+    <p className="pb-q__meta" style={{ paddingLeft: 20, marginTop: 2 }}>
       {text}
     </p>
   );

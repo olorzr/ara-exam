@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { A4Document, CompactPageHeader } from '@/components/print';
 import ExamPrintHeader from '@/components/exam/ExamPrintHeader';
-import { buildAnswerRows, MISSING_ANSWER_LABEL, totalScore } from '@/lib/problem-paper/blocks';
+import { buildAnswerRows, MISSING_ANSWER_LABEL } from '@/lib/problem-paper/blocks';
 import type { PaperItemSnapshot, ProblemPaper } from '@/types/problem-bank';
 
 /** 한 줄에 담을 문항 수 — 답안지와 같은 규약(줄 하나가 인쇄 블록 하나) */
@@ -23,7 +23,6 @@ interface ProblemAnswerKeyViewProps {
 export default function ProblemAnswerKeyView({ paper, items }: ProblemAnswerKeyViewProps) {
   const title = `${paper.title} - 정답표`;
   const rows = useMemo(() => buildAnswerRows(items), [items]);
-  const total = useMemo(() => totalScore(items), [items]);
 
   const blocks = useMemo(() => {
     const out = [];
@@ -43,7 +42,6 @@ export default function ProblemAnswerKeyView({ paper, items }: ProblemAnswerKeyV
               >
                 {row.answer}
               </span>
-              {row.score !== null && <span className="pb-answer-score">{row.score}점</span>}
             </div>
           ))}
         </div>,
@@ -61,10 +59,7 @@ export default function ProblemAnswerKeyView({ paper, items }: ProblemAnswerKeyV
         <>
           <ExamPrintHeader title={title} sourceLabels={paper.source_labels} />
           <div className="section-bar section-bar--mint mb-2">
-            <span>
-              전체 {items.length}문항
-              {total !== null && ` · 만점 ${total}점`}
-            </span>
+            <span>전체 {items.length}문항</span>
           </div>
         </>
       }

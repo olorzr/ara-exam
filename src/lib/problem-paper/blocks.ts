@@ -1,6 +1,7 @@
 import { splitHtmlBlocks } from '@/lib/print/split-html-blocks';
 import { sanitizeProblemHTML } from '@/lib/sanitize-problem';
-import type { PaperItemSnapshot, PaperSettings } from '@/types/problem-bank';
+import { trimEdgeEmptyParagraphs } from './html-trim';
+import type { PaperItemSnapshot } from '@/types/problem-bank';
 import { groupRangeLabel, groupsOf, type PaperItem } from './compose';
 
 /**
@@ -27,7 +28,6 @@ export type PaperBlock =
     key: string;
     number: number;
     path: string;
-    score: number | null;
     /** 출처 표시가 켜졌을 때 찍을 스냅샷 — 글 문항과 같은 줄이 나가야 한다 */
     source: PaperItemSnapshot['source'];
   };
@@ -39,14 +39,13 @@ function passageHeaderText(range: string): string {
 
 /**
  * 스냅샷 목록을 인쇄 블록으로 바꾼다.
+ *
+ * 인쇄 설정(단 수·출처 표시)은 블록을 **나누는 규칙에 영향을 주지 않아** 여기서 받지 않는다.
+ * 출처 표시는 그리는 쪽(`PaperPrintBlocks`)이 판단한다.
  * @param items - 문제지 항목 (order_index 순서)
- * @param settings - 인쇄 설정
  * @returns 순서대로의 블록 목록
  */
-export function buildPaperBlocks(
-  items: readonly PaperItemSnapshot[],
-  settings: PaperSettings,
-): PaperBlock[] {
+export function buildPaperBlocks(items: readonly PaperItemSnapshot[]): PaperBlock[] {
   const paperItems: PaperItem[] = items.map((item, index) => ({
     problemId: String(index),
     passageId: item.passage?.id ?? null,
@@ -72,7 +71,9 @@ export function buildPaperBlocks(
           label: passage.title || passage.label,
         });
       } else {
-        const parts = splitHtmlBlocks(sanitizeProblemHTML(passage.html));
+        // 가장자리 빈 문단을 먼저 걷어낸다 — 상자 테두리 안이 위아래로 뜨는 것을 막고,
+        // first/last 표시도 진짜 첫·마지막 조각에 붙는다
+        const parts = trimEdgeEmptyParagraphs(splitHtmlBlocks(sanitizeProblemHTML(passage.html)));
         parts.forEach((html, i) => {
           blocks.push({
             kind: 'passage-part',
@@ -96,7 +97,6 @@ export function buildPaperBlocks(
           key: `qi-${i}`,
           number,
           path: snapshot.image_path,
-          score: settings.showScore ? snapshot.score : null,
           source: snapshot.source,
         });
         continue;
@@ -130,7 +130,6 @@ export interface AnswerRow {
   number: number;
   /** 미입력이면 '미입력' — 빈칸으로 두면 인쇄물에서 누락과 구분되지 않는다 */
   answer: string;
-  score: number | null;
   question_type: PaperItemSnapshot['question_type'];
 }
 
@@ -146,25 +145,8 @@ export function buildAnswerRows(items: readonly PaperItemSnapshot[]): AnswerRow[
   return items.map((item, i) => ({
     number: i + 1,
     answer: item.answer.trim() || MISSING_ANSWER_LABEL,
-    score: item.score,
     question_type: item.question_type,
   }));
-}
-
-/**
- * 배점 합계. 하나라도 배점이 없으면 합계를 내지 않는다 —
- * 일부만 더한 값을 만점처럼 인쇄하면 채점이 틀어진다.
- * @param items - 문제지 항목
- * @returns 합계. 못 내면 null
- */
-export function totalScore(items: readonly PaperItemSnapshot[]): number | null {
-  if (items.length === 0) return null;
-  let sum = 0;
-  for (const item of items) {
-    if (item.score === null) return null;
-    sum += item.score;
-  }
-  return Math.round(sum * 100) / 100;
 }
 
 /**

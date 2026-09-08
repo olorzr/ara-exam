@@ -63,7 +63,6 @@ export default function ProblemEditorCard({
   const [stem, setStem] = useState(problem.stem_html);
   const [choices, setChoices] = useState<string[]>(problem.choices);
   const [answer, setAnswer] = useState(problem.answer);
-  const [score, setScore] = useState(problem.score === null ? '' : String(problem.score));
   const [type, setType] = useState<QuestionType>(problem.question_type);
   const [area, setArea] = useState<string[]>(problem.area_path);
   const [workTitle, setWorkTitle] = useState(problem.work_title);
@@ -83,7 +82,6 @@ export default function ProblemEditorCard({
     || answer !== problem.answer
     || type !== problem.question_type
     || workTitle !== problem.work_title
-    || score !== (problem.score === null ? '' : String(problem.score))
     || area.join('>') !== problem.area_path.join('>')
     || trimTrailingChoices(choices).join('\u0000') !== problem.choices.join('\u0000');
 
@@ -107,13 +105,10 @@ export default function ProblemEditorCard({
     }
 
     setSaving(true);
-    const parsedScore = score.trim() === '' ? null : Number(score);
     const updatedAt = await onSave({
       stem_html: stem,
       choices: trimmed,
       answer: answer.trim(),
-      // 배점을 못 읽었으면 null 로 둔다 — 0 으로 채우면 만점 계산이 조용히 틀어진다
-      score: parsedScore !== null && Number.isFinite(parsedScore) ? parsedScore : null,
       question_type: type,
       area_path: area,
       work_title: workTitle,
@@ -210,7 +205,7 @@ export default function ProblemEditorCard({
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <div className="space-y-1">
             <Label className="text-xs text-gray-500">유형</Label>
             <Select value={type} onValueChange={(v) => { if (v) setType(v as QuestionType); }}>
@@ -225,13 +220,6 @@ export default function ProblemEditorCard({
             <Input
               value={answer} onChange={(e) => setAnswer(e.target.value)}
               className="h-8 text-sm" placeholder={type === '객관식' ? '1~5' : '답안'}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs text-gray-500">배점</Label>
-            <Input
-              value={score} onChange={(e) => setScore(e.target.value)}
-              className="h-8 text-sm" inputMode="decimal" placeholder="비워도 됨"
             />
           </div>
           <div className="space-y-1">

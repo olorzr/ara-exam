@@ -6,9 +6,7 @@ import {
   longestPassageChars,
   renumberedImageItems,
   MISSING_ANSWER_LABEL,
-  totalScore,
 } from './blocks';
-import { DEFAULT_PAPER_SETTINGS } from './settings';
 import type { PaperItemSnapshot } from '@/types/problem-bank';
 
 function snap(over: Partial<PaperItemSnapshot> = {}): PaperItemSnapshot {
@@ -30,7 +28,7 @@ const passage = (id: string, html = '<p>지문 한 문단</p>') => ({
   render_mode: 'text' as const, image_path: '',
 });
 
-const build = (items: PaperItemSnapshot[]) => buildPaperBlocks(items, DEFAULT_PAPER_SETTINGS);
+const build = (items: PaperItemSnapshot[]) => buildPaperBlocks(items);
 
 describe('buildPaperBlocks', () => {
   it('지문 없는 문항은 문항 블록만 만든다', () => {
@@ -77,12 +75,17 @@ describe('buildPaperBlocks', () => {
     });
   });
 
-  it('배점 숨김이면 이미지 문항에도 배점을 싣지 않는다', () => {
-    const blocks = buildPaperBlocks(
-      [snap({ render_mode: 'image', image_path: 'p/x.jpg', score: 4 })],
-      { ...DEFAULT_PAPER_SETTINGS, showScore: false },
-    );
-    expect(blocks[0]).toMatchObject({ score: null });
+  it('이미지 문항 블록에 배점을 싣지 않는다 — 인쇄에서 배점을 쓰지 않는다', () => {
+    const blocks = build([snap({ render_mode: 'image', image_path: 'p/x.jpg', score: 4 })]);
+    expect(blocks[0]).not.toHaveProperty('score');
+  });
+
+  it('지문 앞뒤의 빈 문단은 버리고 가운데 빈 줄은 남긴다', () => {
+    const p = passage('P1', '<p></p><p>연 하나</p><p></p><p>연 둘</p><p><br></p>');
+    const parts = build([snap({ passage: p })]).filter((b) => b.kind === 'passage-part');
+    expect(parts.map((b) => b.html)).toEqual(['<p>연 하나</p>', '<p></p>', '<p>연 둘</p>']);
+    expect(parts[0]).toMatchObject({ first: true });
+    expect(parts[2]).toMatchObject({ last: true });
   });
 
   it('지문 본문을 정화한다 — 스냅샷은 jsonb 라 나중에 오염될 수 있다', () => {
@@ -148,7 +151,7 @@ describe('imagePathsOf', () => {
   });
 });
 
-describe('buildAnswerRows / totalScore', () => {
+describe('buildAnswerRows', () => {
   it('정답표는 1번부터 다시 센다', () => {
     const rows = buildAnswerRows([snap({ number: 7, answer: '3' }), snap({ number: 9, answer: '1' })]);
     expect(rows.map((r) => r.number)).toEqual([1, 2]);
@@ -158,16 +161,8 @@ describe('buildAnswerRows / totalScore', () => {
     expect(buildAnswerRows([snap({ answer: '  ' })])[0].answer).toBe(MISSING_ANSWER_LABEL);
   });
 
-  it('배점 합계를 낸다', () => {
-    expect(totalScore([snap({ score: 3 }), snap({ score: 4.5 })])).toBe(7.5);
-  });
-
-  it('하나라도 배점이 없으면 합계를 내지 않는다 — 일부 합을 만점처럼 찍으면 안 된다', () => {
-    expect(totalScore([snap({ score: 3 }), snap({ score: null })])).toBeNull();
-  });
-
-  it('빈 문제지는 합계가 없다', () => {
-    expect(totalScore([])).toBeNull();
+  it('정답표 줄에 배점을 담지 않는다', () => {
+    expect(buildAnswerRows([snap({ score: 3 })])[0]).not.toHaveProperty('score');
   });
 });
 

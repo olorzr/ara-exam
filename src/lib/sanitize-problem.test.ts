@@ -26,6 +26,23 @@ describe('sanitizeProblemHTML', () => {
     expect(out).toContain('글');
   });
 
+  it('구역 세 종류의 말머리를 모두 통과시킨다', () => {
+    for (const label of ['보기 1', '자료', '조건', '마', 'C', 'E']) {
+      expect(sanitizeProblemHTML(`<blockquote data-box="${label}">글</blockquote>`))
+        .toContain(`data-box="${label}"`);
+    }
+  });
+
+  it('괄호가 붙은 말머리는 여기서 걸린다 — 다듬기는 파서(normalizeBoxAttributes) 몫이다', () => {
+    expect(sanitizeProblemHTML('<blockquote data-box="(가)">글</blockquote>'))
+      .not.toContain('data-box');
+  });
+
+  it('줄바꿈·구분선·빈 문단을 유지한다 — 원문의 빈 줄이 이 모양으로 저장된다', () => {
+    const html = '<p>첫 행<br>둘째 행</p><p></p><hr>';
+    expect(sanitizeProblemHTML(html)).toBe(html);
+  });
+
   it('img 를 허용하지 않는다 — 이미지는 저장 경로에서 React 가 그린다', () => {
     const out = sanitizeProblemHTML('<p>그림<img src="https://x/y.png" alt="a"></p>');
     expect(out).not.toContain('<img');
