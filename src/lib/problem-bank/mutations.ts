@@ -26,10 +26,11 @@ export interface ProblemPatch {
   stem_html?: string;
   choices?: string[];
   answer?: string;
-  score?: number | null;
   question_type?: Problem['question_type'];
   explanation_html?: string;
   area_path?: string[];
+  /** 교과서 단원 이름 경로 [대단원, 소단원] */
+  unit_path?: string[];
   work_title?: string;
   render_mode?: RenderMode;
   bbox?: Bbox | null;
@@ -77,6 +78,8 @@ export interface PassagePatch {
   author?: string;
   html?: string;
   area_path?: string[];
+  /** 교과서 단원 이름 경로 [대단원, 소단원] */
+  unit_path?: string[];
   render_mode?: RenderMode;
   bbox?: Bbox | null;
   image_path?: string;

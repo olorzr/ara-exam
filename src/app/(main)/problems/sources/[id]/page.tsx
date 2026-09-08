@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -8,8 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useProblemReview } from '@/hooks/useProblemReview';
-import { fetchAreaSets, fetchAreaTree, pickAreaSetForGrade } from '@/lib/problem-bank/area-master';
-import type { AreaTreeNode } from '@/lib/problem-bank/area-tree';
+import { useSourceTrees } from '@/hooks/useSourceTrees';
 import { setSourceStatus } from '@/lib/problem-bank/mutations';
 import { sourceLabel } from '@/lib/problem-bank/source-label';
 import PageImageWithBoxes, { type BoxOverlay } from '@/components/problem-review/PageImageWithBoxes';
@@ -30,7 +29,7 @@ export default function ProblemSourceReviewPage() {
   const sourceId = params?.id ?? '';
   const review = useProblemReview(sourceId);
 
-  const [areaTree, setAreaTree] = useState<AreaTreeNode[]>([]);
+  const { areaTree, unitTree } = useSourceTrees(review.source);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   /**
    * 저장하지 않은 수정이 있는 문항.
@@ -40,17 +39,6 @@ export default function ProblemSourceReviewPage() {
    */
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
   const [wantedPage, setPage] = useState(1);
-
-  useEffect(() => {
-    if (!review.source) return;
-    let alive = true;
-    fetchAreaSets().then(async (sets) => {
-      const setId = pickAreaSetForGrade(sets, review.source?.grade ?? '');
-      const tree = setId ? await fetchAreaTree(setId) : [];
-      if (alive) setAreaTree(tree);
-    });
-    return () => { alive = false; };
-  }, [review.source]);
 
   // 화면에 보이는 쪽 목록.
   //
@@ -231,6 +219,7 @@ export default function ProblemSourceReviewPage() {
                   passage={passage}
                   problemCount={problemCountFor(passage.id)}
                   areaTree={areaTree}
+                  unitTree={unitTree}
                   selected={selectedId === passage.id}
                   // 이미 고른 항목을 다시 누르거나(편집 중 포커스) 하면 쪽은 그대로 둔다 —
                   // 여러 쪽에 걸친 지문을 이어지는 쪽과 대조하며 고칠 수 있어야 한다
@@ -266,6 +255,7 @@ export default function ProblemSourceReviewPage() {
                 key={`${problem.id}:${review.reloadSeq}`}
                 problem={problem}
                 areaTree={areaTree}
+                unitTree={unitTree}
                 selected={selectedId === problem.id}
                 onSelect={() => {
                   if (selectedId !== problem.id) setPage(problem.page_no);

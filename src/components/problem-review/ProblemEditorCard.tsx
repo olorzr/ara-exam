@@ -11,6 +11,7 @@ import ProblemHtmlEditor from '@/components/problem-editor/ProblemHtmlEditor';
 import { blankChoicePositions, trimTrailingChoices } from '@/lib/problem-bank/choices';
 import AreaPathPicker from './AreaPathPicker';
 import type { AreaTreeNode } from '@/lib/problem-bank/area-tree';
+import { UNIT_DEPTH_LABELS } from '@/lib/problem-bank/unit-tree';
 import type { ProblemPatch } from '@/lib/problem-bank/mutations';
 import type { Problem, QuestionType } from '@/types/problem-bank';
 
@@ -36,6 +37,8 @@ function withChoiceAt(choices: readonly string[], index: number, value: string):
 interface ProblemEditorCardProps {
   problem: Problem;
   areaTree: AreaTreeNode[];
+  /** 교과서 단원 트리. 출처에 교과서가 없으면 빈 배열이라 칸이 안 뜬다 */
+  unitTree: AreaTreeNode[];
   selected: boolean;
   onSelect: () => void;
   /** 저장 후 새 `updated_at` 을 돌려준다. 실패하면 null */
@@ -58,13 +61,14 @@ interface ProblemEditorCardProps {
  *    효과로 되돌리는 대신 key 로 다시 마운트하는 것이 React 권장 방식이다.
  */
 export default function ProblemEditorCard({
-  problem, areaTree, selected, onSelect, onSave, onToggleVerified, onDelete, onDirtyChange,
+  problem, areaTree, unitTree, selected, onSelect, onSave, onToggleVerified, onDelete, onDirtyChange,
 }: ProblemEditorCardProps) {
   const [stem, setStem] = useState(problem.stem_html);
   const [choices, setChoices] = useState<string[]>(problem.choices);
   const [answer, setAnswer] = useState(problem.answer);
   const [type, setType] = useState<QuestionType>(problem.question_type);
   const [area, setArea] = useState<string[]>(problem.area_path);
+  const [unit, setUnit] = useState<string[]>(problem.unit_path);
   const [workTitle, setWorkTitle] = useState(problem.work_title);
   const [saving, setSaving] = useState(false);
 
@@ -83,6 +87,7 @@ export default function ProblemEditorCard({
     || type !== problem.question_type
     || workTitle !== problem.work_title
     || area.join('>') !== problem.area_path.join('>')
+    || unit.join('>') !== problem.unit_path.join('>')
     || trimTrailingChoices(choices).join('\u0000') !== problem.choices.join('\u0000');
 
   // 화면이 '검수 마치기' 를 막을 수 있게 알린다. 렌더 중 부모 state 를 건드리지 않도록
@@ -111,6 +116,7 @@ export default function ProblemEditorCard({
       answer: answer.trim(),
       question_type: type,
       area_path: area,
+      unit_path: unit,
       work_title: workTitle,
     });
     setSaving(false);
@@ -232,6 +238,9 @@ export default function ProblemEditorCard({
         </div>
 
         <AreaPathPicker tree={areaTree} value={area} onChange={setArea} />
+        <AreaPathPicker
+          tree={unitTree} value={unit} labels={UNIT_DEPTH_LABELS} onChange={setUnit}
+        />
 
         <div className="flex justify-end">
           <Button type="button" size="sm" onClick={handleSave} disabled={saving}>

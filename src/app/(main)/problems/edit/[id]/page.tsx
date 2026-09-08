@@ -6,8 +6,7 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import ProblemEditorCard from '@/components/problem-review/ProblemEditorCard';
-import { fetchAreaSets, fetchAreaTree, pickAreaSetForGrade } from '@/lib/problem-bank/area-master';
-import type { AreaTreeNode } from '@/lib/problem-bank/area-tree';
+import { useSourceTrees } from '@/hooks/useSourceTrees';
 import {
   ConflictError, deleteProblem, setProblemVerified, updateProblem, type ProblemPatch,
 } from '@/lib/problem-bank/mutations';
@@ -26,8 +25,9 @@ export default function ProblemEditPage() {
 
   const [problem, setProblem] = useState<Problem | null>(null);
   const [source, setSource] = useState<ProblemSource | null>(null);
-  const [areaTree, setAreaTree] = useState<AreaTreeNode[]>([]);
   const [loaded, setLoaded] = useState(false);
+
+  const { areaTree, unitTree } = useSourceTrees(source);
 
   useEffect(() => {
     let alive = true;
@@ -38,12 +38,7 @@ export default function ProblemEditPage() {
         setProblem(row);
         if (row) {
           const src = await fetchSource(row.source_id);
-          if (!alive) return;
-          setSource(src);
-          const sets = await fetchAreaSets();
-          const setId = pickAreaSetForGrade(sets, src?.grade ?? '');
-          const tree = setId ? await fetchAreaTree(setId) : [];
-          if (alive) setAreaTree(tree);
+          if (alive) setSource(src);
         }
       } catch (e) {
         if (alive) toast.error(e instanceof Error ? e.message : '불러오지 못했어요.');
@@ -108,6 +103,7 @@ export default function ProblemEditPage() {
         key={problem.id}
         problem={problem}
         areaTree={areaTree}
+        unitTree={unitTree}
         selected
         onSelect={() => { /* 단건 화면이라 선택 개념이 없다 */ }}
         onSave={save}
