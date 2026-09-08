@@ -26,6 +26,13 @@
 -- ---------------------------------------------
 DO $guard$
 BEGIN
+  IF to_regprocedure('exam.normalize_category_name(text)') IS NULL
+     AND EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'exam') THEN
+    RAISE EXCEPTION
+      'exam.normalize_category_name 이 없습니다 (현재 DB: %). sql/16 을 먼저 적용하세요.',
+      current_database();
+  END IF;
+
   IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'exam') THEN
     RAISE EXCEPTION
       'exam 스키마가 없습니다 (현재 DB: %). SQL Editor 가 다른 Supabase 프로젝트에 '
@@ -118,7 +125,51 @@ UPDATE exam.problems
  WHERE stem_html ~ '\s*[(\[（［【]\s*\d+(?:\.\d+)?\s*점\s*[)\]）］】](?=\s*(?:<|$))';
 
 -- ---------------------------------------------
--- 5. 주석
+-- 5. 교과서 변경 RPC (단원 태그 정리와 한 트랜잭션으로)
+-- ---------------------------------------------
+-- 검수 화면에서 교과서를 바꿀 때 이미 붙은 단원 태그는 **다른 책의 단원**이 되므로 함께
+-- 지운다. 앱에서 UPDATE 세 번(문항·지문·출처)으로 하면 중간에 하나가 실패했을 때
+-- "태그만 사라지고 교과서는 그대로" 가 되어 손으로 붙인 분류를 잃는다 — 한 트랜잭션으로 묶는다.
+--
+-- SECURITY INVOKER(기본)로 둔다: 호출자의 RLS 를 그대로 받아야 하고, 이 표들은 이미
+-- authenticated + 도메인 조건으로 열려 있다.
+CREATE OR REPLACE FUNCTION exam.set_source_textbook(
+  p_source_id   UUID,
+  p_textbook    TEXT,
+  p_clear_units BOOLEAN DEFAULT TRUE
+) RETURNS TEXT
+  LANGUAGE plpgsql
+  SET search_path = exam, pg_temp
+AS $$
+DECLARE
+  v_value TEXT;
+BEGIN
+  -- 표기 정규화는 앱(normalizeCategoryName)과 sql/16 의 DB 함수가 같은 규칙을 쓴다.
+  -- 여기서 한 번 더 거는 이유: 이 RPC 를 앱 밖에서 부르면 '천재 (노미숙)' 처럼 표기가
+  -- 갈린 값이 들어와 필터가 둘로 쪼개진다
+  v_value := exam.normalize_category_name(COALESCE(p_textbook, ''));
+
+  IF p_clear_units THEN
+    UPDATE exam.problems SET unit_path = '{}'
+     WHERE source_id = p_source_id AND cardinality(unit_path) > 0;
+    UPDATE exam.passages SET unit_path = '{}'
+     WHERE source_id = p_source_id AND cardinality(unit_path) > 0;
+  END IF;
+
+  UPDATE exam.problem_sources SET textbook = v_value WHERE id = p_source_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION '출처를 찾지 못했습니다 (id: %)', p_source_id USING ERRCODE = 'no_data_found';
+  END IF;
+
+  RETURN v_value;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION exam.set_source_textbook(UUID, TEXT, BOOLEAN) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION exam.set_source_textbook(UUID, TEXT, BOOLEAN) TO authenticated, service_role;
+
+-- ---------------------------------------------
+-- 6. 주석
 -- ---------------------------------------------
 COMMENT ON COLUMN exam.problem_sources.school_id IS
   'public.schools.id 스냅샷. FK 없음 — ara-system 이 학교를 지워도 기출은 남는다. 표시·필터는 school_name';
@@ -129,7 +180,10 @@ COMMENT ON COLUMN exam.problems.unit_path IS
 COMMENT ON COLUMN exam.passages.unit_path IS
   '교과서 단원의 **이름 경로 스냅샷** [대단원, 소단원] (최대 2단, id 가 아니다)';
 
--- PostgREST 스키마 캐시 갱신 — 없으면 배포 직후 새 컬럼이 PGRST204 로 거부된다
+COMMENT ON FUNCTION exam.set_source_textbook(UUID, TEXT, BOOLEAN) IS
+  '교과서 변경 + (선택) 단원 태그 정리를 한 트랜잭션으로. 앱에서 UPDATE 를 나눠 보내면 중간 실패 때 태그만 사라진다';
+
+-- PostgREST 스키마 캐시 갱신 — 없으면 배포 직후 새 컬럼·RPC 가 PGRST204/PGRST202 로 거부된다
 NOTIFY pgrst, 'reload schema';
 
 -- ---------------------------------------------
@@ -147,6 +201,9 @@ NOTIFY pgrst, 'reload schema';
 -- 배점 잔재(0이어야 한다):
 --   SELECT count(*) FROM exam.problems
 --    WHERE stem_html ~ '\s*[(\[（［【]\s*\d+(?:\.\d+)?\s*점\s*[)\]）］】](?=\s*(?:<|$))';
+-- RPC:
+--   SELECT proname FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+--    WHERE n.nspname = 'exam' AND proname = 'set_source_textbook';                 -- 1행
 -- 인덱스·제약:
 --   SELECT indexname FROM pg_indexes WHERE schemaname = 'exam'
 --    AND indexname IN ('idx_problems_unit_path','idx_problem_sources_textbook');   -- 2행

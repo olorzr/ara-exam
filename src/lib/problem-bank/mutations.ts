@@ -210,21 +210,32 @@ export async function setSourceStatus(id: string, status: string): Promise<void>
 }
 
 /**
- * 출처의 교과서를 바꾼다.
+ * 출처의 교과서를 바꾼다 — 이미 붙은 단원 태그도 같은 트랜잭션에서 정리한다.
  *
  * 업로드 때 못 골랐거나 잘못 고른 것을 검수에서 고칠 수 있어야 한다 — 교과서가 없으면
  * 단원 칸 자체가 안 뜨므로, 이 경로가 없으면 옛 출처는 **영영 분류할 수 없다**
  * (코덱스 리뷰 1R).
+ *
+ * ⚠️ **RPC 한 번으로 보낸다.** 문항·지문·출처를 UPDATE 세 번으로 나누면 중간에 하나가
+ *    실패했을 때 "태그만 사라지고 교과서는 그대로" 가 되어 손으로 붙인 분류를 잃는다
+ *    (코덱스 리뷰 3R). DB 함수가 한 트랜잭션으로 처리한다.
  * @param id - 출처 id
  * @param textbook - 교과서 이름 ('' 는 미지정)
- * @returns 정규화해서 저장한 이름
+ * @param clearUnits - 이미 붙은 단원 태그를 함께 지울지
+ * @returns 저장된 이름
  */
-export async function setSourceTextbook(id: string, textbook: string): Promise<string> {
-  const value = normalizeCategoryName(textbook);
-  const { error } = await supabase
-    .from('problem_sources').update({ textbook: value }).eq('id', id);
+export async function setSourceTextbook(
+  id: string,
+  textbook: string,
+  clearUnits: boolean,
+): Promise<string> {
+  const { data, error } = await supabase.rpc('set_source_textbook', {
+    p_source_id: id,
+    p_textbook: normalizeCategoryName(textbook),
+    p_clear_units: clearUnits,
+  });
   if (error) throw error;
-  return value;
+  return (data as string) ?? '';
 }
 
 /**
@@ -245,17 +256,3 @@ export async function countTaggedUnits(sourceId: string): Promise<number> {
   return counts[0] + counts[1];
 }
 
-/**
- * 이 출처의 단원 태그를 모두 지운다.
- *
- * 교과서를 바꾸면 이미 붙은 단원은 **다른 책의 단원**이라 그대로 두면 아카이브가
- * 'B 교과서 + A 단원' 으로 잘못 묶인다(코덱스 리뷰 2R). 지우고 다시 붙이는 편이 낫다.
- * @param sourceId - 출처 id
- */
-export async function clearSourceUnits(sourceId: string): Promise<void> {
-  for (const table of ['problems', 'passages']) {
-    const { error } = await supabase
-      .from(table).update({ unit_path: [] }).eq('source_id', sourceId).not('unit_path', 'eq', '{}');
-    if (error) throw error;
-  }
-}

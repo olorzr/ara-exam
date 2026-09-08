@@ -39,6 +39,13 @@
 - 비고: **연결 상태·사용량은 여기서 다루지 않는다.** 그건 브라우저가 선생님 PC 의
   코덱스 브릿지에 직접 물어본다(서버는 AI 를 호출하지 않는다).
 
+## RPC exam.set_source_textbook
+- 설명: 기출 출처의 교과서를 바꾸고, 원하면 그 출처의 단원 태그를 **같은 트랜잭션에서** 지운다
+- 인자: `p_source_id uuid`, `p_textbook text`, `p_clear_units boolean` (기본 true)
+- Response: 저장된 교과서 이름(정규화됨)
+- 에러: 출처를 못 찾으면 `no_data_found`
+- 비고: 앱에서 UPDATE 세 번(문항·지문·출처)으로 나누면 중간 실패 때 태그만 사라진다
+
 ## RPC exam.create_problem_paper
 - 설명: 문제지 생성. `problem_papers` 의 **유일한 쓰기 경로**다(직접 INSERT 는 RLS 로 막혀 있다)
 - 인자: `p_title text`, `p_problem_ids uuid[]`, `p_settings jsonb`

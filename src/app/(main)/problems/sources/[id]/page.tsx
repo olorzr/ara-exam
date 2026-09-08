@@ -165,7 +165,7 @@ export default function ProblemSourceReviewPage() {
           <SourceTextbookPicker
             value={source.textbook}
             grade={source.grade}
-            onChange={review.changeTextbook}
+            onChange={(textbook) => review.changeTextbook(textbook, dirtyIds.size)}
           />
           <Button type="button" onClick={finish} disabled={source.status === '완료'}>
             {source.status === '완료' ? '검수 완료됨' : '검수 마치기'}

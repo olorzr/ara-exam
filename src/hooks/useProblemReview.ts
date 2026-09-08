@@ -6,7 +6,7 @@ import {
   fetchPassages, fetchProblemsOfSource, fetchSource,
 } from '@/lib/problem-bank/queries';
 import {
-  clearSourceUnits, ConflictError, countTaggedUnits, deletePassage, deleteProblem,
+  ConflictError, countTaggedUnits, deletePassage, deleteProblem,
   setProblemVerified, setSourceTextbook, updatePassage, updateProblem,
   type PassagePatch, type ProblemPatch,
 } from '@/lib/problem-bank/mutations';
@@ -181,29 +181,34 @@ export function useProblemReview(sourceId: string) {
   /**
    * 교과서를 바꾼다 — 단원 트리가 여기에 달려 있어 검수 중에도 고칠 수 있어야 한다.
    *
-   * ⚠️ 이미 붙은 단원은 **다른 책의 단원**이 되므로 물어보고 지운다. 남겨 두면
-   *    아카이브가 '새 교과서 + 옛 단원' 으로 묶여 아무도 못 찾는다(코덱스 리뷰 2R).
+   * ⚠️ 이미 붙은 단원은 **다른 책의 단원**이 되므로 함께 지운다(RPC 가 한 트랜잭션으로).
+   *    남겨 두면 아카이브가 '새 교과서 + 옛 단원' 으로 묶여 아무도 못 찾는다.
+   * ⚠️ 바꾼 뒤에는 본문을 다시 읽고 카드도 **반드시 다시 마운트한다.** 카드가 단원·발문을
+   *    지역 state 로 들고 있어서, 그대로 두면 옛 값이 새 교과서 아래 다시 저장된다.
+   *    그래서 저장하지 않은 수정이 있으면 먼저 알린다(코덱스 리뷰 3R).
    * @param textbook - 교과서 이름 ('' 는 미지정)
+   * @param dirtyCount - 저장하지 않은 카드 수 (화면이 세고 있다)
    */
-  const changeTextbook = useCallback(async (textbook: string) => {
+  const changeTextbook = useCallback(async (textbook: string, dirtyCount = 0) => {
     try {
       const tagged = await countTaggedUnits(sourceId);
-      if (tagged > 0) {
-        const ok = window.confirm(
-          `이 출처에 단원이 붙은 문항·지문이 ${tagged}개 있어요.\n`
-          + '교과서를 바꾸면 그 단원은 다른 책의 것이 되므로 함께 지웁니다. 계속할까요?',
-        );
+      const warnings = [
+        tagged > 0
+          ? `단원이 붙은 문항·지문 ${tagged}개의 단원이 지워집니다(다른 책의 단원이 됩니다).`
+          : '',
+        dirtyCount > 0 ? `저장하지 않은 수정 ${dirtyCount}개가 사라집니다.` : '',
+      ].filter(Boolean);
+
+      if (warnings.length > 0) {
+        const ok = window.confirm(`교과서를 바꾸면\n· ${warnings.join('\n· ')}\n\n계속할까요?`);
         if (!ok) return;
-        await clearSourceUnits(sourceId);
       }
-      const saved = await setSourceTextbook(sourceId, textbook);
+
+      const saved = await setSourceTextbook(sourceId, textbook, tagged > 0);
       setSource((prev) => (prev ? { ...prev, textbook: saved } : prev));
-      // 단원을 지웠으면 본문을 다시 읽고 카드도 다시 마운트한다 —
-      // 화면에 남은 옛 단원 값을 그대로 저장하면 지운 태그가 되살아난다
-      if (tagged > 0) {
-        await load();
-        setReloadSeq((n) => n + 1);
-      }
+      // 카드가 들고 있던 옛 단원·입력을 버린다 — 개수와 무관하게 늘 다시 읽고 마운트한다
+      await load();
+      setReloadSeq((n) => n + 1);
       toast.success(saved ? `교과서를 '${saved}' 로 바꿨어요.` : '교과서를 지웠어요.');
     } catch (e) {
       reportError(e);
