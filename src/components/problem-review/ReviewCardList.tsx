@@ -15,8 +15,8 @@ interface ReviewCardListProps {
   rows: ReviewRow[];
   passages: Passage[];
   problems: Problem[];
-  /** 서버 본문을 다시 읽은 세대 — 카드 key 에 섞어 다시 마운트한다 */
-  reloadSeq: number;
+  /** 이 카드를 다시 마운트해야 하는가를 나타내는 세대 — key 에 섞는다 */
+  mountKey: (id: string) => string;
   areaTree: AreaTreeNode[];
   unitTree: AreaTreeNode[];
   selectedId: string | null;
@@ -38,7 +38,7 @@ interface ReviewCardListProps {
  * 여기서는 그리기만 한다.
  */
 export default function ReviewCardList({
-  rows, passages, problems, reloadSeq, areaTree, unitTree, selectedId, issues,
+  rows, passages, problems, mountKey, areaTree, unitTree, selectedId, issues,
   onSelect, onDirtyChange, savePassage, saveProblem, toggleVerified, deletePassage, deleteProblem,
 }: ReviewCardListProps) {
   if (rows.length === 0) {
@@ -69,7 +69,7 @@ export default function ReviewCardList({
           if (!passage) return null;
           return (
             <PassageEditorCard
-              key={`${passage.id}:${reloadSeq}`}
+              key={`${passage.id}:${mountKey(passage.id)}`}
               passage={passage}
               problemCount={problemCountFor(passage.id)}
               areaTree={areaTree}
@@ -92,7 +92,7 @@ export default function ReviewCardList({
           <ProblemEditorCard
             // 서버 본문을 다시 읽으면 카드도 다시 마운트한다 —
             // 옛 입력이 남은 채 새 토큰으로 저장되면 남의 수정을 덮어쓴다
-            key={`${problem.id}:${reloadSeq}`}
+            key={`${problem.id}:${mountKey(problem.id)}`}
             problem={problem}
             areaTree={areaTree}
             unitTree={unitTree}

@@ -163,18 +163,20 @@ function ProblemSourceReviewContent() {
    * 지문을 저장한다.
    *
    * ⚠️ **작품명을 바꾸면 딸린 문항의 작품명까지 DB 트리거가 함께 바꾼다.** 그러면 그
-   *    문항들의 `updated_at` 이 올라가므로 훅이 본문을 다시 읽고 카드를 다시 마운트한다 —
-   *    지문 삭제와 똑같이 다른 카드의 미저장 수정이 사라진다. 그래서 같은 확인창을 띄운다.
+   *    문항들의 `updated_at` 이 올라가므로 훅이 본문을 다시 읽고 **그 문항 카드만**
+   *    다시 마운트한다 — 거기서 고치던 내용은 사라진다. 상관없는 카드는 그대로 둔다.
    */
   const savePassageWithGuard = async (passageId: string, patch: Parameters<typeof review.savePassage>[1]) => {
     const passage = review.passages.find((p) => p.id === passageId);
     const titleChanged = patch.title !== undefined && passage && patch.title !== passage.title;
     if (titleChanged) {
-      const others = [...dirtyIds].filter((id) => id !== passageId);
-      if (others.length > 0) {
+      // 실제로 영향받는 것은 **이 지문에 딸린 문항**뿐이다 — 개수를 부풀려 겁주지 않는다
+      const affected = review.problems
+        .filter((p) => p.passage_id === passageId && dirtyIds.has(p.id));
+      if (affected.length > 0) {
         const ok = window.confirm(
-          `작품명을 바꾸면 딸린 문항의 작품명도 함께 바뀝니다.\n`
-          + `문항을 다시 읽어 오므로 다른 카드에 저장하지 않은 수정 ${others.length}개가 사라집니다. 계속할까요?`,
+          '작품명을 바꾸면 딸린 문항의 작품명도 함께 바뀝니다.\n'
+          + `그 문항을 다시 읽어 오므로 저장하지 않은 수정 ${affected.length}개가 사라집니다. 계속할까요?`,
         );
         if (!ok) return false;
       }
@@ -262,7 +264,7 @@ function ProblemSourceReviewContent() {
             rows={ordered}
             passages={review.passages}
             problems={review.problems}
-            reloadSeq={review.reloadSeq}
+            mountKey={review.mountKey}
             areaTree={areaTree}
             unitTree={unitTree}
             selectedId={focus.selectedId}
