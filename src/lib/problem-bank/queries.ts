@@ -16,22 +16,40 @@ const PROBLEM_LIST_COLUMNS =
 /** 한 화면에 보여 줄 문항 수 */
 export const PROBLEM_PAGE_SIZE = 60;
 
+/** 한 화면에 보여 줄 출처 수 */
+export const SOURCE_PAGE_SIZE = 30;
+
+/** 출처 목록 한 페이지 */
+export interface SourcePage {
+  rows: ProblemSource[];
+  /** 전체 개수 — '더 보기'를 보일지 판단한다 */
+  total: number;
+}
+
 /**
- * 출처 목록.
- * @param opts - 상태 필터
- * @returns 최근 순 목록
+ * 출처 목록 한 페이지.
+ *
+ * ⚠️ 상한만 걸고 자르면 안 된다 — 업로드가 쌓이면 **옛 출처가 목록에서 사라지고**
+ *    검수를 못 끝낸 것도 함께 묻힌다(코덱스 리뷰 4R). 총 개수를 함께 돌려준다.
+ * @param opts - 상태 필터와 페이지(0-based)
+ * @returns 행과 전체 개수
  */
-export async function fetchSources(opts: { status?: string } = {}): Promise<ProblemSource[]> {
+export async function fetchSources(
+  opts: { status?: string; page?: number } = {},
+): Promise<SourcePage> {
+  const page = Math.max(0, opts.page ?? 0);
+  const from = page * SOURCE_PAGE_SIZE;
+
   let query = supabase
     .from('problem_sources')
-    .select('*')
+    .select('*', { count: 'exact' })
     .order('created_at', { ascending: false })
-    .limit(200);
+    .range(from, from + SOURCE_PAGE_SIZE - 1);
   if (opts.status) query = query.eq('status', opts.status);
 
-  const { data, error } = await query;
+  const { data, error, count } = await query;
   if (error) throw error;
-  return (data ?? []) as ProblemSource[];
+  return { rows: (data ?? []) as ProblemSource[], total: count ?? 0 };
 }
 
 /**

@@ -26,6 +26,15 @@ export function useProblemReview(sourceId: string) {
   const [pageUrls, setPageUrls] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * 서버에서 본문을 통째로 다시 읽어 온 횟수.
+   *
+   * ⚠️ 편집 카드는 폼 값을 **지역 state** 로 들고 있다. 서버 본문을 새로 받아 놓고
+   *    카드를 그대로 두면, 화면에는 옛 입력이 남은 채 새 버전 토큰만 붙는다 —
+   *    그 상태로 저장하면 **남의 수정을 조용히 덮어쓴다**(코덱스 리뷰 4R).
+   *    호출부가 이 값을 카드 key 에 섞어 다시 마운트하게 한다.
+   */
+  const [reloadSeq, setReloadSeq] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -43,7 +52,11 @@ export function useProblemReview(sourceId: string) {
       // 원본 대조용 페이지 이미지 — 쓰인 쪽만 한 번에 서명한다
       const pages = [...new Set([...ps.map((p) => p.page_no), ...qs.map((q) => q.page_no)])]
         .filter((n) => n >= 1);
-      setPageUrls(await signProblemFiles(pages.map((n) => sourcePagePath(sourceId, n))));
+      // 원본 대조용 페이지 이미지 — OCR 이 읽은 쪽(정답표·이어지는 쪽 포함)을 모두 서명한다.
+      // 항목이 있는 쪽만 서명하면 정답표 쪽이 빠져 정답을 대조할 수 없다
+      const ocrPages = (src?.ocr_meta?.pages ?? []).filter((n) => Number.isInteger(n) && n >= 1);
+      const allPages = [...new Set([...pages, ...ocrPages])].sort((a, b) => a - b);
+      setPageUrls(await signProblemFiles(allPages.map((n) => sourcePagePath(sourceId, n))));
     } catch (e) {
       setError(e instanceof Error ? e.message : '불러오지 못했어요.');
     } finally {
@@ -129,7 +142,12 @@ export function useProblemReview(sourceId: string) {
       // 이후 저장·검수가 아무도 안 고쳤는데 충돌로 튕긴다(코덱스 리뷰 3R).
       // 영향받은 문항을 다시 읽어 본문과 토큰을 같이 맞춘다.
       const affected = problems.some((p) => p.passage_id === id);
-      if (affected) setProblems(await fetchProblemsOfSource(sourceId));
+      if (affected) {
+        setProblems(await fetchProblemsOfSource(sourceId));
+        // 편집 카드도 다시 마운트시킨다 — 새 본문 위에 옛 입력이 남으면
+        // 그대로 저장할 때 남의 수정을 덮어쓴다
+        setReloadSeq((n) => n + 1);
+      }
 
       toast.success('지문을 지웠어요. 문항은 남아 있어요.');
     } catch (e) {
@@ -148,7 +166,7 @@ export function useProblemReview(sourceId: string) {
   );
 
   return {
-    source, passages, problems, loading, error, verifiedCount,
+    source, passages, problems, loading, error, verifiedCount, reloadSeq,
     reload: load, saveProblem, savePassage, toggleVerified,
     removeProblem, removePassage, pageUrlFor,
   };

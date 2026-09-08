@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { fetchSources } from '@/lib/problem-bank/queries';
+import { Button } from '@/components/ui/button';
+import { fetchSources, SOURCE_PAGE_SIZE } from '@/lib/problem-bank/queries';
 import { sourceLabel } from '@/lib/problem-bank/source-label';
 import type { ProblemSource, ProblemSourceStatus } from '@/types/problem-bank';
 
@@ -23,14 +24,38 @@ const STATUS_STYLE: Record<ProblemSourceStatus, string> = {
  */
 export default function ProblemSourcesPage() {
   const [sources, setSources] = useState<ProblemSource[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
+    let alive = true;
     fetchSources()
-      .then(setSources)
+      .then((page) => {
+        if (!alive) return;
+        setSources(page.rows);
+        setTotal(page.total);
+      })
       .catch((e) => toast.error(e instanceof Error ? e.message : '불러오지 못했어요.'))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => { alive = false; };
   }, []);
+
+  /** 목록은 끊어 온다 — 상한만 걸면 옛 출처가 조용히 사라진다 */
+  const loadMore = async () => {
+    setLoadingMore(true);
+    try {
+      const next = await fetchSources({ page: Math.floor(sources.length / SOURCE_PAGE_SIZE) });
+      setSources((list) => [...list, ...next.rows]);
+      setTotal(next.total);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '더 불러오지 못했어요.');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -83,6 +108,14 @@ export default function ProblemSourcesPage() {
               )}
             </Link>
           ))}
+
+          {sources.length < total && (
+            <div className="flex justify-center pt-2">
+              <Button type="button" variant="outline" onClick={loadMore} disabled={loadingMore}>
+                {loadingMore ? '불러오는 중…' : `더 보기 (${sources.length} / ${total})`}
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>

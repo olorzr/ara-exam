@@ -77,7 +77,8 @@ export default function PassageEditorCard({
             type="button" variant="outline" size="sm"
             onClick={() => {
               const message = problemCount > 0
-                ? `이 지문을 지울까요? 딸린 문항 ${problemCount}개는 남고 지문만 떨어집니다.`
+                ? `이 지문을 지울까요? 딸린 문항 ${problemCount}개는 남고 지문만 떨어집니다.\n`
+                  + '문항을 서버에서 다시 읽으므로, 저장하지 않은 입력은 사라집니다.'
                 : '이 지문을 지울까요?';
               if (window.confirm(message)) onDelete();
             }}

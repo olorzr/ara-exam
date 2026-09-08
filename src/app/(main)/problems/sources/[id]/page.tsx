@@ -58,13 +58,18 @@ export default function ProblemSourceReviewPage() {
     return () => { alive = false; };
   }, [review.source]);
 
-  // 화면에 보이는 쪽 목록 — 실제로 항목이 있는 쪽만
+  // 화면에 보이는 쪽 목록.
+  //
+  // 항목이 있는 쪽만 세면 **정답표 쪽이 빠진다**(정답표에는 문항 행이 없다).
+  // 이어지는 쪽도 빠진다(합쳐진 지문은 시작 쪽만 들고 있다).
+  // 그래서 OCR 이 실제로 읽은 쪽(ocr_meta.pages)을 합집합으로 더한다(코덱스 리뷰 4R).
   const pages = useMemo(() => {
     const set = new Set<number>();
     review.passages.forEach((p) => set.add(p.page_no));
     review.problems.forEach((p) => set.add(p.page_no));
-    return [...set].filter((n) => n >= 1).sort((a, b) => a - b);
-  }, [review.passages, review.problems]);
+    (review.source?.ocr_meta?.pages ?? []).forEach((n) => set.add(n));
+    return [...set].filter((n) => Number.isInteger(n) && n >= 1).sort((a, b) => a - b);
+  }, [review.passages, review.problems, review.source]);
 
   // 보고 있던 쪽이 목록에서 사라지면(항목을 다 지웠을 때) 첫 쪽으로 떨어뜨린다.
   // state 를 효과로 되돌리지 않고 **파생**한다 — 렌더가 한 번 더 도는 것을 막는다.
@@ -204,7 +209,7 @@ export default function ProblemSourceReviewPage() {
               if (!passage) return null;
               return (
                 <PassageEditorCard
-                  key={passage.id}
+                  key={`${passage.id}:${review.reloadSeq}`}
                   passage={passage}
                   problemCount={problemCountFor(passage.id)}
                   areaTree={areaTree}
@@ -219,7 +224,9 @@ export default function ProblemSourceReviewPage() {
             if (!problem) return null;
             return (
               <ProblemEditorCard
-                key={problem.id}
+                // 서버 본문을 다시 읽으면 카드도 다시 마운트한다 —
+                // 옛 입력이 남은 채 새 토큰으로 저장되면 남의 수정을 덮어쓴다
+                key={`${problem.id}:${review.reloadSeq}`}
                 problem={problem}
                 areaTree={areaTree}
                 selected={selectedId === problem.id}
