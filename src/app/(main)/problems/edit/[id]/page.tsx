@@ -109,14 +109,14 @@ export default function ProblemEditPage() {
         onToggleVerified={async (verified) => {
           try {
             // 검수 토글도 updated_at 을 바꾼다 — 같이 갱신해야 다음 저장이 충돌하지 않는다
-            const updatedAt = await setProblemVerified(problem.id, verified);
+            const updatedAt = await setProblemVerified(problem.id, problem.updated_at, verified);
             setProblem({
               ...problem,
               status: verified ? '검수완료' : '초안',
               updated_at: updatedAt,
             });
-          } catch {
-            toast.error('저장하지 못했어요.');
+          } catch (e) {
+            toast.error(e instanceof ConflictError ? e.message : '저장하지 못했어요.');
           }
         }}
         onDelete={async () => {

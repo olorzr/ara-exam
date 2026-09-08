@@ -24,6 +24,14 @@ export interface PassageDraft {
   label: string;
   title: string;
   author: string;
+  /**
+   * 이어 붙인 본문.
+   *
+   * ⚠️ 병합 중에는 **조각(fragments)을 따로 들고 있다가** 마지막에 합친다.
+   *    합쳐 둔 글에 대고 "더 긴 쪽이 이긴다"를 적용하면, 겹쳐 읽은 **조각 하나**가
+   *    합본 전체와 길이를 겨루게 되어 개선된 조각을 버리거나(짧으니까)
+   *    합본을 조각으로 갈아치워 앞부분을 잃는다.
+   */
   html: string;
   /** 지문이 시작한 쪽 */
   page_no: number;
@@ -34,6 +42,8 @@ export interface PassageDraft {
   lastPage: number;
   /** 아직 다음 쪽으로 이어지는 중인가 */
   open: boolean;
+  /** 이 지문이 몇 쪽에 걸쳐 있는가 — 잘라 둔 이미지가 전체를 담았는지 판단한다 */
+  pageSpan: number;
 }
 
 /** 저장 직전의 문항 */
@@ -77,8 +87,16 @@ function textOf(html: string): string {
   return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-/** 중복 판정 키. 라벨이 없으면 본문 앞부분으로 대신한다 */
+/**
+ * 중복 판정 키. 라벨이 없으면 본문 앞부분으로 대신한다.
+ *
+ * ⚠️ **이어지는 조각은 내용으로 키를 만들면 안 된다.** 겹쳐 읽은 묶음이 같은 조각을
+ *    더 온전히 봤을 때 글이 달라져 '다른 조각'으로 보이고, 그러면 같은 뒷부분이 두 번
+ *    붙는다. 쪽 경계에서 잘릴 수 있는 지문은 그 쪽의 **마지막 하나뿐**이므로
+ *    (쪽 하나에 이어지는 조각이 둘일 수 없다) 쪽 번호만으로 충분하다.
+ */
 function passageKey(item: OcrItem): string {
+  if (item.continued) return `${item.page}|C`;
   const label = (item.label ?? '').trim();
   return label
     ? `${item.page}|L|${label}`
@@ -91,19 +109,35 @@ function problemKey(item: OcrItem): string {
     : `${item.page}|S|${textOf(item.stem_html).slice(0, 40)}`;
 }
 
-function toPassage(item: OcrItem, id: string): PassageDraft {
+/** 병합 중에만 쓰는 상태 — 조각을 따로 들고 있다가 끝에 합친다 */
+interface PassageWork {
+  draft: PassageDraft;
+  fragments: string[];
+}
+
+/** 중복 판정 키가 가리키는 자리 — 어느 지문의 몇 번째 조각인가 */
+interface FragmentRef {
+  work: PassageWork;
+  index: number;
+}
+
+function toPassage(item: OcrItem, id: string): PassageWork {
   return {
-    id,
-    label: item.label ?? '',
-    title: item.title ?? '',
-    author: item.author ?? '',
-    html: item.html,
-    page_no: item.page,
-    box: item.box,
-    area_path: item.area_path,
-    has_figure: item.has_figure,
-    lastPage: item.page,
-    open: item.continues,
+    draft: {
+      id,
+      label: item.label ?? '',
+      title: item.title ?? '',
+      author: item.author ?? '',
+      html: item.html,
+      page_no: item.page,
+      box: item.box,
+      area_path: item.area_path,
+      has_figure: item.has_figure,
+      lastPage: item.page,
+      open: item.continues,
+      pageSpan: 1,
+    },
+    fragments: [item.html],
   };
 }
 
@@ -145,10 +179,10 @@ function fillGaps(target: ProblemDraft, item: OcrItem): void {
  * 앞 묶음에서 아직 열려 있는(다음 쪽으로 이어지는) 지문을 찾는다.
  * 바로 앞 쪽에서 끊긴 것만 후보다 — 멀리 있는 지문에 잘못 붙이면 두 글이 뒤섞인다.
  */
-function findOpenPassage(passages: PassageDraft[], page: number): PassageDraft | undefined {
-  for (let i = passages.length - 1; i >= 0; i -= 1) {
-    const p = passages[i];
-    if (p.open && p.lastPage === page - 1) return p;
+function findOpenPassage(works: PassageWork[], page: number): PassageWork | undefined {
+  for (let i = works.length - 1; i >= 0; i -= 1) {
+    const w = works[i];
+    if (w.draft.open && w.draft.lastPage === page - 1) return w;
   }
   return undefined;
 }
@@ -163,9 +197,11 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
   const newId = opts.newId ?? (() => crypto.randomUUID());
   const warnings: string[] = [...(opts.leadingWarnings ?? [])];
 
-  const passages: PassageDraft[] = [];
+  const works: PassageWork[] = [];
   const problems: ProblemDraft[] = [];
-  const passageByKey = new Map<string, PassageDraft>();
+  // 키 → **조각 자리**. 합쳐 둔 지문이 아니라 조각을 가리켜야
+  // 겹쳐 읽은 같은 조각끼리 길이를 견줄 수 있다
+  const fragmentByKey = new Map<string, FragmentRef>();
   const problemByKey = new Map<string, ProblemDraft>();
 
   const warn = (message: string) => {
@@ -183,40 +219,49 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
       if (item.kind !== 'passage') continue;
 
       const key = passageKey(item);
-      const existing = passageByKey.get(key);
+      const existing = fragmentByKey.get(key);
       if (existing) {
-        // 겹쳐 읽은 같은 지문 — 더 완전한(긴) 쪽을 남긴다
-        if (textOf(item.html).length > textOf(existing.html).length) {
-          existing.html = item.html;
-          existing.open = item.continues;
-          existing.lastPage = Math.max(existing.lastPage, item.page);
-          if (!existing.label && item.label) existing.label = item.label;
-          if (!existing.title && item.title) existing.title = item.title;
-          if (!existing.author && item.author) existing.author = item.author;
-          if (!existing.box && item.box) existing.box = item.box;
+        // 겹쳐 읽은 **같은 조각** — 더 완전한(긴) 쪽을 남긴다.
+        // 비교 대상이 합본이 아니라 조각이라 앞부분을 잃지 않는다
+        const current = existing.work.fragments[existing.index] ?? '';
+        if (textOf(item.html).length > textOf(current).length) {
+          existing.work.fragments[existing.index] = item.html;
+          const draft = existing.work.draft;
+          // 이 조각이 마지막이었다면 '아직 이어지는가'도 새 값으로 바꾼다
+          if (existing.index === existing.work.fragments.length - 1) {
+            draft.open = item.continues;
+          }
+          draft.lastPage = Math.max(draft.lastPage, item.page);
+          if (!draft.label && item.label) draft.label = item.label;
+          if (!draft.title && item.title) draft.title = item.title;
+          if (!draft.author && item.author) draft.author = item.author;
+          if (!draft.box && item.box) draft.box = item.box;
+          if (item.has_figure) draft.has_figure = true;
         }
-        refToId.set(item.ref, existing.id);
+        refToId.set(item.ref, existing.work.draft.id);
         continue;
       }
 
       // 앞 쪽에서 이어지는 조각이면 그 지문에 붙인다
       if (item.continued) {
-        const open = findOpenPassage(passages, item.page);
+        const open = findOpenPassage(works, item.page);
         if (open) {
-          open.html = `${open.html}\n${item.html}`.trim();
-          open.lastPage = item.page;
-          open.open = item.continues;
-          passageByKey.set(key, open);
-          refToId.set(item.ref, open.id);
+          open.fragments.push(item.html);
+          open.draft.lastPage = item.page;
+          open.draft.open = item.continues;
+          open.draft.pageSpan += 1;
+          if (item.has_figure) open.draft.has_figure = true;
+          fragmentByKey.set(key, { work: open, index: open.fragments.length - 1 });
+          refToId.set(item.ref, open.draft.id);
           continue;
         }
         warn('앞 쪽에서 이어지는 지문을 합치지 못했어요. 검수에서 확인해 주세요.');
       }
 
-      const passage = toPassage(item, newId());
-      passages.push(passage);
-      passageByKey.set(key, passage);
-      refToId.set(item.ref, passage.id);
+      const work = toPassage(item, newId());
+      works.push(work);
+      fragmentByKey.set(key, { work, index: 0 });
+      refToId.set(item.ref, work.draft.id);
     }
 
     // 2) 문항
@@ -239,6 +284,12 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
       problemByKey.set(key, problem);
     }
   }
+
+  // 조각을 이제 합친다 — 조각별 비교가 다 끝난 뒤여야 한다
+  const passages = works.map((w) => ({
+    ...w.draft,
+    html: w.fragments.map((f) => f.trim()).filter(Boolean).join('\n'),
+  }));
 
   // 지문이 끝내 안 닫혔으면 뒷부분이 빠졌을 수 있다 — 조용히 넘기지 않는다
   const unclosed = passages.filter((p) => p.open);

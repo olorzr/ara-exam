@@ -160,22 +160,26 @@ async function uploadPageImages(
     .sort((a, b) => a - b);
   if (pages.length === 0) return;
 
+  // 캔버스 캐시를 쓰는 도구를 재사용한다. data URL → fetch → Blob 수법은
+  // CSP connect-src 가 `data:` 를 막아 **전부 실패**한다(코덱스 리뷰 2R)
+  const cropper = new PageCropper(doc);
   let done = 0;
-  for (const page of pages) {
-    if (signal?.aborted) return;
-    try {
-      // 한 장씩 그린다 — 30쪽을 한 번에 담으면 data URL 만으로 수십 MB 가 된다
-      const { images } = await renderPagesToImages(doc, [page], { signal });
-      const dataUrl = images[0];
-      if (dataUrl) {
-        const blob = await (await fetch(dataUrl)).blob();
-        await uploadProblemFile(sourcePagePath(input.sourceId, page), blob, 'image/jpeg');
+  try {
+    for (const page of pages) {
+      if (signal?.aborted) return;
+      const blob = await cropper.pageBlob(page);
+      if (blob) {
+        try {
+          await uploadProblemFile(sourcePagePath(input.sourceId, page), blob, 'image/jpeg');
+        } catch {
+          // 원본 이미지가 없어도 문항은 읽힌다 — 여기서 멈추지 않는다
+        }
       }
-    } catch {
-      // 원본 이미지가 없어도 문항은 읽힌다 — 여기서 멈추지 않는다
+      done += 1;
+      onProgress?.({ phase: 'page', done, total: pages.length });
     }
-    done += 1;
-    onProgress?.({ phase: 'page', done, total: pages.length });
+  } finally {
+    cropper.dispose();
   }
 }
 

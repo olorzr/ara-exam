@@ -32,6 +32,14 @@ export function usePdfPages(file: File | null) {
     pageCount: 0, loading: false, error: null, from: 1, thumbnails: [], roles: new Map(),
   });
   const aliveRef = useRef(true);
+  /**
+   * 지금 유효한 요청의 세대.
+   *
+   * ⚠️ 언마운트 여부(`aliveRef`)만 보면 부족하다 — 첫 PDF 를 그리는 중에 다른 PDF 를 고르면
+   *    **두 요청이 다 살아 있고**, 먼저 시작한 쪽이 나중에 끝나면서 새 파일의 쪽 수·역할을
+   *    옛 것으로 덮어쓴다. 그 상태로 읽기를 시작하면 엉뚱한 쪽이 OCR 로 간다(코덱스 리뷰 2R).
+   */
+  const genRef = useRef(0);
 
   useEffect(() => {
     aliveRef.current = true;
@@ -41,6 +49,9 @@ export function usePdfPages(file: File | null) {
   }, []);
 
   useEffect(() => {
+    const gen = ++genRef.current;
+    const fresh = () => aliveRef.current && genRef.current === gen;
+
     if (!file) {
       setState({ pageCount: 0, loading: false, error: null, from: 1, thumbnails: [], roles: new Map() });
       return;
@@ -51,12 +62,12 @@ export function usePdfPages(file: File | null) {
       try {
         const count = await pdfPageCount({ kind: 'file', file });
         const thumbs = await pdfThumbnails({ kind: 'file', file }, 1);
-        if (!aliveRef.current) return;
+        if (!fresh()) return;
         const roles = new Map<number, PageRole>();
         for (let p = 1; p <= count; p += 1) roles.set(p, DEFAULT_ROLE);
         setState({ pageCount: count, loading: false, error: null, from: 1, thumbnails: thumbs, roles });
       } catch (e) {
-        if (!aliveRef.current) return;
+        if (!fresh()) return;
         setState((s) => ({
           ...s,
           loading: false,
@@ -69,13 +80,18 @@ export function usePdfPages(file: File | null) {
   /** 썸네일 창을 옮긴다 — 정답표는 보통 뒤쪽에 있다 */
   const showFrom = useCallback(async (next: number) => {
     if (!file) return;
+    // 여기서도 세대를 확인한다. 창을 넘기는 도중에 다른 파일을 고르면
+    // 옛 파일의 썸네일이 새 파일 위에 얹힌다
+    const gen = genRef.current;
+    const fresh = () => aliveRef.current && genRef.current === gen;
+
     setState((s) => ({ ...s, loading: true }));
     try {
       const thumbs = await pdfThumbnails({ kind: 'file', file }, next);
-      if (!aliveRef.current) return;
+      if (!fresh()) return;
       setState((s) => ({ ...s, from: next, thumbnails: thumbs, loading: false }));
     } catch {
-      if (aliveRef.current) setState((s) => ({ ...s, loading: false }));
+      if (fresh()) setState((s) => ({ ...s, loading: false }));
     }
   }, [file]);
 

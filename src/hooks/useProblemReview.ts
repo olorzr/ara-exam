@@ -92,10 +92,13 @@ export function useProblemReview(sourceId: string) {
   }, [passages]);
 
   const toggleVerified = useCallback(async (id: string, verified: boolean) => {
+    const target = problems.find((p) => p.id === id);
+    if (!target) return;
     try {
-      // updated_at 을 같이 갱신한다 — 이 UPDATE 도 트리거를 건드리므로,
-      // 옛 값을 들고 있으면 다음 본문 저장이 남 탓 없이 충돌로 튕긴다
-      const updatedAt = await setProblemVerified(id, verified);
+      // 읽어 온 버전을 걸고, 새 버전을 받아 화면도 갱신한다.
+      // 조건이 없으면 남이 고친 문항의 새 버전을 물려받은 채 옛 본문을 들고 있게 되고,
+      // 다음 저장이 검사를 통과하며 남의 수정을 덮어쓴다
+      const updatedAt = await setProblemVerified(id, target.updated_at, verified);
       setProblems((list) => list.map((p) => (
         p.id === id
           ? { ...p, status: verified ? '검수완료' : '초안', updated_at: updatedAt }
@@ -104,7 +107,7 @@ export function useProblemReview(sourceId: string) {
     } catch (e) {
       reportError(e);
     }
-  }, []);
+  }, [problems]);
 
   const removeProblem = useCallback(async (id: string) => {
     try {

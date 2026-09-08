@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { sanitizeInlineHTML, sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import { normalizeCategoryName } from '@/lib/category-name';
-import type { Bbox, Passage, Problem, RenderMode } from '@/types/problem-bank';
+import type { Bbox, Problem, RenderMode } from '@/types/problem-bank';
 
 /**
  * 검수·편집에서 쓰는 쓰기.
@@ -116,12 +116,21 @@ export async function updatePassage(
  * ⚠️ **새 `updated_at` 을 반드시 돌려주고 화면도 그 값으로 갱신해야 한다.**
  *    이 UPDATE 가 `problems_updated_at` 트리거를 건드리므로, 화면이 옛 값을 들고 있으면
  *    다음 본문 저장이 아무도 안 고쳤는데도 충돌로 튕긴다.
+ *
+ * ⚠️ 그리고 **읽어 온 버전을 조건으로 걸어야 한다.** 조건 없이 성공시키면 그 사이 남이 고친
+ *    문항의 새 버전을 화면이 물려받으면서 본문은 옛것을 들고 있게 되고, 다음 저장이
+ *    동시성 검사를 통과하며 **남의 수정을 조용히 덮어쓴다**(코덱스 리뷰 2R).
  * @param id - 문항 id
+ * @param loadedUpdatedAt - 화면이 읽어 온 시점의 updated_at
  * @param verified - 완료로 표시할지
  * @returns 새 updated_at
- * @throws 저장 실패 시
+ * @throws ConflictError - 그 사이 남이 고쳤을 때
  */
-export async function setProblemVerified(id: string, verified: boolean): Promise<string> {
+export async function setProblemVerified(
+  id: string,
+  loadedUpdatedAt: string,
+  verified: boolean,
+): Promise<string> {
   const { data: session } = await supabase.auth.getSession();
   const { data, error } = await supabase
     .from('problems')
@@ -131,6 +140,7 @@ export async function setProblemVerified(id: string, verified: boolean): Promise
       verified_at: verified ? new Date().toISOString() : null,
     })
     .eq('id', id)
+    .eq('updated_at', loadedUpdatedAt)
     .select('updated_at');
   if (error) throw error;
   if (!data || data.length === 0) throw new ConflictError();

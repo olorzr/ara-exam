@@ -75,7 +75,11 @@ export async function insertPassages(
     image_path: imagePaths.get(p.id) ?? '',
     // 표·그림이 많아 글로 다 못 옮긴 지문은 이미지 출제를 **기본값으로 제안**한다.
     // 검수에서 사람이 바꿀 수 있다.
-    render_mode: p.has_figure && imagePaths.has(p.id) ? 'image' : 'text',
+    //
+    // ⚠️ 단, **여러 쪽에 걸친 지문은 제안하지 않는다.** 잘라 둔 이미지는 시작 쪽 하나뿐이라
+    //    이미지 출제로 두면 이어지는 뒷부분이 인쇄물에서 통째로 사라진다(코덱스 리뷰 2R).
+    //    이런 지문은 글로 인쇄하고, 필요하면 검수에서 사람이 직접 바꾼다.
+    render_mode: p.has_figure && p.pageSpan === 1 && imagePaths.has(p.id) ? 'image' : 'text',
     area_path: p.area_path,
   }));
   await insertChunked('passages', rows);

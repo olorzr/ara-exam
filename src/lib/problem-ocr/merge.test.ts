@@ -155,6 +155,43 @@ describe('mergeOcrDrafts — 지문 합치기', () => {
     expect(res.passages).toHaveLength(2);
   });
 
+  it('이어 붙인 뒤 그 조각의 더 완전한 판이 와도 앞부분을 잃지 않는다', () => {
+    // 코덱스 리뷰 2R: 합쳐 둔 글에 "더 긴 쪽이 이긴다"를 적용하면
+    // 조각 하나가 합본과 길이를 겨루게 되어 앞부분이 통째로 날아갔다
+    const res = mergeOcrDrafts([
+      batch([passage({ ref: 'P1', page: 3, html: '<p>1편 앞부분</p>', continues: true })], [1, 2, 3]),
+      batch([passage({ ref: 'P1', page: 4, label: null, html: '<p>2편</p>', continued: true })], [4, 5]),
+      // 겹쳐 읽은 묶음이 2편을 더 온전히 봤다
+      batch([passage({ ref: 'P1', page: 4, label: null, html: '<p>2편 온전한 뒷부분</p>', continued: true })], [4, 5]),
+    ], { newId });
+
+    expect(res.passages).toHaveLength(1);
+    expect(res.passages[0].html).toContain('1편 앞부분');
+    expect(res.passages[0].html).toContain('2편 온전한 뒷부분');
+  });
+
+  it('짧은 판이 나중에 와도 조각을 되돌리지 않는다', () => {
+    const res = mergeOcrDrafts([
+      batch([passage({ ref: 'P1', page: 3, html: '<p>앞</p>', continues: true })], [3]),
+      batch([passage({ ref: 'P1', page: 4, label: null, html: '<p>뒤 온전한 문장</p>', continued: true })], [4]),
+      batch([passage({ ref: 'P1', page: 4, label: null, html: '<p>뒤</p>', continued: true })], [4]),
+    ], { newId });
+    expect(res.passages[0].html).toContain('뒤 온전한 문장');
+  });
+
+  it('몇 쪽에 걸쳐 있는지 센다 — 잘라 둔 이미지가 전체를 담았는지 판단한다', () => {
+    const res = mergeOcrDrafts([
+      batch([passage({ ref: 'P1', page: 3, html: '<p>앞</p>', continues: true })], [3]),
+      batch([passage({ ref: 'P1', page: 4, label: null, html: '<p>뒤</p>', continued: true })], [4]),
+    ], { newId });
+    expect(res.passages[0].pageSpan).toBe(2);
+  });
+
+  it('한 쪽짜리 지문의 pageSpan 은 1', () => {
+    const res = mergeOcrDrafts([batch([passage()], [1])], { newId });
+    expect(res.passages[0].pageSpan).toBe(1);
+  });
+
   it('끝내 안 닫힌 지문이 있으면 알린다', () => {
     const res = mergeOcrDrafts([
       batch([passage({ continues: true })], [1]),

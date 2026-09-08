@@ -18,6 +18,9 @@ const CANVAS_CACHE_SIZE = 6;
 /** 잘라 낸 이미지의 화질. 원본 대조용이라 아주 높을 필요는 없다 */
 const CROP_QUALITY = 0.85;
 
+/** 페이지 전체 이미지 화질. 화면에서 축소해 보므로 조금 더 낮춰 용량을 아낀다 */
+const PAGE_QUALITY = 0.72;
+
 /** 페이지 캔버스를 재사용하는 잘라내기 도구 */
 export class PageCropper {
   private cache = new Map<number, HTMLCanvasElement>();
@@ -67,6 +70,27 @@ export class PageCropper {
 
       return await new Promise<Blob | null>((resolve) => {
         out.toBlob((blob) => resolve(blob), 'image/jpeg', CROP_QUALITY);
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * 페이지 한 장을 통째로 JPEG 로 만든다(검수 화면의 원본 대조용).
+   *
+   * ⚠️ data URL 을 만든 뒤 `fetch()` 로 Blob 을 얻는 흔한 수법을 쓰면 안 된다 —
+   *    이 앱의 CSP `connect-src` 에 `data:` 가 없어 **차단된다**(코덱스 리뷰 2R).
+   *    캔버스에서 곧바로 `toBlob` 을 부른다.
+   * @param page - 1-based 쪽 번호
+   * @param quality - JPEG 화질
+   * @returns Blob. 만들지 못하면 null
+   */
+  async pageBlob(page: number, quality = PAGE_QUALITY): Promise<Blob | null> {
+    try {
+      const canvas = await this.canvasFor(page);
+      return await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob((blob) => resolve(blob), 'image/jpeg', quality);
       });
     } catch {
       return null;
