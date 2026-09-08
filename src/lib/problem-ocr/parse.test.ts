@@ -13,12 +13,16 @@ function item(over: Record<string, unknown> = {}) {
     kind: 'problem', ref: 'Q1', page: 1, box: null, passage_ref: null, number: 1,
     label: null, title: null, author: null, html: '', continued: false, continues: false,
     question_type: '객관식', stem_html: '<p>물음</p>', choices: ['가', '나', '다', '라', '마'],
-    answer: '1', score: 3, has_figure: false, work_title: null, area_path: [],
+    answer: '1', has_figure: false, work_title: null, area_path: [], unit_path: [],
     ...over,
   };
 }
 
-const ctx = { pages: [1, 2, 3], areaTree: TREE };
+const UNITS: AreaTreeNode[] = [
+  { id: 'u1', name: '1. 문학', children: [{ id: 'u2', name: '(1) 시의 화자', children: [] }] },
+];
+
+const ctx = { pages: [1, 2, 3], areaTree: TREE, unitTree: UNITS };
 const json = (items: unknown[], warnings: string[] = []) => JSON.stringify({ items, warnings });
 
 describe('parseOcrDraft — 구조', () => {
@@ -104,10 +108,73 @@ describe('parseOcrDraft — 정답·선지', () => {
     expect(draft.warnings.join()).toContain('역설법');
   });
 
-  it('정답이 없으면 null 로 둔다 — 0 이나 추측으로 채우지 않는다', () => {
-    const draft = parseOcrDraft(json([item({ answer: null, score: null })]), ctx)!;
+  it('정답이 없으면 null 로 둔다 — 추측으로 채우지 않는다', () => {
+    const draft = parseOcrDraft(json([item({ answer: null })]), ctx)!;
     expect(draft.items[0].answer).toBeNull();
-    expect(draft.items[0].score).toBeNull();
+  });
+
+  it('모델이 배점을 보내도 무시한다 — 스키마에서 뺀 값이다', () => {
+    const draft = parseOcrDraft(json([item({ score: 4 })]), ctx)!;
+    expect(draft.items[0]).not.toHaveProperty('score');
+  });
+});
+
+describe('parseOcrDraft — 서식 다듬기', () => {
+  it('모델이 괄호째 보낸 구역 말머리를 살린다 — 정화기만 거치면 통째로 사라진다', () => {
+    const draft = parseOcrDraft(
+      json([item({ kind: 'passage', ref: 'P1', html: '<blockquote data-box="(가)"><p>시</p></blockquote>' })]),
+      ctx,
+    )!;
+    expect(draft.items[0].html).toContain('data-box="가"');
+  });
+
+  it('빈 문단 모양을 통일한다 — 인쇄 CSS 가 공백 든 문단을 못 잡는다', () => {
+    const draft = parseOcrDraft(
+      json([item({ kind: 'passage', ref: 'P1', html: '<p>연 하나</p><p> </p><p>연 둘</p>' })]),
+      ctx,
+    )!;
+    expect(draft.items[0].html).toContain('<p></p>');
+  });
+
+  it('발문 끝에 딸려 온 배점 표기를 지운다', () => {
+    const draft = parseOcrDraft(json([item({ stem_html: '<p>물음? (3.4점)</p>' })]), ctx)!;
+    expect(draft.items[0].stem_html).toBe('<p>물음?</p>');
+  });
+
+  it('밑줄은 그대로 통과한다', () => {
+    const draft = parseOcrDraft(json([item({ stem_html: '<p>㉠<u>밑줄</u> 부분은?</p>' })]), ctx)!;
+    expect(draft.items[0].stem_html).toContain('<u>밑줄</u>');
+  });
+});
+
+describe('parseOcrDraft — 단원', () => {
+  it('단원 트리에 있는 경로를 담는다', () => {
+    const draft = parseOcrDraft(json([item({ unit_path: ['1. 문학', '(1) 시의 화자'] })]), ctx)!;
+    expect(draft.items[0].unit_path).toEqual(['1. 문학', '(1) 시의 화자']);
+  });
+
+  it('트리에 없는 소단원은 잘라 내고 알린다 — 대단원까지는 멀쩡한 정보다', () => {
+    const draft = parseOcrDraft(json([item({ unit_path: ['1. 문학', '없는 소단원'] })]), ctx)!;
+    expect(draft.items[0].unit_path).toEqual(['1. 문학']);
+    expect(draft.warnings.join()).toContain('단원');
+  });
+
+  it('트리에 아예 없으면 빈 배열', () => {
+    const draft = parseOcrDraft(json([item({ unit_path: ['엉뚱한 단원'] })]), ctx)!;
+    expect(draft.items[0].unit_path).toEqual([]);
+  });
+
+  it('단원 트리를 못 읽었으면 검증 없이 두 단계까지만 받는다 — DB 제약이 2단이다', () => {
+    const draft = parseOcrDraft(
+      json([item({ unit_path: ['가', '나', '다'] })]),
+      { pages: [1, 2, 3], areaTree: TREE },
+    )!;
+    expect(draft.items[0].unit_path).toEqual(['가', '나']);
+  });
+
+  it('단원을 안 보내면 빈 배열', () => {
+    const draft = parseOcrDraft(json([item()]), ctx)!;
+    expect(draft.items[0].unit_path).toEqual([]);
   });
 });
 
@@ -192,22 +259,23 @@ describe('parseAnswerKeyDraft', () => {
   const key = (answers: unknown[], warnings: string[] = []) =>
     JSON.stringify({ answers, warnings });
 
-  it('번호·정답·배점을 담는다', () => {
+  it('번호와 정답을 담는다', () => {
     const draft = parseAnswerKeyDraft(key([{ no: 1, answer: '③', score: 3.5 }]))!;
-    expect(draft.answers).toEqual([{ no: 1, answer: '3', score: 3.5 }]);
+    // 배점은 스키마에서 뺐다 — 모델이 보내도 담지 않는다
+    expect(draft.answers).toEqual([{ no: 1, answer: '3' }]);
   });
 
   it('문항 범위를 벗어난 번호는 버린다', () => {
-    const draft = parseAnswerKeyDraft(key([{ no: 99, answer: '1', score: null }]), { maxNumber: 20 })!;
+    const draft = parseAnswerKeyDraft(key([{ no: 99, answer: '1' }]), { maxNumber: 20 })!;
     expect(draft.answers).toHaveLength(0);
     expect(draft.warnings.join()).toContain('99');
   });
 
   it('같은 번호가 두 번이면 먼저 읽은 값을 남긴다', () => {
     const draft = parseAnswerKeyDraft(
-      key([{ no: 1, answer: '1', score: null }, { no: 1, answer: '5', score: null }]),
+      key([{ no: 1, answer: '1' }, { no: 1, answer: '5' }]),
     )!;
-    expect(draft.answers).toEqual([{ no: 1, answer: '1', score: null }]);
+    expect(draft.answers).toEqual([{ no: 1, answer: '1' }]);
   });
 
   it('모양이 깨지면 null', () => {

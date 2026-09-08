@@ -13,7 +13,7 @@ import { passageKeyIn, problemKeyIn, textOf } from './merge-keys';
  *  - 지문: **더 완전한 쪽이 이긴다**(글이 긴 쪽). 겹침의 목적 자체가 쪽 경계에서 잘린
  *    지문을 통째로 본 묶음의 결과를 얻는 것이라, 먼저 온 것을 고집하면 잘린 지문이 남는다.
  *  - 문항: **먼저 온 것이 이기되 빈 칸만 나중 것이 채운다.** 발문·선지는 어느 묶음에서 읽든
- *    같지만, 정답·배점은 정답표가 실린 쪽을 본 묶음에만 있을 수 있다.
+ *    같지만, 정답은 정답표가 실린 쪽을 본 묶음에만 있을 수 있다.
  *
  * ⚠️ 정답(answer)과 유형(question_type)은 **한 덩어리로** 옮긴다.
  *    유형이 바뀌면 정답의 의미가 달라지기 때문이다('1' 은 객관식에서만 선지 번호다).
@@ -38,6 +38,8 @@ export interface PassageDraft {
   page_no: number;
   box: OcrBox | null;
   area_path: string[];
+  /** 교과서 단원 이름 경로 [대단원, 소단원] */
+  unit_path: string[];
   has_figure: boolean;
   /** 이어 붙인 마지막 쪽 (크롭 범위 안내용) */
   lastPage: number;
@@ -56,9 +58,16 @@ export interface ProblemDraft {
   stem_html: string;
   choices: string[];
   answer: string | null;
+  /**
+   * 배점.
+   * ⚠️ OCR 은 **읽지 않는다**(2026-09-08) — 늘 null 이다. DB 컬럼과 옛 값을 지키려고
+   *    타입에만 남겨 둔 자리다.
+   */
   score: number | null;
   work_title: string;
   area_path: string[];
+  /** 교과서 단원 이름 경로 [대단원, 소단원] */
+  unit_path: string[];
   page_no: number;
   box: OcrBox | null;
   has_figure: boolean;
@@ -106,6 +115,7 @@ function toPassage(item: OcrItem, id: string): PassageWork {
       page_no: item.page,
       box: item.box,
       area_path: item.area_path,
+      unit_path: item.unit_path,
       has_figure: item.has_figure,
       lastPage: item.page,
       open: item.continues,
@@ -124,9 +134,11 @@ function toProblem(item: OcrItem, id: string, passageId: string | null): Problem
     stem_html: item.stem_html,
     choices: item.choices,
     answer: item.answer,
-    score: item.score,
+    // OCR 은 배점을 읽지 않는다 — 컬럼을 지키려고 자리만 채운다
+    score: null,
     work_title: item.work_title ?? '',
     area_path: item.area_path,
+    unit_path: item.unit_path,
     page_no: item.page,
     box: item.box,
     has_figure: item.has_figure,
@@ -142,9 +154,9 @@ function fillGaps(target: ProblemDraft, item: OcrItem): void {
     target.answer = item.answer;
     target.question_type = item.question_type;
   }
-  if (target.score === null && item.score !== null) target.score = item.score;
   if (!target.work_title && item.work_title) target.work_title = item.work_title;
   if (target.area_path.length === 0 && item.area_path.length > 0) target.area_path = item.area_path;
+  if (target.unit_path.length === 0 && item.unit_path.length > 0) target.unit_path = item.unit_path;
   if (!target.box && item.box) target.box = item.box;
   if (item.has_figure) target.has_figure = true;
 }
@@ -211,6 +223,8 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
           if (!draft.title && item.title) draft.title = item.title;
           if (!draft.author && item.author) draft.author = item.author;
           if (!draft.box && item.box) draft.box = item.box;
+          if (draft.area_path.length === 0 && item.area_path.length > 0) draft.area_path = item.area_path;
+          if (draft.unit_path.length === 0 && item.unit_path.length > 0) draft.unit_path = item.unit_path;
           if (item.has_figure) draft.has_figure = true;
         }
         refToId.set(item.ref, existing.work.draft.id);

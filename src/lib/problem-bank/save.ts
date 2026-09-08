@@ -83,6 +83,7 @@ export async function insertPassages(
     //    이런 지문은 글로 인쇄하고, 필요하면 검수에서 사람이 직접 바꾼다.
     render_mode: p.has_figure && p.pageSpan === 1 && imagePaths.has(p.id) ? 'image' : 'text',
     area_path: p.area_path,
+    unit_path: p.unit_path,
   }));
   await insertChunked('passages', rows, onChunk);
 }
@@ -110,8 +111,8 @@ export async function insertProblems(
     stem_html: p.stem_html,
     choices: p.choices,
     answer: p.answer ?? '',
-    score: p.score,
     area_path: p.area_path,
+    unit_path: p.unit_path,
     work_title: p.work_title,
     page_no: p.page_no,
     bbox: p.box ? { column: p.box.column, top: p.box.top, bottom: p.box.bottom } : null,

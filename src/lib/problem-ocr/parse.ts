@@ -1,5 +1,7 @@
 import { sanitizeInlineHTML, sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import { longestKnownPrefix, type AreaTreeNode } from '@/lib/problem-bank/area-tree';
+import { UNIT_DEPTH_MAX } from '@/lib/problem-bank/unit-tree';
+import { normalizeOcrPassageHtml, normalizeOcrStemHtml } from './normalize-html';
 import type { QuestionType } from '@/types/problem-bank';
 import { OCR_MAX_ITEMS_PER_BATCH, OCR_MAX_WARNINGS } from './constants';
 import type { AnswerKeyDraft, AnswerKeyRow, OcrBox, OcrDraft, OcrItem } from './schema';
@@ -86,6 +88,8 @@ export interface ParseContext {
   pages: number[];
   /** 영역 세트 트리. 비어 있으면 영역 검증을 건너뛴다 */
   areaTree?: AreaTreeNode[];
+  /** 교과서 단원 트리. 비어 있으면 단원 검증을 건너뛴다 */
+  unitTree?: AreaTreeNode[];
 }
 
 function pushWarning(warnings: string[], message: string): void {
@@ -147,10 +151,6 @@ function parseItem(
     question_type = '주관식';
   }
 
-  const score = typeof raw.score === 'number' && Number.isFinite(raw.score) && raw.score >= 0
-    ? Math.min(raw.score, 100)
-    : null;
-
   const rawArea = Array.isArray(raw.area_path)
     ? raw.area_path.map((a) => str(a, 60)).filter(Boolean)
     : [];
@@ -159,6 +159,18 @@ function parseItem(
     : [];
   if (rawArea.length > 0 && area_path.length < rawArea.length) {
     pushWarning(warnings, `${ref}: 영역 '${rawArea.join(' > ')}' 가 분류표에 없어 일부만 남겼어요.`);
+  }
+
+  const rawUnit = Array.isArray(raw.unit_path)
+    ? raw.unit_path.map((u) => str(u, 80)).filter(Boolean)
+    : [];
+  // ⚠️ 상한(2)을 반드시 넘긴다 — 트리를 못 읽은 환경에서는 검증 없이 통과하는데,
+  //    3단이 그대로 들어가면 DB 의 cardinality CHECK 에 걸려 저장이 통째로 실패한다
+  const unit_path = rawUnit.length > 0
+    ? longestKnownPrefix(ctx.unitTree ?? [], rawUnit, UNIT_DEPTH_MAX)
+    : [];
+  if (rawUnit.length > 0 && unit_path.length < rawUnit.length) {
+    pushWarning(warnings, `${ref}: 단원 '${rawUnit.join(' > ')}' 가 교과서 단원표에 없어 일부만 남겼어요.`);
   }
 
   return {
@@ -171,17 +183,19 @@ function parseItem(
     label: nullableStr(raw.label, 40),
     title: nullableStr(raw.title, 120),
     author: nullableStr(raw.author, 60),
-    html: sanitizeProblemHTML(str(raw.html, 6000)),
+    // ⚠️ 다듬기가 **정화보다 먼저**다. 정화기는 허용 목록 밖 data-box 를 되돌릴 수 없게
+    //    지우므로, 순서가 바뀌면 모델이 낸 '(가)' 상자 표시가 조용히 사라진다
+    html: sanitizeProblemHTML(normalizeOcrPassageHtml(str(raw.html, 6000))),
     continued: raw.continued === true,
     continues: raw.continues === true,
     question_type,
-    stem_html: sanitizeProblemHTML(str(raw.stem_html, 6000)),
+    stem_html: sanitizeProblemHTML(normalizeOcrStemHtml(str(raw.stem_html, 6000))),
     choices,
     answer,
-    score,
     has_figure: raw.has_figure === true,
     work_title: nullableStr(raw.work_title, 120),
     area_path,
+    unit_path,
   };
 }
 
@@ -274,13 +288,7 @@ export function parseAnswerKeyDraft(
     const answer = normalizeChoice(str(raw.answer, 200));
     if (!answer) continue;
     seen.add(no);
-    answers.push({
-      no,
-      answer,
-      score: typeof raw.score === 'number' && Number.isFinite(raw.score) && raw.score >= 0
-        ? Math.min(raw.score, 100)
-        : null,
-    });
+    answers.push({ no, answer });
   }
 
   return { answers, warnings: warnings.slice(0, OCR_MAX_WARNINGS) };

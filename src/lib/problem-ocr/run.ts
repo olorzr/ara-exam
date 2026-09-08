@@ -36,6 +36,10 @@ export interface OcrRunInput {
   /** 정답표가 있는 쪽 */
   answerPages: number[];
   areaTree: AreaTreeNode[];
+  /** 교과서 단원 트리 (대단원 › 소단원). 교과서를 안 골랐으면 빈 배열 */
+  unitTree: AreaTreeNode[];
+  /** 관리자시스템 내신 관리에 체크된 단원 키 — 모델에게 어디부터 볼지 알려 준다 */
+  scopeUnits: string[];
   /** 원본 시험지의 마지막 문항 번호(알 때) */
   maxNumber?: number | null;
 }
@@ -82,7 +86,12 @@ export async function runProblemOcr(
         const raw = await generateDraft({
           port,
           prompt: buildProblemOcrPrompt({
-            source: input.meta, pages, batch: { index, total }, areaTree: input.areaTree,
+            source: input.meta,
+            pages,
+            batch: { index, total },
+            areaTree: input.areaTree,
+            unitTree: input.unitTree,
+            scopeUnits: input.scopeUnits,
           }),
           outputSchema: PROBLEM_OCR_SCHEMA,
           model: pref.model,
@@ -91,7 +100,9 @@ export async function runProblemOcr(
           signal,
           timeoutMs: ocrTurnBudgetMs(pages.length),
         });
-        const draft = parseOcrDraft(raw, { pages, areaTree: input.areaTree });
+        const draft = parseOcrDraft(raw, {
+          pages, areaTree: input.areaTree, unitTree: input.unitTree,
+        });
         if (!draft) throw new AiError('invalid_output');
         return { draft, rawLength: raw.length };
       },

@@ -10,11 +10,13 @@ import type { ProblemDraft } from './merge';
  *
  * ⚠️ **이미 있는 값은 덮어쓰지 않는다.** 사람이 검수하며 고친 정답을
  *    나중에 돌린 정답표 읽기가 되돌리면 안 된다.
+ *
+ * 배점은 붙이지 않는다(2026-09-08) — 인쇄에 쓰지 않으므로 읽지도 않는다.
  */
 
 /** 붙이기 결과 */
 export interface ApplyAnswerKeyResult {
-  /** 값이 채워진 문항 수 */
+  /** 정답이 채워진 문항 수 */
   filled: number;
   /** 정답표에는 있는데 붙일 문항을 못 찾은 번호 */
   unmatched: number[];
@@ -81,11 +83,6 @@ export function applyAnswerKey(
       touched = true;
     } else if (target.answer !== row.answer) {
       result.conflicts.push({ number: row.no, current: target.answer, fromKey: row.answer });
-    }
-
-    if (target.score === null && row.score !== null) {
-      target.score = row.score;
-      touched = true;
     }
 
     if (touched) result.filled += 1;

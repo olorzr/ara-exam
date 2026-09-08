@@ -133,6 +133,9 @@ export default function ProblemUploadPage() {
       problemPages,
       answerPages,
       areaTree: masters.areaTree,
+      unitTree: masters.unitTree,
+      // '안 보는 시험'의 잠긴 옛 범위는 힌트에서 이미 비워져 온다
+      scopeUnits: masters.scope?.units ?? [],
     });
 
     // 실패해도 출처 행은 남는다 — 검수 화면에서 상태를 보고 다시 돌릴 수 있다

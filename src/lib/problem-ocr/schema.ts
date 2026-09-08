@@ -59,12 +59,13 @@ export interface OcrItem {
   choices: string[];
   /** 같은 쪽에 인쇄된 정답표에서 읽은 값. 없으면 null */
   answer: string | null;
-  score: number | null;
   /** 표·그림이 있어 글로 다 옮기지 못했다 → 이미지 출제 후보 */
   has_figure: boolean;
   work_title: string | null;
   /** 영역 세트 트리의 이름 경로. 해당 없으면 빈 배열 */
   area_path: string[];
+  /** 교과서 단원 트리의 이름 경로 [대단원, 소단원]. 해당 없으면 빈 배열 */
+  unit_path: string[];
 }
 
 /** 한 묶음의 읽기 결과 */
@@ -73,11 +74,13 @@ export interface OcrDraft {
   warnings: string[];
 }
 
-/** 정답표 페이지에서 읽은 정답 한 줄 */
+/**
+ * 정답표 페이지에서 읽은 정답 한 줄.
+ * 배점은 읽지 않는다(2026-09-08) — 인쇄에 쓰지 않으므로 물어볼 이유가 없다.
+ */
 export interface AnswerKeyRow {
   no: number;
   answer: string;
-  score: number | null;
 }
 
 /** 정답표 읽기 결과 */
@@ -87,7 +90,6 @@ export interface AnswerKeyDraft {
 }
 
 const nullableString = { type: ['string', 'null'] };
-const nullableNumber = { type: ['number', 'null'] };
 const nullableInteger = { type: ['integer', 'null'] };
 
 /** 기출 문항·지문 추출 스키마 */
@@ -105,7 +107,7 @@ export const PROBLEM_OCR_SCHEMA = {
         required: [
           'kind', 'ref', 'page', 'box', 'passage_ref', 'number', 'label', 'title', 'author',
           'html', 'continued', 'continues', 'question_type', 'stem_html', 'choices',
-          'answer', 'score', 'has_figure', 'work_title', 'area_path',
+          'answer', 'has_figure', 'work_title', 'area_path', 'unit_path',
         ],
         properties: {
           kind: { type: 'string', enum: ['passage', 'problem'] },
@@ -137,7 +139,6 @@ export const PROBLEM_OCR_SCHEMA = {
             items: { type: 'string', maxLength: 600 },
           },
           answer: { ...nullableString, maxLength: 200 },
-          score: { ...nullableNumber, minimum: 0, maximum: 100 },
           has_figure: { type: 'boolean' },
           work_title: { ...nullableString, maxLength: 120 },
           // 빈 배열이 "해당 없음"이다 — nullable 배열은 엄격 모드에서 다루기 번거롭다
@@ -145,6 +146,11 @@ export const PROBLEM_OCR_SCHEMA = {
             type: 'array',
             maxItems: 4,
             items: { type: 'string', maxLength: 60 },
+          },
+          unit_path: {
+            type: 'array',
+            maxItems: 2,
+            items: { type: 'string', maxLength: 80 },
           },
         },
       },
@@ -169,11 +175,10 @@ export const ANSWER_KEY_SCHEMA = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['no', 'answer', 'score'],
+        required: ['no', 'answer'],
         properties: {
           no: { type: 'integer', minimum: 1 },
           answer: { type: 'string', maxLength: 200 },
-          score: { ...nullableNumber, minimum: 0, maximum: 100 },
         },
       },
     },

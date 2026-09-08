@@ -11,8 +11,8 @@ function passage(over: Partial<OcrItem> = {}): OcrItem {
     kind: 'passage', ref: 'P1', page: 1, box: null, passage_ref: null, number: null,
     label: '[1~3]', title: '소나기', author: '황순원', html: '<p>지문</p>',
     continued: false, continues: false, question_type: '객관식', stem_html: '',
-    choices: [], answer: null, score: null, has_figure: false, work_title: null,
-    area_path: [], ...over,
+    choices: [], answer: null, has_figure: false, work_title: null,
+    area_path: [], unit_path: [], ...over,
   };
 }
 
@@ -21,7 +21,7 @@ function problem(over: Partial<OcrItem> = {}): OcrItem {
     kind: 'problem', ref: 'Q1', page: 1, box: null, passage_ref: null, number: 1,
     label: null, title: null, author: null, html: '', continued: false, continues: false,
     question_type: '객관식', stem_html: '<p>물음</p>', choices: ['가', '나'],
-    answer: null, score: null, has_figure: false, work_title: null, area_path: [], ...over,
+    answer: null, has_figure: false, work_title: null, area_path: [], unit_path: [], ...over,
   };
 }
 
@@ -63,13 +63,25 @@ describe('mergeOcrDrafts — 겹쳐 읽은 중복', () => {
     expect(res.problems).toHaveLength(1);
   });
 
-  it('나중 묶음이 빈 칸(정답·배점)을 채운다 — 정답표는 뒤쪽 쪽에만 있을 수 있다', () => {
+  it('나중 묶음이 빈 정답을 채운다 — 정답표는 뒤쪽 쪽에만 있을 수 있다', () => {
     const res = mergeOcrDrafts([
-      batch([problem({ page: 3, number: 5, answer: null, score: null })], [1, 2, 3]),
-      batch([problem({ page: 3, number: 5, answer: '3', score: 4, question_type: '객관식' })], [3, 4, 5]),
+      batch([problem({ page: 3, number: 5, answer: null })], [1, 2, 3]),
+      batch([problem({ page: 3, number: 5, answer: '3', question_type: '객관식' })], [3, 4, 5]),
     ], { newId });
     expect(res.problems[0].answer).toBe('3');
-    expect(res.problems[0].score).toBe(4);
+  });
+
+  it('나중 묶음이 빈 단원도 채운다 — 앞 묶음에서는 작품을 못 알아봤을 수 있다', () => {
+    const res = mergeOcrDrafts([
+      batch([problem({ page: 3, number: 5, unit_path: [] })], [1, 2, 3]),
+      batch([problem({ page: 3, number: 5, unit_path: ['1. 문학', '(1) 시'] })], [3, 4, 5]),
+    ], { newId });
+    expect(res.problems[0].unit_path).toEqual(['1. 문학', '(1) 시']);
+  });
+
+  it('OCR 은 배점을 읽지 않는다 — 문항 초안의 배점은 늘 비어 있다', () => {
+    const res = mergeOcrDrafts([batch([problem()], [1])], { newId });
+    expect(res.problems[0].score).toBeNull();
   });
 
   it('이미 채워진 값은 나중 묶음이 덮어쓰지 않는다', () => {
