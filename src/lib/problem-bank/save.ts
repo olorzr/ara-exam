@@ -18,19 +18,35 @@ const INSERT_CHUNK = 50;
 
 /**
  * 출처 행을 만든다.
+ *
+ * ⚠️ `answer_key_paths` 는 **답지를 올렸을 때만** 보낸다(sql/19). 컬럼은 배포 직전에
+ *    추가되므로, 늘 보내면 마이그레이션이 늦은 순간 **모든 업로드**가 PGRST204 로 죽는다.
  * @param id - 클라이언트가 만든 UUID
  * @param payload - 폼에서 정규화한 값
- * @param extra - 파일 경로·쪽 수·상태
+ * @param extra - 파일 경로·쪽 수·상태 (+ 별도 답지 경로)
  * @throws 저장 실패 시
  */
 export async function insertSource(
   id: string,
   payload: SourceInsertPayload,
-  extra: { file_path: string; page_count: number; status: ProblemSourceStatus },
+  extra: {
+    file_path: string;
+    page_count: number;
+    status: ProblemSourceStatus;
+    answer_key_paths?: string[];
+  },
 ): Promise<void> {
+  const { answer_key_paths: answerKeyPaths, ...rest } = extra;
   const { error } = await supabase
     .from('problem_sources')
-    .insert({ id, ...payload, ...extra });
+    .insert({
+      id,
+      ...payload,
+      ...rest,
+      ...(answerKeyPaths && answerKeyPaths.length > 0
+        ? { answer_key_paths: answerKeyPaths }
+        : {}),
+    });
   if (error) throw error;
 }
 

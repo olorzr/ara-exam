@@ -30,7 +30,7 @@ type PdfDocumentProxy = Awaited<ReturnType<typeof getPdfDocument>>['pdf']
  * 인코딩이 **모든 쪽을 이 아래로 보장**하므로 묶음 총량은 구성상 항상 예산 안이다.
  * 덕분에 묶음 수를 렌더 전에 알 수 있고(= 진행률·사전 안내가 정확해진다), 바이트 그리디가 필요 없다.
  */
-const MAX_PAGE_BYTES = 1_200_000
+export const MAX_PAGE_BYTES = 1_200_000
 /** 묶음 총량 2차 안전판. 통과가 확인된 3.2MB의 약 2배 */
 const MAX_BATCH_BYTES = 6_000_000
 
@@ -87,7 +87,7 @@ function encodeAt(canvas: HTMLCanvasElement, maxSide: number, quality: number): 
  *    (문제는 장수가 아니라 그 한 장이었다).
  * ⚠️ 재인코딩은 **같은 캔버스를 재사용**한다. pdf.js 재렌더는 비용이 10배다.
  */
-function encodeWithinBudget(canvas: HTMLCanvasElement, budget: number): string | null {
+export function encodeWithinBudget(canvas: HTMLCanvasElement, budget: number): string | null {
   for (const step of ENCODE_STEPS) {
     const url = encodeAt(canvas, step.maxSide, step.quality)
     // 바이트 비교 단위는 base64 문자 수다(실제 JPEG의 약 1.37배). ws로 나가는 것도 이 문자열이다.

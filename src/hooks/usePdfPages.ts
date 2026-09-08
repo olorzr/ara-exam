@@ -142,6 +142,22 @@ export function usePdfPages(file: File | null) {
     });
   }, []);
 
+  /**
+   * 문서 **마지막** 몇 쪽을 한 역할로 — 답지가 뒤에 붙어 있는 시험지용.
+   *
+   * 보이는 창이 아니라 문서 끝을 기준으로 한다. 30쪽짜리에서 정답표는 거의 항상 맨 뒤이고,
+   * 그 쪽을 보려고 창을 넘겨 가며 하나씩 누르는 것이 지금까지의 유일한 방법이었다.
+   */
+  const setRoleForLast = useCallback((count: number, role: PageRole) => {
+    setState((s) => {
+      if (s.pageCount === 0) return s;
+      const roles = new Map(s.roles);
+      const start = Math.max(1, s.pageCount - Math.max(1, Math.floor(count)) + 1);
+      for (let p = start; p <= s.pageCount; p += 1) roles.set(p, role);
+      return { ...s, roles };
+    });
+  }, []);
+
   const pagesWithRole = useCallback((role: PageRole): number[] => {
     const out: number[] = [];
     state.roles.forEach((value, page) => {
@@ -158,6 +174,7 @@ export function usePdfPages(file: File | null) {
     showFrom,
     setRole,
     setRoleForWindow,
+    setRoleForLast,
     pagesWithRole,
   };
 }

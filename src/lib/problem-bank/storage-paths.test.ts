@@ -3,6 +3,7 @@ import {
   PROBLEM_BANK_BUCKET,
   passageRegionPath,
   problemRegionPath,
+  sourceAnswerKeyPath,
   sourceFolder,
   sourcePagePath,
   sourcePdfPath,
@@ -40,5 +41,19 @@ describe('storage-paths', () => {
   it('쪽 번호가 1 미만이거나 정수가 아니면 막는다', () => {
     expect(() => sourcePagePath(ID, 0)).toThrow();
     expect(() => sourcePagePath(ID, 1.5)).toThrow();
+  });
+
+  it('답지 경로를 규약대로 만든다', () => {
+    expect(sourceAnswerKeyPath(ID, 1, 'pdf')).toBe(`sources/${ID}/answer-key/1.pdf`);
+    expect(sourceAnswerKeyPath(ID, 3, 'jpg')).toBe(`sources/${ID}/answer-key/3.jpg`);
+  });
+
+  it('답지 경로가 페이지 이미지와 겹치지 않는다 — 겹치면 원본 대조가 망가진다', () => {
+    expect(sourceAnswerKeyPath(ID, 1, 'jpg')).not.toBe(sourcePagePath(ID, 1));
+  });
+
+  it('답지 번호가 1 미만이거나 정수가 아니면 막는다', () => {
+    expect(() => sourceAnswerKeyPath(ID, 0, 'jpg')).toThrow();
+    expect(() => sourceAnswerKeyPath(ID, 2.5, 'jpg')).toThrow();
   });
 });

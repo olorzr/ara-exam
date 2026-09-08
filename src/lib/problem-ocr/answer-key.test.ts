@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyAnswerKey } from './answer-key';
+import { applyAnswerKey, maxProblemNumber } from './answer-key';
 import type { ProblemDraft } from './merge';
 
 function draft(over: Partial<ProblemDraft> = {}): ProblemDraft {
@@ -71,5 +71,20 @@ describe('applyAnswerKey', () => {
     const rows = Array.from({ length: 12 }, (_, i) => ({ no: i + 1, answer: '1' }));
     const res = applyAnswerKey([], rows);
     expect(res.warnings.join()).toContain('외 4개');
+  });
+});
+
+describe('maxProblemNumber', () => {
+  it('가장 큰 번호를 돌려준다', () => {
+    expect(maxProblemNumber([draft({ number: 3 }), draft({ number: 21 })])).toBe(21);
+  });
+
+  it('번호 없는 문항은 무시한다', () => {
+    expect(maxProblemNumber([draft({ number: null }), draft({ number: 5 })])).toBe(5);
+  });
+
+  it('번호가 하나도 없으면 null — 범위를 지어내지 않는다', () => {
+    expect(maxProblemNumber([draft({ number: null })])).toBeNull();
+    expect(maxProblemNumber([])).toBeNull();
   });
 });

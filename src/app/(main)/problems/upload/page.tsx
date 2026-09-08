@@ -1,9 +1,8 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAiEnabled } from '@/hooks/useAiEnabled';
@@ -18,9 +17,14 @@ import {
   type SourceFormErrors, type SourceFormValues,
 } from '@/lib/problem-bank/source-form';
 import { planPageBatches } from '@/lib/problem-ocr/batch-plan';
+import {
+  answerKeyBatchCount, answerKeySummary, type AnswerKeyInput,
+} from '@/lib/problem-ocr/answer-key-input';
+import { uploadAnswerKey } from '@/lib/problem-ocr/answer-key-upload';
 import { OCR_CONFIRM_BATCH_THRESHOLD } from '@/lib/problem-ocr/constants';
 import { kstYear } from '@/lib/kst-year';
 import SourceMetaForm from '@/components/problem-ocr/SourceMetaForm';
+import SourceFilePickers from '@/components/problem-ocr/SourceFilePickers';
 import PdfPageSelect from '@/components/problem-ocr/PdfPageSelect';
 import OcrProgress from '@/components/problem-ocr/OcrProgress';
 
@@ -40,9 +44,17 @@ export default function ProblemUploadPage() {
   const router = useRouter();
   const ai = useAiEnabled();
   const ocr = useProblemOcr();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [file, setFile] = useState<File | null>(null);
+  /** 따로 올린 답지 (PDF 하나 또는 사진 여러 장) */
+  const [answerKey, setAnswerKey] = useState<AnswerKeyInput | null>(null);
+  /**
+   * 답지 PDF 의 쪽 수를 세는 중.
+   *
+   * ⚠️ 이때 읽기를 시작하면 `answerKey` 가 아직 null 이라 **답지가 조용히 빠진다** —
+   *    정답이 안 채워진 이유를 아무도 알 수 없다(코덱스 리뷰 P2).
+   */
+  const [answerKeyPending, setAnswerKeyPending] = useState(false);
   /**
    * 폼 값과 '제목을 아직 손대지 않았는가'를 **한 덩어리로** 들고 있는다.
    * 따로 두면 값 갱신 함수 안에서 다른 state 를 만지게 되는데, 그 갱신 함수는
@@ -69,15 +81,11 @@ export default function ProblemUploadPage() {
   const problemPages = useMemo(() => pdf.pagesWithRole('problem'), [pdf]);
   const answerPages = useMemo(() => pdf.pagesWithRole('answer'), [pdf]);
   const batchCount = useMemo(() => planPageBatches(problemPages).length, [problemPages]);
-
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const picked = e.target.files?.[0] ?? null;
-    if (picked && picked.type !== 'application/pdf') {
-      toast.error('PDF 파일만 올릴 수 있어요.');
-      return;
-    }
-    setFile(picked);
-  };
+  // 정답표 묶음 = 원본 안 정답표 쪽 + 따로 올린 답지. 둘 다 ChatGPT 를 쓴다
+  const answerBatches = useMemo(
+    () => answerKeyBatchCount(answerPages, answerKey),
+    [answerPages, answerKey],
+  );
 
   const handleStart = async () => {
     if (!file) return;
@@ -97,12 +105,16 @@ export default function ProblemUploadPage() {
       toast.error('읽을 문제 쪽을 하나 이상 골라 주세요.');
       return;
     }
+    if (answerKeyPending) {
+      toast.error('답지를 여는 중이에요. 잠시 뒤에 다시 눌러 주세요.');
+      return;
+    }
 
     // 묶음 하나 = 선생님 ChatGPT 한 번. 무심코 30쪽을 누르면 15번이 나간다
     if (batchCount >= OCR_CONFIRM_BATCH_THRESHOLD) {
       const ok = window.confirm(
         `${problemPages.length}쪽을 ${batchCount}묶음으로 읽어요.\n`
-        + `선생님 ChatGPT 를 약 ${batchCount + (answerPages.length > 0 ? 1 : 0)}번 쓰고 몇 분 걸립니다.\n\n계속할까요?`,
+        + `선생님 ChatGPT 를 약 ${batchCount + answerBatches}번 쓰고 몇 분 걸립니다.\n\n계속할까요?`,
       );
       if (!ok) return;
     }
@@ -114,10 +126,13 @@ export default function ProblemUploadPage() {
     try {
       const filePath = sourcePdfPath(sourceId);
       await uploadProblemFile(filePath, file, 'application/pdf');
+      // 답지를 먼저 올려 둔다 — 출처 행에 경로를 함께 남겨야 검수에서 다시 볼 수 있다
+      const answerKeyPaths = answerKey ? await uploadAnswerKey(sourceId, answerKey) : [];
       await insertSource(sourceId, payload, {
         file_path: filePath,
         page_count: pdf.pageCount,
         status: '추출중',
+        answer_key_paths: answerKeyPaths,
       });
     } catch (e) {
       setUploading(false);
@@ -132,6 +147,7 @@ export default function ProblemUploadPage() {
       meta: payload,
       problemPages,
       answerPages,
+      answerKey,
       areaTree: masters.areaTree,
       unitTree: masters.unitTree,
       // '안 보는 시험'의 잠긴 옛 범위는 힌트에서 이미 비워져 온다
@@ -183,21 +199,13 @@ export default function ProblemUploadPage() {
       <Card>
         <CardHeader><CardTitle className="text-base">2. PDF 고르기</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
+          <SourceFilePickers
+            file={file}
+            onFile={setFile}
+            answerKey={answerKey}
+            onAnswerKey={setAnswerKey}
+            onPending={setAnswerKeyPending}
             disabled={busy}
-            className="flex w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 p-8 text-gray-500 transition hover:border-primary hover:text-primary disabled:opacity-50"
-          >
-            <Upload className="h-8 w-8" />
-            <span className="text-sm">{file ? file.name : 'PDF 파일을 고르세요'}</span>
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="application/pdf,.pdf"
-            className="hidden"
-            onChange={handleFile}
           />
 
           {pdf.error && <p className="text-sm text-red-600">{pdf.error}</p>}
@@ -212,6 +220,7 @@ export default function ProblemUploadPage() {
               loading={pdf.loading}
               onRole={pdf.setRole}
               onRoleForWindow={pdf.setRoleForWindow}
+              onRoleForLast={pdf.setRoleForLast}
               onShowFrom={pdf.showFrom}
             />
           )}
@@ -223,8 +232,9 @@ export default function ProblemUploadPage() {
           <CardHeader><CardTitle className="text-base">3. 읽기</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-gray-600">
-              문제 {problemPages.length}쪽 · 정답표 {answerPages.length}쪽 ·{' '}
-              {batchCount}묶음 (ChatGPT 약 {batchCount + (answerPages.length > 0 ? 1 : 0)}번)
+              문제 {problemPages.length}쪽 · 정답표 {answerPages.length}쪽
+              {answerKey && ` · ${answerKeySummary(answerKey)}`} ·{' '}
+              {batchCount}묶음 (ChatGPT 약 {batchCount + answerBatches}번)
             </p>
 
             <OcrProgress progress={ocr.progress} label={ocr.progressLabel} warnings={ocr.warnings} />
@@ -233,7 +243,7 @@ export default function ProblemUploadPage() {
               <Button
                 type="button"
                 onClick={handleStart}
-                disabled={busy || !ai.enabled || !pdf.ready}
+                disabled={busy || !ai.enabled || !pdf.ready || answerKeyPending}
               >
                 {busy ? '읽는 중…' : '읽기 시작'}
               </Button>

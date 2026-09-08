@@ -147,4 +147,10 @@ describe('buildAnswerKeyPrompt', () => {
     const p = buildAnswerKeyPrompt({ source, pages: [12] });
     expect(p).toContain('문항 수를 모른다');
   });
+
+  it('별도 답지는 쪽 번호 대신 장수를 알린다 — 원본과 쪽 번호가 무관하다', () => {
+    const p = buildAnswerKeyPrompt({ source, pages: [1, 2], imageLabel: '답지 사진' });
+    expect(p).toContain('답지 사진 2장');
+    expect(p).not.toContain('1·2쪽');
+  });
 });

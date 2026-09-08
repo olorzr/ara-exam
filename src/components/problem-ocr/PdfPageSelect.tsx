@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import type { PageRole } from '@/hooks/usePdfPages';
 
 /** 역할별 표시 */
@@ -26,6 +28,8 @@ interface PdfPageSelectProps {
   loading: boolean;
   onRole: (page: number, role: PageRole) => void;
   onRoleForWindow: (role: PageRole) => void;
+  /** 문서 마지막 n쪽을 한 역할로 */
+  onRoleForLast: (count: number, role: PageRole) => void;
   onShowFrom: (from: number) => void;
 }
 
@@ -37,9 +41,13 @@ interface PdfPageSelectProps {
  */
 export default function PdfPageSelect({
   pageCount, from, windowSize, thumbnails, roles, loading,
-  onRole, onRoleForWindow, onShowFrom,
+  onRole, onRoleForWindow, onRoleForLast, onShowFrom,
 }: PdfPageSelectProps) {
   const end = Math.min(pageCount, from + thumbnails.length - 1);
+  const [lastRaw, setLastRaw] = useState(1);
+  // 친 값을 렌더 단계에서 가둔다 — 효과로 되돌리면 lint(set-state-in-effect)에 걸리고
+  // 한 박자 늦게 고쳐지는 구간도 생긴다
+  const last = Math.min(Math.max(1, Math.floor(lastRaw) || 1), Math.max(1, pageCount));
 
   return (
     <div className="space-y-3">
@@ -75,6 +83,27 @@ export default function PdfPageSelect({
             {ROLE_STYLE[role].label}
           </Button>
         ))}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-1 text-xs">
+        <span className="mr-1 text-gray-500">답지가 뒤에 붙어 있으면 · 마지막</span>
+        <Input
+          type="number"
+          min={1}
+          max={pageCount}
+          value={lastRaw}
+          onChange={(e) => setLastRaw(Number(e.target.value))}
+          className="h-8 w-16 text-sm"
+          aria-label="정답표로 지정할 마지막 쪽 수"
+        />
+        <span className="text-gray-500">쪽을</span>
+        <Button
+          type="button" variant="outline" size="sm"
+          onClick={() => onRoleForLast(last, 'answer')}
+          disabled={loading}
+        >
+          정답표로
+        </Button>
       </div>
 
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">

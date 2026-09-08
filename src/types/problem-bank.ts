@@ -38,6 +38,8 @@ export interface OcrMeta {
   durationMs?: number;
   imagesSent?: number;
   warnings?: string[];
+  /** 별도로 올린 답지 파일 수(사진이면 장수, PDF 면 쪽 수) — 검수 화면 요약용 */
+  answerKeyFiles?: number;
   /** 실행 시각 (ISO) */
   ranAt?: string;
 }
@@ -64,6 +66,11 @@ export interface ProblemSource {
   textbook: string;
   /** Storage 경로(버킷 exam-problem-bank 기준). 업로드 실패 시 '' */
   file_path: string;
+  /**
+   * 별도로 올린 답지 파일 경로들(`sources/{id}/answer-key/{n}.pdf|jpg`).
+   * 원본 PDF 안에 붙어 있던 정답표 쪽은 여기가 아니라 `ocr_meta.pages` 에 있다.
+   */
+  answer_key_paths: string[];
   page_count: number;
   status: ProblemSourceStatus;
   ocr_meta: OcrMeta;

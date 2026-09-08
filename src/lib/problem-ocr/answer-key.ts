@@ -104,6 +104,23 @@ export function applyAnswerKey(
   return result;
 }
 
+/**
+ * 읽어 낸 문항 중 가장 큰 번호 — 정답표에게 알려 줄 범위.
+ *
+ * 범위를 주면 모델이 표를 잘못 읽어 만든 헛번호(예: 배점 칸을 번호로 착각한 87)를
+ * 파서가 걸러낸다. 번호를 하나도 못 읽었으면 범위를 지어내지 않는다.
+ * @param problems - 병합이 만든 문항 (또는 DB 에서 읽은 행)
+ * @returns 가장 큰 번호. 번호가 하나도 없으면 null
+ */
+export function maxProblemNumber(problems: readonly { number: number | null }[]): number | null {
+  let max: number | null = null;
+  for (const problem of problems) {
+    if (problem.number === null) continue;
+    if (max === null || problem.number > max) max = problem.number;
+  }
+  return max;
+}
+
 /** 번호를 몇 개만 보여 준다 — 20개가 줄줄이 나오면 아무도 안 읽는다 */
 function listSome(numbers: number[], limit = 8): string {
   const uniq = [...new Set(numbers)].sort((a, b) => a - b);

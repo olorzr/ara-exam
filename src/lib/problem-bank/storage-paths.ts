@@ -46,6 +46,27 @@ export function sourcePagePath(sourceId: string, page: number): string {
 }
 
 /**
+ * 별도로 올린 답지 파일 경로.
+ *
+ * ⚠️ 페이지 이미지(`pages/{n}.jpg`)와 **다른 가족**을 쓴다. 같은 자리에 넣으면
+ *    답지 3장이 원본 1~3쪽을 덮어써 검수 화면의 원본 대조가 통째로 망가진다.
+ * @param sourceId - 출처 id (UUID)
+ * @param index - 1-based 파일 번호 (사진 여러 장이면 고른 순서)
+ * @param ext - 'pdf' 또는 'jpg' (버킷이 이 둘만 받는다)
+ * @returns 버킷 기준 경로
+ */
+export function sourceAnswerKeyPath(
+  sourceId: string,
+  index: number,
+  ext: 'pdf' | 'jpg',
+): string {
+  if (!Number.isInteger(index) || index < 1) {
+    throw new Error(`답지 번호가 잘못됐어요: ${index}`);
+  }
+  return `sources/${assertSafe(sourceId, '출처 id')}/answer-key/${index}.${ext}`;
+}
+
+/**
  * 문항 영역 이미지 경로 ('이미지로 출제' 와 목록 썸네일에 쓴다).
  * @param problemId - 문항 id (UUID)
  * @returns 버킷 기준 경로

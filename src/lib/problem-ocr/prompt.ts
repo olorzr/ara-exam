@@ -187,6 +187,11 @@ export interface AnswerKeyPromptInput {
   pages: number[];
   /** 이 시험지의 마지막 문항 번호(알 때만). 범위를 알려 주면 헛번호가 줄어든다 */
   maxNumber?: number | null;
+  /**
+   * 원본 시험지가 아닌 **별도 답지**에서 읽을 때의 이름('답지 사진'·'답지 PDF').
+   * 이때는 쪽 번호가 원본과 무관하므로 번호 대신 장수를 알린다.
+   */
+  imageLabel?: string | null;
 }
 
 /**
@@ -195,12 +200,14 @@ export interface AnswerKeyPromptInput {
  * @returns 프롬프트 문자열
  */
 export function buildAnswerKeyPrompt(input: AnswerKeyPromptInput): string {
-  const { source, pages, maxNumber } = input;
+  const { source, pages, maxNumber, imageLabel } = input;
   return [
     ANSWER_KEY_RULES,
     '',
     '[이번 묶음]',
-    `- 보낸 이미지는 ${pages.join('·')}쪽이다.`,
+    imageLabel
+      ? `- 보낸 이미지는 ${imageLabel} ${pages.length}장이고, 보낸 순서가 곧 읽는 순서다.`
+      : `- 보낸 이미지는 ${pages.join('·')}쪽이다.`,
     maxNumber
       ? `- 이 시험지는 ${maxNumber}문항이다. 번호는 1~${maxNumber} 범위만 쓴다.`
       : '- 문항 수를 모른다. 표에 보이는 번호를 그대로 쓴다.',

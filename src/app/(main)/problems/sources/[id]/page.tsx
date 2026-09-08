@@ -15,6 +15,7 @@ import PageImageWithBoxes, { type BoxOverlay } from '@/components/problem-review
 import PassageEditorCard from '@/components/problem-review/PassageEditorCard';
 import ProblemEditorCard from '@/components/problem-review/ProblemEditorCard';
 import SourceTextbookPicker from '@/components/problem-review/SourceTextbookPicker';
+import AnswerKeyFiles from '@/components/problem-review/AnswerKeyFiles';
 import OcrProgress from '@/components/problem-ocr/OcrProgress';
 import { toBbox } from '@/lib/problem-bank/bbox';
 
@@ -190,6 +191,7 @@ export default function ProblemSourceReviewPage() {
               </Button>
             ))}
           </div>
+          <AnswerKeyFiles paths={source.answer_key_paths ?? []} />
           <PageImageWithBoxes
             src={review.pageUrlFor(page)}
             boxes={boxes}

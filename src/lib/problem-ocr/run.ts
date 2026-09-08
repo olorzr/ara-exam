@@ -8,15 +8,20 @@ import { openPdfSource, renderPagesToImages, type OpenPdf } from '@/lib/pdf/pdfP
 import type { AreaTreeNode } from '@/lib/problem-bank/area-tree';
 import { insertPassages, insertProblems, updateSource } from '@/lib/problem-bank/save';
 import type { OcrMeta } from '@/types/problem-bank';
-import { applyAnswerKey } from './answer-key';
+import { maxProblemNumber } from './answer-key';
+import { answerKeyImageCount, type AnswerKeyInput } from './answer-key-input';
 import { planPageBatches } from './batch-plan';
 import { representativeFailure, runOcrBatches } from './batch-run';
-import { ANSWER_KEY_PAGES_PER_BATCH, answerKeyTurnBudgetMs, ocrTurnBudgetMs } from './constants';
-import { mergeOcrDrafts, type MergeResult } from './merge';
-import { parseAnswerKeyDraft, parseOcrDraft } from './parse';
-import { buildAnswerKeyPrompt, buildProblemOcrPrompt, type OcrSourceMeta } from './prompt';
+import { ocrTurnBudgetMs } from './constants';
+import { mergeOcrDrafts } from './merge';
+import type { MergeResult } from './merge';
+import { parseOcrDraft } from './parse';
+import { buildProblemOcrPrompt, type OcrSourceMeta } from './prompt';
+import {
+  inDocumentAnswerKey, readAnswerKeys, separateAnswerKey, type AnswerKeySource,
+} from './run-answer-key';
 import { cropRegions, uploadPageImages } from './run-images';
-import { ANSWER_KEY_SCHEMA, PROBLEM_OCR_SCHEMA } from './schema';
+import { PROBLEM_OCR_SCHEMA } from './schema';
 
 /**
  * 기출 PDF 한 건을 읽어 아카이브에 넣는 전체 흐름 (브라우저 전용).
@@ -33,8 +38,10 @@ export interface OcrRunInput {
   meta: OcrSourceMeta;
   /** 문항·지문이 있는 쪽 */
   problemPages: number[];
-  /** 정답표가 있는 쪽 */
+  /** 정답표가 있는 쪽 (원본 PDF 안) */
   answerPages: number[];
+  /** 따로 올린 답지 파일 (없으면 null) */
+  answerKey?: AnswerKeyInput | null;
   areaTree: AreaTreeNode[];
   /** 교과서 단원 트리 (대단원 › 소단원). 교과서를 안 골랐으면 빈 배열 */
   unitTree: AreaTreeNode[];
@@ -120,11 +127,11 @@ export async function runProblemOcr(
 
     const merged = mergeOcrDrafts(ocrRun.drafts, { leadingWarnings: ocrRun.warnings });
 
-    // 정답표는 따로 읽는다 — 본문과 같은 프롬프트로 읽으면 모델이 문제를 풀려 든다
-    let answerRun = { imagesSent: 0, rawLength: 0 };
-    if (input.answerPages.length > 0 && !signal?.aborted) {
-      answerRun = await readAnswerKey(input, doc, merged, port, pref, signal, onProgress);
-    }
+    // 정답표는 따로 읽는다 — 본문과 같은 프롬프트로 읽으면 모델이 문제를 풀려 든다.
+    // 원본 안의 정답표 쪽과 따로 올린 답지를 한 번에 훑는다.
+    const answerRun = await readAllAnswerKeys(input, doc, merged, {
+      port, pref, signal, onProgress,
+    });
 
     onProgress?.({ phase: 'crop', done: 0, total: merged.passages.length + merged.problems.length });
     const cropped = await cropRegions(doc, merged, signal, onProgress);
@@ -157,6 +164,7 @@ export async function runProblemOcr(
       durationMs: Date.now() - startedAt,
       imagesSent: ocrRun.imagesSent + answerRun.imagesSent,
       warnings: merged.warnings,
+      answerKeyFiles: answerKeyImageCount(input.answerKey ?? null),
       ranAt: new Date().toISOString(),
     };
     await updateSource(input.sourceId, { status: '검수중', ocr_meta: meta });
@@ -172,6 +180,9 @@ export async function runProblemOcr(
       ocr_meta: {
         pages: [...input.problemPages, ...input.answerPages].sort((a, b) => a - b),
         durationMs: Date.now() - startedAt,
+        // ⚠️ ocr_meta 는 통째로 덮어쓴다 — 실패 경로에서도 답지 수를 빠뜨리면
+        //    검수 화면이 "답지를 안 올렸다"고 거짓말을 한다
+        answerKeyFiles: answerKeyImageCount(input.answerKey ?? null),
         ranAt: new Date().toISOString(),
         warnings: [
           e instanceof Error && e.message ? `읽기가 끝나지 못했어요: ${e.message}` : '읽기가 끝나지 못했어요.',
@@ -189,49 +200,55 @@ export async function runProblemOcr(
   }
 }
 
-/** 정답표 쪽을 읽어 문항에 붙인다. 실패해도 본문 저장을 막지 않는다 */
-async function readAnswerKey(
+/** 원본 안 정답표 쪽과 별도 답지를 모두 읽는다. 실패해도 본문 저장을 막지 않는다 */
+async function readAllAnswerKeys(
   input: OcrRunInput,
   doc: OpenPdf,
   merged: MergeResult,
-  port: number,
-  pref: { model: string | null; effort: string | null },
-  signal: AbortSignal | undefined,
-  onProgress?: (p: OcrRunProgress) => void,
+  env: {
+    port: number;
+    pref: { model: string | null; effort: string | null };
+    signal?: AbortSignal;
+    onProgress?: (p: OcrRunProgress) => void;
+  },
 ): Promise<{ imagesSent: number; rawLength: number }> {
-  const batches = planPageBatches(input.answerPages, {
-    size: ANSWER_KEY_PAGES_PER_BATCH,
-    overlap: 0,
-  });
+  const empty = { imagesSent: 0, rawLength: 0 };
+  if (env.signal?.aborted) return empty;
 
-  const run = await runOcrBatches({
-    batches,
-    renderBatch: (pages) => renderPagesToImages(doc, pages, { signal }),
-    runBatch: async ({ pages, images }) => {
-      const raw = await generateDraft({
-        port,
-        prompt: buildAnswerKeyPrompt({
-          source: input.meta, pages, maxNumber: input.maxNumber ?? null,
-        }),
-        outputSchema: ANSWER_KEY_SCHEMA,
-        model: pref.model,
-        effort: pref.effort,
-        images,
-        signal,
-        timeoutMs: answerKeyTurnBudgetMs(pages.length),
-      });
-      const draft = parseAnswerKeyDraft(raw, { maxNumber: input.maxNumber ?? undefined });
-      if (!draft) throw new AiError('invalid_output');
-      return { draft, rawLength: raw.length };
-    },
-    onProgress: (done, total) => onProgress?.({ phase: 'answer-key', done, total }),
-    signal,
-  });
+  const sources: AnswerKeySource[] = [];
+  const inDoc = inDocumentAnswerKey(doc, input.answerPages, env.signal);
+  if (inDoc) sources.push(inDoc);
 
-  merged.warnings.push(...run.warnings);
-  for (const { draft } of run.drafts) {
-    const applied = applyAnswerKey(merged.problems, draft.answers);
-    merged.warnings.push(...applied.warnings);
+  let disposeSeparate: (() => void) | null = null;
+  if (input.answerKey) {
+    try {
+      const separate = await separateAnswerKey(input.answerKey, env.signal);
+      disposeSeparate = separate.dispose;
+      sources.push(separate.source);
+    } catch {
+      // 답지를 못 열어도 본문은 이미 다 읽었다 — 경고만 남기고 계속한다
+      merged.warnings.push(
+        '따로 올린 답지를 열지 못했어요. 정답은 검수 화면에서 직접 넣어 주세요.',
+      );
+    }
   }
-  return { imagesSent: run.imagesSent, rawLength: run.rawLength };
+
+  // ⚠️ 여기부터는 반드시 finally 안이다 — 답지 PDF 를 열어 둔 채 빠져나가면
+  //    그 문서가 영영 안 닫힌다(읽을 것이 없어 곧바로 돌아가는 길 포함)
+  try {
+    if (sources.length === 0) return empty;
+    return await readAnswerKeys(sources, {
+      meta: input.meta,
+      merged,
+      // 읽어 낸 마지막 번호를 알려 주면 모델이 만든 헛번호를 파서가 걸러낸다
+      maxNumber: input.maxNumber ?? maxProblemNumber(merged.problems),
+      port: env.port,
+      pref: env.pref,
+      signal: env.signal,
+      onProgress: (done, total) => env.onProgress?.({ phase: 'answer-key', done, total }),
+    });
+  } finally {
+    // 답지 PDF 를 두 번째로 열었으면 반드시 닫는다
+    disposeSeparate?.();
+  }
 }
