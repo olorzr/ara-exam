@@ -74,6 +74,7 @@ export default function ArchiveList({
         {grouped.groups.map((group) => (
           <PassageGroupCard
             key={group.passageId ?? '__none__'}
+            passageId={group.passageId}
             passage={group.passage}
             source={group.rows[0]?.source ?? null}
             problemCount={group.rows.length}

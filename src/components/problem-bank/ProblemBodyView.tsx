@@ -27,7 +27,15 @@ interface ProblemBodyViewProps {
  * 대신 CSS 스코프(`.pb-sheet`)는 그대로 공유해 모양이 갈라지지 않게 한다.
  */
 export default function ProblemBodyView({ problem, imageUrls }: ProblemBodyViewProps) {
-  const objective = problem.question_type === '객관식' && problem.choices.length > 0;
+  /**
+   * 이미지로 출제하는 문항인가.
+   *
+   * ⚠️ 이때 글은 **온전하지 않다.** 프롬프트가 "옮길 수 있는 글자만 적으라" 고 시켰고
+   *    OCR 이 그림·표가 있는 문항을 이미지 출제로 저장한다(save.ts). 글만 보여 주면
+   *    그림이 통째로 빠진 문항을 보고 문제지에 담게 된다 — 인쇄와 같은 것을 보여 준다.
+   */
+  const asImage = problem.render_mode === 'image' && Boolean(problem.image_path);
+  const objective = !asImage && problem.question_type === '객관식' && problem.choices.length > 0;
   const answer = problem.answer.trim();
 
   return (
@@ -37,15 +45,21 @@ export default function ProblemBodyView({ problem, imageUrls }: ProblemBodyViewP
           {problem.number !== null && (
             <span className="q-num q-num--mint">{String(problem.number).padStart(2, '0')}</span>
           )}
-          <div
-            className="pb-q__stem"
-            dangerouslySetInnerHTML={{
-              __html: stripTrailingEmptyParagraphs(sanitizeProblemHTML(problem.stem_html)),
-            }}
-          />
+          {!asImage && (
+            <div
+              className="pb-q__stem"
+              dangerouslySetInnerHTML={{
+                __html: stripTrailingEmptyParagraphs(sanitizeProblemHTML(problem.stem_html)),
+              }}
+            />
+          )}
         </div>
 
-        {problem.figure_paths.length > 0 && (
+        {asImage && (
+          <FigureImage path={problem.image_path} urls={imageUrls} alt="문항" />
+        )}
+
+        {!asImage && problem.figure_paths.length > 0 && (
           <div className="pb-figure">
             {problem.figure_paths.map((path) => (
               <FigureImage key={path} path={path} urls={imageUrls} alt="자료" />

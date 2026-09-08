@@ -7,7 +7,10 @@ import type { Passage } from '@/types/problem-bank';
 
 /** 지문 본문까지 붙인 묶음 */
 export interface LoadedPassageGroup<T> extends PassageGroup<T> {
-  /** 지문 본문. 아직 못 읽었거나 지문 없는 묶음이면 null */
+  /**
+   * 지문 본문. 지문이 없는 묶음이거나 **아직·끝내 못 읽은** 경우 null 이다 —
+   * 둘을 가르려면 `passageId` 를 함께 봐야 한다(`passageId` 가 있는데 null 이면 못 읽은 것).
+   */
   passage: Passage | null;
 }
 
@@ -41,7 +44,8 @@ export function usePassageGroups<T extends { passage_id: string | null }>(
         if (alive) setPassages(new Map(rowsIn.map((p) => [p.id, p])));
       })
       .catch(() => {
-        // 본문을 못 읽어도 묶음 머리는 보인다 — 목록을 막지 않는다
+        // 본문을 못 읽어도 목록은 보여야 한다. 다만 **'지문 없음' 으로 보이면 안 된다** —
+        // 그건 거짓말이다(코덱스 리뷰 4R). 화면이 passageId 로 둘을 가른다
       })
       .finally(() => {
         if (alive) setLoadedKey(key);

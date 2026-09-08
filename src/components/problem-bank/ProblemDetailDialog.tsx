@@ -149,7 +149,8 @@ function DetailBody({ problemId }: { problemId: string }) {
 
       <ProblemBodyView problem={shown} imageUrls={images.urls} />
 
-      {shown.image_path && (
+      {/* 이미지 출제 문항은 위 본문이 곧 그 이미지다 — 같은 그림을 두 번 두지 않는다 */}
+      {shown.image_path && shown.render_mode !== 'image' && (
         <div>
           <button
             type="button"

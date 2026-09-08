@@ -17,7 +17,12 @@ function excerpt(html: string): string {
 }
 
 interface PassageGroupCardProps {
-  /** 지문 본문. null 이면 '지문 없는 문항' 묶음이거나 아직 못 읽은 것 */
+  /**
+   * 이 묶음의 지문 id. null 이면 **지문이 없는 문항들**이다.
+   * 값이 있는데 `passage` 가 null 이면 본문을 아직·끝내 못 읽은 것 — 둘은 다른 말이다.
+   */
+  passageId: string | null;
+  /** 지문 본문. 못 읽었으면 null */
   passage: Passage | null;
   /** 이 묶음 문항들의 출처 (첫 문항 기준) */
   source: SourceLabelInput | null;
@@ -35,7 +40,7 @@ interface PassageGroupCardProps {
  * 고를 수 있다. 본문은 기본으로 접어 둔다 — 펼쳐 두면 목록이 아니라 책이 된다.
  */
 export default function PassageGroupCard({
-  passage, source, problemCount, imageUrl, children,
+  passageId, passage, source, problemCount, imageUrl, children,
 }: PassageGroupCardProps) {
   const [open, setOpen] = useState(false);
 
@@ -43,7 +48,9 @@ export default function PassageGroupCard({
     return (
       <section className="space-y-2">
         <p className="text-sm font-medium text-gray-500">
-          지문 없는 문항 <span className="text-xs text-gray-400">({problemCount})</span>
+          {/* ⚠️ 못 읽은 것을 '지문 없음' 이라고 하면 거짓말이다 — 딸린 지문이 분명히 있다 */}
+          {passageId ? '지문을 불러오지 못했어요' : '지문 없는 문항'}
+          <span className="text-xs text-gray-400"> ({problemCount})</span>
         </p>
         <div className="space-y-2">{children}</div>
       </section>
