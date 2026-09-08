@@ -36,6 +36,12 @@ export function useProblemReview(sourceId: string) {
    *    호출부가 이 값을 카드 key 에 섞어 다시 마운트하게 한다.
    */
   const [reloadSeq, setReloadSeq] = useState(0);
+  /**
+   * 화면 전체를 잠가야 하는 일이 도는 중인가(교과서 변경).
+   * 끝나면 카드를 다시 마운트하므로, 그 사이 새로 친 내용은 어차피 사라진다 —
+   * 아예 못 치게 걷어 내는 편이 정직하다.
+   */
+  const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -181,37 +187,47 @@ export function useProblemReview(sourceId: string) {
   /**
    * 교과서를 바꾼다 — 단원 트리가 여기에 달려 있어 검수 중에도 고칠 수 있어야 한다.
    *
-   * ⚠️ 이미 붙은 단원은 **다른 책의 단원**이 되므로 함께 지운다(RPC 가 한 트랜잭션으로).
-   *    남겨 두면 아카이브가 '새 교과서 + 옛 단원' 으로 묶여 아무도 못 찾는다.
+   * ⚠️ 이미 붙은 단원은 **다른 책의 단원**이 되므로 함께 지운다. 지우는 판단은 **DB 가**
+   *    한다(RPC 가 한 트랜잭션에서 현재 태그를 지운다) — 앞서 센 개수로 결정하면 그 사이
+   *    다른 탭이 붙인 태그가 새 교과서 아래 남는다(코덱스 리뷰 4R). 센 개수는 안내용이다.
    * ⚠️ 바꾼 뒤에는 본문을 다시 읽고 카드도 **반드시 다시 마운트한다.** 카드가 단원·발문을
    *    지역 state 로 들고 있어서, 그대로 두면 옛 값이 새 교과서 아래 다시 저장된다.
-   *    그래서 저장하지 않은 수정이 있으면 먼저 알린다(코덱스 리뷰 3R).
+   *    그래서 저장하지 않은 수정이 있으면 먼저 알리고(취소하면 아무것도 건드리지 않는다),
+   *    확인한 뒤에는 `busy` 로 카드를 걷어 내 그 사이 새로 친 내용이 말없이 사라지지 않게 한다.
    * @param textbook - 교과서 이름 ('' 는 미지정)
-   * @param dirtyCount - 저장하지 않은 카드 수 (화면이 세고 있다)
+   * @param countDirty - 저장하지 않은 카드 수를 **묻는 순간** 세어 주는 함수
    */
-  const changeTextbook = useCallback(async (textbook: string, dirtyCount = 0) => {
+  const changeTextbook = useCallback(async (
+    textbook: string,
+    countDirty: () => number = () => 0,
+  ) => {
     try {
       const tagged = await countTaggedUnits(sourceId);
+      const dirty = countDirty();
       const warnings = [
         tagged > 0
           ? `단원이 붙은 문항·지문 ${tagged}개의 단원이 지워집니다(다른 책의 단원이 됩니다).`
           : '',
-        dirtyCount > 0 ? `저장하지 않은 수정 ${dirtyCount}개가 사라집니다.` : '',
+        dirty > 0 ? `저장하지 않은 수정 ${dirty}개가 사라집니다.` : '',
       ].filter(Boolean);
 
       if (warnings.length > 0) {
         const ok = window.confirm(`교과서를 바꾸면\n· ${warnings.join('\n· ')}\n\n계속할까요?`);
+        // 취소하면 아무것도 건드리지 않는다 — 카드도 그대로 둔다
         if (!ok) return;
       }
 
-      const saved = await setSourceTextbook(sourceId, textbook, tagged > 0);
+      setBusy(true);
+      const saved = await setSourceTextbook(sourceId, textbook, true);
       setSource((prev) => (prev ? { ...prev, textbook: saved } : prev));
-      // 카드가 들고 있던 옛 단원·입력을 버린다 — 개수와 무관하게 늘 다시 읽고 마운트한다
+      // 카드가 들고 있던 옛 단원·입력을 버린다 — 태그 개수와 무관하게 늘 다시 읽고 마운트한다
       await load();
       setReloadSeq((n) => n + 1);
       toast.success(saved ? `교과서를 '${saved}' 로 바꿨어요.` : '교과서를 지웠어요.');
     } catch (e) {
       reportError(e);
+    } finally {
+      setBusy(false);
     }
   }, [sourceId, load]);
 
@@ -226,7 +242,7 @@ export function useProblemReview(sourceId: string) {
   );
 
   return {
-    source, passages, problems, loading, error, verifiedCount, reloadSeq,
+    source, passages, problems, loading, busy, error, verifiedCount, reloadSeq,
     reload: load, saveProblem, savePassage, toggleVerified, changeTextbook,
     removeProblem, removePassage, pageUrlFor,
   };

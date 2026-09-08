@@ -129,7 +129,7 @@ export default function ProblemSourceReviewPage() {
     }
   };
 
-  if (review.loading) {
+  if (review.loading || review.busy) {
     return (
       <div className="flex justify-center py-16">
         <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
@@ -165,7 +165,8 @@ export default function ProblemSourceReviewPage() {
           <SourceTextbookPicker
             value={source.textbook}
             grade={source.grade}
-            onChange={(textbook) => review.changeTextbook(textbook, dirtyIds.size)}
+            // 묻는 순간의 미저장 개수를 센다 — 부를 때 값을 굳히면 그 사이 친 내용이 안 잡힌다
+            onChange={(textbook) => review.changeTextbook(textbook, () => dirtyIds.size)}
           />
           <Button type="button" onClick={finish} disabled={source.status === '완료'}>
             {source.status === '완료' ? '검수 완료됨' : '검수 마치기'}

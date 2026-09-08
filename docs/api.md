@@ -44,7 +44,9 @@
 - 인자: `p_source_id uuid`, `p_textbook text`, `p_clear_units boolean` (기본 true)
 - Response: 저장된 교과서 이름(정규화됨)
 - 에러: 출처를 못 찾으면 `no_data_found`
-- 비고: 앱에서 UPDATE 세 번(문항·지문·출처)으로 나누면 중간 실패 때 태그만 사라진다
+- 비고: 앱에서 UPDATE 세 번(문항·지문·출처)으로 나누면 중간 실패 때 태그만 사라진다.
+  앱은 `p_clear_units` 를 **늘 true** 로 보낸다 — 미리 센 개수로 정하면 그 사이 다른 탭이
+  붙인 태그가 새 교과서 아래 남는다(태그가 없으면 그 UPDATE 는 0행으로 지나간다)
 
 ## RPC exam.create_problem_paper
 - 설명: 문제지 생성. `problem_papers` 의 **유일한 쓰기 경로**다(직접 INSERT 는 RLS 로 막혀 있다)
