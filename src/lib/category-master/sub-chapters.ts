@@ -10,6 +10,20 @@ export async function getSubChapters(majorChapterId: string): Promise<SubChapter
   return (data as SubChapter[]) ?? [];
 }
 
+/**
+ * 여러 대단원의 소단원을 **한 번에** 조회한다.
+ * 대단원마다 따로 부르면 N+1 이라 교과서 하나에 12번씩 왕복하게 된다.
+ * @param majorChapterIds - 대단원 id 목록 (비어 있으면 조회하지 않는다)
+ * @returns 소단원 목록 (이름순)
+ */
+export async function getSubChaptersByMajorIds(majorChapterIds: string[]): Promise<SubChapter[]> {
+  if (majorChapterIds.length === 0) return [];
+  const { data } = await supabase
+    .from('sub_chapters').select('*')
+    .in('major_chapter_id', majorChapterIds).order('name');
+  return (data as SubChapter[]) ?? [];
+}
+
 /** 소단원을 추가한다 */
 export async function createSubChapter(name: string, majorChapterId: string) {
   return supabase

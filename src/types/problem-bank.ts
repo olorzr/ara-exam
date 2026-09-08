@@ -48,6 +48,11 @@ export interface ProblemSource {
   source_type: ProblemSourceType;
   title: string;
   school_name: string;
+  /**
+   * 관리자시스템 `public.schools.id` 스냅샷. FK 가 아니다 —
+   * 학교가 지워져도 기출은 남아야 하므로. 표시·필터는 계속 `school_name` 을 쓴다.
+   */
+  school_id: string | null;
   year: string;
   grade: string;
   semester: string;
@@ -55,6 +60,8 @@ export interface ProblemSource {
   exam_type: string;
   /** 문제집이면 출판사, 모의고사면 주관(교육청·평가원) */
   publisher: string;
+  /** 교과서 = `exam.publishers.name` 이름 스냅샷. '' 는 미지정 */
+  textbook: string;
   /** Storage 경로(버킷 exam-problem-bank 기준). 업로드 실패 시 '' */
   file_path: string;
   page_count: number;
@@ -83,6 +90,8 @@ export interface Passage {
   render_mode: RenderMode;
   /** ara-system 영역 분류 마스터의 **이름 경로 스냅샷**(id 아님) */
   area_path: string[];
+  /** 교과서 단원의 이름 경로 스냅샷 [대단원, 소단원] (최대 2단). 문항의 unit_path 와 같은 규약 */
+  unit_path: string[];
   user_id: string;
   updated_by: string | null;
   created_at: string;
@@ -102,10 +111,20 @@ export interface Problem {
   choices: string[];
   /** 객관식은 '1'~'5', 그 밖은 자유 텍스트. '' = 미입력 */
   answer: string;
-  /** 인쇄된 배점을 못 읽었으면 null (0 이나 균등값으로 채우지 않는다) */
+  /**
+   * 배점.
+   * ⚠️ 2026-09-08 부터 **읽지도 보여 주지도 않는다** — OCR 이 채우지 않고 화면·인쇄에도
+   *    나오지 않는다. 옛 행의 값을 잃지 않으려고 컬럼과 타입만 남겨 둔 자리다.
+   */
   score: number | null;
   explanation_html: string;
   area_path: string[];
+  /**
+   * 교과서 단원의 **이름 경로 스냅샷** [대단원, 소단원] (최대 2단).
+   * 마스터(`exam.major_chapters`/`sub_chapters`)의 id 가 아니다 — area_path 와 같은 이유로,
+   * 마스터에서 이름이 바뀌거나 지워져도 이미 태깅한 문항이 흔들리면 안 된다.
+   */
+  unit_path: string[];
   work_title: string;
   tags: string[];
   page_no: number;
@@ -127,6 +146,11 @@ export interface Problem {
 /** 문제지 인쇄 설정. RPC 가 화이트리스트로 재조립한 값만 저장된다 */
 export interface PaperSettings {
   columns: 1 | 2;
+  /**
+   * @deprecated 배점을 인쇄하지 않는다(2026-09-08). 렌더러는 이 값을 보지 않는다.
+   * DB RPC `create_problem_paper` 가 저장할 때마다 이 키를 화이트리스트로 다시 조립하고
+   * 이미 만든 문제지에 `true` 가 들어 있어, 타입에서 빼면 저장된 행과 어긋난다.
+   */
   showScore: boolean;
   showSource: boolean;
 }

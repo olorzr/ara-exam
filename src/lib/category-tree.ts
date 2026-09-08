@@ -133,8 +133,14 @@ function buildSchoolLevelTree(level: string, cats: Category[]): CategoryTreeNode
   };
 }
 
-/** 자연스러운 문자열 비교 (숫자 부분을 숫자로 비교) */
-function naturalCompare(a: string, b: string): number {
+/**
+ * 자연스러운 문자열 비교 (숫자 부분을 숫자로 비교).
+ * `'10. 문학'` 이 `'2. 문법'` 보다 뒤에 오게 한다 — 단원 이름은 거의 번호로 시작한다.
+ * @param a - 왼쪽 문자열
+ * @param b - 오른쪽 문자열
+ * @returns 정렬 비교값
+ */
+export function naturalCompare(a: string, b: string): number {
   const regex = /(\d+)|(\D+)/g;
   const aParts = a.match(regex) ?? [];
   const bParts = b.match(regex) ?? [];

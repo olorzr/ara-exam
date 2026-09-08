@@ -26,8 +26,8 @@ import PdfPageSelect from '@/components/problem-ocr/PdfPageSelect';
 import OcrProgress from '@/components/problem-ocr/OcrProgress';
 
 const EMPTY_FORM: SourceFormValues = {
-  source_type: '내신기출', title: '', school_name: '', year: String(kstYear()),
-  grade: '', semester: '', exam_type: '', publisher: '',
+  source_type: '내신기출', level: '중등', title: '', school_name: '', school_id: '',
+  textbook: '', year: String(kstYear()), grade: '', semester: '', exam_type: '', publisher: '',
 };
 
 /**

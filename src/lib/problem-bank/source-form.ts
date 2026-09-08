@@ -1,5 +1,6 @@
 import { normalizeCategoryName } from '@/lib/category-name';
-import { toStoredValue } from '@/lib/external-category';
+import { HIGH_SCHOOL_GRADES, MIDDLE_SCHOOL_GRADES } from '@/lib/constants';
+import { toStoredValue, UNSPECIFIED_OPTION } from '@/lib/external-category';
 import type { ProblemSourceType } from '@/types/problem-bank';
 
 /**
@@ -18,11 +19,51 @@ export const SOURCE_TYPE_OPTIONS: ProblemSourceType[] = ['내신기출', '모의
 /** 시험 구분 선택지. '' 는 미지정 */
 export const EXAM_TYPE_OPTIONS = ['중간', '기말'] as const;
 
+/**
+ * 학교급.
+ *
+ * ⚠️ **저장하지 않는다.** 폼에서 학교·학년 선택지를 좁히는 데만 쓰고, DB 에서는
+ *    `grade`('중2')의 접두사로 되찾는다(`levelFromGrade`). 저장하면 '중1인데 고등' 처럼
+ *    어긋난 행이 생겨 CHECK 로 또 막아야 한다(ara-system mig420 과 같은 판단).
+ */
+export type SchoolLevel = '중등' | '고등';
+
+/** 학교급 선택지 — 화면 순서가 곧 이 순서다 */
+export const SCHOOL_LEVEL_OPTIONS: readonly SchoolLevel[] = ['중등', '고등'];
+
+/**
+ * 그 학교급에서 고를 수 있는 학년.
+ * @param level - 학교급
+ * @returns 학년 선택지 (+ '미지정')
+ */
+export function gradeOptionsForLevel(level: SchoolLevel): string[] {
+  const grades = level === '고등' ? HIGH_SCHOOL_GRADES : MIDDLE_SCHOOL_GRADES;
+  return [...grades, UNSPECIFIED_OPTION];
+}
+
+/**
+ * 학년에서 학교급을 되찾는다. 저장된 출처에는 학교급 컬럼이 없다.
+ * @param grade - '중2' 같은 학년 ('' 는 미지정)
+ * @returns 학교급. 알 수 없으면 null
+ */
+export function levelFromGrade(grade: string): SchoolLevel | null {
+  const g = (grade ?? '').trim();
+  if (g.startsWith('중')) return '중등';
+  if (g.startsWith('고')) return '고등';
+  return null;
+}
+
 /** 화면이 들고 있는 값 (표시값 그대로 — '미지정' 센티널을 포함할 수 있다) */
 export interface SourceFormValues {
   source_type: ProblemSourceType;
+  /** 학교급 — 저장하지 않고 학교·학년 선택지를 좁히는 데만 쓴다 */
+  level: SchoolLevel;
   title: string;
   school_name: string;
+  /** 관리자시스템 public.schools.id. 손으로 적은 학교면 '' */
+  school_id: string;
+  /** 교과서(= exam.publishers.name). '' 는 미지정 */
+  textbook: string;
   year: string;
   grade: string;
   semester: string;
@@ -30,11 +71,14 @@ export interface SourceFormValues {
   publisher: string;
 }
 
-/** DB 에 넣을 형태 */
+/** DB 에 넣을 형태 (학교급은 없다 — 학년에서 파생한다) */
 export interface SourceInsertPayload {
   source_type: ProblemSourceType;
   title: string;
   school_name: string;
+  /** FK 가 아니다 — 학교가 지워져도 기출은 남는다 */
+  school_id: string | null;
+  textbook: string;
   year: string;
   grade: string;
   semester: string;
@@ -98,6 +142,8 @@ export function toSourcePayload(values: SourceFormValues): SourceInsertPayload {
     semester: toStoredValue(values.semester).trim(),
     exam_type: toStoredValue(values.exam_type).trim(),
     publisher: normalizeCategoryName(toStoredValue(values.publisher)),
+    school_id: values.school_id || null,
+    textbook: normalizeCategoryName(toStoredValue(values.textbook)),
   };
 }
 
@@ -108,7 +154,9 @@ export function toSourcePayload(values: SourceFormValues): SourceInsertPayload {
  * @returns 보여 줄 필드 이름 목록
  */
 export function visibleFields(type: ProblemSourceType): (keyof SourceFormValues)[] {
-  const base: (keyof SourceFormValues)[] = ['source_type', 'title', 'year', 'grade'];
+  // 학교급·교과서는 유형과 무관하게 묻는다 — 학교급은 학년·학교 목록을 좁히고,
+  // 교과서는 어느 유형이든 단원별로 찾을 수 있어야 하기 때문이다
+  const base: (keyof SourceFormValues)[] = ['source_type', 'level', 'title', 'year', 'grade', 'textbook'];
   if (type === '내신기출') return [...base, 'school_name', 'semester', 'exam_type'];
   if (type === '모의고사') return [...base, 'publisher'];
   if (type === '문제집') return [...base, 'publisher'];
@@ -130,4 +178,37 @@ export function suggestTitle(values: SourceFormValues): string {
   ].filter(Boolean);
   if (parts.length === 0) return '';
   return normalizeCategoryName(parts.join(' '));
+}
+
+/**
+ * 폼 값 하나를 고친 결과 (제목 자동 채움 규칙 포함).
+ *
+ * 제목은 **선생님이 직접 치기 전까지** `suggestTitle` 을 따라간다. 예전에는 '…로 채우기'
+ * 버튼을 눌러야 했는데, 안 누르고 넘어가면 제목이 비어 검증에 걸렸다.
+ * 직접 치면 자동을 끄고(치는 대로 둔다), 칸을 비우면 다시 켠다.
+ *
+ * 학교급을 바꾸면 **학교·학년·교과서를 비운다** — 다른 급의 학교가 남아 있으면
+ * 목록에 없는 값이 선택된 채로 저장된다.
+ * @param values - 지금 값
+ * @param patch - 바꿀 값
+ * @param titleAuto - 지금까지 제목을 자동으로 채우고 있었는가
+ * @returns 새 값과 새 자동 여부
+ */
+export function applySourcePatch(
+  values: SourceFormValues,
+  patch: Partial<SourceFormValues>,
+  titleAuto: boolean,
+): { values: SourceFormValues; titleAuto: boolean } {
+  const levelChanged = patch.level !== undefined && patch.level !== values.level;
+  const cleared: Partial<SourceFormValues> = levelChanged
+    ? { school_id: '', school_name: '', grade: '', textbook: '' }
+    : {};
+
+  const nextAuto = patch.title === undefined ? titleAuto : patch.title.trim() === '';
+  const merged: SourceFormValues = { ...values, ...cleared, ...patch };
+
+  return {
+    values: nextAuto ? { ...merged, title: suggestTitle(merged) } : merged,
+    titleAuto: nextAuto,
+  };
 }

@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
+  applySourcePatch,
+  gradeOptionsForLevel,
+  levelFromGrade,
   requiresSchool,
   suggestTitle,
   toSourcePayload,
@@ -11,8 +14,9 @@ import { UNSPECIFIED_OPTION } from '@/lib/external-category';
 
 function values(over: Partial<SourceFormValues> = {}): SourceFormValues {
   return {
-    source_type: '내신기출', title: '상현중 중간고사', school_name: '상현중',
-    year: '2026', grade: '중2', semester: '1학기', exam_type: '중간', publisher: '',
+    source_type: '내신기출', level: '중등', title: '상현중 중간고사', school_name: '상현중',
+    school_id: 'school-uuid', textbook: '', year: '2026', grade: '중2',
+    semester: '1학기', exam_type: '중간', publisher: '',
     ...over,
   };
 }
@@ -39,6 +43,22 @@ describe('validateSourceForm', () => {
   it('학년도는 네 자리 숫자여야 한다', () => {
     expect(validateSourceForm(values({ year: '26' })).year).toBeTruthy();
     expect(validateSourceForm(values({ year: UNSPECIFIED_OPTION })).year).toBeUndefined();
+  });
+});
+
+describe('toSourcePayload — 새 컬럼', () => {
+  it('학교 id 와 교과서를 함께 담는다', () => {
+    const p = toSourcePayload(values({ textbook: '천재 (노미숙)' }));
+    expect(p.school_id).toBe('school-uuid');
+    expect(p.textbook).toBe('천재(노미숙)');
+  });
+
+  it('학교를 손으로 고르지 않았으면 school_id 는 null 이다 — 빈 문자열은 uuid 가 아니다', () => {
+    expect(toSourcePayload(values({ school_id: '' })).school_id).toBeNull();
+  });
+
+  it('학교급은 저장하지 않는다 — 학년에서 파생한다', () => {
+    expect(Object.keys(toSourcePayload(values()))).not.toContain('level');
   });
 });
 
@@ -87,5 +107,56 @@ describe('suggestTitle', () => {
   it('아무것도 안 골랐으면 빈 문자열', () => {
     const v = values({ year: '', school_name: '', grade: '', semester: '', exam_type: '', publisher: '' });
     expect(suggestTitle(v)).toBe('');
+  });
+});
+
+describe('gradeOptionsForLevel / levelFromGrade', () => {
+  it('학교급을 고르면 그 급의 학년만 보인다', () => {
+    expect(gradeOptionsForLevel('중등')).toEqual(['중1', '중2', '중3', UNSPECIFIED_OPTION]);
+    expect(gradeOptionsForLevel('고등')).toEqual(['고1', '고2', '고3', UNSPECIFIED_OPTION]);
+  });
+
+  it('학년에서 학교급을 되찾는다 — DB 에는 학교급 컬럼이 없다', () => {
+    expect(levelFromGrade('중2')).toBe('중등');
+    expect(levelFromGrade('고1')).toBe('고등');
+    expect(levelFromGrade('')).toBeNull();
+  });
+});
+
+describe('applySourcePatch — 제목 자동 채움', () => {
+  it('안 건드린 제목은 고른 값을 따라간다 — 버튼을 안 눌러도 채워진다', () => {
+    const start = values({ title: '', year: '2026', school_name: '', grade: '', semester: '', exam_type: '' });
+    const first = applySourcePatch(start, { school_name: '상현중' }, true);
+    expect(first.values.title).toBe('2026 상현중');
+    const second = applySourcePatch(first.values, { grade: '중2' }, first.titleAuto);
+    expect(second.values.title).toBe('2026 상현중 중2');
+  });
+
+  it('직접 친 제목은 다른 칸을 바꿔도 그대로다', () => {
+    const typed = applySourcePatch(values({ title: '' }), { title: '내가 쓴 제목' }, true);
+    expect(typed.titleAuto).toBe(false);
+    const next = applySourcePatch(typed.values, { grade: '중3' }, typed.titleAuto);
+    expect(next.values.title).toBe('내가 쓴 제목');
+  });
+
+  it('제목을 비우면 다시 자동으로 돌아간다', () => {
+    const typed = applySourcePatch(values(), { title: '손으로' }, true);
+    const cleared = applySourcePatch(typed.values, { title: '' }, typed.titleAuto);
+    expect(cleared.titleAuto).toBe(true);
+    expect(cleared.values.title).toBe('2026 상현중 중2 1학기 중간');
+  });
+
+  it('학교급을 바꾸면 학교·학년·교과서를 비운다 — 다른 급 학교가 남으면 안 된다', () => {
+    const next = applySourcePatch(values({ textbook: '천재(노미숙)' }), { level: '고등' }, false);
+    expect(next.values.school_id).toBe('');
+    expect(next.values.school_name).toBe('');
+    expect(next.values.grade).toBe('');
+    expect(next.values.textbook).toBe('');
+    expect(next.values.level).toBe('고등');
+  });
+
+  it('같은 학교급을 다시 고르면 아무것도 비우지 않는다', () => {
+    const next = applySourcePatch(values(), { level: '중등' }, false);
+    expect(next.values.school_name).toBe('상현중');
   });
 });

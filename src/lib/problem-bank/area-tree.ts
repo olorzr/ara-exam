@@ -91,16 +91,24 @@ export function isKnownPath(tree: AreaTreeNode[], path: string[]): boolean {
  * '문학 > 현대시' 는 멀쩡한 정보다. 버리면 사람이 처음부터 다시 골라야 한다.
  * @param tree - 영역 트리 (비어 있으면 검증을 건너뛰고 원본을 그대로 돌려준다)
  * @param path - 검사할 이름 경로
+ * @param max - 허용 단계 수. 교과서 단원처럼 더 얕은 트리는 2 를 넘긴다
  * @returns 트리에 있는 최장 접두사
  */
-export function longestKnownPrefix(tree: AreaTreeNode[], path: string[]): string[] {
-  if (tree.length === 0) return path.slice(0, AREA_DEPTH_MAX);
+export function longestKnownPrefix(
+  tree: AreaTreeNode[],
+  path: string[],
+  max: number = AREA_DEPTH_MAX,
+): string[] {
+  // ⚠️ 트리를 못 읽은 환경에서는 검증 없이 통과시키므로, 여기서 **단계 상한을 반드시 지킨다**
+  //    (DB 의 cardinality CHECK 를 넘기면 저장이 통째로 실패한다)
+  if (tree.length === 0) return path.slice(0, max);
 
   const out: string[] = [];
   let nodes = tree;
   for (const name of path) {
     const hit = nodes.find((n) => n.name === name);
     if (!hit) break;
+    if (out.length >= max) break;
     out.push(hit.name);
     nodes = hit.children;
   }
