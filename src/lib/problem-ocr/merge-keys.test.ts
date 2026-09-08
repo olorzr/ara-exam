@@ -8,7 +8,7 @@ function item(over: Partial<OcrItem> = {}): OcrItem {
     label: null, title: null, author: null, html: '<p>지문</p>',
     continued: false, continues: false, question_type: '객관식', stem_html: '',
     choices: [], answer: null, has_figure: false, work_title: null,
-    area_path: [], unit_path: [], ...over,
+    area_path: [], unit_path: [], grammar_paths: [], ...over,
   };
 }
 

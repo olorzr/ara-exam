@@ -11,7 +11,9 @@ import ProblemHtmlEditor from '@/components/problem-editor/ProblemHtmlEditor';
 import { blankChoicePositions, trimTrailingChoices } from '@/lib/problem-bank/choices';
 import { sanitizeInlineHTML } from '@/lib/sanitize-problem';
 import AreaPathPicker from './AreaPathPicker';
+import GrammarTagPicker from './GrammarTagPicker';
 import type { AreaTreeNode } from '@/lib/problem-bank/area-tree';
+import { isGrammarArea } from '@/lib/problem-bank/grammar-tree';
 import { UNIT_DEPTH_LABELS } from '@/lib/problem-bank/unit-tree';
 import type { ProblemPatch } from '@/lib/problem-bank/mutations';
 import type { Problem, QuestionType } from '@/types/problem-bank';
@@ -73,6 +75,7 @@ export default function ProblemEditorCard({
   const [type, setType] = useState<QuestionType>(problem.question_type);
   const [area, setArea] = useState<string[]>(problem.area_path);
   const [unit, setUnit] = useState<string[]>(problem.unit_path);
+  const [grammar, setGrammar] = useState<string[]>(problem.grammar_paths);
   const [workTitle, setWorkTitle] = useState(problem.work_title);
   const [saving, setSaving] = useState(false);
 
@@ -92,6 +95,7 @@ export default function ProblemEditorCard({
     || workTitle !== problem.work_title
     || area.join('>') !== problem.area_path.join('>')
     || unit.join('>') !== problem.unit_path.join('>')
+    || grammar.join('\u0000') !== problem.grammar_paths.join('\u0000')
     || trimTrailingChoices(choices).join('\u0000') !== problem.choices.join('\u0000');
 
   // 화면이 '검수 마치기' 를 막을 수 있게 알린다. 렌더 중 부모 state 를 건드리지 않도록
@@ -121,6 +125,7 @@ export default function ProblemEditorCard({
       question_type: type,
       area_path: area,
       unit_path: unit,
+      grammar_paths: grammar,
       work_title: workTitle,
     });
     setSaving(false);
@@ -265,6 +270,9 @@ export default function ProblemEditorCard({
         <AreaPathPicker
           tree={unitTree} value={unit} labels={UNIT_DEPTH_LABELS} onChange={setUnit}
         />
+        {/* 지금 고른 영역으로 판단한다 — 저장된 값이 아니라 화면 값이라야, 영역을 문법으로
+            바꾸는 순간 칸이 따라 열린다 */}
+        <GrammarTagPicker value={grammar} suggested={isGrammarArea(area)} onChange={setGrammar} />
 
         <div className="flex justify-end">
           <Button type="button" size="sm" onClick={handleSave} disabled={saving}>

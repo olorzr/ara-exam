@@ -26,8 +26,8 @@ describe('filters ↔ 주소', () => {
       ...EMPTY_FILTERS,
       source_type: '내신기출', school_name: '상현중', year: '2026', grade: '중2',
       semester: '1학기', exam_type: '중간', textbook: '천재(노미숙)', area_path: ['문학', '현대시'],
-      unit_path: ['1. 문학', '(1) 시'], work_title: '동백꽃', search: '심상',
-      verifiedOnly: true, page: 2,
+      unit_path: ['1. 문학', '(1) 시'], grammar_path: ['단어', '품사'],
+      work_title: '동백꽃', search: '심상', verifiedOnly: true, page: 2,
     };
     const back = filtersFromParams(new URLSearchParams(filtersToQueryString(source).slice(1)));
     expect(back).toEqual(source);
@@ -37,6 +37,13 @@ describe('filters ↔ 주소', () => {
     const q = filtersToQueryString({ ...EMPTY_FILTERS, work_title: '동백꽃' });
     expect(q).toContain('work=');
     expect(filtersFromParams(new URLSearchParams(q.slice(1))).work_title).toBe('동백꽃');
+  });
+
+  it('문법 분류는 gram 으로 싣고 되읽는다', () => {
+    const q = filtersToQueryString({ ...EMPTY_FILTERS, grammar_path: ['단어', '품사', '명사'] });
+    expect(q).toContain('gram=');
+    expect(filtersFromParams(new URLSearchParams(q.slice(1))).grammar_path)
+      .toEqual(['단어', '품사', '명사']);
   });
 
   it('학기는 sem 으로 싣고 되읽는다', () => {
@@ -73,6 +80,20 @@ describe('toProblemQuery', () => {
 
   it('영역은 배열 그대로 넘긴다', () => {
     expect(toProblemQuery({ ...EMPTY_FILTERS, area_path: ['문학'] }).area_path).toEqual(['문학']);
+  });
+
+  it('문법은 고른 가지 아래 잎으로 펴서 넘긴다', () => {
+    // 저장값이 경로 문자열이라 '단어 > 품사' 로는 아무것도 안 걸린다 — 잎을 나열해야 한다
+    const q = toProblemQuery({ ...EMPTY_FILTERS, grammar_path: ['단어', '품사'] });
+    expect(q.grammar_paths).toHaveLength(9);
+    expect(q.grammar_paths).toContain('단어 > 품사 > 명사');
+    // 고른 값 자체(중간 마디)는 저장되지 않는 값이라 조건에 넣지 않는다
+    expect(q.grammar_paths).not.toContain('단어 > 품사');
+  });
+
+  it('문법 잎을 고르면 그 하나만 조건이 된다', () => {
+    expect(toProblemQuery({ ...EMPTY_FILTERS, grammar_path: ['담화', '담화의 맥락'] }).grammar_paths)
+      .toEqual(['담화 > 담화의 맥락']);
   });
 
   it('교과서와 단원도 조건이 된다', () => {

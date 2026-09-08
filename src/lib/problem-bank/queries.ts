@@ -11,7 +11,8 @@ import type { Passage, Problem, ProblemSource } from '@/types/problem-bank';
 /** 목록에 필요한 컬럼만 — 본문 HTML 은 무겁다 */
 const PROBLEM_LIST_COLUMNS =
   'id, source_id, passage_id, number, question_type, stem_html, choices, answer, '
-  + 'area_path, unit_path, work_title, page_no, image_path, render_mode, status, created_at';
+  + 'area_path, unit_path, grammar_paths, work_title, page_no, image_path, render_mode, '
+  + 'status, created_at';
 
 /** 한 화면에 보여 줄 문항 수 */
 export const PROBLEM_PAGE_SIZE = 60;
@@ -168,6 +169,11 @@ export interface ProblemQuery {
   area_path?: string[];
   /** 교과서 단원 경로 — 대단원만 주면 그 아래 소단원 문항까지 걸린다 */
   unit_path?: string[];
+  /**
+   * 문법 분류 — **찾을 경로 문자열들**(하나라도 걸리면 통과, `&&`).
+   * 상위를 골랐을 때 그 아래 잎으로 펴는 일은 `filters.ts` 가 이미 끝내고 넘긴다.
+   */
+  grammar_paths?: string[];
   /** 작품명. 이 조건이 걸리면 목록이 **지문 순서**로 정렬된다 */
   work_title?: string;
   /** 발문·선지·작품명 평문 검색 */
@@ -243,6 +249,13 @@ export async function fetchProblemPage(query: ProblemQuery): Promise<ProblemPage
   if (query.unit_path && query.unit_path.length > 0) {
     // 같은 이유로 대단원만 골라도 그 아래 소단원 문항이 함께 걸린다
     request = request.contains('unit_path', query.unit_path);
+  }
+  if (query.grammar_paths && query.grammar_paths.length > 0) {
+    // ⚠️ 여기만 `contains` 가 아니라 **`overlaps`** 다. 이 컬럼은 원소 하나가 경로 하나라
+    //    (`'단어 > 품사 > 명사'`) 문항에 여러 개가 붙는다 — `@>` 는 "준 것을 **전부** 가진 행"
+    //    이라 두 태그를 넘기면 둘 다 붙은 문항만 나온다. 상위 검색은 잎을 나열해 찾는 것이라
+    //    "하나라도 걸리면" 이 맞다(grammar-tree.ts 의 grammarPathsUnder).
+    request = request.overlaps('grammar_paths', query.grammar_paths);
   }
   if (query.search?.trim()) {
     // .or() 를 쓰지 않는다 — 백슬래시·괄호 이스케이프가 인용을 통과하며 풀린다.

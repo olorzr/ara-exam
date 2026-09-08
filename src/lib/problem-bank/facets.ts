@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { expandGrammarAncestors } from './grammar-tree';
 import {
   SCHOOL_EXAM_SOURCE_TYPE, schoolExamKey, type SchoolExamFacet,
 } from './school-exam-tree';
@@ -214,3 +215,38 @@ export const fetchAreaFacets = (): Promise<string[][]> => collectPathFacets('are
  * @returns 중복 없는 경로 목록
  */
 export const fetchUnitFacets = (): Promise<string[][]> => collectPathFacets('unit_path');
+
+/**
+ * 아카이브에 쓰인 문법 분류 목록.
+ *
+ * ⚠️ `collectPathFacets` 를 재사용할 수 없다 — 그쪽은 컬럼 하나가 **경로 하나**라는
+ *    전제인데, 이 컬럼은 원소 하나가 경로 하나이고 한 행에 여러 개가 들어 있다.
+ *
+ * 모은 것은 문항이 실제로 들고 있는 **잎**뿐이라, 그대로 선택지로 두면 '품사 전체' 를
+ * 고를 수가 없다 — `expandGrammarAncestors` 로 조상까지 펴서 돌려준다.
+ * @returns 중복 없는 경로 문자열 목록 (교재 목차 순서)
+ */
+export async function fetchGrammarFacets(): Promise<string[]> {
+  const seen = new Set<string>();
+
+  for (let from = 0; from < FACET_MAX_ROWS; from += FACET_CHUNK) {
+    const { data, error } = await supabase
+      .from('problems')
+      .select('grammar_paths')
+      .not('grammar_paths', 'eq', '{}')
+      .order('id')
+      .range(from, from + FACET_CHUNK - 1);
+    // 선택지를 못 만들어도 목록은 봐야 한다 — 여기까지 모은 것만 돌려준다
+    if (error) break;
+
+    const rows = (data ?? []) as unknown as { grammar_paths: string[] | null }[];
+    for (const row of rows) {
+      for (const path of row.grammar_paths ?? []) {
+        if (path) seen.add(path);
+      }
+    }
+    if (rows.length < FACET_CHUNK) break;
+  }
+
+  return expandGrammarAncestors([...seen]);
+}

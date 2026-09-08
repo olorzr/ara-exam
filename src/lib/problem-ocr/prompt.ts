@@ -1,4 +1,5 @@
 import { wrapUntrustedData } from '@/lib/ai/untrusted-data';
+import { GRAMMAR_TREE } from '@/lib/problem-bank/grammar-tree';
 import type { AreaTreeNode } from '@/lib/problem-bank/area-tree';
 import type { ProblemSourceType } from '@/types/problem-bank';
 
@@ -81,6 +82,16 @@ const RULES = `[역할]
 - 지문의 작품·글이 교과서 어느 단원에 실렸는지 확실할 때만 적는다.
   트리에 없거나 판단이 안 서면 빈 배열([])로 둔다. **추정하지 않는다.**
 
+[문법]
+- **문법을 묻는 문항일 때만** 아래 데이터의 '문법트리' 에 **있는 이름만** grammar_paths 에 담는다.
+- 경로 하나를 [대분류, 중분류, 개념] 순서의 배열로 적는다: ["단어","품사","명사"].
+  '담화'·'어문 규정' 처럼 중분류가 없는 가지는 두 마디로 끝난다: ["담화","담화의 맥락"].
+- 한 문항이 개념 여럿을 물으면 배열을 **여러 개** 낸다(최대 3개).
+  예: 피동과 사동을 함께 묻는 문항 →
+  [["문장","문법 요소","피동 표현"],["문장","문법 요소","사동 표현"]]
+- 문법 문항이 아니거나(문학·독서·화법과 작문) 판단이 안 서면 빈 배열([])로 둔다.
+  **추정하지 않는다.**
+
 [확인이 필요한 것]
 - 못 읽었거나 아리송한 것은 warnings 에 적는다. 그때 **반드시 쪽 번호와 문항 번호를 함께**
   적는다(예: '3쪽 12번 선지가 흐려서 못 읽었어요'). 어디 얘기인지 없으면 선생님이 찾을 수 없다.
@@ -153,6 +164,7 @@ export function buildProblemOcrPrompt(input: ProblemOcrPromptInput): string {
     hasUnits
       ? '- 단원트리가 주어졌다. 교과서 단원을 그 안에서 고른다.'
       : '- 단원트리가 비어 있다. unit_path 는 전부 빈 배열([])로 둔다.',
+    '- 문법트리는 늘 주어진다. 문법 문항일 때만 그 안에서 고른다.',
   ];
 
   // 겹쳐 읽는 쪽이 있으므로 같은 항목이 두 묶음에 나올 수 있다 — 그게 정상임을 알린다
@@ -179,6 +191,8 @@ export function buildProblemOcrPrompt(input: ProblemOcrPromptInput): string {
       교과서: source.textbook || null,
       영역트리: hasTree ? flattenTree(areaTree) : null,
       단원트리: hasUnits ? flattenTree(unitTree) : null,
+      // 문법 트리는 앱의 코드 상수라 늘 실린다(교과서·학년과 무관한 축이다)
+      문법트리: flattenTree(GRAMMAR_TREE),
       시험범위단원: scopeUnits.length > 0 ? scopeUnits : null,
     }),
   ].join('\n');

@@ -15,6 +15,7 @@ function item(over: Record<string, unknown> = {}) {
     label: null, title: null, author: null, html: '', continued: false, continues: false,
     question_type: '객관식', stem_html: '<p>물음</p>', choices: ['가', '나', '다', '라', '마'],
     answer: '1', has_figure: false, work_title: null, area_path: [], unit_path: [],
+    grammar_paths: [],
     ...over,
   };
 }
@@ -200,6 +201,50 @@ describe('parseOcrDraft — 단원', () => {
   it('단원을 안 보내면 빈 배열', () => {
     const draft = parseOcrDraft(json([item()]), ctx)!;
     expect(draft.items[0].unit_path).toEqual([]);
+  });
+});
+
+describe('parseOcrDraft — 문법', () => {
+  it('마디 배열을 저장 모양인 경로 문자열로 접는다', () => {
+    const draft = parseOcrDraft(
+      json([item({ grammar_paths: [['단어', '품사', '명사']] })]), ctx,
+    )!;
+    expect(draft.items[0].grammar_paths).toEqual(['단어 > 품사 > 명사']);
+  });
+
+  it('여러 개를 그대로 담는다 — 한 문항이 개념 둘을 걸친다', () => {
+    const draft = parseOcrDraft(json([item({
+      grammar_paths: [['문장', '문법 요소', '피동 표현'], ['문장', '문법 요소', '사동 표현']],
+    })]), ctx)!;
+    expect(draft.items[0].grammar_paths).toEqual([
+      '문장 > 문법 요소 > 피동 표현', '문장 > 문법 요소 > 사동 표현',
+    ]);
+  });
+
+  it('지어낸 마지막 마디는 잘라 내고 남은 앞부분을 살린다', () => {
+    const draft = parseOcrDraft(
+      json([item({ grammar_paths: [['단어', '품사', '없는품사']] })]), ctx,
+    )!;
+    expect(draft.items[0].grammar_paths).toEqual(['단어 > 품사']);
+  });
+
+  it('트리에 아예 없으면 빼고 알린다', () => {
+    const draft = parseOcrDraft(
+      json([item({ grammar_paths: [['엉뚱한분류', '개념']] })]), ctx,
+    )!;
+    expect(draft.items[0].grammar_paths).toEqual([]);
+    expect(said(draft.warnings)).toContain('문법 분류');
+  });
+
+  it('같은 경로를 두 번 내면 한 번만 담는다', () => {
+    const draft = parseOcrDraft(json([item({
+      grammar_paths: [['담화', '담화의 맥락'], ['담화', '담화의 맥락']],
+    })]), ctx)!;
+    expect(draft.items[0].grammar_paths).toEqual(['담화 > 담화의 맥락']);
+  });
+
+  it('문법을 안 보내면 빈 배열', () => {
+    expect(parseOcrDraft(json([item()]), ctx)!.items[0].grammar_paths).toEqual([]);
   });
 });
 

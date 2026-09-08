@@ -1,5 +1,8 @@
 import { sanitizeInlineHTML, sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import { longestKnownPrefix, type AreaTreeNode } from '@/lib/problem-bank/area-tree';
+import {
+  formatGrammarPath, GRAMMAR_DEPTH_MAX, GRAMMAR_TREE, normalizeGrammarPaths,
+} from '@/lib/problem-bank/grammar-tree';
 import { UNIT_DEPTH_MAX } from '@/lib/problem-bank/unit-tree';
 import { normalizeOcrPassageHtml, normalizeOcrStemHtml } from './normalize-html';
 import type { QuestionType } from '@/types/problem-bank';
@@ -146,6 +149,26 @@ function parseItem(
     });
   }
 
+  // 문법은 경로가 **여러 개**라 하나씩 검증한다. 마스터가 코드 상수라 트리가 늘 있고,
+  // 그래서 area/unit 과 달리 '트리를 못 읽어 통과' 하는 길이 없다
+  const rawGrammar = Array.isArray(raw.grammar_paths) ? raw.grammar_paths : [];
+  const kept: string[] = [];
+  const dropped: string[] = [];
+  for (const entry of rawGrammar) {
+    const path = Array.isArray(entry) ? entry.map((g) => str(g, 60)).filter(Boolean) : [];
+    if (path.length === 0) continue;
+    const known = longestKnownPrefix(GRAMMAR_TREE, path, GRAMMAR_DEPTH_MAX);
+    if (known.length === 0) dropped.push(path.join(' > '));
+    else kept.push(formatGrammarPath(known));
+  }
+  const grammar_paths = normalizeGrammarPaths(kept);
+  if (dropped.length > 0) {
+    pushWarning(warnings, {
+      ...at,
+      message: `문법 분류 '${dropped.join("', '")}' 가 분류표에 없어 뺐어요.`,
+    });
+  }
+
   return {
     kind,
     ref,
@@ -171,6 +194,7 @@ function parseItem(
     work_title: normalizeWork(nullableStr(raw.work_title, 120)),
     area_path,
     unit_path,
+    grammar_paths,
   };
 }
 

@@ -140,6 +140,13 @@ export interface Problem {
    * 마스터에서 이름이 바뀌거나 지워져도 이미 태깅한 문항이 흔들리면 안 된다.
    */
   unit_path: string[];
+  /**
+   * 문법 분류의 **이름 경로 스냅샷 목록**. 원소 하나가 경로 하나이고 `' > '` 로 잇는다
+   * (예: `['단어 > 품사 > 명사', '문장 > 문법 요소 > 피동 표현']`).
+   * ⚠️ area_path·unit_path 와 **모양이 다르다** — 그쪽은 배열 하나가 경로 하나라 한 개만
+   *    붙지만, 수능 문법 문항은 개념 두셋을 걸친다. 마스터는 코드 상수(grammar-tree.ts).
+   */
+  grammar_paths: string[];
   work_title: string;
   tags: string[];
   page_no: number;

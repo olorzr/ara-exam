@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { SEMESTER_OPTIONS } from '@/lib/constants';
 import { SOURCE_TYPE_OPTIONS, EXAM_TYPE_OPTIONS } from '@/lib/problem-bank/source-form';
 import { areaPathLabel } from '@/lib/problem-bank/area-tree';
+import { formatGrammarPath, parseGrammarPath } from '@/lib/problem-bank/grammar-tree';
 import type { SourceFacets, WorkFacet } from '@/lib/problem-bank/facets';
 import { hasActiveFilters, UNSPECIFIED_AXIS, type ProblemFilters } from '@/lib/problem-bank/filters';
 import { unitPathLabel } from '@/lib/problem-bank/unit-tree';
@@ -62,6 +63,8 @@ interface ProblemFilterBarProps {
   facets: SourceFacets;
   areaFacets: string[][];
   unitFacets: string[][];
+  /** 문법 분류는 원소가 경로 문자열이라 다른 패싯과 모양이 다르다 */
+  grammarFacets: string[];
   workFacets: WorkFacet[];
   total: number;
   onChange: (patch: Partial<ProblemFilters>) => void;
@@ -75,9 +78,10 @@ interface ProblemFilterBarProps {
  * 문항이 하나도 없는 영역이 잔뜩 나온다.
  */
 export default function ProblemFilterBar({
-  filters, facets, areaFacets, unitFacets, workFacets, total, onChange, onReset,
+  filters, facets, areaFacets, unitFacets, grammarFacets, workFacets, total, onChange, onReset,
 }: ProblemFilterBarProps) {
   const workTitles = workFacets.map((w) => w.title);
+  const grammarValue = formatGrammarPath(filters.grammar_path);
   // base-ui Select 의 onValueChange 는 `string | null` 을 준다(CLAUDE.md Known Issues)
   const pick = (key: keyof ProblemFilters) => (v: string | null) => {
     if (v) onChange({ [key]: v === ALL ? '' : v, page: 0 } as Partial<ProblemFilters>);
@@ -197,6 +201,24 @@ export default function ProblemFilterBar({
                 .map((key) => (
                   <SelectItem key={key} value={key}>{areaPathLabel(key.split('>'))}</SelectItem>
                 ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        {showAxis(grammarFacets.length > 0, filters.grammar_path.length > 0) && (
+          <Select
+            value={grammarValue || ALL}
+            onValueChange={(v) => {
+              if (v) onChange({ grammar_path: v === ALL ? [] : parseGrammarPath(v), page: 0 });
+            }}
+          >
+            <SelectTrigger className="h-9 w-52 text-sm"><SelectValue placeholder="문법" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>문법 전체</SelectItem>
+              {/* 선택지가 이미 저장 표기(' > ')라 따로 라벨을 만들지 않는다 */}
+              {withValue(grammarFacets, grammarValue).map((key) => (
+                <SelectItem key={key} value={key}>{key}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         )}
