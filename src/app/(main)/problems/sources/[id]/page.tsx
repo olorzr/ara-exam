@@ -214,7 +214,12 @@ export default function ProblemSourceReviewPage() {
                   problemCount={problemCountFor(passage.id)}
                   areaTree={areaTree}
                   selected={selectedId === passage.id}
-                  onSelect={() => { setSelectedId(passage.id); setPage(passage.page_no); }}
+                  // 이미 고른 항목을 다시 누르거나(편집 중 포커스) 하면 쪽은 그대로 둔다 —
+                  // 여러 쪽에 걸친 지문을 이어지는 쪽과 대조하며 고칠 수 있어야 한다
+                  onSelect={() => {
+                    if (selectedId !== passage.id) setPage(passage.page_no);
+                    setSelectedId(passage.id);
+                  }}
                   onSave={(patch) => review.savePassage(passage.id, patch)}
                   onDelete={() => review.removePassage(passage.id)}
                 />
@@ -230,7 +235,10 @@ export default function ProblemSourceReviewPage() {
                 problem={problem}
                 areaTree={areaTree}
                 selected={selectedId === problem.id}
-                onSelect={() => { setSelectedId(problem.id); setPage(problem.page_no); }}
+                onSelect={() => {
+                  if (selectedId !== problem.id) setPage(problem.page_no);
+                  setSelectedId(problem.id);
+                }}
                 onSave={(patch) => review.saveProblem(problem.id, patch)}
                 // 방금 저장해서 알고 있는 버전을 **그대로 넘긴다** — 버리면 저장 직후
                 // 검수가 옛 버전으로 걸려 아무도 안 고쳤는데 충돌한다

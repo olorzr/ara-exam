@@ -11,6 +11,7 @@ import ProblemPaperView from '@/components/problem-paper/ProblemPaperView';
 import ProblemAnswerKeyView from '@/components/problem-paper/ProblemAnswerKeyView';
 import ProblemAnswerSheetView from '@/components/problem-paper/ProblemAnswerSheetView';
 import { supabase } from '@/lib/supabase';
+import { useImagesReady } from '@/hooks/useImagesReady';
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls';
 import { imagePathsOf } from '@/lib/problem-paper/blocks';
 import { normalizePaperSettings } from '@/lib/problem-paper/settings';
@@ -42,7 +43,10 @@ export default function ProblemPaperViewPage() {
   // 이미지로 출제한 문항은 그 이미지가 본문 전체라, 조용히 비워 인쇄하면
   // 문항이 통째로 빠진 시험지가 나간다(코덱스 리뷰 7R)
   const images = useSignedImageUrls(useMemo(() => imagePathsOf(items), [items]));
-  const imagesBlocked = images.loading || images.missing.length > 0;
+  // 서명만으로는 부족하다 — 그 뒤의 이미지 요청이 실패하면 깨진 그림이 인쇄된다
+  const ready = useImagesReady(useMemo(() => [...images.urls.values()], [images.urls]));
+  const brokenCount = images.missing.length + ready.failed.length;
+  const imagesBlocked = images.loading || ready.loading || brokenCount > 0;
 
   useEffect(() => {
     let alive = true;
@@ -118,19 +122,21 @@ export default function ProblemPaperViewPage() {
             disabled={mode === 'paper' && imagesBlocked}
           >
             <Printer className="h-3.5 w-3.5" />
-            <span className="ml-1">{images.loading && mode === 'paper' ? '이미지 준비 중…' : '인쇄'}</span>
+            <span className="ml-1">
+              {mode === 'paper' && (images.loading || ready.loading) ? '이미지 준비 중…' : '인쇄'}
+            </span>
           </Button>
         </div>
       </div>
 
-      {mode === 'paper' && images.missing.length > 0 && (
+      {mode === 'paper' && brokenCount > 0 && (
         <div
           className="flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
           data-no-print
         >
           <AlertTriangle className="h-4 w-4" />
           <span>
-            이미지 {images.missing.length}개를 불러오지 못했어요. 지금 인쇄하면 그 문항이 빈칸으로 나갑니다.
+            이미지 {brokenCount}개를 불러오지 못했어요. 지금 인쇄하면 그 문항이 빈칸으로 나갑니다.
           </span>
           <Button type="button" variant="outline" size="sm" onClick={images.reload}>
             다시 시도
