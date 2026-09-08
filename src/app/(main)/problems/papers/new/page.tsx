@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import ProblemCard from '@/components/problem-bank/ProblemCard';
 import ProblemFilterBar from '@/components/problem-bank/ProblemFilterBar';
@@ -108,6 +109,29 @@ export default function PaperComposePage() {
               ))
             )}
           </div>
+
+          {/* 목록은 60개씩 끊어 온다 — 넘기는 버튼이 없으면 그 뒤 문항은 담을 수가 없다 */}
+          {archive.pageCount > 1 && (
+            <div className="flex items-center justify-center gap-2">
+              <Button
+                type="button" variant="outline" size="sm"
+                onClick={() => archive.patch({ page: archive.filters.page - 1 })}
+                disabled={archive.filters.page <= 0}
+              >
+                이전
+              </Button>
+              <span className="text-sm text-gray-500">
+                {archive.filters.page + 1} / {archive.pageCount}
+              </span>
+              <Button
+                type="button" variant="outline" size="sm"
+                onClick={() => archive.patch({ page: archive.filters.page + 1 })}
+                disabled={archive.filters.page >= archive.pageCount - 1}
+              >
+                다음
+              </Button>
+            </div>
+          )}
         </div>
 
         <div className="space-y-3">

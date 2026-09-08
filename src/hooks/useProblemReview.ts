@@ -123,15 +123,19 @@ export function useProblemReview(sourceId: string) {
     try {
       await deletePassage(id);
       setPassages((list) => list.filter((p) => p.id !== id));
-      // 딸린 문항은 남는다(FK ON DELETE SET NULL) — 화면도 그렇게 맞춘다
-      setProblems((list) => list.map((p) => (
-        p.passage_id === id ? { ...p, passage_id: null } : p
-      )));
+
+      // 딸린 문항은 남지만(FK ON DELETE SET NULL) 그 UPDATE 가 updated_at 트리거를
+      // 건드린다. 화면에서 passage_id 만 지우면 문항들이 **옛 버전 토큰**을 들고 있어
+      // 이후 저장·검수가 아무도 안 고쳤는데 충돌로 튕긴다(코덱스 리뷰 3R).
+      // 영향받은 문항을 다시 읽어 본문과 토큰을 같이 맞춘다.
+      const affected = problems.some((p) => p.passage_id === id);
+      if (affected) setProblems(await fetchProblemsOfSource(sourceId));
+
       toast.success('지문을 지웠어요. 문항은 남아 있어요.');
     } catch (e) {
       reportError(e);
     }
-  }, []);
+  }, [problems, sourceId]);
 
   const verifiedCount = useMemo(
     () => problems.filter((p) => p.status === '검수완료').length,

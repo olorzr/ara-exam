@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ProblemHtmlEditor from '@/components/problem-editor/ProblemHtmlEditor';
+import { blankChoicePositions, trimTrailingChoices } from '@/lib/problem-bank/choices';
 import AreaPathPicker from './AreaPathPicker';
 import type { AreaTreeNode } from '@/lib/problem-bank/area-tree';
 import type { ProblemPatch } from '@/lib/problem-bank/mutations';
@@ -51,11 +52,23 @@ export default function ProblemEditorCard({
   const missingAnswer = !answer.trim();
 
   const handleSave = async () => {
+    // ⚠️ 빈 칸을 걸러내며 압축하면 안 된다 — 정답은 위치 번호라 뒤 선지가 당겨지면
+    //    정답이 다른 선지를 가리키게 된다. 뒤쪽만 자르고 가운데는 자리를 지킨다
+    const trimmed = trimTrailingChoices(choices);
+    const blanks = blankChoicePositions(trimmed);
+    if (blanks.length > 0) {
+      const ok = window.confirm(
+        `${blanks.join(', ')}번 선지가 비어 있어요.\n`
+        + '정답 번호가 자리로 매겨지므로 빈 칸도 그대로 저장합니다. 계속할까요?',
+      );
+      if (!ok) return;
+    }
+
     setSaving(true);
     const parsedScore = score.trim() === '' ? null : Number(score);
     await onSave({
       stem_html: stem,
-      choices: choices.filter((c) => c.trim().length > 0),
+      choices: trimmed,
       answer: answer.trim(),
       // 배점을 못 읽었으면 null 로 둔다 — 0 으로 채우면 만점 계산이 조용히 틀어진다
       score: parsedScore !== null && Number.isFinite(parsedScore) ? parsedScore : null,
