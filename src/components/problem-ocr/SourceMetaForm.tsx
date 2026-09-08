@@ -3,68 +3,122 @@
 import { useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SEMESTER_OPTIONS } from '@/lib/constants';
 import {
-  EXTERNAL_GRADE_OPTIONS, UNSPECIFIED_OPTION, buildYearOptions, toOptionValue,
+  UNSPECIFIED_OPTION, buildYearOptions, toOptionValue, toStoredValue,
 } from '@/lib/external-category';
+import type { NaesinSchool } from '@/lib/naesin-scope/types';
+import type { ScopeHint } from '@/lib/problem-bank/scope-resolve';
 import {
-  EXAM_TYPE_OPTIONS, SOURCE_TYPE_OPTIONS, suggestTitle, visibleFields,
-  type SourceFormErrors, type SourceFormValues,
+  EXAM_TYPE_OPTIONS, SCHOOL_LEVEL_OPTIONS, SOURCE_TYPE_OPTIONS, gradeOptionsForLevel,
+  suggestTitle, visibleFields,
+  type SchoolLevel, type SourceFormErrors, type SourceFormValues,
 } from '@/lib/problem-bank/source-form';
 import type { ProblemSourceType } from '@/types/problem-bank';
+import LabeledSelect from './LabeledSelect';
+import SourceTextbookField from './SourceTextbookField';
 
 interface SourceMetaFormProps {
   values: SourceFormValues;
   errors: SourceFormErrors;
-  /** 학교 마스터 이름 목록 (exam.schools) */
-  schools: string[];
+  /** 관리자시스템에 등록된 그 학교급의 학교 */
+  schools: NaesinSchool[];
+  /** 그 학교급의 교과서 이름 (= exam.publishers.name) */
+  textbooks: string[];
+  /** 내신 관리에 등록된 시험범위 힌트 */
+  scope: ScopeHint | null;
   onChange: (patch: Partial<SourceFormValues>) => void;
 }
 
 /**
  * 기출 업로드의 출처 정보 폼.
+ *
+ * 묻는 순서가 곧 좁혀 가는 순서다: **학교급 → 학교 → 학년**. 학교급을 먼저 골라야
+ * 학교 목록(중학교 15 / 고등학교 5)과 학년(중1~3 / 고1~3)을 그 급으로 좁힐 수 있다.
  * 유형에 따라 묻는 항목이 달라진다 — 문제집에 학교를 물으면 빈 칸만 늘어난다.
+ *
+ * 제목은 **버튼 없이** 고른 값을 따라간다(`applySourcePatch`). 직접 치면 그대로 두고,
+ * 비우면 다시 따라간다.
  */
-export default function SourceMetaForm({ values, errors, schools, onChange }: SourceMetaFormProps) {
+export default function SourceMetaForm({
+  values, errors, schools, textbooks, scope, onChange,
+}: SourceMetaFormProps) {
   const fields = useMemo(() => new Set(visibleFields(values.source_type)), [values.source_type]);
   const yearOptions = useMemo(() => buildYearOptions([values.year]), [values.year]);
   const suggestion = useMemo(() => suggestTitle(values), [values]);
 
+  const schoolOptions = useMemo(() => [
+    { value: UNSPECIFIED_OPTION, label: UNSPECIFIED_OPTION },
+    ...schools.map((s) => ({ value: s.id, label: s.name })),
+  ], [schools]);
+
+  // 학교는 id 로 고르고 이름을 함께 담는다 — 표시·필터·문제지 스냅샷이 이름을 쓴다
+  const pickSchool = (id: string) => {
+    if (id === UNSPECIFIED_OPTION) {
+      onChange({ school_id: '', school_name: '' });
+      return;
+    }
+    onChange({ school_id: id, school_name: schools.find((s) => s.id === id)?.name ?? '' });
+  };
+
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <div className="space-y-2">
-        <Label>출처 유형</Label>
-        <Select
-          value={values.source_type}
-          onValueChange={(v) => { if (v) onChange({ source_type: v as ProblemSourceType }); }}
-        >
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {SOURCE_TYPE_OPTIONS.map((t) => (
-              <SelectItem key={t} value={t}>{t}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <LabeledSelect
+        label="출처 유형"
+        value={values.source_type}
+        options={SOURCE_TYPE_OPTIONS}
+        onChange={(v) => onChange({ source_type: v as ProblemSourceType })}
+      />
+
+      <LabeledSelect
+        label="학교급"
+        value={values.level}
+        options={SCHOOL_LEVEL_OPTIONS}
+        onChange={(v) => onChange({ level: v as SchoolLevel })}
+      />
 
       {fields.has('school_name') && (
-        <div className="space-y-2">
-          <Label>학교</Label>
-          <Select
-            value={toOptionValue(values.school_name)}
-            onValueChange={(v) => { if (v) onChange({ school_name: v }); }}
-          >
-            <SelectTrigger><SelectValue placeholder="학교 선택" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value={UNSPECIFIED_OPTION}>{UNSPECIFIED_OPTION}</SelectItem>
-              {schools.map((name) => (
-                <SelectItem key={name} value={name}>{name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.school_name && <p className="text-xs text-red-600">{errors.school_name}</p>}
-        </div>
+        <LabeledSelect
+          label="학교"
+          value={values.school_id || UNSPECIFIED_OPTION}
+          options={schoolOptions}
+          placeholder="학교 선택"
+          error={errors.school_name}
+          onChange={pickSchool}
+        />
+      )}
+
+      <LabeledSelect
+        label="학년"
+        value={toOptionValue(values.grade)}
+        options={gradeOptionsForLevel(values.level)}
+        onChange={(v) => onChange({ grade: toStoredValue(v) })}
+      />
+
+      <LabeledSelect
+        label="학년도"
+        value={toOptionValue(values.year)}
+        options={yearOptions}
+        error={errors.year}
+        onChange={(v) => onChange({ year: toStoredValue(v) })}
+      />
+
+      {fields.has('semester') && (
+        <LabeledSelect
+          label="학기"
+          value={toOptionValue(values.semester)}
+          options={[UNSPECIFIED_OPTION, ...SEMESTER_OPTIONS]}
+          onChange={(v) => onChange({ semester: toStoredValue(v) })}
+        />
+      )}
+
+      {fields.has('exam_type') && (
+        <LabeledSelect
+          label="시험"
+          value={toOptionValue(values.exam_type)}
+          options={[UNSPECIFIED_OPTION, ...EXAM_TYPE_OPTIONS]}
+          onChange={(v) => onChange({ exam_type: toStoredValue(v) })}
+        />
       )}
 
       {fields.has('publisher') && (
@@ -78,72 +132,12 @@ export default function SourceMetaForm({ values, errors, schools, onChange }: So
         </div>
       )}
 
-      <div className="space-y-2">
-        <Label>학년도</Label>
-        <Select
-          value={toOptionValue(values.year)}
-          onValueChange={(v) => { if (v) onChange({ year: v }); }}
-        >
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {yearOptions.map((y) => (
-              <SelectItem key={y} value={y}>{y}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {errors.year && <p className="text-xs text-red-600">{errors.year}</p>}
-      </div>
-
-      <div className="space-y-2">
-        <Label>학년</Label>
-        <Select
-          value={toOptionValue(values.grade)}
-          onValueChange={(v) => { if (v) onChange({ grade: v }); }}
-        >
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {EXTERNAL_GRADE_OPTIONS.map((g) => (
-              <SelectItem key={g} value={g}>{g}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {fields.has('semester') && (
-        <div className="space-y-2">
-          <Label>학기</Label>
-          <Select
-            value={toOptionValue(values.semester)}
-            onValueChange={(v) => { if (v) onChange({ semester: v }); }}
-          >
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value={UNSPECIFIED_OPTION}>{UNSPECIFIED_OPTION}</SelectItem>
-              {SEMESTER_OPTIONS.map((s) => (
-                <SelectItem key={s} value={s}>{s}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-
-      {fields.has('exam_type') && (
-        <div className="space-y-2">
-          <Label>시험</Label>
-          <Select
-            value={toOptionValue(values.exam_type)}
-            onValueChange={(v) => { if (v) onChange({ exam_type: v }); }}
-          >
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value={UNSPECIFIED_OPTION}>{UNSPECIFIED_OPTION}</SelectItem>
-              {EXAM_TYPE_OPTIONS.map((t) => (
-                <SelectItem key={t} value={t}>{t}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
+      <SourceTextbookField
+        value={values.textbook}
+        textbooks={textbooks}
+        scope={scope}
+        onChange={(v) => onChange({ textbook: v })}
+      />
 
       <div className="space-y-2 sm:col-span-2 lg:col-span-3">
         <Label htmlFor="source-title">제목</Label>
@@ -154,15 +148,6 @@ export default function SourceMetaForm({ values, errors, schools, onChange }: So
           placeholder={suggestion || '예: 2026 상현중 중2 1학기 중간'}
         />
         {errors.title && <p className="text-xs text-red-600">{errors.title}</p>}
-        {!values.title && suggestion && (
-          <button
-            type="button"
-            className="text-xs text-primary underline underline-offset-2"
-            onClick={() => onChange({ title: suggestion })}
-          >
-            &lsquo;{suggestion}&rsquo; 로 채우기
-          </button>
-        )}
       </div>
     </div>
   );

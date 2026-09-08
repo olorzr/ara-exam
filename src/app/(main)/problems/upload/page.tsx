@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Upload } from 'lucide-react';
@@ -9,14 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAiEnabled } from '@/hooks/useAiEnabled';
 import { usePdfPages } from '@/hooks/usePdfPages';
 import { useProblemOcr } from '@/hooks/useProblemOcr';
-import { getSchools } from '@/lib/category-master';
-import { fetchAreaSets, fetchAreaTree, pickAreaSetForGrade } from '@/lib/problem-bank/area-master';
-import type { AreaTreeNode } from '@/lib/problem-bank/area-tree';
+import { useSourceMasters } from '@/hooks/useSourceMasters';
 import { insertSource } from '@/lib/problem-bank/save';
 import { uploadProblemFile } from '@/lib/problem-bank/storage';
 import { sourcePdfPath } from '@/lib/problem-bank/storage-paths';
 import {
-  toSourcePayload, validateSourceForm, type SourceFormErrors, type SourceFormValues,
+  applySourcePatch, toSourcePayload, validateSourceForm,
+  type SourceFormErrors, type SourceFormValues,
 } from '@/lib/problem-bank/source-form';
 import { planPageBatches } from '@/lib/problem-ocr/batch-plan';
 import { OCR_CONFIRM_BATCH_THRESHOLD } from '@/lib/problem-ocr/constants';
@@ -44,37 +43,32 @@ export default function ProblemUploadPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [file, setFile] = useState<File | null>(null);
-  const [values, setValues] = useState<SourceFormValues>(EMPTY_FORM);
+  /**
+   * 폼 값과 '제목을 아직 손대지 않았는가'를 **한 덩어리로** 들고 있는다.
+   * 따로 두면 값 갱신 함수 안에서 다른 state 를 만지게 되는데, 그 갱신 함수는
+   * 순수해야 한다(React 가 두 번 부를 수 있다). `applySourcePatch` 가 둘을 함께 돌려준다.
+   */
+  const [form, setForm] = useState({ values: EMPTY_FORM, titleAuto: true });
   const [errors, setErrors] = useState<SourceFormErrors>({});
-  const [schools, setSchools] = useState<string[]>([]);
-  const [areaTree, setAreaTree] = useState<AreaTreeNode[]>([]);
   const [uploading, setUploading] = useState(false);
 
+  const values = form.values;
   const pdf = usePdfPages(file);
 
-  useEffect(() => {
-    getSchools().then((rows) => setSchools(rows.map((s) => s.name))).catch(() => setSchools([]));
+  const onChange = useCallback((patch: Partial<SourceFormValues>) => {
+    setForm((f) => applySourcePatch(f.values, patch, f.titleAuto));
+    setErrors({});
   }, []);
 
-  // 영역 마스터는 못 읽어도(정책 미적용 환경) 화면을 막지 않는다 — 자유 입력으로 떨어진다
-  useEffect(() => {
-    let alive = true;
-    fetchAreaSets().then(async (sets) => {
-      const setId = pickAreaSetForGrade(sets, values.grade);
-      const tree = setId ? await fetchAreaTree(setId) : [];
-      if (alive) setAreaTree(tree);
-    });
-    return () => { alive = false; };
-  }, [values.grade]);
+  // 마스터(학교·교과서·영역·단원)와 내신 범위 힌트는 훅 하나가 맡는다
+  const masters = useSourceMasters(values, useCallback(
+    (textbook: string) => onChange({ textbook }),
+    [onChange],
+  ));
 
   const problemPages = useMemo(() => pdf.pagesWithRole('problem'), [pdf]);
   const answerPages = useMemo(() => pdf.pagesWithRole('answer'), [pdf]);
   const batchCount = useMemo(() => planPageBatches(problemPages).length, [problemPages]);
-
-  const onChange = useCallback((patch: Partial<SourceFormValues>) => {
-    setValues((v) => ({ ...v, ...patch }));
-    setErrors({});
-  }, []);
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const picked = e.target.files?.[0] ?? null;
@@ -138,7 +132,7 @@ export default function ProblemUploadPage() {
       meta: payload,
       problemPages,
       answerPages,
-      areaTree,
+      areaTree: masters.areaTree,
     });
 
     // 실패해도 출처 행은 남는다 — 검수 화면에서 상태를 보고 다시 돌릴 수 있다
@@ -172,7 +166,14 @@ export default function ProblemUploadPage() {
       <Card>
         <CardHeader><CardTitle className="text-base">1. 출처 정보</CardTitle></CardHeader>
         <CardContent>
-          <SourceMetaForm values={values} errors={errors} schools={schools} onChange={onChange} />
+          <SourceMetaForm
+            values={values}
+            errors={errors}
+            schools={masters.schools}
+            textbooks={masters.textbooks}
+            scope={masters.scope}
+            onChange={onChange}
+          />
         </CardContent>
       </Card>
 
