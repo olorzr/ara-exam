@@ -69,6 +69,9 @@ export async function runProblemOcr(
   // 문서는 **한 번만** 연다 — 묶음마다 열면 파일 전체를 매번 복사한다
   const doc: OpenPdf = await openPdfSource({ kind: 'file', file: input.file });
 
+  // 실패·취소했을 때 출처를 어떤 상태로 남길지 판단하는 데 쓴다
+  let savedAnything = false;
+
   try {
     // 검수 화면이 원본과 대조할 페이지 이미지를 먼저 올린다.
     // ⚠️ 이걸 빼면 검수 화면의 왼쪽(원본) 칸이 **늘 비어 있고**, 선생님이 잘못 읽은
@@ -123,6 +126,7 @@ export async function runProblemOcr(
     onProgress?.({ phase: 'save', done: 0, total: 1 });
     await insertPassages(input.sourceId, merged.passages, cropped.passageImages);
     await insertProblems(input.sourceId, merged.problems, cropped.problemImages);
+    savedAnything = merged.passages.length > 0 || merged.problems.length > 0;
 
     const meta: OcrMeta = {
       model: pref.model,
@@ -138,6 +142,27 @@ export async function runProblemOcr(
 
     onProgress?.({ phase: 'save', done: 1, total: 1 });
     return { merged, meta };
+  } catch (e) {
+    // ⚠️ '추출중' 인 채로 두면 안 된다. 업로드가 그 상태로 만들어 두고 성공 경로만
+    //    상태를 바꾸므로, 실패·취소한 작업이 **영영 돌고 있는 것처럼** 보인다
+    //    (코덱스 리뷰 12R). 저장된 게 있으면 검수중, 없으면 업로드로 되돌린다.
+    await updateSource(input.sourceId, {
+      status: savedAnything ? '검수중' : '업로드',
+      ocr_meta: {
+        pages: [...input.problemPages, ...input.answerPages].sort((a, b) => a - b),
+        durationMs: Date.now() - startedAt,
+        ranAt: new Date().toISOString(),
+        warnings: [
+          e instanceof Error && e.message ? `읽기가 끝나지 못했어요: ${e.message}` : '읽기가 끝나지 못했어요.',
+          savedAnything
+            ? '읽은 부분만 담겼어요. 검수에서 확인하고, 필요하면 다시 업로드해 주세요.'
+            : '담긴 문항이 없어요. 업로드 화면에서 다시 시도해 주세요.',
+        ],
+      },
+    }).catch(() => {
+      // 상태 정리까지 실패하면 어쩔 수 없다 — 원래 오류를 가리지 않는다
+    });
+    throw e;
   } finally {
     doc.pdf.destroy();
   }

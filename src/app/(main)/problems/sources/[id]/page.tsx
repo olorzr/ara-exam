@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
@@ -197,8 +198,15 @@ export default function ProblemSourceReviewPage() {
         <div className="space-y-3">
           {ordered.length === 0 && (
             <Card>
-              <CardContent className="py-12 text-center text-sm text-gray-500">
-                읽어 낸 문항이 없어요. 업로드 화면에서 다시 시도해 주세요.
+              <CardContent className="space-y-3 py-12 text-center text-sm text-gray-500">
+                <p>읽어 낸 문항이 없어요.</p>
+                {/* 실패·취소한 작업에서 실제로 돌아갈 곳을 준다 — 안내만 하고 길이 없으면 막힌다 */}
+                <Link
+                  href="/problems/upload"
+                  className="inline-block rounded-md bg-primary px-3 py-2 text-sm text-white"
+                >
+                  다시 업로드하기
+                </Link>
               </CardContent>
             </Card>
           )}

@@ -40,6 +40,9 @@ interface DragState {
   pointerId: number;
   lastIndex: number | null;
   rects: ItemRect[];
+  /** 마지막으로 본 포인터 위치 — 자동 스크롤 중에는 포인터가 멈춰 있어도 자리가 바뀐다 */
+  x: number;
+  y: number;
 }
 
 /**
@@ -89,7 +92,10 @@ export function useListDrag({ containerRef, onPreview, onCommit }: ListDragArgs)
     } catch {
       return; // 이미 놓인 포인터 — 잡을 게 없다
     }
-    drag.current = { pointerId: e.pointerId, lastIndex: null, rects: measure() };
+    drag.current = {
+      pointerId: e.pointerId, lastIndex: null, rects: measure(),
+      x: e.clientX, y: e.clientY,
+    };
     setDragging(true);
   }, [measure]);
 
@@ -98,7 +104,12 @@ export function useListDrag({ containerRef, onPreview, onCommit }: ListDragArgs)
     if (!state || e.pointerId !== state.pointerId) return;
     e.stopPropagation();
 
-    const next = indexAt(state, e.clientX, e.clientY);
+    state.x = e.clientX;
+    state.y = e.clientY;
+    // 포인터가 움직였으니 카드 위치도 다시 잰다(스크롤·미리보기 자리표시자로 달라진다)
+    state.rects = measure();
+
+    const next = indexAt(state, state.x, state.y);
     if (next !== state.lastIndex) {
       state.lastIndex = next;
       onPreview(next);
@@ -113,12 +124,24 @@ export function useListDrag({ containerRef, onPreview, onCommit }: ListDragArgs)
       if (step !== 0) {
         const roll = () => {
           container.scrollTop += step;
+          // ⚠️ 굴리는 동안 카드가 움직인다. 포인터가 멈춰 있어도 **자리를 다시 계산**해야
+          //    한다 — 안 그러면 놓았을 때 pointerdown 시점의 좌표로 계산해 엉뚱한 곳에
+          //    끼워 넣는다(코덱스 리뷰 12R)
+          const live = drag.current;
+          if (live) {
+            live.rects = measure();
+            const moved = indexAt(live, live.x, live.y);
+            if (moved !== live.lastIndex) {
+              live.lastIndex = moved;
+              onPreview(moved);
+            }
+          }
           scrollRaf.current = requestAnimationFrame(roll);
         };
         scrollRaf.current = requestAnimationFrame(roll);
       }
     }
-  }, [containerRef, indexAt, onPreview, stopAutoScroll]);
+  }, [containerRef, indexAt, measure, onPreview, stopAutoScroll]);
 
   const finish = useCallback((e: React.PointerEvent<HTMLElement>) => {
     const state = drag.current;
