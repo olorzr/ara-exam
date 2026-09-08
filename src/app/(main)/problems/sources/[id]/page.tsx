@@ -16,21 +16,7 @@ import PageImageWithBoxes, { type BoxOverlay } from '@/components/problem-review
 import PassageEditorCard from '@/components/problem-review/PassageEditorCard';
 import ProblemEditorCard from '@/components/problem-review/ProblemEditorCard';
 import OcrProgress from '@/components/problem-ocr/OcrProgress';
-import { boxToBbox } from '@/lib/problem-ocr/crop';
-import type { Bbox } from '@/types/problem-bank';
-
-/** DB 의 bbox jsonb 는 두 가지 모양이 올 수 있다 — 저장한 {column,top,bottom} 과 정규화 사각형 */
-function toBbox(raw: unknown): Bbox | null {
-  if (!raw || typeof raw !== 'object') return null;
-  const value = raw as Record<string, unknown>;
-  if (typeof value.column === 'number' && typeof value.top === 'number' && typeof value.bottom === 'number') {
-    return boxToBbox({ column: value.column as 0 | 1 | 2, top: value.top, bottom: value.bottom });
-  }
-  if (typeof value.x === 'number' && typeof value.y === 'number') {
-    return { x: value.x, y: value.y, w: Number(value.w) || 0, h: Number(value.h) || 0 };
-  }
-  return null;
-}
+import { toBbox } from '@/lib/problem-bank/bbox';
 
 /**
  * 기출 검수 화면 (`/problems/sources/[id]`).

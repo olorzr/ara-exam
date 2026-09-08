@@ -7,20 +7,15 @@ import { AiError } from '@/lib/ai/types';
 import { openPdfSource, renderPagesToImages, type OpenPdf } from '@/lib/pdf/pdfPages';
 import type { AreaTreeNode } from '@/lib/problem-bank/area-tree';
 import { insertPassages, insertProblems, updateSource } from '@/lib/problem-bank/save';
-import { uploadProblemFile } from '@/lib/problem-bank/storage';
-import {
-  passageRegionPath, problemRegionPath, sourcePagePath,
-} from '@/lib/problem-bank/storage-paths';
 import type { OcrMeta } from '@/types/problem-bank';
 import { applyAnswerKey } from './answer-key';
 import { planPageBatches } from './batch-plan';
 import { representativeFailure, runOcrBatches } from './batch-run';
 import { ANSWER_KEY_PAGES_PER_BATCH, answerKeyTurnBudgetMs, ocrTurnBudgetMs } from './constants';
-import { boxToBbox } from './crop';
-import { PageCropper } from './crop-dom';
 import { mergeOcrDrafts, type MergeResult } from './merge';
 import { parseAnswerKeyDraft, parseOcrDraft } from './parse';
 import { buildAnswerKeyPrompt, buildProblemOcrPrompt, type OcrSourceMeta } from './prompt';
+import { cropRegions, uploadPageImages } from './run-images';
 import { ANSWER_KEY_SCHEMA, PROBLEM_OCR_SCHEMA } from './schema';
 
 /**
@@ -183,46 +178,6 @@ export async function runProblemOcr(
   }
 }
 
-/**
- * 검수용 페이지 이미지를 Storage 에 올린다.
- *
- * 정답표 쪽까지 함께 올린다 — 정답이 이상할 때 어디서 읽었는지 봐야 한다.
- * 한 장이 실패해도 다음 장을 계속 올린다(원본 대조가 부분적으로라도 되는 편이 낫다).
- */
-async function uploadPageImages(
-  input: OcrRunInput,
-  doc: OpenPdf,
-  signal: AbortSignal | undefined,
-  onProgress?: (p: OcrRunProgress) => void,
-): Promise<void> {
-  const pages = [...new Set([...input.problemPages, ...input.answerPages])]
-    .filter((n) => Number.isInteger(n) && n >= 1)
-    .sort((a, b) => a - b);
-  if (pages.length === 0) return;
-
-  // 캔버스 캐시를 쓰는 도구를 재사용한다. data URL → fetch → Blob 수법은
-  // CSP connect-src 가 `data:` 를 막아 **전부 실패**한다(코덱스 리뷰 2R)
-  const cropper = new PageCropper(doc);
-  let done = 0;
-  try {
-    for (const page of pages) {
-      if (signal?.aborted) return;
-      const blob = await cropper.pageBlob(page);
-      if (blob) {
-        try {
-          await uploadProblemFile(sourcePagePath(input.sourceId, page), blob, 'image/jpeg');
-        } catch {
-          // 원본 이미지가 없어도 문항은 읽힌다 — 여기서 멈추지 않는다
-        }
-      }
-      done += 1;
-      onProgress?.({ phase: 'page', done, total: pages.length });
-    }
-  } finally {
-    cropper.dispose();
-  }
-}
-
 /** 정답표 쪽을 읽어 문항에 붙인다. 실패해도 본문 저장을 막지 않는다 */
 async function readAnswerKey(
   input: OcrRunInput,
@@ -269,97 +224,3 @@ async function readAnswerKey(
   }
   return { imagesSent: run.imagesSent, rawLength: run.rawLength };
 }
-
-/** 문항·지문 영역을 잘라 올린다. 실패한 것은 경로 없이 두고 넘어간다 */
-async function cropRegions(
-  doc: OpenPdf,
-  merged: MergeResult,
-  signal: AbortSignal | undefined,
-  onProgress?: (p: OcrRunProgress) => void,
-): Promise<{
-  passageImages: Map<string, string>;
-  problemImages: Map<string, string>;
-  warnings: string[];
-}> {
-  const cropper = new PageCropper(doc);
-  const passageImages = new Map<string, string>();
-  const problemImages = new Map<string, string>();
-  const warnings: string[] = [];
-
-  interface CropTarget {
-    id: string;
-    page: number;
-    box: NonNullable<PassageBox>;
-    kind: 'passage' | 'problem';
-    /** 그림·표가 있어 **글만으로는 온전하지 않은** 항목 — 실패를 조용히 넘기면 안 된다 */
-    needsImage: boolean;
-    label: string;
-  }
-
-  const targets: CropTarget[] = [
-    ...merged.passages.filter((p) => p.box).map((p) => ({
-      id: p.id, page: p.page_no, box: p.box!, kind: 'passage' as const,
-      needsImage: p.has_figure, label: `${p.page_no}쪽 지문`,
-    })),
-    ...merged.problems.filter((p) => p.box).map((p) => ({
-      id: p.id, page: p.page_no, box: p.box!, kind: 'problem' as const,
-      needsImage: p.has_figure,
-      label: p.number !== null ? `${p.number}번` : `${p.page_no}쪽 문항`,
-    })),
-  ];
-
-  // 그림이 있다고 표시됐는데 좌표가 없으면 애초에 자를 수가 없다 — 그것도 알린다
-  const noBox = [
-    ...merged.passages.filter((p) => p.has_figure && !p.box).map((p) => `${p.page_no}쪽 지문`),
-    ...merged.problems.filter((p) => p.has_figure && !p.box)
-      .map((p) => (p.number !== null ? `${p.number}번` : `${p.page_no}쪽 문항`)),
-  ];
-  const failed: string[] = [...noBox];
-
-  try {
-    let done = 0;
-    for (let i = 0; i < targets.length; i += 1) {
-      const target = targets[i];
-      if (signal?.aborted) {
-        // ⚠️ 취소로 멈춰도 **남은 그림 항목은 경고에 넣는다.** 호출부는 여기까지 읽은
-        //    결과를 그대로 저장하는데, 이미지 없이 저장된 그림 문항은 글만으로는
-        //    내용이 빠진 상태다 — 조용히 아카이브에 들어가면 안 된다(코덱스 리뷰 19R)
-        failed.push(...targets.slice(i).filter((t) => t.needsImage).map((t) => t.label));
-        break;
-      }
-      const blob = await cropper.crop(target.page, boxToBbox(target.box));
-      let ok = false;
-      if (blob) {
-        const path = target.kind === 'passage'
-          ? passageRegionPath(target.id)
-          : problemRegionPath(target.id);
-        try {
-          await uploadProblemFile(path, blob, 'image/jpeg');
-          (target.kind === 'passage' ? passageImages : problemImages).set(target.id, path);
-          ok = true;
-        } catch {
-          // 이미지가 없어도 본문은 멀쩡하다 — 저장을 막지 않는다
-        }
-      }
-      // ⚠️ 그림이 있는 항목은 다르다. 프롬프트가 "옮길 수 있는 글자만 적으라" 고 시켰으므로
-      //    글만으로는 온전하지 않다. 이미지를 못 만들었으면 **반드시 알린다**(코덱스 리뷰 17R)
-      if (!ok && target.needsImage) failed.push(target.label);
-      done += 1;
-      onProgress?.({ phase: 'crop', done, total: targets.length });
-    }
-  } finally {
-    cropper.dispose();
-  }
-
-  if (failed.length > 0) {
-    warnings.push(
-      `그림·표가 있는 항목의 이미지를 만들지 못했어요(${failed.slice(0, 8).join(', ')}`
-      + `${failed.length > 8 ? ` 외 ${failed.length - 8}개` : ''}). `
-      + '글만으로는 내용이 빠질 수 있으니 검수에서 확인해 주세요.',
-    );
-  }
-
-  return { passageImages, problemImages, warnings };
-}
-
-type PassageBox = MergeResult['passages'][number]['box'];

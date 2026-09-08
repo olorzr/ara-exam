@@ -5,9 +5,8 @@ import { toast } from 'sonner';
 import {
   EMPTY_FILTERS, toProblemQuery, type ProblemFilters,
 } from '@/lib/problem-bank/filters';
-import {
-  fetchAreaFacets, fetchProblemPage, fetchSourceFacets, PROBLEM_PAGE_SIZE,
-} from '@/lib/problem-bank/queries';
+import { fetchAreaFacets, fetchSourceFacets } from '@/lib/problem-bank/facets';
+import { fetchProblemPage, PROBLEM_PAGE_SIZE } from '@/lib/problem-bank/queries';
 import type { Problem, ProblemSource } from '@/types/problem-bank';
 
 export type ArchiveRow = Problem & { source: ProblemSource };
