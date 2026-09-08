@@ -35,6 +35,14 @@ export default function PaperComposePage() {
 
   const groups = useMemo(() => groupsOf(paper.items), [paper.items]);
   const groupStarts = useMemo(() => new Set(groups.map((g) => g.start)), [groups]);
+  /** 항목 index → 그 항목이 속한 묶음 번호 (묶음 통째 이동에 쓴다) */
+  const groupIndexOf = useMemo(() => {
+    const map = new Map<number, number>();
+    groups.forEach((g, gi) => {
+      for (let i = g.start; i <= g.end; i += 1) map.set(i, gi);
+    });
+    return map;
+  }, [groups]);
 
   const commit = useCallback((index: number | null) => {
     const dragged = source;
@@ -171,6 +179,16 @@ export default function PaperComposePage() {
                     onRemove={() => paper.remove(item.problemId)}
                     onMoveUp={() => paper.move(index, index - 1)}
                     onMoveDown={() => paper.move(index, index + 2)}
+                    onMoveGroupUp={groupIndexOf.get(index) === 0 ? undefined : () => {
+                      const gi = groupIndexOf.get(index);
+                      if (gi !== undefined) paper.moveWholeGroup(gi, gi - 1);
+                    }}
+                    onMoveGroupDown={
+                      groupIndexOf.get(index) === groups.length - 1 ? undefined : () => {
+                        const gi = groupIndexOf.get(index);
+                        if (gi !== undefined) paper.moveWholeGroup(gi, gi + 1);
+                      }
+                    }
                     dragHandlers={{
                       ...drag.handlers,
                       onPointerDown: (e) => {

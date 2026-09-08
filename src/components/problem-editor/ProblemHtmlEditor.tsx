@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -61,6 +61,17 @@ interface ProblemHtmlEditorProps {
 export default function ProblemHtmlEditor({
   value, onChange, minHeight = 120, ariaLabel,
 }: ProblemHtmlEditorProps) {
+  /**
+   * 우리가 마지막으로 밖에 내보낸 HTML.
+   *
+   * ⚠️ 이게 없으면 **표가 있는 글에서 글자마다 커서가 끝으로 튄다.** TipTap 은
+   *    `<colgroup>` 과 표 크기 style 을 함께 내는데 정화가 그걸 지우므로,
+   *    "정화한 값 == getHTML()" 비교가 **영영 참이 되지 않아** 키를 칠 때마다
+   *    문서를 통째로 갈아 끼우게 된다(코덱스 리뷰 18R).
+   *    내가 낸 값이 돌아온 것인지부터 확인해 그 경우는 아무것도 하지 않는다.
+   */
+  const lastEmitted = useRef<string>(value);
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -80,14 +91,22 @@ export default function ProblemHtmlEditor({
         ...(ariaLabel ? { 'aria-label': ariaLabel } : {}),
       },
     },
-    onUpdate: ({ editor: e }) => onChange(e.getHTML()),
+    onUpdate: ({ editor: e }) => {
+      const html = e.getHTML();
+      lastEmitted.current = html;
+      onChange(html);
+    },
   });
 
-  // 다른 문항으로 옮겨 갔을 때만 갈아 끼운다 — 타이핑 중에 덮어쓰면 커서가 튄다
+  // 바깥에서 내용이 갈렸을 때만 갈아 끼운다 — 타이핑 중에 덮어쓰면 커서가 튄다
   useEffect(() => {
     if (!editor) return;
+    // 내가 방금 낸 값이 그대로 돌아온 것이면 아무것도 하지 않는다
+    if (value === lastEmitted.current) return;
     const next = sanitizeProblemHTML(value);
-    if (next !== editor.getHTML()) editor.commands.setContent(next, { emitUpdate: false });
+    if (next === editor.getHTML()) return;
+    editor.commands.setContent(next, { emitUpdate: false });
+    lastEmitted.current = next;
     // value 가 바뀔 때만 반응한다(editor 는 안정적인 참조다)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);

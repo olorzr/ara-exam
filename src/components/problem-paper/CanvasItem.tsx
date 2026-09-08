@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown, ChevronUp, GripVertical, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, GripVertical, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { areaPathLabel } from '@/lib/problem-bank/area-tree';
 import type { ArchiveRow } from '@/hooks/useProblemArchive';
@@ -23,6 +23,14 @@ interface CanvasItemProps {
   onRemove: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  /**
+   * 지문 묶음 통째로 옮기기 — 묶음의 첫 문항에만 준다.
+   *
+   * 문항 하나씩 옮기는 버튼은 **자기 묶음 안에서만** 움직인다(같은 지문이 흩어지면
+   * 안 되므로). 그래서 묶음을 다른 지문 앞뒤로 보내려면 별도 조작이 필요하다.
+   */
+  onMoveGroupUp?: () => void;
+  onMoveGroupDown?: () => void;
 }
 
 /**
@@ -33,6 +41,7 @@ interface CanvasItemProps {
  */
 export default function CanvasItem({
   row, number, groupStart, dragHandlers, onRemove, onMoveUp, onMoveDown,
+  onMoveGroupUp, onMoveGroupDown,
 }: CanvasItemProps) {
   return (
     <div
@@ -52,7 +61,27 @@ export default function CanvasItem({
 
       <div className="min-w-0 flex-1">
         {groupStart && row?.passage_id && (
-          <Badge variant="outline" className="mb-1">지문 묶음 시작</Badge>
+          <div className="mb-1 flex items-center gap-1">
+            <Badge variant="outline">지문 묶음</Badge>
+            {onMoveGroupUp && (
+              <button
+                type="button" onClick={onMoveGroupUp}
+                className="rounded p-0.5 text-gray-400 hover:bg-gray-100"
+                aria-label="이 지문 묶음을 앞으로"
+              >
+                <ChevronsUp className="h-3.5 w-3.5" />
+              </button>
+            )}
+            {onMoveGroupDown && (
+              <button
+                type="button" onClick={onMoveGroupDown}
+                className="rounded p-0.5 text-gray-400 hover:bg-gray-100"
+                aria-label="이 지문 묶음을 뒤로"
+              >
+                <ChevronsDown className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
         )}
         <p className="text-sm text-gray-800">
           {row ? excerpt(row.stem_html) : '(불러오지 못한 문항)'}
