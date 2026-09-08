@@ -98,6 +98,28 @@ describe('mergeOcrDrafts — 겹쳐 읽은 중복', () => {
     expect(res.problems).toHaveLength(1);
   });
 
+  it('한 쪽 안에서 번호가 반복돼도 각각 남는다 — 문제집·프린트는 절마다 1번부터 다시 센다', () => {
+    // 코덱스 리뷰 14R: 쪽·번호만으로 키를 만들면 둘째 문항이 통째로 사라졌다
+    const res = mergeOcrDrafts([
+      batch([
+        problem({ ref: 'Q1', page: 2, number: 1, stem_html: '<p>유형A 1번</p>' }),
+        problem({ ref: 'Q2', page: 2, number: 1, stem_html: '<p>유형B 1번</p>' }),
+      ], [2]),
+    ], { newId });
+    expect(res.problems).toHaveLength(2);
+    expect(res.problems[1].stem_html).toContain('유형B');
+  });
+
+  it('겹쳐 읽으면 같은 자리끼리만 합쳐진다 — 반복 번호가 있어도 중복이 안 생긴다', () => {
+    const two = () => [
+      problem({ ref: 'Q1', page: 2, number: 1, stem_html: '<p>유형A 1번</p>' }),
+      problem({ ref: 'Q2', page: 2, number: 1, stem_html: '<p>유형B 1번</p>', answer: '4' }),
+    ];
+    const res = mergeOcrDrafts([batch(two(), [1, 2]), batch(two(), [2, 3])], { newId });
+    expect(res.problems).toHaveLength(2);
+    expect(res.problems[1].answer).toBe('4');
+  });
+
   it('쪽이 다르면 같은 번호라도 다른 문항이다 — 문제집은 절마다 번호가 다시 시작한다', () => {
     const res = mergeOcrDrafts([
       batch([problem({ page: 1, number: 1 }), problem({ ref: 'Q2', page: 4, number: 1 })], [1, 4]),

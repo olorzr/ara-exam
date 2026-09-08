@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -46,6 +46,13 @@ export default function ProblemSourceReviewPage() {
 
   const [areaTree, setAreaTree] = useState<AreaTreeNode[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  /**
+   * 저장하지 않은 수정이 있는 문항.
+   *
+   * ⚠️ 이걸 안 보면 고치던 내용을 버린 채 출처가 '완료' 로 굳는다 — 검수한 자료인 줄
+   *    알고 그대로 인쇄하게 된다(코덱스 리뷰 14R).
+   */
+  const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
   const [wantedPage, setPage] = useState(1);
 
   useEffect(() => {
@@ -120,7 +127,24 @@ export default function ProblemSourceReviewPage() {
   const problemCountFor = (passageId: string) =>
     review.problems.filter((p) => p.passage_id === passageId).length;
 
+  const markDirty = useCallback((id: string, dirty: boolean) => {
+    setDirtyIds((prev) => {
+      if (prev.has(id) === dirty) return prev;
+      const next = new Set(prev);
+      if (dirty) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
+
   const finish = async () => {
+    if (dirtyIds.size > 0) {
+      const ok = window.confirm(
+        `저장하지 않은 문항이 ${dirtyIds.size}개 있어요.\n`
+        + '지금 마치면 그 수정은 사라지고 옛 내용이 검수한 자료로 남습니다. 계속할까요?',
+      );
+      if (!ok) return;
+    }
     try {
       await setSourceStatus(sourceId, '완료');
       toast.success('검수를 마쳤어요. 아카이브에서 문제지에 담을 수 있어요.');
@@ -248,6 +272,7 @@ export default function ProblemSourceReviewPage() {
                   setSelectedId(problem.id);
                 }}
                 onSave={(patch) => review.saveProblem(problem.id, patch)}
+                onDirtyChange={(dirty) => markDirty(problem.id, dirty)}
                 // 방금 저장해서 알고 있는 버전을 **그대로 넘긴다** — 버리면 저장 직후
                 // 검수가 옛 버전으로 걸려 아무도 안 고쳤는데 충돌한다
                 onToggleVerified={(v, knownUpdatedAt) => (

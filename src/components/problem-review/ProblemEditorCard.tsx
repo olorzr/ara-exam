@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Check, Image as ImageIcon, Trash2, Type } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -43,6 +43,8 @@ interface ProblemEditorCardProps {
   /** `knownUpdatedAt` 은 방금 저장해 이미 아는 버전 — 화면 state 가 안 돌아도 맞는 값을 쓴다 */
   onToggleVerified: (verified: boolean, knownUpdatedAt?: string) => void;
   onDelete: () => void;
+  /** 저장하지 않은 수정이 생기거나 사라질 때 알린다 — 화면이 '검수 마치기'를 막는 데 쓴다 */
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 /**
@@ -56,7 +58,7 @@ interface ProblemEditorCardProps {
  *    효과로 되돌리는 대신 key 로 다시 마운트하는 것이 React 권장 방식이다.
  */
 export default function ProblemEditorCard({
-  problem, areaTree, selected, onSelect, onSave, onToggleVerified, onDelete,
+  problem, areaTree, selected, onSelect, onSave, onToggleVerified, onDelete, onDirtyChange,
 }: ProblemEditorCardProps) {
   const [stem, setStem] = useState(problem.stem_html);
   const [choices, setChoices] = useState<string[]>(problem.choices);
@@ -84,6 +86,12 @@ export default function ProblemEditorCard({
     || score !== (problem.score === null ? '' : String(problem.score))
     || area.join('>') !== problem.area_path.join('>')
     || trimTrailingChoices(choices).join('\u0000') !== problem.choices.join('\u0000');
+
+  // 화면이 '검수 마치기' 를 막을 수 있게 알린다. 렌더 중 부모 state 를 건드리지 않도록
+  // 값이 바뀔 때만 효과로 통지한다
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
 
   const handleSave = async (): Promise<string | null> => {
     // ⚠️ 빈 칸을 걸러내며 압축하면 안 된다 — 정답은 위치 번호라 뒤 선지가 당겨지면

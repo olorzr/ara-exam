@@ -103,10 +103,34 @@ function passageKey(item: OcrItem): string {
     : `${item.page}|H|${textOf(item.html).slice(0, 40)}`;
 }
 
-function problemKey(item: OcrItem): string {
+/**
+ * 문항 중복 판정 키의 **기본형**.
+ *
+ * ⚠️ 여기에 등장 순번이 더 붙는다(problemKeyIn 참조). 쪽·번호만으로 유일하다고 보면
+ *    문제집·프린트처럼 **한 쪽 안에서 번호가 다시 시작하는** 자료에서 서로 다른 문항이
+ *    같은 키를 받아 하나가 통째로 사라진다(코덱스 리뷰 14R).
+ */
+function problemKeyBase(item: OcrItem): string {
   return item.number !== null
     ? `${item.page}|N|${item.number}`
     : `${item.page}|S|${textOf(item.stem_html).slice(0, 40)}`;
+}
+
+/**
+ * 이 묶음 안에서의 등장 순번까지 더한 키.
+ *
+ * 한 묶음 안에 같은 기본 키가 두 번 나오면 **서로 다른 문항**이다 — 모델은 둘을 각각
+ * 다른 ref 로 냈다. 반면 다른 묶음에서 같은 키가 나오면 겹쳐 읽은 **같은 문항**이다.
+ * 순번을 붙이면 그 둘이 갈린다: 같은 자리끼리만 합쳐진다.
+ * @param item - 검증된 항목
+ * @param seenInBatch - 이 묶음에서 기본 키가 몇 번 나왔는지 (호출하며 증가시킨다)
+ * @returns 순번이 붙은 키
+ */
+function problemKeyIn(item: OcrItem, seenInBatch: Map<string, number>): string {
+  const base = problemKeyBase(item);
+  const nth = seenInBatch.get(base) ?? 0;
+  seenInBatch.set(base, nth + 1);
+  return `${base}#${nth}`;
 }
 
 /** 병합 중에만 쓰는 상태 — 조각을 따로 들고 있다가 끝에 합친다 */
@@ -265,11 +289,14 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
     }
 
     // 2) 문항
+    // 이 묶음에서 같은 기본 키가 몇 번째로 나왔는지 — 한 쪽에서 번호가 반복되는
+    // 자료(문제집·프린트)의 서로 다른 문항을 갈라 준다
+    const seenInBatch = new Map<string, number>();
     for (const item of draft.items) {
       if (item.kind !== 'problem') continue;
 
       const passageId = item.passage_ref ? refToId.get(item.passage_ref) ?? null : null;
-      const key = problemKey(item);
+      const key = problemKeyIn(item, seenInBatch);
       const existing = problemByKey.get(key);
 
       if (existing) {
