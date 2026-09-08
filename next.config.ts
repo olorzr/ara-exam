@@ -2,8 +2,13 @@ import type { NextConfig } from 'next';
 
 const isProd = process.env.NODE_ENV === 'production';
 
+// 'wasm-unsafe-eval' 은 **WebAssembly 컴파일만** 허용하는 좁은 권한이다(JS eval 은 아니다).
+// pdf.js 워커가 JBIG2·JPX 이미지를 풀 때 WebAssembly.instantiate 를 부르는데,
+// 이게 없으면 흑백 스캐너 PDF 의 본문이 프로덕션에서만 백지로 렌더된다
+// (wasmUrl 을 줘도 소용없다 — 파일은 받아 오지만 컴파일이 막힌다). 코덱스 리뷰 8R
+// 개발 모드의 'unsafe-eval' 은 wasm 도 함께 허용하므로 그쪽에서는 드러나지 않는다.
 const scriptSrc = isProd
-  ? "'self' 'unsafe-inline'"
+  ? "'self' 'unsafe-inline' 'wasm-unsafe-eval'"
   : "'self' 'unsafe-inline' 'unsafe-eval'";
 
 const cspDirectives = [

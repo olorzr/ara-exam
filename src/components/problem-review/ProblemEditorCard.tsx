@@ -68,7 +68,22 @@ export default function ProblemEditorCard({
   const verified = problem.status === '검수완료';
   const missingAnswer = !answer.trim();
 
-  const handleSave = async () => {
+  /**
+   * 저장하지 않은 수정이 있는가.
+   *
+   * ⚠️ 이걸 안 보면 **고친 내용을 버린 채 옛 OCR 결과가 '검수완료'로 굳는다** —
+   *    화면을 떠나면 지역 state 가 사라지는데 상태만 검수완료로 남아,
+   *    검수한 자료인 줄 알고 그대로 인쇄하게 된다(코덱스 리뷰 8R).
+   */
+  const dirty = stem !== problem.stem_html
+    || answer !== problem.answer
+    || type !== problem.question_type
+    || workTitle !== problem.work_title
+    || score !== (problem.score === null ? '' : String(problem.score))
+    || area.join('>') !== problem.area_path.join('>')
+    || trimTrailingChoices(choices).join('\u0000') !== problem.choices.join('\u0000');
+
+  const handleSave = async (): Promise<boolean> => {
     // ⚠️ 빈 칸을 걸러내며 압축하면 안 된다 — 정답은 위치 번호라 뒤 선지가 당겨지면
     //    정답이 다른 선지를 가리키게 된다. 뒤쪽만 자르고 가운데는 자리를 지킨다
     const trimmed = trimTrailingChoices(choices);
@@ -78,12 +93,12 @@ export default function ProblemEditorCard({
         `${blanks.join(', ')}번 선지가 비어 있어요.\n`
         + '정답 번호가 자리로 매겨지므로 빈 칸도 그대로 저장합니다. 계속할까요?',
       );
-      if (!ok) return;
+      if (!ok) return false;
     }
 
     setSaving(true);
     const parsedScore = score.trim() === '' ? null : Number(score);
-    await onSave({
+    const ok = await onSave({
       stem_html: stem,
       choices: trimmed,
       answer: answer.trim(),
@@ -94,6 +109,19 @@ export default function ProblemEditorCard({
       work_title: workTitle,
     });
     setSaving(false);
+    return ok;
+  };
+
+  /**
+   * 검수 완료로 표시한다. 저장하지 않은 수정이 있으면 **먼저 저장하고**,
+   * 저장이 실패하면 검수 표시도 하지 않는다 — 고친 내용을 버린 채 상태만 굳으면 안 된다.
+   */
+  const handleVerify = async (next: boolean) => {
+    if (next && dirty) {
+      const saved = await handleSave();
+      if (!saved) return;
+    }
+    onToggleVerified(next);
   };
 
   const toggleRenderMode = () => {
@@ -117,6 +145,7 @@ export default function ProblemEditorCard({
         <Badge variant="outline">{problem.page_no}쪽</Badge>
         {verified && <Badge className="bg-emerald-500 text-white">검수완료</Badge>}
         {missingAnswer && <Badge className="bg-amber-500 text-white">정답 미입력</Badge>}
+        {dirty && <Badge className="bg-sky-500 text-white">저장 안 됨</Badge>}
         {problem.render_mode === 'image' && <Badge variant="outline">이미지 출제</Badge>}
 
         <div className="ml-auto flex items-center gap-1">
@@ -129,7 +158,8 @@ export default function ProblemEditorCard({
           )}
           <Button
             type="button" variant={verified ? 'outline' : 'default'} size="sm"
-            onClick={() => onToggleVerified(!verified)}
+            onClick={() => handleVerify(!verified)}
+            disabled={saving}
           >
             <Check className="h-3.5 w-3.5" />
             <span className="ml-1">{verified ? '검수 해제' : '검수 완료'}</span>
