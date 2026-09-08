@@ -41,11 +41,11 @@ export default function DashboardPage() {
   }, [user]);
 
   const quickActions = [
-    { href: '/exam/builder', icon: Lightbulb, label: '개념 관리', desc: '개념지를 만들고 관리해요 💡' },
+    { href: '/exam/builder', icon: Lightbulb, label: '개념지', desc: '개념지를 만들고 관리해요 💡' },
     { href: '/words/new', icon: PlusCircle, label: '단어 입력', desc: '새 단어를 추가해요 ✨' },
     { href: '/words', icon: FolderOpen, label: '단어 관리', desc: '저장된 단어를 관리해요 📖' },
     { href: '/categories', icon: FolderCog, label: '카테고리 관리', desc: '출판사·단원을 정리해요 📂' },
-    { href: '/exam/create', icon: FileText, label: '시험지 생성', desc: '시험지를 만들어요 ✏️' },
+    { href: '/exam/create', icon: FileText, label: '단어 시험지 생성', desc: '시험지를 만들어요 ✏️' },
     { href: '/exam/history', icon: History, label: '시험 이력', desc: '이전 시험지를 확인해요 🔍' },
   ];
 

@@ -104,7 +104,7 @@ export default function ExamPreview({
   return (
     <div className="flex flex-col h-full">
       {/* 탭 바 */}
-      <div className="bg-white border-b-2 border-gray-200 px-6 flex sticky top-16 z-40" data-no-print>
+      <div className="bg-white border-b-2 border-gray-200 px-6 flex sticky top-[var(--app-topbar-h)] z-40" data-no-print>
         {TABS.map((tab) => (
           <button
             key={tab.key}

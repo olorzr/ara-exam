@@ -18,11 +18,11 @@ src/
 │       ├── words/           # 단어 관리
 │       │   └── new/         # 단어 입력 (직접/CSV)
 │       └── exam/            # 시험 관련
-│           ├── create/      # 시험지 생성
+│           ├── create/      # 단어 시험지 생성
 │           ├── history/     # 시험 이력
 │           └── view/        # 시험지/답안지/단어장 보기
 ├── components/
-│   ├── layout/              # 레이아웃 컴포넌트 (Header 등)
+│   ├── layout/              # 앱 셸 (AppShell·Sidebar·nav-items — 좌측 사이드바 네비게이션)
 │   ├── words/               # 단어 입력 관련 분리 컴포넌트
 │   └── ui/                  # Shadcn UI 컴포넌트
 ├── lib/                     # 유틸리티, 설정

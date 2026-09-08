@@ -121,7 +121,7 @@ export default function ExamCategoryBar({ category, onChange }: ExamCategoryBarP
   const label = category.unit ? formatCategoryLabel(toCategory(category)) : '카테고리를 선택하세요';
 
   return (
-    <div className="bg-white border-b-2 border-primary p-4 flex items-center gap-3 sticky top-16 z-40" data-no-print>
+    <div className="bg-white border-b-2 border-primary p-4 flex items-center gap-3 sticky top-[var(--app-topbar-h)] z-40" data-no-print>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger
           render={

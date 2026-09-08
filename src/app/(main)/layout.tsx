@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import Header from '@/components/layout/Header';
+import AppShell from '@/components/layout/AppShell';
 
 /**
  * 인증이 필요한 메인 영역 레이아웃. 미인증 시 로그인으로 리다이렉트한다.
@@ -28,12 +28,5 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
   if (!user) return null;
 
-  return (
-    <div className="min-h-screen bg-white">
-      <Header />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {children}
-      </main>
-    </div>
-  );
+  return <AppShell>{children}</AppShell>;
 }

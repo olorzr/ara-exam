@@ -31,7 +31,7 @@ export default function ConceptEditorPage() {
     <>
       {/* 미리보기 화면 */}
       {e.screen === 'preview' && (
-        <div className="-mx-4 sm:-mx-6 lg:-mx-8 -my-8 eb-preview-wrap" style={{ height: 'calc(100vh - 64px)' }}>
+        <div className="-mx-4 sm:-mx-6 lg:-mx-8 -my-8 eb-preview-wrap" style={{ height: 'calc(100vh - var(--app-topbar-h))' }}>
           <ExamPreview
             editorHTML={e.editorHTML}
             category={e.category}
@@ -49,7 +49,7 @@ export default function ConceptEditorPage() {
       {/* 에디터 화면 — preview 중에는 숨김 (언마운트하지 않음) */}
       <div className="-mx-4 sm:-mx-6 lg:-mx-8 -mt-8" style={{ display: e.screen === 'editor' ? undefined : 'none' }}>
         {/* 상단 바: 뒤로가기 + 제목 + 저장 */}
-        <div className="bg-white border-b border-gray-200 px-5 py-3 flex items-center gap-3 sticky top-16 z-50">
+        <div className="bg-white border-b border-gray-200 px-5 py-3 flex items-center gap-3 sticky top-[var(--app-topbar-h)] z-50">
           <Button
             variant="ghost"
             size="sm"
@@ -82,7 +82,7 @@ export default function ConceptEditorPage() {
         <ExamCategoryBar category={e.category} onChange={e.handleCategoryChange} />
 
         {/* 에디터 + 사이드바 */}
-        <div className="flex gap-5 p-5 overflow-hidden" style={{ height: 'calc(100vh - 64px - 56px - 80px)' }}>
+        <div className="flex gap-5 p-5 overflow-hidden" style={{ height: 'calc(100vh - var(--app-topbar-h) - 56px - 80px)' }}>
           <div className="flex-[7] min-w-0 h-full">
             <ExamEditor
               onHTMLChange={e.setEditorHTML}
