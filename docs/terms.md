@@ -61,7 +61,8 @@
 - 관련 파일: src/lib/problem-ocr/merge.ts, src/lib/problem-paper/blocks.ts
 
 ## 문항 (Problem)
-- 정의: 발문·선지·정답·배점을 가진 문제 하나. 단어 시험지의 '문항'과는 다른 개념이다
+- 정의: 발문·선지·정답을 가진 문제 하나. 단어 시험지의 '문항'과는 다른 개념이다.
+  배점 컬럼(`score`)은 남아 있지만 2026-09-08 부터 읽지도 보여 주지도 않는다
 - 코드에서의 사용: `Problem`, `problems` 표
 - 관련 파일: src/types/problem-bank.ts, src/components/problem-review/ProblemEditorCard.tsx
 
@@ -69,6 +70,30 @@
 - 정의: 아카이브 문항을 골라 조합한 인쇄물. 본문은 만든 시점의 **스냅샷**이라 원본이 바뀌어도 변하지 않는다
 - 코드에서의 사용: `ProblemPaper`, `problem_papers` / `problem_paper_items`, RPC `create_problem_paper`
 - 관련 파일: src/lib/problem-paper/compose.ts, sql/17_problem_bank.sql
+
+## 교과서 (textbook)
+- 정의: 그 기출이 다루는 교과서. 값은 카테고리 관리의 **출판사 이름 스냅샷**(`exam.publishers.name`)이다
+- 코드에서의 사용: `ProblemSource.textbook`, `fetchUnitTree`, 아카이브 필터 `book`
+- 관련 파일: src/lib/problem-bank/unit-master.ts, src/components/problem-ocr/SourceTextbookField.tsx
+
+## 단원 경로 (unit_path)
+- 정의: 문항·지문이 실린 교과서 단원을 **이름 배열**로 스냅샷한 값 (`['1. 문학', '(1) 시의 화자']`, 최대 2단).
+  마스터는 카테고리 관리(대단원·소단원)이고 여기서는 고르기만 한다 — area_path 와 같은 규약
+- 코드에서의 사용: `Problem.unit_path`, `buildUnitTree`, `UNIT_DEPTH_LABELS`
+- 관련 파일: src/lib/problem-bank/unit-tree.ts, src/lib/problem-bank/unit-master.ts, sql/18_problem_bank_units.sql
+
+## 구역 상자 (data-box)
+- 정의: 지문·발문 안의 상자·구간 표시. 값의 종류에 따라 인쇄 모양이 셋이다 —
+  `보기`·`자료`·`조건`(+번호)은 〈보기〉 테두리 상자, `가`~`마`는 (가) 머리글, `A`~`E`는 [A] 왼쪽 세로선.
+  괄호는 인쇄 CSS 가 붙이므로 값에는 넣지 않는다
+- 코드에서의 사용: `isBoxLabel`, `normalizeBoxAttributes`, `BOX_LABEL_OPTIONS`
+- 관련 파일: src/lib/box-labels.ts, src/lib/sanitize-problem.ts, src/styles/problem-paper.css
+
+## 학교급 (SchoolLevel)
+- 정의: 중등 / 고등. 업로드 폼에서 학교·학년 선택지를 좁히는 데만 쓰고 **저장하지 않는다** —
+  DB 에서는 학년('중2') 접두사로 되찾는다
+- 코드에서의 사용: `SCHOOL_LEVEL_OPTIONS`, `gradeOptionsForLevel`, `levelFromGrade`
+- 관련 파일: src/lib/problem-bank/source-form.ts
 
 ## 영역 경로 (area_path)
 - 정의: 문항의 분류를 **이름 배열**로 스냅샷한 값 (`['문학','현대시']`). 마스터는 ara-system 이 소유하고 여기서는 고르기만 한다

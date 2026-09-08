@@ -158,6 +158,16 @@
 - [2026-09-04] 표 재분할은 한 패스에 **표 하나**만 쪼갠다(상한 32). 표가 많은 개념지는 그만큼 재측정이 돈다 — 렌더가 몇 프레임 늦을 뿐 내용에는 영향이 없다. 페이지 끝에 걸린 조각이 측정 오차로 다시 밀리면 **1행짜리 조각(+반복된 제목 행)** 이 남을 수 있다(내용 유실 없음, 외관 문제)
 
 ## Architecture Decisions
+- [2026-09-08] **기출 문제 은행 2차 — 학교 마스터·교과서 단원·서식**([sql/18_problem_bank_units.sql](sql/18_problem_bank_units.sql)). 되돌리지 말아야 할 판단들:
+  - **학교급(중등/고등)은 저장하지 않는다.** 업로드 폼에서 학교·학년 선택지를 좁히는 데만 쓰고 DB 에서는 `grade`('중2') 접두사로 되찾는다(`levelFromGrade`). ara-system 마이그 420 과 같은 근거 — 저장하면 '중1인데 고등' 같은 어긋난 행을 CHECK 로 또 막아야 한다
+  - 학교의 원본은 **관리자시스템 `public.schools`** 다(중등 15·고등 5, mig375 로 authenticated SELECT 열려 있다). 이 앱의 `exam.schools` 는 외부지문·프린트용 이름 마스터라 기출과 무관하다 — **두 표를 헷갈리지 말 것**. `problem_sources.school_id` 는 **FK 가 아니다**(학교가 지워져도 기출은 남아야 한다). 표시·필터·문제지 스냅샷은 계속 `school_name` 을 쓴다
+  - **교과서 단원의 정본은 이 앱의 카테고리 관리**(`exam.publishers › major_chapters › sub_chapters`)다. 관리자시스템의 '교과서' 탭(`public.curriculum_textbooks`)은 그것을 매일 밤 복사한 사본이라 정본이 아니다(운영 데이터의 47권이 전부 `source_app='ara-exam'`)
+  - `unit_path` 는 `area_path` 와 같은 **이름 경로 스냅샷**이다(최대 2단, 마스터 id 가 아니다). 마스터 전개 카테고리는 실제 UUID 가 없고(`master-major-…` 합성 id), 개념지도 텍스트 복사 방식이라 같은 규약을 따른다. ⚠️ **남은 빈 구멍**: 카테고리 관리에서 단원 이름을 바꾸면 이미 태깅된 `unit_path` 는 따라가지 않는다. 필요해지면 `sync_major_chapter_name`/`sync_sub_chapter_name` 트리거를 `problems.unit_path[1]`/`[2]` 까지 넓히는 것이 정공법이다
+  - **구역 상자는 `data-box` 하나로 간다.** 값의 종류가 곧 인쇄 모양이다(보기·자료·조건 → 〈보기〉 테두리, 가~마 → (가) 머리글, A~E → [A] 세로선). 괄호는 CSS 가 붙이므로 값에는 넣지 않는다. 허용 목록([src/lib/box-labels.ts](src/lib/box-labels.ts))을 넓히면 **인쇄·편집기 CSS 선택자 목록도 같이** 넓혀야 한다(값별로 나열한다 — `attr()` 로 종류를 가를 수 없다)
+  - **`data-box` 값 정규화는 정화보다 먼저**다. 정화 훅은 허용 밖 값을 `keepAttr=false` 로 지워 되돌릴 수 없다 — 실제로 첫 OCR 에서 모델이 낸 `data-box="(가)"` 가 통째로 사라져 (가)(나) 지문 구분이 없어졌다. `normalizeBoxAttributes` 를 파서에서 `sanitizeProblemHTML` **앞에** 부른다
+  - **배점은 읽지도 보여 주지도 않는다.** OCR 스키마·프롬프트·정답표에서 뺐고 화면·인쇄에서도 지웠다. 단 `problems.score` 컬럼과 `PaperSettings.showScore` 키는 **남긴다** — RPC 가 저장할 때마다 그 키를 화이트리스트로 다시 조립하고 이미 만든 문제지에 값이 들어 있다. 문제지 머리의 '점수란'(`ExamPrintHeader showScoreRow`)은 배점이 아니라 채점자가 쓰는 칸이라 그대로 둔다
+  - **TipTap 3.x 두 가지**: ① `@tiptap/react` 는 `shouldRerenderOnTransaction` 이 기본 false 라 툴바에서 `editor.isActive()`·`getAttributes()` 를 직접 읽으면 커서를 옮겨도 갱신되지 않는다 → `useEditorState` 로 구독한다. ② StarterKit 3.x 는 `underline`·`hardBreak`·`horizontalRule`·`trailingNode` 를 이미 포함하므로 `@tiptap/extension-underline` 을 따로 등록하면 확장이 두 벌이 된다
+  - **원문의 빈 줄은 빈 문단 `<p></p>`** 로 담고 인쇄 CSS 가 `p:empty::before` 로 한 줄 높이를 준다. `:empty` 는 공백 한 칸만 있어도 안 맞으므로 모양 통일은 파서(`normalizeBlankParagraphs`)가 한다. 반대로 `trailingNode` 가 표·상자 뒤에 **자동으로** 붙이는 빈 문단은 인쇄에서 걷어낸다(`html-trim.ts`) — 가운데 빈 줄은 원문이므로 남긴다
 - [2026-09-08] **기출 문제 은행 도입**([sql/17_problem_bank.sql](sql/17_problem_bank.sql)). 표 5개(`problem_sources`/`passages`/`problems`/`problem_papers`/`problem_paper_items`)와 RPC `exam.create_problem_paper`. 굵직한 결정들:
   - **DB 헬퍼는 `public` 이 아니라 `exam` 스키마에 있다**(ara-system mig254 가 만들었다) — `exam.is_allowed_domain()`, `exam.enforce_user_id_from_auth()`, `exam.update_updated_at()`, `exam.audit_log`. sql/01~14 의 `public.is_allowed_domain()` 표기는 **옛 standalone 프로젝트 기준이라 지금은 틀리다**. 새 마이그레이션은 `exam.` 헬퍼를 쓰고 guard 블록에서 존재를 확인한다
   - 아카이브 3표는 `concept_sheets` 처럼 **공유 FOR ALL**(선생님들이 함께 검수한다). 문제지는 `exams` 처럼 **SELECT/DELETE 만 + RPC 한 곳**으로 잠갔다 — 본문이 스냅샷이라 직접 INSERT 를 허용하면 위조가 된다

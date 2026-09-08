@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ProblemHtmlEditor from '@/components/problem-editor/ProblemHtmlEditor';
 import { blankChoicePositions, trimTrailingChoices } from '@/lib/problem-bank/choices';
+import { sanitizeInlineHTML } from '@/lib/sanitize-problem';
 import AreaPathPicker from './AreaPathPicker';
 import type { AreaTreeNode } from '@/lib/problem-bank/area-tree';
 import { UNIT_DEPTH_LABELS } from '@/lib/problem-bank/unit-tree';
@@ -198,14 +199,24 @@ export default function ProblemEditorCard({
           <div className="space-y-1">
             <Label className="text-xs text-gray-500">선지</Label>
             {['①', '②', '③', '④', '⑤'].map((glyph, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <span className="w-5 text-sm text-gray-500">{glyph}</span>
-                <Input
-                  value={choices[i] ?? ''}
-                  onChange={(e) => setChoices(withChoiceAt(choices, i, e.target.value))}
-                  className="h-8 text-sm"
-                  aria-label={`${i + 1}번 선지`}
-                />
+              <div key={i} className="flex items-start gap-2">
+                <span className="mt-1.5 w-5 text-sm text-gray-500">{glyph}</span>
+                <div className="flex-1 space-y-0.5">
+                  <Input
+                    value={choices[i] ?? ''}
+                    onChange={(e) => setChoices(withChoiceAt(choices, i, e.target.value))}
+                    className="h-8 text-sm"
+                    aria-label={`${i + 1}번 선지`}
+                  />
+                  {/* 선지는 글 상자로 고치므로 밑줄이 <u> 태그 그대로 보인다.
+                      인쇄에 어떻게 나가는지 한 줄로 미리 보여 준다 */}
+                  {(choices[i] ?? '').includes('<') && (
+                    <p
+                      className="px-1 text-xs text-gray-500"
+                      dangerouslySetInnerHTML={{ __html: sanitizeInlineHTML(choices[i] ?? '') }}
+                    />
+                  )}
+                </div>
               </div>
             ))}
           </div>

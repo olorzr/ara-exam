@@ -125,13 +125,15 @@ src/
 ### 데이터 흐름
 
 ```
-[업로드]  PDF → pdf.js 렌더(scale 2) → 쪽 역할 지정(문제/정답표/제외)
+[업로드]  출처 정보(학교급 → 학교 → 학년 → … → 교과서, 제목 자동)
+          → PDF → pdf.js 렌더(scale 2) → 쪽 역할 지정(문제/정답표/제외)
           → Storage(exam-problem-bank) → problem_sources(추출중)
 [OCR]     3쪽씩(겹침 1) 묶어 선생님 PC 의 코덱스 turn → parse → merge
           → passages/problems INSERT → bbox 로 영역 크롭 → 이미지 업로드
           → 정답표 쪽은 따로 읽어 번호로 붙임 → problem_sources(검수중)
-[검수]    원본 페이지 이미지 + 영역 오버레이 ↔ TipTap 편집·정답·배점·영역
-[아카이브] 필터(출처·학교·년도·학년·영역·검색) + 페이지네이션
+[검수]    원본 페이지 이미지 + 영역 오버레이 ↔ TipTap 편집·정답·영역·교과서 단원
+[아카이브] 왼쪽 교과서·단원 트리 + 필터(출처·학교·년도·학년·교과서·단원·영역·검색)
+          + 페이지네이션
 [문제지]  드래그 조합 → RPC create_problem_paper(스냅샷) → A4 인쇄 3종
 ```
 
@@ -150,17 +152,30 @@ src/
 ## lib/problem-ocr
 - 역할: 프롬프트 조립 → 구조화 출력 파싱 → 묶음 실행 → 병합 → 영역 크롭
 - 의존: lib/ai, lib/pdf, lib/sanitize-problem
-- 주요 파일: schema.ts, prompt.ts, parse.ts, batch-plan.ts, batch-run.ts, merge.ts, crop.ts, run.ts
+- 주요 파일: schema.ts, prompt.ts, parse.ts, normalize-html.ts, batch-plan.ts, batch-run.ts,
+  merge.ts, merge-keys.ts, crop.ts, run.ts, run-images.ts
+- 서식 규약: 밑줄 `<u>`, 시행 줄바꿈 `<br>`, 원문의 빈 줄 `<p></p>`, 구분선 `<hr>`,
+  구역 상자 `<blockquote data-box="…">`. **다듬기(normalize-html)가 정화보다 먼저** 돈다 —
+  정화기는 허용 목록 밖 `data-box` 값을 되돌릴 수 없게 지운다
+- 배점은 읽지 않는다(2026-09-08). 스키마·프롬프트·정답표 모두에서 뺐다
 
 ## lib/problem-bank
-- 역할: 아카이브 조회·쓰기, Storage 경로·서명, 영역 마스터 읽기, 필터
-- 의존: lib/supabase, lib/supabase-public(읽기 전용)
-- 주요 파일: queries.ts, mutations.ts, storage.ts, storage-paths.ts, area-tree.ts, filters.ts
+- 역할: 아카이브 조회·쓰기, Storage 경로·서명, 영역·단원 마스터 읽기, 필터·패싯
+- 의존: lib/supabase, lib/supabase-public(읽기 전용), lib/category-master(단원 마스터)
+- 주요 파일: queries.ts, facets.ts, mutations.ts, storage.ts, storage-paths.ts, bbox.ts,
+  area-tree.ts, area-master.ts, unit-tree.ts, unit-master.ts, scope-resolve.ts,
+  source-form.ts, filters.ts
+- 분류의 두 축: **영역**(ara-system 마스터, 최대 4단)과 **교과서 단원**(이 앱의 카테고리 관리,
+  2단). 둘 다 노드 id 가 아니라 **이름 경로 스냅샷**으로 저장한다
+- 학교는 관리자시스템 `public.schools` 가 원본이다(`school_id` + 이름 스냅샷). 교과서는
+  내신 관리에 등록된 시험범위(`scope-resolve.ts`)에서 자동으로 찾아 준다
 
 ## lib/problem-paper
 - 역할: 문제지 조합 규칙(지문 묶음 연속성)과 인쇄 블록 조립
 - 의존: lib/print(splitHtmlBlocks), lib/shuffle
-- 주요 파일: compose.ts, dnd.ts, blocks.ts, settings.ts, shuffle-groups.ts
+- 주요 파일: compose.ts, dnd.ts, blocks.ts, html-trim.ts, settings.ts, shuffle-groups.ts
+- 배점은 인쇄하지 않는다(2026-09-08). `PaperSettings.showScore` 키는 RPC 화이트리스트
+  호환용으로만 남아 있고 렌더러는 보지 않는다
 
 ### 인쇄
 
