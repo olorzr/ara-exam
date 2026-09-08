@@ -6,8 +6,8 @@ import {
   EMPTY_FILTERS, toProblemQuery, type ProblemFilters,
 } from '@/lib/problem-bank/filters';
 import {
-  EMPTY_SOURCE_FACETS, fetchAreaFacets, fetchSourceFacets, fetchUnitFacets,
-  type SourceFacets,
+  EMPTY_SOURCE_FACETS, fetchAreaFacets, fetchSourceFacets, fetchUnitFacets, fetchWorkFacets,
+  type SourceFacets, type WorkFacet,
 } from '@/lib/problem-bank/facets';
 import { fetchProblemPage, PROBLEM_PAGE_SIZE } from '@/lib/problem-bank/queries';
 import type { Problem, ProblemSource } from '@/types/problem-bank';
@@ -33,11 +33,13 @@ export function useProblemArchive(initial: ProblemFilters = EMPTY_FILTERS) {
   const [facets, setFacets] = useState<SourceFacets>(EMPTY_SOURCE_FACETS);
   const [areaFacets, setAreaFacets] = useState<string[][]>([]);
   const [unitFacets, setUnitFacets] = useState<string[][]>([]);
+  const [workFacets, setWorkFacets] = useState<WorkFacet[]>([]);
 
   useEffect(() => {
     fetchSourceFacets().then(setFacets).catch(() => { /* 선택지가 없어도 목록은 본다 */ });
     fetchAreaFacets().then(setAreaFacets).catch(() => { /* 영역 필터만 빠진다 */ });
     fetchUnitFacets().then(setUnitFacets).catch(() => { /* 단원 필터만 빠진다 */ });
+    fetchWorkFacets().then(setWorkFacets).catch(() => { /* 작품 트리만 빠진다 */ });
   }, []);
 
   const queryKey = JSON.stringify(toProblemQuery(filters));
@@ -76,7 +78,7 @@ export function useProblemArchive(initial: ProblemFilters = EMPTY_FILTERS) {
   const pageCount = Math.max(1, Math.ceil(total / PROBLEM_PAGE_SIZE));
 
   return {
-    filters, rows, total, loading, facets, areaFacets, unitFacets, pageCount,
+    filters, rows, total, loading, facets, areaFacets, unitFacets, workFacets, pageCount,
     patch, reset, reload,
   };
 }

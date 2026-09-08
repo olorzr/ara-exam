@@ -125,6 +125,83 @@ async function collectPathFacets(column: 'area_path' | 'unit_path'): Promise<str
   return out.sort((a, b) => a.join('>').localeCompare(b.join('>'), 'ko'));
 }
 
+/** 아카이브에 실제로 있는 작품 하나 */
+export interface WorkFacet {
+  /** `problems.work_title` (표준 표기) */
+  title: string;
+  /** 지은이 — 지문에서 가져온다. 모르면 '' */
+  author: string;
+  /** 이 작품으로 태깅된 문항 수 */
+  count: number;
+}
+
+/**
+ * 아카이브에 쓰인 작품 목록.
+ *
+ * 개수를 함께 세는 이유: 트리에 '동백꽃 (12)' 로 보여야 어느 작품이 문제 은행에 두툼하게
+ * 쌓였는지 한눈에 보인다.
+ *
+ * 지은이는 `problems` 에 없다 — 지문(`passages.title`/`author`)에서 같은 제목을 찾아
+ * 붙인다. 폴더를 지은이로 나누기 때문이다. 같은 제목에 지은이가 여럿이면(표기가 갈렸거나
+ * 동명이작) **가장 많이 쓰인 이름**을 고른다.
+ * @returns 작품 목록 (제목 한글 사전순)
+ */
+export async function fetchWorkFacets(): Promise<WorkFacet[]> {
+  const counts = new Map<string, number>();
+  for (let from = 0; from < FACET_MAX_ROWS; from += FACET_CHUNK) {
+    const { data, error } = await supabase
+      .from('problems')
+      .select('work_title')
+      .neq('work_title', '')
+      .order('id')
+      .range(from, from + FACET_CHUNK - 1);
+    // 선택지를 못 만들어도 목록은 봐야 한다 — 여기까지 모은 것만 돌려준다
+    if (error) break;
+    const rows = (data ?? []) as { work_title: string }[];
+    for (const row of rows) {
+      const title = row.work_title;
+      if (!title) continue;
+      counts.set(title, (counts.get(title) ?? 0) + 1);
+    }
+    if (rows.length < FACET_CHUNK) break;
+  }
+  if (counts.size === 0) return [];
+
+  const authors = await collectPassageAuthors();
+  return [...counts.entries()]
+    .map(([title, count]) => ({ title, author: authors.get(title) ?? '', count }))
+    .sort((a, b) => a.title.localeCompare(b.title, 'ko'));
+}
+
+/** 지문에서 제목 → 지은이를 모은다 (가장 많이 쓰인 이름을 고른다) */
+async function collectPassageAuthors(): Promise<Map<string, string>> {
+  const tally = new Map<string, Map<string, number>>();
+  for (let from = 0; from < FACET_MAX_ROWS; from += FACET_CHUNK) {
+    const { data, error } = await supabase
+      .from('passages')
+      .select('title, author')
+      .neq('title', '')
+      .neq('author', '')
+      .order('id')
+      .range(from, from + FACET_CHUNK - 1);
+    if (error) break;
+    const rows = (data ?? []) as { title: string; author: string }[];
+    for (const row of rows) {
+      const byAuthor = tally.get(row.title) ?? new Map<string, number>();
+      byAuthor.set(row.author, (byAuthor.get(row.author) ?? 0) + 1);
+      tally.set(row.title, byAuthor);
+    }
+    if (rows.length < FACET_CHUNK) break;
+  }
+
+  const out = new Map<string, string>();
+  for (const [title, byAuthor] of tally) {
+    const best = [...byAuthor.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (best) out.set(title, best[0]);
+  }
+  return out;
+}
+
 /**
  * 아카이브에 쓰인 영역 경로 목록.
  * @returns 중복 없는 경로 목록

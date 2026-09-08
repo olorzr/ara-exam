@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import ProblemCard from '@/components/problem-bank/ProblemCard';
+import ProblemDetailDialog from '@/components/problem-bank/ProblemDetailDialog';
 import ProblemFilterBar from '@/components/problem-bank/ProblemFilterBar';
 import CanvasItem from '@/components/problem-paper/CanvasItem';
 import PaperToolbar from '@/components/problem-paper/PaperToolbar';
@@ -30,6 +31,8 @@ export default function PaperComposePage() {
   /** 지금 끌고 있는 것 — 아카이브에서 새로 담는 중이거나, 캔버스 안에서 옮기는 중 */
   const [source, setSource] = useState<{ kind: 'add'; row: ArchiveRow } | { kind: 'move'; from: number } | null>(null);
   const [preview, setPreview] = useState<number | null>(null);
+  /** 상세 창에 띄운 문항 — 담기 전에 지문과 함께 확인한다 */
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const thumbnails = useSignedImageUrls(archive.rows.map((r) => r.image_path).filter(Boolean));
 
@@ -86,6 +89,7 @@ export default function PaperComposePage() {
             facets={archive.facets}
             areaFacets={archive.areaFacets}
             unitFacets={archive.unitFacets}
+            workFacets={archive.workFacets}
             total={archive.total}
             onChange={archive.patch}
             onReset={archive.reset}
@@ -106,6 +110,7 @@ export default function PaperComposePage() {
                   thumbnailUrl={thumbnails.urls.get(row.image_path) ?? null}
                   added={paper.added.has(row.id)}
                   showEditLink={false}
+                  onOpen={() => setOpenId(row.id)}
                   onAdd={() => paper.add(row)}
                   dragHandlers={{
                     ...drag.handlers,
@@ -207,6 +212,8 @@ export default function PaperComposePage() {
           </div>
         </div>
       </div>
+
+      <ProblemDetailDialog problemId={openId} onClose={() => setOpenId(null)} />
     </div>
   );
 }

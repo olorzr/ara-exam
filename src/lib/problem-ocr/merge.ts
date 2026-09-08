@@ -1,6 +1,10 @@
 import type { QuestionType } from '@/types/problem-bank';
-import { OCR_MAX_WARNINGS } from './constants';
+import { OCR_MAX_MERGED_WARNINGS } from './constants';
 import type { OcrBox, OcrDraft } from './schema';
+import {
+  capWarnings, itemTargetLabel, resolveDraftWarning, warningKey,
+  type OcrWarning, type OcrWarningTarget,
+} from './warnings';
 import { passageKeyIn, problemKeyIn, textOf } from './merge-keys';
 import {
   fillGaps, fillPassageGaps, toPassage, toProblem,
@@ -80,7 +84,11 @@ export interface ProblemDraft {
 export interface MergeResult {
   passages: PassageDraft[];
   problems: ProblemDraft[];
-  warnings: string[];
+  /**
+   * 최종 경고. 파서가 `ref` 로만 가리키던 항목이 여기서 **진짜 행 id** 를 얻는다 —
+   * 그래야 검수 화면이 "이 경고는 저 카드 얘기" 라고 짚어 줄 수 있다.
+   */
+  warnings: OcrWarning[];
 }
 
 /** 한 묶음의 결과와 그 묶음이 읽은 쪽 */
@@ -93,7 +101,7 @@ export interface MergeOptions {
   /** id 생성기. 테스트에서 결정론적으로 바꾸려고 주입식으로 둔다 */
   newId?: () => string;
   /** 묶음 실행 중 생긴 경고(렌더 실패 등)를 앞에 붙인다 */
-  leadingWarnings?: string[];
+  leadingWarnings?: OcrWarning[];
 }
 
 /**
@@ -116,7 +124,8 @@ function findOpenPassage(works: PassageWork[], page: number): PassageWork | unde
  */
 export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}): MergeResult {
   const newId = opts.newId ?? (() => crypto.randomUUID());
-  const warnings: string[] = [...(opts.leadingWarnings ?? [])];
+  const warnings: OcrWarning[] = [...(opts.leadingWarnings ?? [])];
+  const seenWarnings = new Set(warnings.map(warningKey));
 
   const works: PassageWork[] = [];
   const problems: ProblemDraft[] = [];
@@ -125,14 +134,20 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
   const fragmentByKey = new Map<string, FragmentRef>();
   const problemByKey = new Map<string, ProblemDraft>();
 
-  const warn = (message: string) => {
-    if (warnings.length < OCR_MAX_WARNINGS && !warnings.includes(message)) warnings.push(message);
+  /**
+   * 경고를 담는다 — 같은 말이라도 **대상이 다르면 다른 경고**다(문항마다 알려야 한다).
+   */
+  const warn = (warning: OcrWarning) => {
+    const key = warningKey(warning);
+    if (seenWarnings.has(key)) return;
+    seenWarnings.add(key);
+    warnings.push(warning);
   };
 
   for (const { draft } of drafts) {
-    warnings.push(...draft.warnings.filter((w) => !warnings.includes(w)));
-
-    // 이 묶음의 ref → 합쳐진 지문 id. ref 는 묶음 안에서만 유효하다
+    // 이 묶음의 ref → 합쳐진 행 id. ref 는 묶음 안에서만 유효하다.
+    // ⚠️ 지문·문항을 다 훑은 **뒤에** 이 표로 경고를 푼다 — 먼저 풀면 표가 비어 있어
+    //    모든 경고가 행을 못 찾고 쪽 대상으로 떨어진다
     const refToId = new Map<string, string>();
 
     // 1) 지문 먼저 — 문항이 참조를 풀 수 있어야 한다
@@ -174,7 +189,11 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
           refToId.set(item.ref, open.draft.id);
           continue;
         }
-        warn('앞 쪽에서 이어지는 지문을 합치지 못했어요. 검수에서 확인해 주세요.');
+        warn({
+          message: '앞 쪽에서 이어지는 지문을 합치지 못했어요. 검수에서 확인해 주세요.',
+          // 새로 만드는 지문이라 아래에서 id 가 생긴다 — 쪽만 가리켜도 찾아갈 수 있다
+          targets: [{ kind: 'passage', page: item.page, label: `${item.page}쪽 지문` }],
+        });
       }
 
       const work = toPassage(item, newId());
@@ -198,13 +217,18 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
         fillGaps(existing, item);
         // 지문은 나중에야 온전히 보이는 경우가 있다(앞 묶음에서는 잘려 있었다)
         if (!existing.passage_id && passageId) existing.passage_id = passageId;
+        refToId.set(item.ref, existing.id);
         continue;
       }
 
       const problem = toProblem(item, newId(), passageId);
       problems.push(problem);
       problemByKey.set(key, problem);
+      refToId.set(item.ref, problem.id);
     }
+
+    // 이제 ref 가 전부 풀리므로 이 묶음의 경고에 행 id 를 붙인다
+    for (const warning of draft.warnings) warn(resolveDraftWarning(warning, refToId));
   }
 
   // 조각을 이제 합친다 — 조각별 비교가 다 끝난 뒤여야 한다
@@ -213,11 +237,21 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
     html: w.fragments.map((f) => f.trim()).filter(Boolean).join('\n'),
   }));
 
-  // 지문이 끝내 안 닫혔으면 뒷부분이 빠졌을 수 있다 — 조용히 넘기지 않는다
+  // 지문이 끝내 안 닫혔으면 뒷부분이 빠졌을 수 있다 — 조용히 넘기지 않는다.
+  // 개수만 세지 말고 **어느 지문인지** 짚는다(개수만으로는 찾을 방법이 없다)
   const unclosed = passages.filter((p) => p.open);
   if (unclosed.length > 0) {
-    warn(`뒷부분이 이어지는 지문 ${unclosed.length}개가 있어요. 검수에서 이어 붙여 주세요.`);
+    const targets: OcrWarningTarget[] = unclosed.map((p) => ({
+      kind: 'passage',
+      id: p.id,
+      page: p.page_no,
+      label: itemTargetLabel({ kind: 'passage', page: p.page_no }),
+    }));
+    warn({
+      message: `뒷부분이 이어지는 지문 ${unclosed.length}개가 있어요. 검수에서 이어 붙여 주세요.`,
+      targets,
+    });
   }
 
-  return { passages, problems, warnings: warnings.slice(0, OCR_MAX_WARNINGS) };
+  return { passages, problems, warnings: capWarnings(warnings, OCR_MAX_MERGED_WARNINGS) };
 }

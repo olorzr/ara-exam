@@ -49,6 +49,8 @@ interface ProblemEditorCardProps {
   onDelete: () => void;
   /** 저장하지 않은 수정이 생기거나 사라질 때 알린다 — 화면이 '검수 마치기'를 막는 데 쓴다 */
   onDirtyChange?: (dirty: boolean) => void;
+  /** OCR 이 이 문항에 남긴 확인거리 — 위 배너의 경고를 카드에도 붙인다 */
+  issues?: string[];
 }
 
 /**
@@ -63,6 +65,7 @@ interface ProblemEditorCardProps {
  */
 export default function ProblemEditorCard({
   problem, areaTree, unitTree, selected, onSelect, onSave, onToggleVerified, onDelete, onDirtyChange,
+  issues,
 }: ProblemEditorCardProps) {
   const [stem, setStem] = useState(problem.stem_html);
   const [choices, setChoices] = useState<string[]>(problem.choices);
@@ -150,7 +153,8 @@ export default function ProblemEditorCard({
       data-problem-id={problem.id}
       onFocusCapture={onSelect}
       className={`rounded-lg border p-4 transition ${
-        selected ? 'border-primary shadow-sm' : 'border-gray-200'
+        selected ? 'border-primary shadow-sm'
+          : issues && issues.length > 0 ? 'border-amber-300' : 'border-gray-200'
       }`}
     >
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -160,6 +164,9 @@ export default function ProblemEditorCard({
         <Badge variant="outline">{problem.page_no}쪽</Badge>
         {verified && <Badge className="bg-emerald-500 text-white">검수완료</Badge>}
         {missingAnswer && <Badge className="bg-amber-500 text-white">정답 미입력</Badge>}
+        {issues && issues.length > 0 && (
+          <Badge className="bg-amber-500 text-white">확인 필요 {issues.length}</Badge>
+        )}
         {dirty && <Badge className="bg-sky-500 text-white">저장 안 됨</Badge>}
         {problem.render_mode === 'image' && <Badge variant="outline">이미지 출제</Badge>}
 
@@ -188,6 +195,12 @@ export default function ProblemEditorCard({
           </Button>
         </div>
       </div>
+
+      {issues && issues.length > 0 && (
+        <ul className="mb-3 list-disc space-y-0.5 rounded border border-amber-200 bg-amber-50 py-2 pl-7 pr-3 text-xs text-amber-900">
+          {issues.map((issue) => <li key={issue}>{issue}</li>)}
+        </ul>
+      )}
 
       <div className="space-y-3">
         <div className="space-y-1">

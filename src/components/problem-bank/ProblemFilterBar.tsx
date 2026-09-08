@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { SEMESTER_OPTIONS } from '@/lib/constants';
 import { SOURCE_TYPE_OPTIONS, EXAM_TYPE_OPTIONS } from '@/lib/problem-bank/source-form';
 import { areaPathLabel } from '@/lib/problem-bank/area-tree';
-import type { SourceFacets } from '@/lib/problem-bank/facets';
+import type { SourceFacets, WorkFacet } from '@/lib/problem-bank/facets';
 import { hasActiveFilters, UNSPECIFIED_AXIS, type ProblemFilters } from '@/lib/problem-bank/filters';
 import { unitPathLabel } from '@/lib/problem-bank/unit-tree';
 
@@ -62,6 +62,7 @@ interface ProblemFilterBarProps {
   facets: SourceFacets;
   areaFacets: string[][];
   unitFacets: string[][];
+  workFacets: WorkFacet[];
   total: number;
   onChange: (patch: Partial<ProblemFilters>) => void;
   onReset: () => void;
@@ -74,8 +75,9 @@ interface ProblemFilterBarProps {
  * 문항이 하나도 없는 영역이 잔뜩 나온다.
  */
 export default function ProblemFilterBar({
-  filters, facets, areaFacets, unitFacets, total, onChange, onReset,
+  filters, facets, areaFacets, unitFacets, workFacets, total, onChange, onReset,
 }: ProblemFilterBarProps) {
+  const workTitles = workFacets.map((w) => w.title);
   // base-ui Select 의 onValueChange 는 `string | null` 을 준다(CLAUDE.md Known Issues)
   const pick = (key: keyof ProblemFilters) => (v: string | null) => {
     if (v) onChange({ [key]: v === ALL ? '' : v, page: 0 } as Partial<ProblemFilters>);
@@ -166,6 +168,17 @@ export default function ProblemFilterBar({
                 .map((key) => (
                   <SelectItem key={key} value={key}>{unitPathLabel(key.split('>'))}</SelectItem>
                 ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        {showAxis(workFacets.length > 0, Boolean(filters.work_title)) && (
+          <Select value={filters.work_title || ALL} onValueChange={pick('work_title')}>
+            <SelectTrigger className="h-9 w-40 text-sm"><SelectValue placeholder="작품" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>작품 전체</SelectItem>
+              {withValue(workTitles, filters.work_title)
+                .map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
             </SelectContent>
           </Select>
         )}

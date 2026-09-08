@@ -2,6 +2,9 @@ import { AiError, type AiErrorCode } from '@/lib/ai/types';
 import { aiErrorMessage } from '@/lib/ai/errors';
 import { OCR_MAX_WARNINGS } from './constants';
 import type { PageBatch } from './batch-plan';
+import {
+  capWarnings, listSome, pageTarget, type OcrWarning, type OcrWarningTarget,
+} from './warnings';
 
 /**
  * 묶음을 **순차로** 실행한다.
@@ -38,7 +41,7 @@ export type BatchFailure =
 export interface BatchRunResult<TDraft> {
   drafts: { draft: TDraft; pages: number[] }[];
   /** 루프가 만든 경고(건너뛴 쪽·실패한 묶음) — 병합의 leadingWarnings 로 넘긴다 */
-  warnings: string[];
+  warnings: OcrWarning[];
   /** 묶음별 실패 내역 — 하나도 성공 못 했을 때 호출부가 진짜 원인을 고르는 재료 */
   failures: BatchFailure[];
   imagesSent: number;
@@ -68,13 +71,6 @@ export interface BatchRunDeps<TDraft> {
   signal?: AbortSignal;
 }
 
-/** 번호를 몇 개만 보여 준다 */
-function listSome(numbers: number[], limit = 8): string {
-  const uniq = [...new Set(numbers)].sort((a, b) => a - b);
-  const head = uniq.slice(0, limit).join(', ');
-  return uniq.length > limit ? `${head} 외 ${uniq.length - limit}개` : head;
-}
-
 /**
  * 실패 내역에서 사람에게 보여 줄 대표 원인 하나를 고른다.
  * @param result - 실행 결과
@@ -101,7 +97,7 @@ export async function runOcrBatches<TDraft>(
   const total = batches.length;
 
   const drafts: { draft: TDraft; pages: number[] }[] = [];
-  const warnings: string[] = [];
+  const warnings: OcrWarning[] = [];
   const skippedPages: number[] = [];
   const failures: BatchFailure[] = [];
   let imagesSent = 0;
@@ -166,18 +162,28 @@ export async function runOcrBatches<TDraft>(
   }
 
   if (skippedPages.length > 0) {
-    warnings.push(`이미지가 너무 커서 건너뛴 쪽이 있어요: ${listSome(skippedPages)}쪽`);
+    warnings.push({
+      message: `이미지가 너무 커서 건너뛴 쪽이 있어요: ${listSome(skippedPages)}쪽`,
+      targets: skippedPages.map(pageTarget),
+    });
   }
   if (failures.length > 0) {
-    // 왜 못 읽었는지까지 적는다 — "N묶음 실패"만 남기면 사람이 할 수 있는 일이 없다
+    // 왜 못 읽었는지까지 적는다 — "N묶음 실패"만 남기면 사람이 할 수 있는 일이 없다.
+    // **몇 쪽이 비었는지**도 적는다 — '2번째 묶음' 은 선생님이 볼 수 없는 우리 사정이다
     const aiFailure = failures.find((f) => f.kind === 'ai');
     const reason = aiFailure
       ? aiErrorMessage((aiFailure as { code: AiErrorCode }).code)
       : '쪽을 이미지로 만들지 못했어요.';
-    warnings.push(
-      `${total}묶음 중 ${failures.length}묶음을 읽지 못했어요(${listSome(failures.map((f) => f.batch))}번째). `
-      + `그 쪽 내용은 비어 있을 수 있어요 — ${reason}`,
-    );
+    const lostPages = failures.flatMap((f) => batches[f.batch - 1] ?? []);
+    const where = lostPages.length > 0
+      ? `${listSome(lostPages)}쪽`
+      : `${listSome(failures.map((f) => f.batch))}번째 묶음`;
+    const targets: OcrWarningTarget[] = [...new Set(lostPages)].map(pageTarget);
+    warnings.push({
+      message: `${total}묶음 중 ${failures.length}묶음을 읽지 못했어요(${where}). `
+        + `그 쪽 내용은 비어 있을 수 있어요 — ${reason}`,
+      ...(targets.length > 0 ? { targets } : {}),
+    });
   }
   if (fatal === 'cancelled' && drafts.length > 0) {
     warnings.push(`취소하기 전까지 읽은 ${drafts.length}묶음만 담았어요.`);
@@ -185,7 +191,7 @@ export async function runOcrBatches<TDraft>(
 
   return {
     drafts,
-    warnings: warnings.slice(0, OCR_MAX_WARNINGS),
+    warnings: capWarnings(warnings, OCR_MAX_WARNINGS),
     failures,
     imagesSent,
     rawLength,

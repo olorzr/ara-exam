@@ -1,5 +1,6 @@
 import type { QuestionType } from '@/types/problem-bank';
 import { OCR_MAX_ITEMS_PER_BATCH, OCR_MAX_WARNINGS } from './constants';
+import type { DraftWarning } from './warnings';
 
 /**
  * 기출 OCR 의 구조화 출력 계약.
@@ -68,10 +69,15 @@ export interface OcrItem {
   unit_path: string[];
 }
 
-/** 한 묶음의 읽기 결과 */
+/**
+ * 한 묶음의 읽기 결과.
+ *
+ * 경고가 `DraftWarning` 인 이유: 이 단계에서는 아직 **행 id 가 없다**(id 는 병합이 만든다).
+ * 어느 항목 얘기인지는 묶음 지역 이름(`ref`)으로만 말할 수 있고, 병합이 그것을 id 로 바꾼다.
+ */
 export interface OcrDraft {
   items: OcrItem[];
-  warnings: string[];
+  warnings: DraftWarning[];
 }
 
 /**
@@ -86,7 +92,7 @@ export interface AnswerKeyRow {
 /** 정답표 읽기 결과 */
 export interface AnswerKeyDraft {
   answers: AnswerKeyRow[];
-  warnings: string[];
+  warnings: DraftWarning[];
 }
 
 const nullableString = { type: ['string', 'null'] };

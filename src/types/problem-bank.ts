@@ -5,6 +5,8 @@
  * 표시값 '미지정' ↔ 저장값 '' 변환은 `src/lib/external-category.ts` 한 곳에서만 한다.
  */
 
+import type { OcrWarning } from '@/lib/problem-ocr/warnings';
+
 /** 업로드한 원본 문서의 종류 */
 export type ProblemSourceType = '내신기출' | '모의고사' | '문제집' | '프린트';
 
@@ -37,7 +39,13 @@ export interface OcrMeta {
   batches?: number;
   durationMs?: number;
   imagesSent?: number;
-  warnings?: string[];
+  /**
+   * 확인이 필요한 것들.
+   *
+   * ⚠️ 옛 출처에는 **문자열**이 들어 있다(대상 개념이 생기기 전에 저장된 행). 화면은
+   *    두 모양을 모두 그려야 한다 — 객체만 받으면 옛 출처의 경고가 통째로 사라진다.
+   */
+  warnings?: OcrWarning[];
   /** 별도로 올린 답지 파일 수(사진이면 장수, PDF 면 쪽 수) — 검수 화면 요약용 */
   answerKeyFiles?: number;
   /** 실행 시각 (ISO) */

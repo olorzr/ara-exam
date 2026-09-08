@@ -8,6 +8,22 @@
  */
 
 /**
+ * 선지 기호 — 본문에는 저장하지 않고 **그릴 때** 붙인다.
+ * 인쇄(`PaperPrintBlocks`)와 화면(`ProblemBodyView`)이 같은 값을 써야 한 시험지가
+ * 두 모양으로 보이지 않는다.
+ */
+export const CHOICE_GLYPHS = ['①', '②', '③', '④', '⑤'] as const;
+
+/**
+ * 선지 번호에 맞는 기호 — 다섯 개를 넘으면 숫자로 적는다.
+ * @param index - 0부터 세는 자리
+ * @returns 기호 또는 '(6)'
+ */
+export function choiceGlyph(index: number): string {
+  return CHOICE_GLYPHS[index] ?? `(${index + 1})`;
+}
+
+/**
  * 저장할 선지 배열을 만든다.
  * @param choices - 화면에서 입력한 다섯 칸
  * @returns 뒤쪽 빈 칸을 잘라 낸 배열 (가운데 빈 칸은 자리를 지킨다)

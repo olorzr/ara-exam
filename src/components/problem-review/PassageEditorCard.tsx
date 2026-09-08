@@ -26,6 +26,8 @@ interface PassageEditorCardProps {
   onDelete: () => void;
   /** 저장하지 않은 수정이 생기거나 사라질 때 알린다 — '검수 마치기' 를 막는 데 쓴다 */
   onDirtyChange?: (dirty: boolean) => void;
+  /** OCR 이 이 지문에 남긴 확인거리 — 위 배너의 경고를 카드에도 붙인다 */
+  issues?: string[];
 }
 
 /**
@@ -35,6 +37,7 @@ interface PassageEditorCardProps {
  */
 export default function PassageEditorCard({
   passage, problemCount, areaTree, unitTree, selected, onSelect, onSave, onDelete, onDirtyChange,
+  issues,
 }: PassageEditorCardProps) {
   const [html, setHtml] = useState(passage.html);
   const [title, setTitle] = useState(passage.title);
@@ -71,7 +74,8 @@ export default function PassageEditorCard({
       data-passage-id={passage.id}
       onFocusCapture={onSelect}
       className={`rounded-lg border-2 p-4 transition ${
-        selected ? 'border-primary shadow-sm' : 'border-amber-200 bg-amber-50/40'
+        selected ? 'border-primary shadow-sm'
+          : issues && issues.length > 0 ? 'border-amber-400 bg-amber-50/40' : 'border-amber-200 bg-amber-50/40'
       }`}
     >
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -82,6 +86,9 @@ export default function PassageEditorCard({
         <Badge variant="outline">문항 {problemCount}개</Badge>
         {passage.render_mode === 'image' && <Badge variant="outline">이미지 출제</Badge>}
         {dirty && <Badge className="bg-sky-500 text-white">저장 안 됨</Badge>}
+        {issues && issues.length > 0 && (
+          <Badge className="bg-amber-500 text-white">확인 필요 {issues.length}</Badge>
+        )}
 
         <div className="ml-auto flex items-center gap-1">
           {passage.image_path && (
@@ -107,11 +114,19 @@ export default function PassageEditorCard({
         </div>
       </div>
 
+      {issues && issues.length > 0 && (
+        <ul className="mb-3 list-disc space-y-0.5 rounded border border-amber-300 bg-amber-50 py-2 pl-7 pr-3 text-xs text-amber-900">
+          {issues.map((issue) => <li key={issue}>{issue}</li>)}
+        </ul>
+      )}
+
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
             <Label className="text-xs text-gray-500">작품명</Label>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} className="h-8 text-sm" />
+            {/* 트리거가 딸린 문항의 작품명까지 함께 바꾼다 — 모르고 고치면 놀란다 */}
+            <p className="text-[11px] text-gray-400">딸린 문항의 작품명도 함께 바뀝니다</p>
           </div>
           <div className="space-y-1">
             <Label className="text-xs text-gray-500">지은이</Label>

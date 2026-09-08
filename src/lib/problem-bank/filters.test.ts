@@ -26,10 +26,17 @@ describe('filters ↔ 주소', () => {
       ...EMPTY_FILTERS,
       source_type: '내신기출', school_name: '상현중', year: '2026', grade: '중2',
       semester: '1학기', exam_type: '중간', textbook: '천재(노미숙)', area_path: ['문학', '현대시'],
-      unit_path: ['1. 문학', '(1) 시'], search: '심상', verifiedOnly: true, page: 2,
+      unit_path: ['1. 문학', '(1) 시'], work_title: '동백꽃', search: '심상',
+      verifiedOnly: true, page: 2,
     };
     const back = filtersFromParams(new URLSearchParams(filtersToQueryString(source).slice(1)));
     expect(back).toEqual(source);
+  });
+
+  it('작품은 work 로 싣고 되읽는다', () => {
+    const q = filtersToQueryString({ ...EMPTY_FILTERS, work_title: '동백꽃' });
+    expect(q).toContain('work=');
+    expect(filtersFromParams(new URLSearchParams(q.slice(1))).work_title).toBe('동백꽃');
   });
 
   it('학기는 sem 으로 싣고 되읽는다', () => {
@@ -74,6 +81,14 @@ describe('toProblemQuery', () => {
     expect(q.unit_path).toEqual(['1. 문학']);
   });
 
+  it('작품도 조건이 된다 — 자유 텍스트라 미지정만은 없다', () => {
+    expect(toProblemQuery({ ...EMPTY_FILTERS, work_title: '동백꽃' }).work_title).toBe('동백꽃');
+    expect('work_title' in toProblemQuery(EMPTY_FILTERS)).toBe(false);
+    // 자유 텍스트 축이므로 센티널을 그 이름의 작품으로 본다
+    expect(toProblemQuery({ ...EMPTY_FILTERS, work_title: UNSPECIFIED_AXIS }).work_title)
+      .toBe(UNSPECIFIED_AXIS);
+  });
+
   it("'미지정만' 은 빈 문자열 조건으로 나간다 — 빈 값(전체)과 반드시 구분돼야 한다", () => {
     const q = toProblemQuery({ ...EMPTY_FILTERS, semester: UNSPECIFIED_AXIS });
     expect(q.semester).toBe('');
@@ -116,6 +131,7 @@ describe('hasActiveFilters', () => {
     expect(hasActiveFilters({ ...EMPTY_FILTERS, unit_path: ['1. 문학'] })).toBe(true);
     expect(hasActiveFilters({ ...EMPTY_FILTERS, semester: '1학기' })).toBe(true);
     expect(hasActiveFilters({ ...EMPTY_FILTERS, semester: UNSPECIFIED_AXIS })).toBe(true);
+    expect(hasActiveFilters({ ...EMPTY_FILTERS, work_title: '동백꽃' })).toBe(true);
   });
 
   it('쪽 번호만으로는 조건이 아니다', () => {

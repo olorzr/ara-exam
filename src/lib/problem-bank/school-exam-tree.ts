@@ -47,7 +47,7 @@ function axisValue(value: string): string {
   return value === '' ? UNSPECIFIED_AXIS : value;
 }
 
-/** 학교 축을 통째로 비우는 패치 — 교과서 트리로 넘어갈 때 쓴다 */
+/** 학교 축을 통째로 비우는 패치 — 다른 트리로 넘어갈 때 쓴다 */
 export const SCHOOL_AXES_CLEARED: Partial<ProblemFilters> = {
   source_type: '', school_name: '', year: '', grade: '', semester: '', exam_type: '',
 };
@@ -176,17 +176,26 @@ export function schoolExamFilterPatch(facet: SchoolExamFacet): Partial<ProblemFi
     exam_type: axisValue(facet.exam_type),
     textbook: '',
     unit_path: [],
+    // 작품 트리도 같은 이유로 비운다 — 세 트리는 서로의 축을 남기지 않는다
+    work_title: '',
     page: 0,
   };
 }
 
+/** 아카이브 왼쪽 패널의 탭 */
+export type ArchiveSideTab = 'units' | 'schools' | 'works';
+
 /**
  * 주소로 들어왔을 때 왼쪽 패널의 첫 탭.
+ *
+ * 링크를 받아 열었는데 엉뚱한 트리가 켜져 있으면 왜 이 목록인지 알 수 없다 —
+ * 걸린 조건을 만든 트리를 보여 준다.
  * @param filters - 주소에서 복원한 필터
- * @returns 학교 조건만 있으면 'schools', 그 밖에는 'units'
+ * @returns 켤 탭
  */
 export function initialSideTab(
-  filters: Pick<ProblemFilters, 'school_name' | 'unit_path'>,
-): 'units' | 'schools' {
+  filters: Pick<ProblemFilters, 'school_name' | 'unit_path' | 'work_title'>,
+): ArchiveSideTab {
+  if (filters.work_title && filters.unit_path.length === 0) return 'works';
   return filters.school_name && filters.unit_path.length === 0 ? 'schools' : 'units';
 }

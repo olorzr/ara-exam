@@ -107,20 +107,37 @@ export function useProblemReview(sourceId: string) {
     }
   }, [problems]);
 
+  /**
+   * 지문을 저장한다.
+   *
+   * ⚠️ **작품명을 바꾸면 딸린 문항까지 움직인다.** DB 트리거(`passages_sync_work_title`)가
+   *    같은 트랜잭션에서 그 문항들의 `work_title` 을 따라 바꾸고, 그 UPDATE 가
+   *    `updated_at` 트리거를 건드린다. 화면이 옛 버전을 들고 있으면 이후 그 문항의
+   *    저장·검수가 **아무도 안 고쳤는데 충돌로 튕긴다** — 지문 삭제(removePassage)와
+   *    똑같은 이유다. 그래서 문항을 다시 읽고 카드도 다시 마운트한다.
+   * @returns 저장에 성공했는가
+   */
   const savePassage = useCallback(async (id: string, patch: PassagePatch): Promise<boolean> => {
     const target = passages.find((p) => p.id === id);
     if (!target) return false;
+    const titleChanged = patch.title !== undefined && patch.title !== target.title;
     try {
       const updatedAt = await updatePassage(id, target.updated_at, patch);
       setPassages((list) => list.map((p) => (
         p.id === id ? { ...p, ...patch, updated_at: updatedAt } as Passage : p
       )));
+
+      if (titleChanged) {
+        // 트리거는 이 UPDATE 와 한 트랜잭션이라, 응답을 받은 시점에는 이미 반영돼 있다
+        setProblems(await fetchProblemsOfSource(sourceId));
+        setReloadSeq((n) => n + 1);
+      }
       return true;
     } catch (e) {
       reportError(e);
       return false;
     }
-  }, [passages]);
+  }, [passages, sourceId]);
 
   /**
    * 검수 완료 표시를 켜고 끈다.

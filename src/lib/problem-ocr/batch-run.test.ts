@@ -1,10 +1,15 @@
 import { describe, it, expect, vi } from 'vitest';
 import { representativeFailure, runOcrBatches } from './batch-run';
 import { AiError } from '@/lib/ai/types';
+import { toWarningObject, warningText } from './warnings';
 
 /** 요청한 쪽을 전부 그려 낸 렌더 함수 */
 const ok = (images: string[] = ['data:image/jpeg;base64,x']) =>
   vi.fn(async (pages: number[]) => ({ images, rendered: pages, skipped: [] }));
+
+/** 경고를 한 줄로 이어 본다 */
+const said = (res: { warnings: Parameters<typeof warningText>[0][] }) =>
+  res.warnings.map(warningText).join(' | ');
 
 describe('runOcrBatches', () => {
   it('묶음을 순서대로 실행한다 — 병렬로 보내면 한도만 빨리 태운다', async () => {
@@ -37,7 +42,8 @@ describe('runOcrBatches', () => {
 
     expect(runBatch).toHaveBeenCalledWith(expect.objectContaining({ pages: [2, 3] }));
     expect(res.drafts[0].pages).toEqual([2, 3]);
-    expect(res.warnings.join()).toContain('건너뛴 쪽');
+    expect(said(res)).toContain('건너뛴 쪽');
+    expect(toWarningObject(res.warnings[0]).targets).toEqual([{ kind: 'page', page: 1, label: '1쪽' }]);
   });
 
   it('한 묶음이 실패해도 나머지를 계속 읽는다 — 이미 태운 사용량을 버리지 않는다', async () => {
@@ -65,8 +71,11 @@ describe('runOcrBatches', () => {
         .mockResolvedValueOnce({ draft: 'a', rawLength: 1 })
         .mockRejectedValueOnce(new AiError('timeout')),
     });
-    expect(res.warnings.join()).toContain('읽지 못했어요');
-    expect(res.warnings.join()).toContain('시간이 초과');
+    expect(said(res)).toContain('읽지 못했어요');
+    expect(said(res)).toContain('시간이 초과');
+    // '2번째 묶음' 은 우리 사정이다 — 선생님이 볼 수 있는 것은 쪽 번호다
+    expect(said(res)).toContain('2쪽');
+    expect(toWarningObject(res.warnings[0]).targets).toEqual([{ kind: 'page', page: 2, label: '2쪽' }]);
   });
 
   it('한도 초과처럼 반복해도 같은 결과인 오류는 즉시 멈춘다', async () => {
@@ -101,7 +110,7 @@ describe('runOcrBatches', () => {
       runBatch,
     });
     expect(runBatch).not.toHaveBeenCalled();
-    expect(res.warnings.join()).toContain('건너뛴 쪽');
+    expect(said(res)).toContain('건너뛴 쪽');
   });
 
   it('취소하면 남은 묶음을 보내지 않고 읽은 것은 남긴다', async () => {
@@ -121,7 +130,7 @@ describe('runOcrBatches', () => {
     expect(runBatch).toHaveBeenCalledTimes(1);
     expect(res.fatal).toBe('cancelled');
     expect(res.drafts).toHaveLength(1);
-    expect(res.warnings.join()).toContain('취소하기 전까지');
+    expect(said(res)).toContain('취소하기 전까지');
   });
 
   it('렌더 도중 취소되면 AI 를 부르지 않는다 — 한도 절약', async () => {

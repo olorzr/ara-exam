@@ -111,6 +111,20 @@ describe('buildProblemOcrPrompt', () => {
     expect(prompt).toContain('배점 표기는 옮기지 않는다');
   });
 
+  it('작품명·지은이를 읽으라고 한다 — 스키마에만 있고 설명이 없으면 모델이 비워 둔다', () => {
+    expect(prompt).toContain('[작품]');
+    expect(prompt).toContain('title');
+    expect(prompt).toContain('author');
+    expect(prompt).toContain('work_title');
+    // 감싸는 기호를 벗겨야 같은 작품이 여러 갈래로 쌓이지 않는다
+    expect(prompt).toContain('「동백꽃」');
+    expect(prompt).toContain('지어내지 않는다');
+  });
+
+  it('경고에 쪽·문항 번호를 함께 적으라고 한다 — 어디 얘기인지 없으면 못 찾는다', () => {
+    expect(prompt).toContain('쪽 번호와 문항 번호를 함께');
+  });
+
   it('단원 트리와 시험범위를 실어 보내고 그 안에서만 고르라고 한다', () => {
     expect(prompt).toContain('단원트리');
     expect(prompt).toContain('(1) 시의 화자');
