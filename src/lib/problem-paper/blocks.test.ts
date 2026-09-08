@@ -68,6 +68,14 @@ describe('buildPaperBlocks', () => {
     expect(blocks[0]).toMatchObject({ kind: 'problem-image', number: 1 });
   });
 
+  it('이미지 문항도 출처 스냅샷을 들고 간다 — 출처 표시가 그림 문항만 빠지면 안 된다', () => {
+    const blocks = build([snap({ render_mode: 'image', image_path: 'p/x.jpg' })]);
+    expect(blocks[0]).toMatchObject({
+      kind: 'problem-image',
+      source: expect.objectContaining({ school_name: '상현중' }),
+    });
+  });
+
   it('배점 숨김이면 이미지 문항에도 배점을 싣지 않는다', () => {
     const blocks = buildPaperBlocks(
       [snap({ render_mode: 'image', image_path: 'p/x.jpg', score: 4 })],

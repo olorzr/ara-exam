@@ -122,6 +122,7 @@ export async function runProblemOcr(
 
     onProgress?.({ phase: 'crop', done: 0, total: merged.passages.length + merged.problems.length });
     const cropped = await cropRegions(doc, merged, signal, onProgress);
+    merged.warnings.push(...cropped.warnings);
 
     onProgress?.({ phase: 'save', done: 0, total: 1 });
     // 묶음 하나라도 들어가면 곧바로 표시한다 — 중간에 실패해도 앞 묶음은 남아 있어서,
@@ -263,25 +264,52 @@ async function cropRegions(
   merged: MergeResult,
   signal: AbortSignal | undefined,
   onProgress?: (p: OcrRunProgress) => void,
-): Promise<{ passageImages: Map<string, string>; problemImages: Map<string, string> }> {
+): Promise<{
+  passageImages: Map<string, string>;
+  problemImages: Map<string, string>;
+  warnings: string[];
+}> {
   const cropper = new PageCropper(doc);
   const passageImages = new Map<string, string>();
   const problemImages = new Map<string, string>();
+  const warnings: string[] = [];
 
-  const targets: { id: string; page: number; box: NonNullable<PassageBox>; kind: 'passage' | 'problem' }[] = [
+  interface CropTarget {
+    id: string;
+    page: number;
+    box: NonNullable<PassageBox>;
+    kind: 'passage' | 'problem';
+    /** 그림·표가 있어 **글만으로는 온전하지 않은** 항목 — 실패를 조용히 넘기면 안 된다 */
+    needsImage: boolean;
+    label: string;
+  }
+
+  const targets: CropTarget[] = [
     ...merged.passages.filter((p) => p.box).map((p) => ({
       id: p.id, page: p.page_no, box: p.box!, kind: 'passage' as const,
+      needsImage: p.has_figure, label: `${p.page_no}쪽 지문`,
     })),
     ...merged.problems.filter((p) => p.box).map((p) => ({
       id: p.id, page: p.page_no, box: p.box!, kind: 'problem' as const,
+      needsImage: p.has_figure,
+      label: p.number !== null ? `${p.number}번` : `${p.page_no}쪽 문항`,
     })),
   ];
+
+  // 그림이 있다고 표시됐는데 좌표가 없으면 애초에 자를 수가 없다 — 그것도 알린다
+  const noBox = [
+    ...merged.passages.filter((p) => p.has_figure && !p.box).map((p) => `${p.page_no}쪽 지문`),
+    ...merged.problems.filter((p) => p.has_figure && !p.box)
+      .map((p) => (p.number !== null ? `${p.number}번` : `${p.page_no}쪽 문항`)),
+  ];
+  const failed: string[] = [...noBox];
 
   try {
     let done = 0;
     for (const target of targets) {
       if (signal?.aborted) break;
       const blob = await cropper.crop(target.page, boxToBbox(target.box));
+      let ok = false;
       if (blob) {
         const path = target.kind === 'passage'
           ? passageRegionPath(target.id)
@@ -289,10 +317,14 @@ async function cropRegions(
         try {
           await uploadProblemFile(path, blob, 'image/jpeg');
           (target.kind === 'passage' ? passageImages : problemImages).set(target.id, path);
+          ok = true;
         } catch {
           // 이미지가 없어도 본문은 멀쩡하다 — 저장을 막지 않는다
         }
       }
+      // ⚠️ 그림이 있는 항목은 다르다. 프롬프트가 "옮길 수 있는 글자만 적으라" 고 시켰으므로
+      //    글만으로는 온전하지 않다. 이미지를 못 만들었으면 **반드시 알린다**(코덱스 리뷰 17R)
+      if (!ok && target.needsImage) failed.push(target.label);
       done += 1;
       onProgress?.({ phase: 'crop', done, total: targets.length });
     }
@@ -300,7 +332,15 @@ async function cropRegions(
     cropper.dispose();
   }
 
-  return { passageImages, problemImages };
+  if (failed.length > 0) {
+    warnings.push(
+      `그림·표가 있는 항목의 이미지를 만들지 못했어요(${failed.slice(0, 8).join(', ')}`
+      + `${failed.length > 8 ? ` 외 ${failed.length - 8}개` : ''}). `
+      + '글만으로는 내용이 빠질 수 있으니 검수에서 확인해 주세요.',
+    );
+  }
+
+  return { passageImages, problemImages, warnings };
 }
 
 type PassageBox = MergeResult['passages'][number]['box'];

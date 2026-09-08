@@ -59,6 +59,8 @@ export function renderPaperBlocks({ blocks, settings, imageUrls }: RenderArgs): 
               {block.score !== null && <span className="pb-q__score">[{block.score}점]</span>}
             </div>
             <PrintImage path={block.path} urls={imageUrls} alt={`${block.number}번 문항`} />
+            {/* 출처 표시는 글 문항과 같아야 한다 — 그림 문항만 빠지면 표기가 들쭉날쭉해진다 */}
+            {settings.showSource && <SourceLine source={block.source} />}
           </div>
         );
 
@@ -155,12 +157,20 @@ function ProblemBlock({ number, snapshot, settings, imageUrls }: ProblemBlockPro
         </div>
       )}
 
-      {settings.showSource && (
-        <p className="pb-q__score" style={{ paddingLeft: 20, marginTop: 2 }}>
-          {[snapshot.source.year, snapshot.source.school_name || snapshot.source.publisher,
-            snapshot.source.exam_type].filter(Boolean).join(' ')}
-        </p>
-      )}
+      {settings.showSource && <SourceLine source={snapshot.source} />}
     </div>
+  );
+}
+
+/** 문항 아래에 붙는 출처 한 줄 — 글 문항·그림 문항이 같은 모양을 쓴다 */
+function SourceLine({ source }: { source: PaperItemSnapshot['source'] }) {
+  const text = [source.year, source.school_name || source.publisher, source.exam_type]
+    .filter(Boolean)
+    .join(' ');
+  if (!text) return null;
+  return (
+    <p className="pb-q__score" style={{ paddingLeft: 20, marginTop: 2 }}>
+      {text}
+    </p>
   );
 }

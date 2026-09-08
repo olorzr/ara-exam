@@ -22,7 +22,15 @@ export type PaperBlock =
   | { kind: 'passage-part'; key: string; html: string; first: boolean; last: boolean }
   | { kind: 'passage-image'; key: string; path: string; label: string }
   | { kind: 'problem'; key: string; number: number; snapshot: PaperItemSnapshot }
-  | { kind: 'problem-image'; key: string; number: number; path: string; score: number | null };
+  | {
+    kind: 'problem-image';
+    key: string;
+    number: number;
+    path: string;
+    score: number | null;
+    /** 출처 표시가 켜졌을 때 찍을 스냅샷 — 글 문항과 같은 줄이 나가야 한다 */
+    source: PaperItemSnapshot['source'];
+  };
 
 /** 지문 머리글 문구 — 국어 시험지의 관용 표현 */
 function passageHeaderText(range: string): string {
@@ -89,6 +97,7 @@ export function buildPaperBlocks(
           number,
           path: snapshot.image_path,
           score: settings.showScore ? snapshot.score : null,
+          source: snapshot.source,
         });
         continue;
       }
