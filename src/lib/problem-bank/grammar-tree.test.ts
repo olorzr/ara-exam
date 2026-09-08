@@ -151,16 +151,26 @@ describe('normalizeGrammarPaths', () => {
 });
 
 describe('isGrammarArea — 칸을 펼칠지', () => {
-  it('중등 문법 영역이면 true', () => {
-    expect(isGrammarArea(['중등 국어', '문법'])).toBe(true);
+  it('중등·고등은 화법과 언어 > 언어 다 (운영 마스터 실제 모양)', () => {
+    expect(isGrammarArea(['화법과 언어', '언어'])).toBe(true);
   });
 
-  it('고등은 언어와 매체다', () => {
+  it('초등은 문법·어휘/어법', () => {
+    expect(isGrammarArea(['문법'])).toBe(true);
+    expect(isGrammarArea(['어휘/어법'])).toBe(true);
+  });
+
+  it('옛 표기 언어와 매체도 받는다', () => {
     expect(isGrammarArea(['고등 국어', '언어와 매체'])).toBe(true);
   });
 
+  it('같은 갈래라도 화법은 false — 문법 개념을 붙일 자리가 아니다', () => {
+    expect(isGrammarArea(['화법과 언어', '화법'])).toBe(false);
+  });
+
   it('문학·독서는 false', () => {
-    expect(isGrammarArea(['중등 국어', '문학', '현대시'])).toBe(false);
+    expect(isGrammarArea(['문학', '산문 문학', '현대 소설'])).toBe(false);
+    expect(isGrammarArea(['독서와 작문', '독서'])).toBe(false);
     expect(isGrammarArea([])).toBe(false);
   });
 });
