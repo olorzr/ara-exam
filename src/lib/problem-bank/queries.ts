@@ -147,11 +147,13 @@ export async function fetchProblemPage(query: ProblemQuery): Promise<ProblemPage
     .order('created_at', { ascending: false })
     .range(from, from + PROBLEM_PAGE_SIZE - 1);
 
-  if (query.source_type) request = request.eq('problem_sources.source_type', query.source_type);
-  if (query.school_name) request = request.eq('problem_sources.school_name', query.school_name);
-  if (query.year) request = request.eq('problem_sources.year', query.year);
-  if (query.grade) request = request.eq('problem_sources.grade', query.grade);
-  if (query.exam_type) request = request.eq('problem_sources.exam_type', query.exam_type);
+  // ⚠️ 임베드에 별칭(`source:`)을 주면 필터 경로도 **별칭**을 써야 한다.
+  //    `problem_sources.year` 로 쓰면 PostgREST 가 "그런 임베드 없음" 으로 요청을 거부한다.
+  if (query.source_type) request = request.eq('source.source_type', query.source_type);
+  if (query.school_name) request = request.eq('source.school_name', query.school_name);
+  if (query.year) request = request.eq('source.year', query.year);
+  if (query.grade) request = request.eq('source.grade', query.grade);
+  if (query.exam_type) request = request.eq('source.exam_type', query.exam_type);
   if (query.work_title) request = request.eq('work_title', query.work_title);
   if (query.verifiedOnly) request = request.eq('status', '검수완료');
   if (query.area_path && query.area_path.length > 0) {

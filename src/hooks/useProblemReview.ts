@@ -93,9 +93,13 @@ export function useProblemReview(sourceId: string) {
 
   const toggleVerified = useCallback(async (id: string, verified: boolean) => {
     try {
-      await setProblemVerified(id, verified);
+      // updated_at 을 같이 갱신한다 — 이 UPDATE 도 트리거를 건드리므로,
+      // 옛 값을 들고 있으면 다음 본문 저장이 남 탓 없이 충돌로 튕긴다
+      const updatedAt = await setProblemVerified(id, verified);
       setProblems((list) => list.map((p) => (
-        p.id === id ? { ...p, status: verified ? '검수완료' : '초안' } : p
+        p.id === id
+          ? { ...p, status: verified ? '검수완료' : '초안', updated_at: updatedAt }
+          : p
       )));
     } catch (e) {
       reportError(e);

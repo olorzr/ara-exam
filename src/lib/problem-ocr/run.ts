@@ -8,7 +8,9 @@ import { openPdfSource, renderPagesToImages, type OpenPdf } from '@/lib/pdf/pdfP
 import type { AreaTreeNode } from '@/lib/problem-bank/area-tree';
 import { insertPassages, insertProblems, updateSource } from '@/lib/problem-bank/save';
 import { uploadProblemFile } from '@/lib/problem-bank/storage';
-import { passageRegionPath, problemRegionPath } from '@/lib/problem-bank/storage-paths';
+import {
+  passageRegionPath, problemRegionPath, sourcePagePath,
+} from '@/lib/problem-bank/storage-paths';
 import type { OcrMeta } from '@/types/problem-bank';
 import { applyAnswerKey } from './answer-key';
 import { planPageBatches } from './batch-plan';
@@ -44,7 +46,7 @@ export interface OcrRunInput {
 }
 
 export interface OcrRunProgress {
-  phase: 'ocr' | 'answer-key' | 'crop' | 'save';
+  phase: 'page' | 'ocr' | 'answer-key' | 'crop' | 'save';
   done: number;
   total: number;
 }
@@ -68,6 +70,11 @@ export async function runProblemOcr(
   const doc: OpenPdf = await openPdfSource({ kind: 'file', file: input.file });
 
   try {
+    // 검수 화면이 원본과 대조할 페이지 이미지를 먼저 올린다.
+    // ⚠️ 이걸 빼면 검수 화면의 왼쪽(원본) 칸이 **늘 비어 있고**, 선생님이 잘못 읽은
+    //    글자를 알아챌 방법이 사라진다(코덱스 리뷰가 잡은 결함).
+    await uploadPageImages(input, doc, signal, onProgress);
+
     const batches = planPageBatches(input.problemPages);
 
     const ocrRun = await runOcrBatches({
@@ -133,6 +140,42 @@ export async function runProblemOcr(
     return { merged, meta };
   } finally {
     doc.pdf.destroy();
+  }
+}
+
+/**
+ * 검수용 페이지 이미지를 Storage 에 올린다.
+ *
+ * 정답표 쪽까지 함께 올린다 — 정답이 이상할 때 어디서 읽었는지 봐야 한다.
+ * 한 장이 실패해도 다음 장을 계속 올린다(원본 대조가 부분적으로라도 되는 편이 낫다).
+ */
+async function uploadPageImages(
+  input: OcrRunInput,
+  doc: OpenPdf,
+  signal: AbortSignal | undefined,
+  onProgress?: (p: OcrRunProgress) => void,
+): Promise<void> {
+  const pages = [...new Set([...input.problemPages, ...input.answerPages])]
+    .filter((n) => Number.isInteger(n) && n >= 1)
+    .sort((a, b) => a - b);
+  if (pages.length === 0) return;
+
+  let done = 0;
+  for (const page of pages) {
+    if (signal?.aborted) return;
+    try {
+      // 한 장씩 그린다 — 30쪽을 한 번에 담으면 data URL 만으로 수십 MB 가 된다
+      const { images } = await renderPagesToImages(doc, [page], { signal });
+      const dataUrl = images[0];
+      if (dataUrl) {
+        const blob = await (await fetch(dataUrl)).blob();
+        await uploadProblemFile(sourcePagePath(input.sourceId, page), blob, 'image/jpeg');
+      }
+    } catch {
+      // 원본 이미지가 없어도 문항은 읽힌다 — 여기서 멈추지 않는다
+    }
+    done += 1;
+    onProgress?.({ phase: 'page', done, total: pages.length });
   }
 }
 

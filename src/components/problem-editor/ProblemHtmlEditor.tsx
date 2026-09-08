@@ -6,9 +6,39 @@ import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
 import { Table, TableRow } from '@tiptap/extension-table';
+import { Extension } from '@tiptap/core';
 import { Bold, Italic, Table as TableIcon, Underline as UnderlineIcon } from 'lucide-react';
 import { CustomTableCell, CustomTableHeader } from '@/components/exam-builder/CustomTableCell';
 import { sanitizeProblemHTML } from '@/lib/sanitize-problem';
+
+/**
+ * 〈보기〉 상자를 살려 두는 blockquote.
+ *
+ * ⚠️ StarterKit 기본 blockquote 는 **모르는 속성을 버린다.** 그대로 두면 OCR 이 만든
+ *    `<blockquote data-box="보기">` 를 한 글자만 고쳐도 `getHTML()` 이 속성을 빼고,
+ *    저장하는 순간 말머리와 인쇄 상자 테두리가 영영 사라진다
+ *    (인쇄 CSS 가 `blockquote[data-box]` 를 겨냥한다).
+ *    값 검증은 정화(sanitize-problem.ts)가 하므로 여기서는 통과만 시킨다.
+ *
+ * blockquote 확장을 갈아 끼우지 않고 **전역 속성**으로 얹는다 — 새 패키지를 늘리지 않고
+ * StarterKit 의 blockquote 동작(단축키·입력 규칙)을 그대로 쓰기 위해서다.
+ */
+const BoxAttribute = Extension.create({
+  name: 'boxAttribute',
+  addGlobalAttributes() {
+    return [{
+      types: ['blockquote'],
+      attributes: {
+        'data-box': {
+          default: null,
+          parseHTML: (element: HTMLElement) => element.getAttribute('data-box'),
+          renderHTML: (attributes: Record<string, unknown>) =>
+            (attributes['data-box'] ? { 'data-box': attributes['data-box'] } : {}),
+        },
+      },
+    }];
+  },
+});
 
 interface ProblemHtmlEditorProps {
   /** 저장된 HTML. 바뀌면 편집기 내용을 갈아 끼운다 */
@@ -35,6 +65,7 @@ export default function ProblemHtmlEditor({
     immediatelyRender: false,
     extensions: [
       StarterKit.configure({ heading: { levels: [3, 4] } }),
+      BoxAttribute,
       Underline,
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Table.configure({ resizable: true }),

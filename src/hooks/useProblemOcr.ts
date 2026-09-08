@@ -8,6 +8,7 @@ import { runProblemOcr, type OcrRunInput, type OcrRunProgress } from '@/lib/prob
 
 /** 단계별 한글 이름 — 진행률 문구가 화면마다 달라지지 않게 한 곳에 둔다 */
 const PHASE_LABEL: Record<OcrRunProgress['phase'], string> = {
+  page: '원본 페이지 저장 중',
   ocr: '문제 읽는 중',
   'answer-key': '정답표 읽는 중',
   crop: '문항 이미지 자르는 중',
