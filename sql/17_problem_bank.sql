@@ -565,7 +565,7 @@ NOTIFY pgrst, 'reload schema';
 -- SELECT table_name FROM information_schema.tables
 --  WHERE table_schema = 'exam' AND table_name LIKE 'problem%' OR table_name = 'passages';
 --
--- 2) 정책이 전부 도메인 조건을 갖는지 (7행이어야 한다)
+-- 2) 정책이 전부 도메인 조건을 갖는지 (6행이어야 한다 — 아카이브 3표 FOR ALL, 문제지 SELECT·DELETE, 항목 SELECT)
 -- SELECT tablename, policyname, cmd FROM pg_policies
 --  WHERE schemaname = 'exam'
 --    AND tablename IN ('problem_sources','passages','problems','problem_papers','problem_paper_items')
