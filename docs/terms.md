@@ -49,3 +49,38 @@
 - 정의: ara-system 수업 > 내신 관리가 (학교×학년×학년도×학기×중간/기말) 단위로 저장한 시험범위·교과서·단원 체크·시험 기간. 이 앱은 읽기 전용으로 연동해 시험지 생성 시 해당 범위의 단어 카테고리를 자동 선택한다
 - 코드에서의 사용: `ScopeSlotRow`, `fetchScopeSlot`, `matchScopeToCategories`, `publicDb()` (public 스키마 읽기 전용 — 쓰기 금지)
 - 관련 파일: `src/lib/naesin-scope/`, `src/lib/supabase-public.ts`, `src/components/exam/NaesinScopeLoader.tsx`
+
+## 기출 출처 (ProblemSource)
+- 정의: 선생님이 올린 기출 PDF 한 건. 학교 내신·모의고사·문제집·프린트 네 종류
+- 코드에서의 사용: `ProblemSource`, `problem_sources` 표, `source_type`
+- 관련 파일: src/types/problem-bank.ts, src/lib/problem-bank/source-form.ts, sql/17_problem_bank.sql
+
+## 지문 (Passage)
+- 정의: 여러 문항이 함께 쓰는 글. "[1~3] 다음 글을 읽고 물음에 답하시오" 의 그 글
+- 코드에서의 사용: `Passage`, `passages` 표, 문항의 `passage_id`
+- 관련 파일: src/lib/problem-ocr/merge.ts, src/lib/problem-paper/blocks.ts
+
+## 문항 (Problem)
+- 정의: 발문·선지·정답·배점을 가진 문제 하나. 단어 시험지의 '문항'과는 다른 개념이다
+- 코드에서의 사용: `Problem`, `problems` 표
+- 관련 파일: src/types/problem-bank.ts, src/components/problem-review/ProblemEditorCard.tsx
+
+## 문제지 (ProblemPaper)
+- 정의: 아카이브 문항을 골라 조합한 인쇄물. 본문은 만든 시점의 **스냅샷**이라 원본이 바뀌어도 변하지 않는다
+- 코드에서의 사용: `ProblemPaper`, `problem_papers` / `problem_paper_items`, RPC `create_problem_paper`
+- 관련 파일: src/lib/problem-paper/compose.ts, sql/17_problem_bank.sql
+
+## 영역 경로 (area_path)
+- 정의: 문항의 분류를 **이름 배열**로 스냅샷한 값 (`['문학','현대시']`). 마스터는 ara-system 이 소유하고 여기서는 고르기만 한다
+- 코드에서의 사용: `Problem.area_path`, `isKnownPath`, `longestKnownPrefix`
+- 관련 파일: src/lib/problem-bank/area-tree.ts, src/lib/problem-bank/area-master.ts
+
+## 이미지로 출제 (render_mode: 'image')
+- 정의: 표·그림이 많아 글로 옮기지 못한 문항·지문을 **잘라 둔 원본 이미지**로 인쇄하는 방식
+- 코드에서의 사용: `render_mode`, `image_path`
+- 관련 파일: src/lib/problem-ocr/crop.ts, src/components/problem-paper/PaperPrintBlocks.tsx
+
+## 코덱스 브릿지 (Codex bridge)
+- 정의: 선생님 PC 에서 도는 작은 중계 프로그램. 브라우저가 자기 ChatGPT 로 OCR 을 돌리게 해 준다. 학원 서버는 AI 를 호출하지 않는다
+- 코드에서의 사용: `src/lib/ai/codex/*`, `ws://127.0.0.1:8899`
+- 관련 파일: src/lib/ai/codex/README.md, Ara-system `public/ara-ai/bridge.cjs`

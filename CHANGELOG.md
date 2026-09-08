@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.2.0] - 2026-09-08
+### Added
+- **기출 문제 은행.** 학교 기출·모의고사·문제집 PDF 를 올리면 **선생님 컴퓨터의 ChatGPT** 가 읽어 지문·문항으로 옮기고, 검수한 뒤 골라서 새 문제지를 만든다. 학원 서버는 AI 를 호출하지 않아 추가 비용이 없다([sql/17_problem_bank.sql](sql/17_problem_bank.sql) — **앱 배포 전에 적용해야 한다**)
+  - 화면: `/problems/upload`(업로드·읽기) · `/problems/sources`(출처·검수) · `/problems/archive`(아카이브) · `/problems/papers/new`(조합) · `/problems/papers/[id]`(문제지·정답표·답안지 인쇄) · `/settings/ai`(연결 설정)
+  - **읽기는 3쪽씩 묶고 한 쪽을 겹친다**([batch-plan.ts](src/lib/problem-ocr/batch-plan.ts)). 국어 기출은 지문을 통째로 옮겨 적어야 해서 출력 토큰이 지연을 지배하고(정답표 읽기의 5쪽보다 잘게), 겹치지 않으면 쪽 경계를 넘는 지문이 **양쪽에서 반씩 잘린 두 개**가 된다. 겹쳐서 생기는 중복은 병합이 정리한다 — 지문은 **더 완전한(긴) 쪽**이, 문항은 **먼저 온 쪽**이 이기되 빈 칸(정답·배점)만 나중 것이 채운다([merge.ts](src/lib/problem-ocr/merge.ts))
+  - **문제를 풀지 않는다.** 정답·배점은 같은 쪽에 인쇄된 정답표에서만 읽고 없으면 `null` 로 둔다([prompt.ts](src/lib/problem-ocr/prompt.ts)). 정답표 쪽은 본문과 **따로** 읽는다 — 같은 프롬프트로 읽으면 모델이 문제를 풀어 채우려 든다. 붙일 때 이미 있는 값은 덮어쓰지 않는다(검수한 값이 우선)
+  - `①` → `'1'` 정규화가 없으면 **실제 시험지 대부분이 주관식으로 강등된다**(한국 시험지는 정답을 원문자로 찍는다). [parse.ts](src/lib/problem-ocr/parse.ts) 의 `CHOICE_GLYPHS`
+  - 그림·표가 많아 글로 못 옮긴 문항은 **잘라 둔 원본 이미지로 출제**할 수 있다(`render_mode: 'image'`). 좌표는 x/y/w/h 네 숫자가 아니라 **단 번호 + 세로 구간**만 요구한다 — 시각 모델의 가로 좌표는 부정확하고 국어 시험지는 거의 2단 조판이라 그것만으로 충분하다([crop.ts](src/lib/problem-ocr/crop.ts))
+  - 문제지 조합은 **드래그**다(대시보드 위젯과 같은 포인터 캡처 방식, 새 패키지 없음). **같은 지문의 문항은 반드시 붙어 있어야 한다** — 흩어지면 인쇄에서 지문이 여러 번 나오고 "[3~5]" 머리글이 거짓말을 한다. 앱([compose.ts](src/lib/problem-paper/compose.ts))과 DB RPC 가 같은 규칙을 따로 검사한다. 키보드·터치를 위해 담기(＋)·위·아래 버튼도 함께 둔다
+  - 인쇄는 기존 A4 엔진을 그대로 쓴다. **지문은 문단 단위 블록**으로 흘려 보낸다 — 통째로 한 블록에 넣으면 한 쪽을 넘는 순간 축소돼 깨알같이 인쇄된다. 정답이 없는 문항은 정답표에 빈칸이 아니라 **'미입력'** 이라고 찍는다(빈칸이면 인쇄 누락과 구분되지 않는다)
+  - 문제지 본문은 만든 시점의 **스냅샷**이다(`exam_words` 와 같은 규약). 원본 문항을 고치거나 지워도 이미 만든 문제지는 그대로 인쇄된다
+- **AI 연결 설정**(`/settings/ai`) — 브릿지 설치 안내·연결 상태·모델 선택. 설치 파일은 ara-system 이 호스팅한다(브릿지는 두 앱이 **한 벌을 공유**한다)
+
+### Changed
+- 라우트 인증 중복 8줄을 `requireSession`([src/lib/require-session.ts](src/lib/require-session.ts))으로 통합했다. 동작은 그대로다
+- `sanitize-html.ts` 의 DOMPurify 훅을 **프로필 인지형**으로 바꿨다. `isomorphic-dompurify` 는 인스턴스가 하나뿐이라 훅도 전역이고, 문항용 정화를 다른 모듈에서 `addHook` 으로 추가하면 **개념지 정화에 문항 규칙이 섞인다**. 훅은 한 번만 걸고 문서 종류별 차이는 활성 프로필로 바꾼다
+- `ExamPrintHeader` 의 합격선 줄을 선택 항목으로 바꿨다 — 기출 문제지에는 합격선 개념이 없다
+
+### 배포 순서
+1. ara-system 마이그레이션 474(영역 분류 마스터 읽기 권한) + `bridge.cjs` v2 배포
+2. **`sql/17_problem_bank.sql` 적용** (앱보다 먼저 — 안 하면 문제 은행 화면 전체가 PGRST205)
+3. Vercel 에 `AI_OCR_BETA=1`
+4. 앱 배포 → 선생님들께 `bridge.cjs` 재다운로드 안내(예전 파일은 이 사이트 주소를 몰라 403)
+
 ## [0.1.16] - 2026-09-08
 ### Changed
 - **상단 가로 헤더를 좌측 사이드바로 바꿨다.** 앞으로 기능을 더 넣을 계획인데 가로 바는 이미 한계였다 — 관리자 계정은 메뉴 7개(≈724px)에 로고·로그아웃까지 더해 `lg`(콘텐츠 960px)에 겨우 들어갔고, `flex-wrap` 이 없어 폭이 모자라면 각 아이템 텍스트가 접혀 헤더가 2줄이 됐다. 세로 목록은 항목이 늘어도 쌓이기만 한다([src/components/layout/AppShell.tsx](src/components/layout/AppShell.tsx), [Sidebar.tsx](src/components/layout/Sidebar.tsx))

@@ -4,6 +4,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "../styles/print-a4.css";
+@import "../styles/problem-paper.css";
 
 @custom-variant dark (&:is(.dark *));
 

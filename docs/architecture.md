@@ -115,3 +115,58 @@ src/
 - 출력 (렌더): supabase select → `src/lib/exam-transform.ts` 의 `transformHTML` / `stripTrailingEmpty` / `extractMarkedWords` 각 함수 entry 에서 `sanitizeConceptHTML` 호출 → `ExamSheetRenderer` 의 `dangerouslySetInnerHTML`
 - 화이트리스트 위치: `src/lib/sanitize-html.ts` (`ALLOWED_TAGS`, `ALLOWED_ATTR`). 새 TipTap 확장 추가 시 같이 갱신 필수
 - 네트워크 계층 방어: `next.config.ts` 의 CSP — `object-src 'none'`, `frame-ancestors 'none'`, `connect-src` 화이트리스트(Supabase, NaverWorks)
+
+---
+
+## 기출 문제 은행 (2026-09)
+
+학교 기출·모의고사·문제집 PDF 를 읽어 문항 단위로 쌓고, 골라서 새 문제지를 만든다.
+
+### 데이터 흐름
+
+```
+[업로드]  PDF → pdf.js 렌더(scale 2) → 쪽 역할 지정(문제/정답표/제외)
+          → Storage(exam-problem-bank) → problem_sources(추출중)
+[OCR]     3쪽씩(겹침 1) 묶어 선생님 PC 의 코덱스 turn → parse → merge
+          → passages/problems INSERT → bbox 로 영역 크롭 → 이미지 업로드
+          → 정답표 쪽은 따로 읽어 번호로 붙임 → problem_sources(검수중)
+[검수]    원본 페이지 이미지 + 영역 오버레이 ↔ TipTap 편집·정답·배점·영역
+[아카이브] 필터(출처·학교·년도·학년·영역·검색) + 페이지네이션
+[문제지]  드래그 조합 → RPC create_problem_paper(스냅샷) → A4 인쇄 3종
+```
+
+### 모듈
+
+## lib/ai (+ lib/ai/codex)
+- 역할: 선생님 PC 의 코덱스 브릿지와 통신. **서버는 AI 를 호출하지 않는다**
+- 의존: 없음(순수 프로토콜) — 원본은 ara-system `app/lib/ai/`
+- 주요 파일: codex/protocol.ts, codex/localClient.ts, codex/generateDraft.ts, errors.ts, flags.ts
+
+## lib/pdf
+- 역할: PDF → 캔버스 → JPEG data URL. 썸네일
+- 의존: pdfjs-dist (⚠️ `wasmUrl: '/pdfjs-wasm/'` 필수 — 없으면 스캔본이 백지로 렌더된다)
+- 주요 파일: pdfRenderer.ts, pdfPages.ts
+
+## lib/problem-ocr
+- 역할: 프롬프트 조립 → 구조화 출력 파싱 → 묶음 실행 → 병합 → 영역 크롭
+- 의존: lib/ai, lib/pdf, lib/sanitize-problem
+- 주요 파일: schema.ts, prompt.ts, parse.ts, batch-plan.ts, batch-run.ts, merge.ts, crop.ts, run.ts
+
+## lib/problem-bank
+- 역할: 아카이브 조회·쓰기, Storage 경로·서명, 영역 마스터 읽기, 필터
+- 의존: lib/supabase, lib/supabase-public(읽기 전용)
+- 주요 파일: queries.ts, mutations.ts, storage.ts, storage-paths.ts, area-tree.ts, filters.ts
+
+## lib/problem-paper
+- 역할: 문제지 조합 규칙(지문 묶음 연속성)과 인쇄 블록 조립
+- 의존: lib/print(splitHtmlBlocks), lib/shuffle
+- 주요 파일: compose.ts, dnd.ts, blocks.ts, settings.ts, shuffle-groups.ts
+
+### 인쇄
+
+기존 A4 엔진(`A4Document`)을 그대로 쓴다. 문서 종류를 늘리는 일은 **블록 배열을 만들어
+넘기는 컴포넌트 하나**를 쓰는 것이 전부다. 타이포그래피 스코프는 `.pb-sheet`
+(개념지의 `.eb-sheet-table` 과 같은 역할, `src/styles/problem-paper.css`).
+
+⚠️ 지문은 **문단 단위 블록**으로 쪼갠다. 통째로 한 블록에 넣으면 한 쪽을 넘는 순간
+`transform: scale()` 로 깨알같이 줄어든다. 문항은 하나가 한 블록이다(발문과 선지가 갈리면 못 읽는다).

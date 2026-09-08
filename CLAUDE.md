@@ -158,6 +158,14 @@
 - [2026-09-04] 표 재분할은 한 패스에 **표 하나**만 쪼갠다(상한 32). 표가 많은 개념지는 그만큼 재측정이 돈다 — 렌더가 몇 프레임 늦을 뿐 내용에는 영향이 없다. 페이지 끝에 걸린 조각이 측정 오차로 다시 밀리면 **1행짜리 조각(+반복된 제목 행)** 이 남을 수 있다(내용 유실 없음, 외관 문제)
 
 ## Architecture Decisions
+- [2026-09-08] **기출 문제 은행 도입**([sql/17_problem_bank.sql](sql/17_problem_bank.sql)). 표 5개(`problem_sources`/`passages`/`problems`/`problem_papers`/`problem_paper_items`)와 RPC `exam.create_problem_paper`. 굵직한 결정들:
+  - **DB 헬퍼는 `public` 이 아니라 `exam` 스키마에 있다**(ara-system mig254 가 만들었다) — `exam.is_allowed_domain()`, `exam.enforce_user_id_from_auth()`, `exam.update_updated_at()`, `exam.audit_log`. sql/01~14 의 `public.is_allowed_domain()` 표기는 **옛 standalone 프로젝트 기준이라 지금은 틀리다**. 새 마이그레이션은 `exam.` 헬퍼를 쓰고 guard 블록에서 존재를 확인한다
+  - 아카이브 3표는 `concept_sheets` 처럼 **공유 FOR ALL**(선생님들이 함께 검수한다). 문제지는 `exams` 처럼 **SELECT/DELETE 만 + RPC 한 곳**으로 잠갔다 — 본문이 스냅샷이라 직접 INSERT 를 허용하면 위조가 된다
+  - **`passages`·`problems` 의 INSERT 는 감사하지 않는다.** OCR 한 번이 수백 행이라 본문 HTML 째로 `audit_log` 에 복사하면 표가 폭발한다. "언제 누가 무엇을 읽었나"는 `problem_sources.ocr_meta` + 그 행의 UPDATE 감사로 남는다. 사람이 하는 수정·삭제는 전부 감사한다
+  - **`UNIQUE(source_id, number)` 를 두지 않았다.** 문제집·프린트는 절마다 번호가 1부터 다시 시작하고, PostgREST 일괄 INSERT 는 원자적이라 중복 하나에 OCR 결과 전체가 실패한다. 중복 정리는 클라이언트 병합이 맡는다
+  - Storage 버킷 `exam-problem-bank`(비공개). **UPDATE 정책을 일부러 만들지 않았다** — 있으면 클라이언트가 `upsert:true` 로 되돌아가도 통과해 버리는데, 그 조합은 ara-system `exam-papers` 버킷을 1년 가까이 조용히 죽여 놨던 형태다. 바꿔 올릴 땐 지우고 새로 올린다(`replaceProblemFile`)
+- [2026-09-08] **AI 는 서버가 아니라 선생님 PC 에서 돈다**(ara-system 의 코덱스 브릿지를 이식). 학원 서버는 `AI_OCR_BETA` 플래그만 판정하고 `/api/ai/status` 로 알려 줄 뿐 AI 를 호출하지 않는다 — 그래서 토큰 비용이 0 이고 `auth.json` 이 선생님 PC 를 벗어나지 않는다. 대신 **컴퓨터마다 설치가 필요**하고 브릿지가 안 떠 있으면 못 쓴다. 자세한 프로토콜 함정은 [src/lib/ai/codex/README.md](src/lib/ai/codex/README.md)
+  - **브릿지는 두 앱이 한 벌을 공유한다.** 원본은 ara-system `public/ara-ai/bridge.cjs` 이고 거기 `ALLOWED_ORIGINS` 에 이 앱 주소가 들어 있어야 한다(v2 부터). 여기서 파일을 다시 호스팅하면 포트 8899 를 두고 프로세스 둘이 다툰다
 - [2026-03-09] 포인트 컬러 `#81D8D0`을 CSS 변수 `--primary`로 통합 → Tailwind `text-primary`, `bg-primary` 등으로 일관되게 사용
 - [2026-03-09] 카테고리 포맷팅/그룹화 로직을 `lib/format.ts`로 추출 → words, exam/create 등 여러 페이지에서 중복 제거
 - [2026-03-09] words/new 페이지를 CategoryForm + WordEntryTable로 분리 → 300줄 제한 준수
@@ -188,6 +196,15 @@
 - [2026-09-03] **(2026-09-04 에 뒤집음) 개념지 단 수를 '글자 수'에서 '글자 수 + 표 열 수'로 바꿨다**([src/lib/print/sheet-columns.ts](src/lib/print/sheet-columns.ts)). 300자 초과면 무조건 2단이었는데, 표가 있는 개념지는 거의 항상 300자를 넘어 **열 3~5개짜리 표가 폭 ≈328px 칸에 밀려 들어가** 잘렸다. 이제 `maxTableColumns` 가 3 이상이면 시트 전체를 1단(≈680px)으로 되돌린다. **혼합 폭(본문 2단 + 표만 전체 폭)은 일부러 안 했다** — 5종 문서가 공용하는 인쇄 엔진(`paginate`/`A4Document`)에 블록별 폭 개념을 새로 넣어야 해서 범위·위험 대비 이득이 작다. 단 수는 저장하지 않는 파생값이라 표를 지우면 자동으로 2단으로 돌아온다
 
 ## Gotchas
+- [2026-09-08] **`isomorphic-dompurify` 는 인스턴스가 하나뿐이라 `addHook` 이 전역이다.** 문항용 정화를 별도 모듈에서 훅으로 추가하면 개념지 정화에도 그 훅이 발화한다. 그래서 훅은 [sanitize-profile.ts](src/lib/sanitize-profile.ts) 에 **한 번만** 걸고 문서 종류별 차이는 활성 프로필로 바꾼다(`withProfile`). 프로필은 `finally` 로 반드시 되돌린다 — 예외가 나도 다음 호출이 남의 규칙을 물려받으면 안 된다. 새 정화 프로필을 추가할 땐 여기에 얹을 것
+- [2026-09-08] **OCR 묶음은 3쪽·겹침 1이다**([problem-ocr/constants.ts](src/lib/problem-ocr/constants.ts)). 정답표 읽기의 5쪽보다 잘게 자른 이유는 국어 지문 전사가 **출력 토큰**을 훨씬 많이 쓰기 때문이고(지연을 지배하는 건 이미지 장수가 아니다), 겹치는 이유는 **쪽 경계를 넘는 지문**이다 — 겹치지 않으면 어느 묶음도 그 지문을 통째로 못 봐서 반씩 잘린 지문 두 개가 남는다. 겹침을 0으로 되돌리지 말 것
+- [2026-09-08] **병합 규칙이 지문과 문항에서 다르다**([merge.ts](src/lib/problem-ocr/merge.ts)). 지문은 **더 완전한(글이 긴) 쪽이 이기고**, 문항은 **먼저 온 쪽이 이기되 빈 칸만 나중 것이 채운다**. 지문에 first-wins 를 쓰면 겹침의 목적(잘린 지문을 온전히 본 묶음의 결과)이 사라진다. ⚠️ **정답(answer)과 유형(question_type)은 한 덩어리로** 옮긴다 — 유형이 바뀌면 `'1'` 이 선지 번호인지 답안 문자열인지가 달라진다
+- [2026-09-08] **좌표는 x/y/w/h 로 받지 않는다.** 시각 모델의 가로 좌표는 부정확하고 국어 시험지는 거의 2단 조판이라, `{column, top, bottom}`(단 번호 + 세로 비율)만 받아 단 폭 전체를 여유 있게 잘라낸다([crop.ts](src/lib/problem-ocr/crop.ts)). 네 숫자로 되돌리면 크롭이 글자를 자른다
+- [2026-09-08] **문제지의 지문 묶음 연속성은 앱과 DB 가 따로 검사한다.** 같은 지문의 문항이 흩어지면 인쇄에서 지문이 여러 번 나오고 머리글 범위가 거짓말을 한다. 앱만 검사하면 RPC 직접 호출로 뚫리고, DB 만 검사하면 사람이 어디를 고쳐야 할지 모른다. `isContiguous`([compose.ts](src/lib/problem-paper/compose.ts))와 RPC 의 gaps-and-islands 검사를 **같이** 유지할 것
+- [2026-09-08] **문제지 인쇄에서 지문은 문단 단위 블록으로 쪼갠다**([problem-paper/blocks.ts](src/lib/problem-paper/blocks.ts)). 인쇄 엔진의 블록은 쪼갤 수 없는 최소 단위라, 지문을 통째로 넣으면 한 쪽을 넘는 순간 `transform: scale()` 로 깨알같이 줄어든다. 상자 윤곽은 조각마다 좌우를 그리고 위·아래는 첫·마지막 조각만 그려서(`pb-passage-part--first/--last`) 단·쪽이 갈려도 하나로 보이게 한다
+- [2026-09-08] **`pdfjs-dist` 는 `wasmUrl: '/pdfjs-wasm/'` 없이는 스캔본을 백지로 렌더한다**(JBIG2 디코딩). 자산은 `predev`/`prebuild` 훅([scripts/copy-pdfjs-wasm.js](scripts/copy-pdfjs-wasm.js))이 `node_modules` 에서 복사하고 git 에는 넣지 않는다. 끝 슬래시 필수
+- [2026-09-08] **CSP `connect-src` 에 `ws://127.0.0.1:*` 이 있어야 브릿지에 붙는다**([next.config.ts](next.config.ts)). ara-system 은 CSP 가 아예 없어 겪지 않은 문제다. 127.0.0.1 은 potentially trustworthy 라 https 문서에서도 mixed content 가 아니고 `upgrade-insecure-requests` 도 loopback 은 면제하지만, **프로덕션 배포 후 DevTools 로 한 번 확인할 것** — 만약 wss 로 올라가면 핸드셰이크가 조용히 실패한다
+- [2026-09-08] **`react-hooks/set-state-in-effect` 가 이 저장소에서는 에러다.** 효과 안에서 동기 setState 를 하면 lint 가 막는다. 쓰던 패턴의 대안: ① 로딩 플래그 → "무엇을 이미 불러왔는가"(`loadedKey`)를 기억하고 로딩을 파생, ② prop 이 바뀌면 폼 초기화 → 호출부에서 `key` 로 다시 마운트, ③ 유효하지 않은 선택값 되돌리기 → 렌더 단계에서 파생, ④ 비동기 조회 → `.then()` 안에서만 setState
 - [2026-09-04] **표 열 폭은 인쇄 직전에 JS 가 정한다 — CSS 만으로는 표현할 수 없다.** `overflow-wrap: anywhere`(아래 2026-09-03 항목) 는 셀 min-content 를 한 글자로 무너뜨려, 자동 레이아웃이 긴 글 열에 폭을 몰아주고 2~3글자 열을 한 글자 폭으로 누른다. 그래서 [table-col-fit.ts](src/lib/print/table-col-fit.ts) 가 열 폭을 나눠 퍼센트 `<colgroup>` + `table-layout: fixed` 로 박는다. **되돌리면 안 되는 것들**
   - **프로브는 `width: max-content` 래퍼 + 표 `width: auto` 둘 다 필요하다** ([table-measure.ts](src/lib/print/table-measure.ts) 의 `measureMaxContentWidths`). 래퍼가 없으면 절대배치 shrink-to-fit 이 컨테이너 폭에 걸려 **접힌 폭**을 재고, 표의 `width` 를 안 되돌리면 이미 박힌 `fixed` + 100% 를 그대로 읽는다. 측정 컨테이너(`.a4-measure`)는 `visibility: hidden` 이라 레이아웃이 살아 있어 여기서 재는 게 맞다 — 시트와 같은 타이포그래피 스코프(`.eb-sheet-table .sheet-body`)여야 폭이 맞으므로 프로브도 `SHEET_BODY_CLASS` 를 쓴다
   - **실측 폭에 여유(`COLUMN_SLACK_PX` 2px)를 반드시 얹는다.** max-content 에 딱 맞게 주면 퍼센트 환산·`border-collapse` 겹침에서 1픽셀 미만이 깎여 **마지막 글자가 접힌다**. WebKit 렌더로 확인한 실제 회귀다(`구분` → `구/분`)

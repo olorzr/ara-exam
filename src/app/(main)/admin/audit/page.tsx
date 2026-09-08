@@ -26,6 +26,10 @@ const TABLE_LABEL: Record<string, string> = {
   exams: '시험지',
   concept_sheets: '개념지',
   words: '단어',
+  problem_sources: '기출 출처',
+  passages: '지문',
+  problems: '문항',
+  problem_papers: '문제지',
 };
 
 const PAGE_SIZE = 50;
@@ -120,6 +124,10 @@ export default function AuditLogPage() {
           <option value="exams">시험지</option>
           <option value="concept_sheets">개념지</option>
           <option value="words">단어</option>
+          <option value="problem_sources">기출 출처</option>
+          <option value="passages">지문</option>
+          <option value="problems">문항</option>
+          <option value="problem_papers">문제지</option>
         </select>
         <select
           value={filterAction}

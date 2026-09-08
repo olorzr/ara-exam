@@ -1,0 +1,220 @@
+import { supabase } from '@/lib/supabase';
+import type { Passage, Problem, ProblemSource } from '@/types/problem-bank';
+
+/**
+ * 기출 아카이브 조회.
+ *
+ * ⚠️ PostgREST 는 기본 1,000행에서 잘린다. 목록은 **반드시 `.range()` 로 페이지**를 나누고
+ *    총 개수는 `count: 'exact'` 로 따로 받는다(조용히 잘린 목록이 '전부'로 보이면 안 된다).
+ */
+
+/** 목록에 필요한 컬럼만 — 본문 HTML 은 무겁다 */
+const PROBLEM_LIST_COLUMNS =
+  'id, source_id, passage_id, number, question_type, stem_html, choices, answer, score, '
+  + 'area_path, work_title, page_no, image_path, render_mode, status, created_at';
+
+/** 한 화면에 보여 줄 문항 수 */
+export const PROBLEM_PAGE_SIZE = 60;
+
+/**
+ * 출처 목록.
+ * @param opts - 상태 필터
+ * @returns 최근 순 목록
+ */
+export async function fetchSources(opts: { status?: string } = {}): Promise<ProblemSource[]> {
+  let query = supabase
+    .from('problem_sources')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (opts.status) query = query.eq('status', opts.status);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []) as ProblemSource[];
+}
+
+/**
+ * 출처 한 건.
+ * @param id - 출처 id
+ * @returns 출처. 없으면 null
+ */
+export async function fetchSource(id: string): Promise<ProblemSource | null> {
+  const { data, error } = await supabase
+    .from('problem_sources')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as ProblemSource) ?? null;
+}
+
+/**
+ * 한 출처의 지문 전부.
+ * @param sourceId - 출처 id
+ * @returns 쪽 순서 목록
+ */
+export async function fetchPassages(sourceId: string): Promise<Passage[]> {
+  const { data, error } = await supabase
+    .from('passages')
+    .select('*')
+    .eq('source_id', sourceId)
+    .order('page_no')
+    .limit(500);
+  if (error) throw error;
+  return (data ?? []) as Passage[];
+}
+
+/**
+ * 한 출처의 문항 전부 (검수 화면용 — 본문까지 전부 읽는다).
+ * @param sourceId - 출처 id
+ * @returns 쪽·번호 순서 목록
+ */
+export async function fetchProblemsOfSource(sourceId: string): Promise<Problem[]> {
+  const { data, error } = await supabase
+    .from('problems')
+    .select('*')
+    .eq('source_id', sourceId)
+    .order('page_no')
+    .order('number', { nullsFirst: false })
+    .limit(500);
+  if (error) throw error;
+  return (data ?? []) as Problem[];
+}
+
+/**
+ * 문항 한 건 (편집 화면용).
+ * @param id - 문항 id
+ * @returns 문항. 없으면 null
+ */
+export async function fetchProblem(id: string): Promise<Problem | null> {
+  const { data, error } = await supabase
+    .from('problems')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as Problem) ?? null;
+}
+
+/** 아카이브 목록 한 페이지 */
+export interface ProblemPage {
+  rows: (Problem & { source: ProblemSource })[];
+  /** 필터에 걸린 전체 개수 (페이지 수 계산용) */
+  total: number;
+}
+
+/** 목록 조회 조건 */
+export interface ProblemQuery {
+  source_type?: string;
+  school_name?: string;
+  year?: string;
+  grade?: string;
+  exam_type?: string;
+  /** 영역 이름 경로 — 배열 포함(@>) 으로 찾는다 */
+  area_path?: string[];
+  work_title?: string;
+  /** 발문·선지·작품명 평문 검색 */
+  search?: string;
+  /** '검수완료' 만 보기 */
+  verifiedOnly?: boolean;
+  page?: number;
+}
+
+/**
+ * ilike 패턴에서 와일드카드를 막는다.
+ *
+ * `%`·`_` 를 그대로 넘기면 사용자가 친 글자가 패턴이 되어 엉뚱한 결과가 나온다.
+ * @param value - 사용자가 친 검색어
+ * @returns 이스케이프된 문자열
+ */
+export function escapeIlike(value: string): string {
+  return value.replace(/[\\%_]/g, (m) => `\\${m}`);
+}
+
+/**
+ * 아카이브 목록을 한 페이지 가져온다.
+ * @param query - 필터
+ * @returns 행과 전체 개수
+ */
+export async function fetchProblemPage(query: ProblemQuery): Promise<ProblemPage> {
+  const page = Math.max(0, query.page ?? 0);
+  const from = page * PROBLEM_PAGE_SIZE;
+
+  let request = supabase
+    .from('problems')
+    .select(`${PROBLEM_LIST_COLUMNS}, source:problem_sources!inner(*)`, { count: 'exact' })
+    .order('created_at', { ascending: false })
+    .range(from, from + PROBLEM_PAGE_SIZE - 1);
+
+  if (query.source_type) request = request.eq('problem_sources.source_type', query.source_type);
+  if (query.school_name) request = request.eq('problem_sources.school_name', query.school_name);
+  if (query.year) request = request.eq('problem_sources.year', query.year);
+  if (query.grade) request = request.eq('problem_sources.grade', query.grade);
+  if (query.exam_type) request = request.eq('problem_sources.exam_type', query.exam_type);
+  if (query.work_title) request = request.eq('work_title', query.work_title);
+  if (query.verifiedOnly) request = request.eq('status', '검수완료');
+  if (query.area_path && query.area_path.length > 0) {
+    // 배열 포함 — '문학' 으로 찾으면 '문학 > 현대시' 문항도 걸린다
+    request = request.contains('area_path', query.area_path);
+  }
+  if (query.search?.trim()) {
+    // .or() 를 쓰지 않는다 — 백슬래시·괄호 이스케이프가 인용을 통과하며 풀린다.
+    // 검색용 평문 컬럼 하나로 단순 ilike 를 건다(DB 트리거가 채운다).
+    request = request.ilike('search_text', `%${escapeIlike(query.search.trim().toLowerCase())}%`);
+  }
+
+  const { data, error, count } = await request;
+  if (error) throw error;
+  return {
+    rows: (data ?? []) as unknown as (Problem & { source: ProblemSource })[],
+    total: count ?? 0,
+  };
+}
+
+/**
+ * 필터 선택지를 만들 재료 — 출처 표는 작으므로 통째로 읽어도 된다.
+ * @returns 실제로 존재하는 값들
+ */
+export async function fetchSourceFacets(): Promise<{
+  schools: string[];
+  years: string[];
+  grades: string[];
+}> {
+  const { data, error } = await supabase
+    .from('problem_sources')
+    .select('school_name, year, grade')
+    .limit(1000);
+  if (error) throw error;
+
+  const rows = (data ?? []) as { school_name: string; year: string; grade: string }[];
+  const uniq = (values: string[]) => [...new Set(values.filter(Boolean))].sort();
+  return {
+    schools: uniq(rows.map((r) => r.school_name)),
+    years: uniq(rows.map((r) => r.year)).reverse(),
+    grades: uniq(rows.map((r) => r.grade)),
+  };
+}
+
+/**
+ * 아카이브에 실제로 쓰인 영역 경로들 — 필터 트리를 만든다.
+ * @returns 중복 없는 경로 목록
+ */
+export async function fetchAreaFacets(): Promise<string[][]> {
+  const { data, error } = await supabase
+    .from('problems')
+    .select('area_path')
+    .not('area_path', 'eq', '{}')
+    .limit(1000);
+  if (error) return [];
+
+  const seen = new Set<string>();
+  const out: string[][] = [];
+  for (const row of (data ?? []) as { area_path: string[] }[]) {
+    const key = row.area_path.join(' > ');
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(row.area_path);
+  }
+  return out.sort((a, b) => a.join('>').localeCompare(b.join('>'), 'ko'));
+}

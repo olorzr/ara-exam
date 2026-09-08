@@ -1,0 +1,193 @@
+/*
+ * 기출 문제지 인쇄 스타일.
+ *
+ * ⚠️ 낱장 크기·여백은 여기 적지 않는다 — `src/lib/print/constants.ts` 가 단일 출처이고
+ *    `A4Sheet` 가 인라인 style 로 적용한다. CSS 에 px 를 복사하면 두 벌이 되어 어긋난다.
+ *
+ * 타이포그래피 스코프는 `.pb-sheet` 다(개념지의 `.eb-sheet-table` 과 같은 역할).
+ */
+
+.pb-sheet {
+  font-size: 10pt;
+  line-height: 1.55;
+  color: #1f2937;
+}
+
+.pb-sheet p { margin: 0 0 3pt; }
+.pb-sheet p:last-child { margin-bottom: 0; }
+
+/* ── 지문 ─────────────────────────────────────────── */
+
+.pb-passage-header {
+  font-size: 10pt;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 4px;
+}
+
+/*
+ * 지문은 문단 단위로 쪼개져 여러 블록이 된다(한 쪽을 넘어가도 축소되지 않게).
+ * 그래서 상자 윤곽을 조각마다 그린다 — 좌우는 항상, 위·아래는 첫·마지막 조각만.
+ * 이렇게 해야 단이나 쪽이 갈려도 하나의 상자로 보인다.
+ */
+.pb-passage-part {
+  border-left: 1px solid #d1d5db;
+  border-right: 1px solid #d1d5db;
+  padding: 0 8px;
+}
+.pb-passage-part--first {
+  border-top: 1px solid #d1d5db;
+  padding-top: 6px;
+}
+.pb-passage-part--last {
+  border-bottom: 1px solid #d1d5db;
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+}
+
+/* 〈보기〉 상자 — data-box 값이 곧 말머리다(정화가 허용 목록만 통과시킨다) */
+.pb-sheet blockquote[data-box] {
+  position: relative;
+  border: 1px solid #9ca3af;
+  padding: 12px 8px 6px;
+  margin: 4px 0;
+}
+.pb-sheet blockquote[data-box]::before {
+  content: '〈' attr(data-box) '〉';
+  position: absolute;
+  top: -1px;
+  left: 8px;
+  transform: translateY(-50%);
+  background: #fff;
+  padding: 0 4px;
+  font-size: 9pt;
+  font-weight: 700;
+}
+
+/* ── 문항 ─────────────────────────────────────────── */
+
+.pb-q {
+  break-inside: avoid;
+  padding: 4px 0 6px;
+}
+
+.pb-q__head {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.pb-q__stem { flex: 1; }
+.pb-q__stem p { margin: 0 0 2pt; }
+
+.pb-q__score {
+  font-size: 9pt;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.pb-q__choices {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-left: 20px;
+  margin-top: 3px;
+}
+.pb-q__choice {
+  font-size: 9.5pt;
+  color: #374151;
+}
+.pb-q__choice-glyph {
+  margin-right: 3px;
+  color: #5BBFB7;
+  font-weight: 700;
+}
+
+/* 주관식·서술형 답 쓰는 줄 */
+.pb-q__lines {
+  padding-left: 20px;
+  margin-top: 4px;
+}
+.pb-q__line {
+  border-bottom: 1px solid #d1d5db;
+  height: 18px;
+}
+
+/* 그림·표 이미지와 '이미지로 출제' — 칸을 넘지 않게 반드시 가둔다.
+   넘치면 .a4-sheet__body 의 overflow:hidden 이 인쇄에서만 조용히 잘라낸다 */
+.pb-sheet img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+.pb-figure { margin-top: 4px; }
+
+/* ── 표 ───────────────────────────────────────────── */
+/* 개념지 시트와 같은 규칙 — 셀이 min-content 로 버티면 2단 칸에서 표가 삐져나간다 */
+.pb-sheet table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 4px 0;
+  table-layout: auto;
+}
+.pb-sheet th,
+.pb-sheet td {
+  border: 1px solid #9ca3af;
+  padding: 3px 5px;
+  font-size: 9pt;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.pb-sheet th { background: #f3f4f6; font-weight: 700; }
+
+/* ── 정답표 ───────────────────────────────────────── */
+
+.pb-answer-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0 12px;
+  margin-bottom: 6px;
+}
+.pb-answer-cell {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  min-height: 28px;
+}
+.pb-answer-row--band .pb-answer-cell { background: #F0FAF9; }
+.pb-answer-num {
+  font-size: 11pt;
+  font-weight: 800;
+  color: #5BBFB7;
+  width: 22px;
+}
+.pb-answer-value {
+  font-size: 10pt;
+  font-weight: 600;
+  color: #1f2937;
+  overflow-wrap: anywhere;
+}
+.pb-answer-value--missing { color: #b45309; font-weight: 500; }
+.pb-answer-score {
+  margin-left: auto;
+  font-size: 8.5pt;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+/* ── 답안지 ───────────────────────────────────────── */
+
+.pb-omr-bubbles {
+  display: flex;
+  gap: 5px;
+  font-size: 10pt;
+  color: #9ca3af;
+}
+.pb-omr-line {
+  flex: 1;
+  border-bottom: 1px solid #d1d5db;
+  min-width: 60px;
+}

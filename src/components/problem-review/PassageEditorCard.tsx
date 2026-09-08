@@ -1,0 +1,118 @@
+'use client';
+
+import { useState } from 'react';
+import { Image as ImageIcon, Trash2, Type } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import ProblemHtmlEditor from '@/components/problem-editor/ProblemHtmlEditor';
+import AreaPathPicker from './AreaPathPicker';
+import type { AreaTreeNode } from '@/lib/problem-bank/area-tree';
+import type { PassagePatch } from '@/lib/problem-bank/mutations';
+import type { Passage } from '@/types/problem-bank';
+
+interface PassageEditorCardProps {
+  passage: Passage;
+  /** 이 지문에 딸린 문항 수 — 지우기 전에 알려 준다 */
+  problemCount: number;
+  areaTree: AreaTreeNode[];
+  selected: boolean;
+  onSelect: () => void;
+  onSave: (patch: PassagePatch) => Promise<boolean>;
+  onDelete: () => void;
+}
+
+/**
+ * 지문 한 개의 검수 카드.
+ *
+ * ⚠️ 호출부는 `key={passage.id}` 를 준다(ProblemEditorCard 와 같은 이유).
+ */
+export default function PassageEditorCard({
+  passage, problemCount, areaTree, selected, onSelect, onSave, onDelete,
+}: PassageEditorCardProps) {
+  const [html, setHtml] = useState(passage.html);
+  const [title, setTitle] = useState(passage.title);
+  const [author, setAuthor] = useState(passage.author);
+  const [area, setArea] = useState<string[]>(passage.area_path);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    await onSave({ html, title, author, area_path: area });
+    setSaving(false);
+  };
+
+  const toggleRenderMode = () => {
+    const next = passage.render_mode === 'image' ? 'text' : 'image';
+    if (next === 'image' && !passage.image_path) return;
+    onSave({ render_mode: next });
+  };
+
+  return (
+    <div
+      data-passage-id={passage.id}
+      onFocusCapture={onSelect}
+      className={`rounded-lg border-2 p-4 transition ${
+        selected ? 'border-primary shadow-sm' : 'border-amber-200 bg-amber-50/40'
+      }`}
+    >
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <button type="button" onClick={onSelect} className="text-sm font-semibold text-gray-900">
+          지문 {passage.label || ''}
+        </button>
+        <Badge variant="outline">{passage.page_no}쪽</Badge>
+        <Badge variant="outline">문항 {problemCount}개</Badge>
+        {passage.render_mode === 'image' && <Badge variant="outline">이미지 출제</Badge>}
+
+        <div className="ml-auto flex items-center gap-1">
+          {passage.image_path && (
+            <Button type="button" variant="outline" size="sm" onClick={toggleRenderMode}>
+              {passage.render_mode === 'image'
+                ? <><Type className="h-3.5 w-3.5" /><span className="ml-1">글로 출제</span></>
+                : <><ImageIcon className="h-3.5 w-3.5" /><span className="ml-1">이미지로 출제</span></>}
+            </Button>
+          )}
+          <Button
+            type="button" variant="outline" size="sm"
+            onClick={() => {
+              const message = problemCount > 0
+                ? `이 지문을 지울까요? 딸린 문항 ${problemCount}개는 남고 지문만 떨어집니다.`
+                : '이 지문을 지울까요?';
+              if (window.confirm(message)) onDelete();
+            }}
+            aria-label="지문 삭제"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">작품명</Label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} className="h-8 text-sm" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">지은이</Label>
+            <Input value={author} onChange={(e) => setAuthor(e.target.value)} className="h-8 text-sm" />
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-xs text-gray-500">본문</Label>
+          <ProblemHtmlEditor value={html} onChange={setHtml} minHeight={200} ariaLabel="지문 본문" />
+        </div>
+
+        <AreaPathPicker tree={areaTree} value={area} onChange={setArea} />
+
+        <div className="flex justify-end">
+          <Button type="button" size="sm" onClick={handleSave} disabled={saving}>
+            {saving ? '저장 중…' : '저장'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}

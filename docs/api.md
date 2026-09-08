@@ -30,3 +30,19 @@
 - signInWithPassword: 로그인
 - signUp: 회원가입
 - signOut: 로그아웃
+
+## GET /api/ai/status
+- 설명: AI 기능(기출 OCR) 활성 여부 조회. 화면이 AI UI 를 그릴지 판단하는 데 쓴다
+- 인증: `Authorization: Bearer <supabase access_token>` (도메인 검사 포함)
+- Response: `{ enabled: boolean, features: { problem_ocr: boolean } }`
+- 에러: 401 `{ ok: false, reason: 'unauthorized' }`
+- 비고: **연결 상태·사용량은 여기서 다루지 않는다.** 그건 브라우저가 선생님 PC 의
+  코덱스 브릿지에 직접 물어본다(서버는 AI 를 호출하지 않는다).
+
+## RPC exam.create_problem_paper
+- 설명: 문제지 생성. `problem_papers` 의 **유일한 쓰기 경로**다(직접 INSERT 는 RLS 로 막혀 있다)
+- 인자: `p_title text`, `p_problem_ids uuid[]`, `p_settings jsonb`
+- Response: 만들어진 문제지 `uuid`
+- 검증: 도메인 · 제목 비지 않음 · 1~200개 · 중복 없음 · 전부 실재 ·
+  **같은 지문의 문항이 붙어 있을 것**(흩어지면 인쇄에서 지문이 여러 번 나온다)
+- 비고: 본문을 `problem_paper_items.snapshot` 에 굳힌다. 설정은 화이트리스트로 재조립한다

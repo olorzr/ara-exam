@@ -1,0 +1,237 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { useProblemReview } from '@/hooks/useProblemReview';
+import { fetchAreaSets, fetchAreaTree, pickAreaSetForGrade } from '@/lib/problem-bank/area-master';
+import type { AreaTreeNode } from '@/lib/problem-bank/area-tree';
+import { setSourceStatus } from '@/lib/problem-bank/mutations';
+import { sourceLabel } from '@/lib/problem-bank/source-label';
+import PageImageWithBoxes, { type BoxOverlay } from '@/components/problem-review/PageImageWithBoxes';
+import PassageEditorCard from '@/components/problem-review/PassageEditorCard';
+import ProblemEditorCard from '@/components/problem-review/ProblemEditorCard';
+import OcrProgress from '@/components/problem-ocr/OcrProgress';
+import { boxToBbox } from '@/lib/problem-ocr/crop';
+import type { Bbox } from '@/types/problem-bank';
+
+/** DB 의 bbox jsonb 는 두 가지 모양이 올 수 있다 — 저장한 {column,top,bottom} 과 정규화 사각형 */
+function toBbox(raw: unknown): Bbox | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const value = raw as Record<string, unknown>;
+  if (typeof value.column === 'number' && typeof value.top === 'number' && typeof value.bottom === 'number') {
+    return boxToBbox({ column: value.column as 0 | 1 | 2, top: value.top, bottom: value.bottom });
+  }
+  if (typeof value.x === 'number' && typeof value.y === 'number') {
+    return { x: value.x, y: value.y, w: Number(value.w) || 0, h: Number(value.h) || 0 };
+  }
+  return null;
+}
+
+/**
+ * 기출 검수 화면 (`/problems/sources/[id]`).
+ *
+ * 왼쪽에 원본 페이지, 오른쪽에 읽어 낸 지문·문항을 둔다.
+ * **원본과 대조**하는 것이 검수의 핵심이라 두 화면을 나란히 본다.
+ */
+export default function ProblemSourceReviewPage() {
+  const params = useParams<{ id: string }>();
+  const router = useRouter();
+  const sourceId = params?.id ?? '';
+  const review = useProblemReview(sourceId);
+
+  const [areaTree, setAreaTree] = useState<AreaTreeNode[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [wantedPage, setPage] = useState(1);
+
+  useEffect(() => {
+    if (!review.source) return;
+    let alive = true;
+    fetchAreaSets().then(async (sets) => {
+      const setId = pickAreaSetForGrade(sets, review.source?.grade ?? '');
+      const tree = setId ? await fetchAreaTree(setId) : [];
+      if (alive) setAreaTree(tree);
+    });
+    return () => { alive = false; };
+  }, [review.source]);
+
+  // 화면에 보이는 쪽 목록 — 실제로 항목이 있는 쪽만
+  const pages = useMemo(() => {
+    const set = new Set<number>();
+    review.passages.forEach((p) => set.add(p.page_no));
+    review.problems.forEach((p) => set.add(p.page_no));
+    return [...set].filter((n) => n >= 1).sort((a, b) => a - b);
+  }, [review.passages, review.problems]);
+
+  // 보고 있던 쪽이 목록에서 사라지면(항목을 다 지웠을 때) 첫 쪽으로 떨어뜨린다.
+  // state 를 효과로 되돌리지 않고 **파생**한다 — 렌더가 한 번 더 도는 것을 막는다.
+  const page = pages.includes(wantedPage) ? wantedPage : pages[0] ?? 1;
+
+  const boxes = useMemo<BoxOverlay[]>(() => {
+    const out: BoxOverlay[] = [];
+    for (const passage of review.passages) {
+      if (passage.page_no !== page) continue;
+      const bbox = toBbox(passage.bbox);
+      if (bbox) out.push({ id: passage.id, bbox, label: '지문', kind: 'passage' });
+    }
+    for (const problem of review.problems) {
+      if (problem.page_no !== page) continue;
+      const bbox = toBbox(problem.bbox);
+      if (bbox) {
+        out.push({
+          id: problem.id,
+          bbox,
+          label: problem.number !== null ? `${problem.number}` : '?',
+          kind: 'problem',
+        });
+      }
+    }
+    return out;
+  }, [review.passages, review.problems, page]);
+
+  /** 지문 다음에 그 지문의 문항이 오도록 늘어놓는다 — 검수 순서가 읽는 순서와 같아야 한다 */
+  const ordered = useMemo(() => {
+    const rows: ({ kind: 'passage'; id: string } | { kind: 'problem'; id: string })[] = [];
+    const used = new Set<string>();
+    for (const passage of review.passages) {
+      rows.push({ kind: 'passage', id: passage.id });
+      for (const problem of review.problems) {
+        if (problem.passage_id === passage.id) {
+          rows.push({ kind: 'problem', id: problem.id });
+          used.add(problem.id);
+        }
+      }
+    }
+    for (const problem of review.problems) {
+      if (!used.has(problem.id)) rows.push({ kind: 'problem', id: problem.id });
+    }
+    return rows;
+  }, [review.passages, review.problems]);
+
+  const problemCountFor = (passageId: string) =>
+    review.problems.filter((p) => p.passage_id === passageId).length;
+
+  const finish = async () => {
+    try {
+      await setSourceStatus(sourceId, '완료');
+      toast.success('검수를 마쳤어요. 아카이브에서 문제지에 담을 수 있어요.');
+      router.push('/problems/archive');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '상태를 바꾸지 못했어요.');
+    }
+  };
+
+  if (review.loading) {
+    return (
+      <div className="flex justify-center py-16">
+        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  if (review.error || !review.source) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center text-sm text-gray-500">
+          {review.error ?? '출처를 찾지 못했어요.'}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const source = review.source;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">{source.title}</h1>
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
+            <Badge variant="outline">{source.source_type}</Badge>
+            {sourceLabel(source)}
+            <span>· 문항 {review.problems.length}개 (검수 {review.verifiedCount})</span>
+          </p>
+        </div>
+        <Button type="button" onClick={finish} disabled={source.status === '완료'}>
+          {source.status === '완료' ? '검수 완료됨' : '검수 마치기'}
+        </Button>
+      </div>
+
+      <OcrProgress progress={null} label="" warnings={source.ocr_meta?.warnings ?? []} />
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+        <div className="space-y-2 lg:sticky lg:top-4 lg:self-start">
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="mr-1 text-sm text-gray-500">쪽</span>
+            {pages.map((n) => (
+              <Button
+                key={n} type="button" size="sm"
+                variant={n === page ? 'default' : 'outline'}
+                onClick={() => setPage(n)}
+              >
+                {n}
+              </Button>
+            ))}
+          </div>
+          <PageImageWithBoxes
+            src={review.pageUrlFor(page)}
+            boxes={boxes}
+            selectedId={selectedId}
+            onSelect={(id) => {
+              setSelectedId(id);
+              document
+                .querySelector(`[data-problem-id="${id}"], [data-passage-id="${id}"]`)
+                ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }}
+          />
+        </div>
+
+        <div className="space-y-3">
+          {ordered.length === 0 && (
+            <Card>
+              <CardContent className="py-12 text-center text-sm text-gray-500">
+                읽어 낸 문항이 없어요. 업로드 화면에서 다시 시도해 주세요.
+              </CardContent>
+            </Card>
+          )}
+
+          {ordered.map((row) => {
+            if (row.kind === 'passage') {
+              const passage = review.passages.find((p) => p.id === row.id);
+              if (!passage) return null;
+              return (
+                <PassageEditorCard
+                  key={passage.id}
+                  passage={passage}
+                  problemCount={problemCountFor(passage.id)}
+                  areaTree={areaTree}
+                  selected={selectedId === passage.id}
+                  onSelect={() => { setSelectedId(passage.id); setPage(passage.page_no); }}
+                  onSave={(patch) => review.savePassage(passage.id, patch)}
+                  onDelete={() => review.removePassage(passage.id)}
+                />
+              );
+            }
+            const problem = review.problems.find((p) => p.id === row.id);
+            if (!problem) return null;
+            return (
+              <ProblemEditorCard
+                key={problem.id}
+                problem={problem}
+                areaTree={areaTree}
+                selected={selectedId === problem.id}
+                onSelect={() => { setSelectedId(problem.id); setPage(problem.page_no); }}
+                onSave={(patch) => review.saveProblem(problem.id, patch)}
+                onToggleVerified={(v) => review.toggleVerified(problem.id, v)}
+                onDelete={() => review.removeProblem(problem.id)}
+              />
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}

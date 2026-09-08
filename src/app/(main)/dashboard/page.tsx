@@ -47,6 +47,9 @@ export default function DashboardPage() {
     { href: '/categories', icon: FolderCog, label: '카테고리 관리', desc: '출판사·단원을 정리해요 📂' },
     { href: '/exam/create', icon: FileText, label: '단어 시험지 생성', desc: '시험지를 만들어요 ✏️' },
     { href: '/exam/history', icon: History, label: '시험 이력', desc: '이전 시험지를 확인해요 🔍' },
+    { href: '/problems/archive', icon: FolderOpen, label: '문제 아카이브', desc: '기출 문항을 찾아봐요 🗂️' },
+    { href: '/problems/upload', icon: PlusCircle, label: '기출 업로드', desc: 'PDF 를 읽어 문항으로 옮겨요 📤' },
+    { href: '/problems/papers/new', icon: FileText, label: '문제지 조합', desc: '기출로 문제지를 만들어요 🧩' },
   ];
 
   return (

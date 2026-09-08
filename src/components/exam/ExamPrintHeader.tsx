@@ -2,8 +2,12 @@ interface ExamPrintHeaderProps {
   title: string;
   /** 출처(단원) 라벨 목록 */
   sourceLabels: string[];
-  passCount: number;
-  passPercentage: number;
+  /**
+   * 합격 기준. **주지 않으면 그 줄을 그리지 않는다** —
+   * 기출 문제지에는 합격선 개념이 없다(단어 시험지에만 있다).
+   */
+  passCount?: number;
+  passPercentage?: number;
   /** 이름·날짜·점수란 — 답안지에서는 숨긴다 */
   showScoreRow?: boolean;
   /** 점수란 분모 (총 문항 수) */
@@ -59,9 +63,11 @@ export default function ExamPrintHeader({
               </span>
             ))}
           </div>
-          <span className="self-end">
-            합격 <strong className="text-gray-800">{passCount}개</strong> 이상 ({passPercentage}%)
-          </span>
+          {passCount !== undefined && passPercentage !== undefined && (
+            <span className="self-end">
+              합격 <strong className="text-gray-800">{passCount}개</strong> 이상 ({passPercentage}%)
+            </span>
+          )}
         </div>
       </div>
     </>
