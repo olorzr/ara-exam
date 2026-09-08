@@ -23,8 +23,12 @@ export interface ApplyAnswerKeyResult {
   filled: number;
   /** 정답표에는 있는데 붙일 문항을 못 찾은 번호 */
   unmatched: number[];
-  /** 이미 있던 값과 정답표가 다른 문항 — 덮어쓰지 않고 알리기만 한다 */
-  conflicts: { id: string; number: number; current: string; fromKey: string }[];
+  /**
+   * 이미 있던 값과 정답표가 다른 문항 — 덮어쓰지 않고 알리기만 한다.
+   * `page` 를 함께 담는다 — 없으면 검수 화면이 카드만 강조하고 **원본은 딴 쪽이 보인다**
+   * (대조가 검수의 핵심인데 정작 그 쪽을 못 편다 — 코덱스 리뷰 P2).
+   */
+  conflicts: { id: string; number: number; page: number; current: string; fromKey: string }[];
   warnings: OcrWarning[];
 }
 
@@ -98,7 +102,11 @@ export function applyAnswerKey(
       touched = true;
     } else if (target.answer !== row.answer) {
       result.conflicts.push({
-        id: target.id, number: row.no, current: target.answer, fromKey: row.answer,
+        id: target.id,
+        number: row.no,
+        page: target.page_no,
+        current: target.answer,
+        fromKey: row.answer,
       });
     }
 
@@ -122,7 +130,8 @@ export function applyAnswerKey(
       targets: result.conflicts.map((c) => ({
         kind: 'problem' as const,
         id: c.id,
-        label: itemTargetLabel({ kind: 'problem', number: c.number }),
+        page: c.page,
+        label: itemTargetLabel({ kind: 'problem', page: c.page, number: c.number }),
       })),
     });
   }

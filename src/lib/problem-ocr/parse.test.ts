@@ -78,6 +78,19 @@ describe('parseOcrDraft — 항목 관대성', () => {
     expect(draft.items).toHaveLength(1);
     expect(draft.items[0].number).toBe(1);
   });
+
+  it('버린 중복의 경고는 ref 를 떼고 남긴다 — 살아남은 항목을 짚으면 거짓이 된다', () => {
+    const draft = parseOcrDraft(json([
+      item({ ref: 'Q1', number: 1 }),
+      // 버려질 쪽에만 빈 선지가 있다
+      item({ ref: 'Q1', number: 1, choices: ['가', '', '다'] }),
+    ]), ctx)!;
+    expect(draft.items).toHaveLength(1);
+    const blank = draft.warnings.find((w) => w.message.includes('선지'));
+    expect(blank).toBeDefined();
+    expect(blank!.ref).toBeUndefined();
+    expect(blank!.page).toBe(1);
+  });
 });
 
 describe('parseOcrDraft — 정답·선지', () => {

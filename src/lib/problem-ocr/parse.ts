@@ -203,18 +203,29 @@ export function parseOcrDraft(raw: string, ctx: ParseContext): OcrDraft | null {
   const refs = new Set<string>();
 
   for (const rawItem of parsed.items.slice(0, OCR_MAX_ITEMS_PER_BATCH)) {
-    const item = parseItem(rawItem, ctx, pageSet, warnings);
-    if (!item) continue;
+    // ⚠️ 항목별 경고는 **따로 받는다.** 곧바로 본 목록에 넣으면, 그 항목이 아래에서
+    //    중복으로 버려질 때 경고에 남은 ref 가 **살아남은 다른 항목**으로 풀려
+    //    엉뚱한 카드에 "선지가 비었어요" 가 붙는다(코덱스 리뷰 P2).
+    const itemWarnings: DraftWarning[] = [];
+    const item = parseItem(rawItem, ctx, pageSet, itemWarnings);
+    if (!item) {
+      for (const w of itemWarnings) pushWarning(warnings, w);
+      continue;
+    }
+
     // 같은 ref 가 두 번 오면 뒤에 오는 참조가 어느 쪽을 가리키는지 알 수 없다 — 먼저 온 것을 남긴다
     if (refs.has(item.ref)) {
-      // 버린 쪽에는 행이 안 생긴다 — 남은 항목을 가리키면 엉뚱한 카드를 지목하게 되므로
-      // 쪽만 알린다
       pushWarning(warnings, {
         message: '같은 항목을 두 번 읽어 뒤엣것을 버렸어요.',
         page: item.page,
       });
+      // 버린 쪽의 경고는 **ref 를 떼고** 남긴다 — 남은 항목을 가리키면 거짓이 되지만,
+      // 통째로 지우면 그 읽기에서만 보인 문제가 조용히 사라진다
+      for (const w of itemWarnings) pushWarning(warnings, { ...w, ref: undefined });
       continue;
     }
+
+    for (const w of itemWarnings) pushWarning(warnings, w);
     refs.add(item.ref);
     items.push(item);
   }

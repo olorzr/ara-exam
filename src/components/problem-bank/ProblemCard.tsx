@@ -82,6 +82,9 @@ export default function ProblemCard({
       } ${selectable || openable ? 'cursor-pointer' : ''}`}
       onClick={selectable ? onToggleSelect : openable ? handleOpen : undefined}
       onKeyDown={openable ? (e) => {
+        // ⚠️ 안쪽 버튼·링크에서 올라온 Enter·Space 는 그 컨트롤의 것이다.
+        //    가로채면 키보드로는 편집 링크를 열 수 없고 상세 창만 뜬다(코덱스 리뷰 P2)
+        if (e.target !== e.currentTarget) return;
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           handleOpen();

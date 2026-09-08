@@ -115,6 +115,10 @@ export function useProblemReview(sourceId: string) {
    *    `updated_at` 트리거를 건드린다. 화면이 옛 버전을 들고 있으면 이후 그 문항의
    *    저장·검수가 **아무도 안 고쳤는데 충돌로 튕긴다** — 지문 삭제(removePassage)와
    *    똑같은 이유다. 그래서 문항을 다시 읽고 카드도 다시 마운트한다.
+   *
+   * ⚠️ 다시 읽는 동안에는 `busy` 로 카드를 걷어 낸다. 그 사이에 다른 카드를 계속 칠 수
+   *    있으면, 확인창이 센 개수 **뒤에** 친 내용이 말없이 사라진다(코덱스 리뷰 P2).
+   *    교과서 변경(changeTextbook)과 같은 처리다.
    * @returns 저장에 성공했는가
    */
   const savePassage = useCallback(async (id: string, patch: PassagePatch): Promise<boolean> => {
@@ -128,9 +132,14 @@ export function useProblemReview(sourceId: string) {
       )));
 
       if (titleChanged) {
-        // 트리거는 이 UPDATE 와 한 트랜잭션이라, 응답을 받은 시점에는 이미 반영돼 있다
-        setProblems(await fetchProblemsOfSource(sourceId));
-        setReloadSeq((n) => n + 1);
+        setBusy(true);
+        try {
+          // 트리거는 이 UPDATE 와 한 트랜잭션이라, 응답을 받은 시점에는 이미 반영돼 있다
+          setProblems(await fetchProblemsOfSource(sourceId));
+          setReloadSeq((n) => n + 1);
+        } finally {
+          setBusy(false);
+        }
       }
       return true;
     } catch (e) {

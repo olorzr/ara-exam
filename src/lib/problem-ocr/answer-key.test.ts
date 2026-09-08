@@ -28,11 +28,13 @@ describe('applyAnswerKey', () => {
     const problems = [draft({ number: 1, answer: '2' })];
     const res = applyAnswerKey(problems, [{ no: 1, answer: '5' }]);
     expect(problems[0].answer).toBe('2');
-    expect(res.conflicts).toEqual([{ id: 'p1', number: 1, current: '2', fromKey: '5' }]);
+    expect(res.conflicts).toEqual([{ id: 'p1', number: 1, page: 1, current: '2', fromKey: '5' }]);
     expect(said(res)).toContain('덮어쓰지 않았어요');
     // 두 값을 함께 보여 준다 — 개수만 알려 주면 원본을 다시 열어야 한다
     expect(said(res)).toContain('1번(입력 2 · 정답표 5)');
-    expect(toWarningObject(res.warnings[0]).targets?.[0]).toMatchObject({ id: 'p1' });
+    // 쪽까지 있어야 검수 화면이 원본을 그 쪽으로 펴 준다(대조가 검수의 핵심이다)
+    expect(toWarningObject(res.warnings[0]).targets?.[0])
+      .toMatchObject({ id: 'p1', page: 1, label: '1번' });
   });
 
   it('배점은 건드리지 않는다 — 정답표에서 읽지도 않는다', () => {
