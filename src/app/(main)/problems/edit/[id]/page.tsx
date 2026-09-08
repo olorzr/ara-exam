@@ -118,11 +118,11 @@ export default function ProblemEditPage() {
             const updatedAt = await setProblemVerified(
               problem.id, knownUpdatedAt ?? problem.updated_at, verified,
             );
-            setProblem({
-              ...problem,
-              status: verified ? '검수완료' : '초안',
-              updated_at: updatedAt,
-            });
+            // ⚠️ 바깥의 `problem` 을 펼치면 **방금 저장한 값이 옛 값으로 되돌아간다**
+            //    (이 클로저는 저장 전 상태를 붙잡고 있다). 최신 상태 위에서 두 칸만 바꾼다
+            setProblem((prev) => (prev
+              ? { ...prev, status: verified ? '검수완료' : '초안', updated_at: updatedAt }
+              : prev));
           } catch (e) {
             toast.error(e instanceof ConflictError ? e.message : '저장하지 못했어요.');
           }

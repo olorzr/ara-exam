@@ -232,7 +232,11 @@ export default function ProblemSourceReviewPage() {
                 selected={selectedId === problem.id}
                 onSelect={() => { setSelectedId(problem.id); setPage(problem.page_no); }}
                 onSave={(patch) => review.saveProblem(problem.id, patch)}
-                onToggleVerified={(v) => review.toggleVerified(problem.id, v)}
+                // 방금 저장해서 알고 있는 버전을 **그대로 넘긴다** — 버리면 저장 직후
+                // 검수가 옛 버전으로 걸려 아무도 안 고쳤는데 충돌한다
+                onToggleVerified={(v, knownUpdatedAt) => (
+                  review.toggleVerified(problem.id, v, knownUpdatedAt)
+                )}
                 onDelete={() => review.removeProblem(problem.id)}
               />
             );
