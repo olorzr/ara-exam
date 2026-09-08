@@ -127,6 +127,15 @@ export async function pdfPageCount(src: PdfSource): Promise<number> {
 
 export type RenderedPages = {
   images: string[]
+  /**
+   * 실제로 그려 낸 쪽 번호. **images 와 순서·길이가 정확히 같다.**
+   *
+   * ⚠️ 호출부는 요청한 pages 가 아니라 **이 값**을 프롬프트에 실어야 한다.
+   *    한 쪽이라도 건너뛰면 "이미지 순서 = 이 쪽 번호" 라는 약속이 깨져
+   *    2쪽 내용이 1쪽으로 기록되고, 그 잘못된 쪽 번호가 중복 판정·지문 병합·
+   *    이미지 크롭까지 줄줄이 어긋나게 만든다.
+   */
+  rendered: number[]
   /** 예산 안에 못 넣어 건너뛴 쪽 번호 — 호출부가 경고로 알린다(조용히 빠뜨리지 않기) */
   skipped: number[]
 }
@@ -147,6 +156,7 @@ export async function renderPagesToImages(
     .sort((a, b) => a - b)
 
   const images: string[] = []
+  const rendered: number[] = []
   const skipped: number[] = []
   let bytes = 0
 
@@ -158,10 +168,11 @@ export async function renderPagesToImages(
     if (bytes + url.length > MAX_BATCH_BYTES) { skipped.push(page); continue }
     bytes += url.length
     images.push(url)
+    rendered.push(page)
     await new Promise(resolve => setTimeout(resolve, 0))
   }
 
-  return { images, skipped }
+  return { images, rendered, skipped }
 }
 
 /**

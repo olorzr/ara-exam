@@ -19,6 +19,24 @@ export interface PdfPagesState {
   roles: Map<number, PageRole>;
 }
 
+/** 상태가 **어느 파일의 것인지** 함께 들고 있는다 */
+interface FileScopedState extends PdfPagesState {
+  forFile: File | null;
+}
+
+/** 아직 이 파일의 결과가 없을 때 보여 줄 상태 */
+function pendingState(file: File | null): FileScopedState {
+  return {
+    forFile: file,
+    pageCount: 0,
+    loading: file !== null,
+    error: null,
+    from: 1,
+    thumbnails: [],
+    roles: new Map(),
+  };
+}
+
 /**
  * PDF 를 열어 쪽 수를 세고 썸네일을 보여 주며, 쪽마다 역할을 고르게 한다.
  *
@@ -28,9 +46,17 @@ export interface PdfPagesState {
  * @returns 상태와 조작 함수
  */
 export function usePdfPages(file: File | null) {
-  const [state, setState] = useState<PdfPagesState>({
-    pageCount: 0, loading: false, error: null, from: 1, thumbnails: [], roles: new Map(),
-  });
+  const [stored, setState] = useState<FileScopedState>(() => pendingState(null));
+
+  /**
+   * 화면이 쓰는 상태.
+   *
+   * ⚠️ 파일이 바뀌면 **즉시** 옛 쪽 수·역할을 버려야 한다. 남겨 두면 새 파일이 아직
+   *    안 열렸는데 화면엔 옛 선택이 남고, 그대로 읽기를 누르면 엉뚱한 쪽이 OCR 로 간다
+   *    (코덱스 리뷰 6R). 효과로 되돌리지 않고 **렌더 단계에서 파생**한다 —
+   *    `react-hooks/set-state-in-effect` 를 피하면서 한 박자 늦는 구간도 없앤다.
+   */
+  const state: PdfPagesState = stored.forFile === file ? stored : pendingState(file);
   const aliveRef = useRef(true);
   /**
    * 지금 유효한 요청의 세대.
@@ -51,13 +77,8 @@ export function usePdfPages(file: File | null) {
   useEffect(() => {
     const gen = ++genRef.current;
     const fresh = () => aliveRef.current && genRef.current === gen;
+    if (!file) return;
 
-    if (!file) {
-      setState({ pageCount: 0, loading: false, error: null, from: 1, thumbnails: [], roles: new Map() });
-      return;
-    }
-
-    setState((s) => ({ ...s, loading: true, error: null, from: 1 }));
     (async () => {
       try {
         const count = await pdfPageCount({ kind: 'file', file });
@@ -65,14 +86,22 @@ export function usePdfPages(file: File | null) {
         if (!fresh()) return;
         const roles = new Map<number, PageRole>();
         for (let p = 1; p <= count; p += 1) roles.set(p, DEFAULT_ROLE);
-        setState({ pageCount: count, loading: false, error: null, from: 1, thumbnails: thumbs, roles });
+        setState({
+          forFile: file, pageCount: count, loading: false, error: null,
+          from: 1, thumbnails: thumbs, roles,
+        });
       } catch (e) {
         if (!fresh()) return;
-        setState((s) => ({
-          ...s,
+        // 여는 데 실패해도 **비운 채로** 둔다 — 옛 파일의 선택을 물려주지 않는다
+        setState({
+          forFile: file,
+          pageCount: 0,
           loading: false,
           error: e instanceof Error ? e.message : 'PDF 를 열지 못했어요.',
-        }));
+          from: 1,
+          thumbnails: [],
+          roles: new Map(),
+        });
       }
     })();
   }, [file]);
@@ -123,6 +152,8 @@ export function usePdfPages(file: File | null) {
 
   return {
     ...state,
+    /** 이 파일로 읽기를 시작해도 되는가 — 다 열렸고 오류가 없을 때만 */
+    ready: !state.loading && !state.error && state.pageCount > 0,
     windowSize: THUMB_WINDOW,
     showFrom,
     setRole,

@@ -49,8 +49,14 @@ export interface BatchRunResult<TDraft> {
 
 export interface BatchRunDeps<TDraft> {
   batches: PageBatch[];
-  /** 그 묶음의 쪽을 이미지로. 실패하면 throw 해도 되고 빈 배열을 돌려줘도 된다 */
-  renderBatch: (pages: PageBatch, index: number) => Promise<{ images: string[]; skipped: number[] }>;
+  /**
+   * 그 묶음의 쪽을 이미지로. 실패하면 throw 해도 되고 빈 배열을 돌려줘도 된다.
+   * `rendered` 는 **실제로 그린 쪽 번호**이고 images 와 순서·길이가 같아야 한다.
+   */
+  renderBatch: (
+    pages: PageBatch,
+    index: number,
+  ) => Promise<{ images: string[]; rendered: number[]; skipped: number[] }>;
   /** 이미지를 실제로 AI 에 보내 초안 하나를 받는다 */
   runBatch: (args: {
     pages: PageBatch;
@@ -109,10 +115,15 @@ export async function runOcrBatches<TDraft>(
     }
 
     let images: string[] = [];
+    // ⚠️ 프롬프트에 실을 쪽 번호는 요청한 쪽이 아니라 **실제로 그린 쪽**이다.
+    //    한 쪽이라도 건너뛰면 "이미지 순서 = 이 쪽 번호" 약속이 깨져 내용이 엉뚱한 쪽으로
+    //    기록되고, 중복 판정·지문 병합·크롭까지 줄줄이 어긋난다(코덱스 리뷰 6R)
+    let pages: number[] = batches[i];
     try {
-      const rendered = await renderBatch(batches[i], i);
-      images = rendered.images;
-      skippedPages.push(...rendered.skipped);
+      const result = await renderBatch(batches[i], i);
+      images = result.images;
+      pages = result.rendered;
+      skippedPages.push(...result.skipped);
     } catch (e) {
       failures.push({
         kind: 'render',
@@ -139,10 +150,8 @@ export async function runOcrBatches<TDraft>(
     }
 
     try {
-      const { draft, rawLength: len } = await runBatch({
-        pages: batches[i], images, index: i, total,
-      });
-      drafts.push({ draft, pages: batches[i] });
+      const { draft, rawLength: len } = await runBatch({ pages, images, index: i, total });
+      drafts.push({ draft, pages });
       imagesSent += images.length;
       rawLength += len;
     } catch (e) {

@@ -222,25 +222,44 @@ export async function fetchSourceFacets(): Promise<{
   };
 }
 
+/** 영역 선택지를 모을 때 한 번에 읽는 행 수 (PostgREST 기본 상한) */
+const FACET_CHUNK = 1000;
+
+/** 영역 선택지를 모으려고 훑을 최대 행 수 — 무한정 훑지 않기 위한 안전판 */
+const FACET_MAX_ROWS = 20_000;
+
 /**
- * 아카이브에 실제로 쓰인 영역 경로들 — 필터 트리를 만든다.
+ * 아카이브에 실제로 쓰인 영역 경로들 — 필터 선택지를 만든다.
+ *
+ * ⚠️ **1,000행에서 자르면 안 된다.** PostgREST 기본 상한만 믿으면 태깅된 문항이
+ *    1,000개를 넘는 순간 그 뒤에만 있는 영역이 **선택지에서 조용히 사라진다**
+ *    (문항은 목록에 있는데 고를 수가 없다 — 코덱스 리뷰 6R).
+ *    `area_path` 한 컬럼만 읽으므로 훑는 비용은 작다.
  * @returns 중복 없는 경로 목록
  */
 export async function fetchAreaFacets(): Promise<string[][]> {
-  const { data, error } = await supabase
-    .from('problems')
-    .select('area_path')
-    .not('area_path', 'eq', '{}')
-    .limit(1000);
-  if (error) return [];
-
   const seen = new Set<string>();
   const out: string[][] = [];
-  for (const row of (data ?? []) as { area_path: string[] }[]) {
-    const key = row.area_path.join(' > ');
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    out.push(row.area_path);
+
+  for (let from = 0; from < FACET_MAX_ROWS; from += FACET_CHUNK) {
+    const { data, error } = await supabase
+      .from('problems')
+      .select('area_path')
+      .not('area_path', 'eq', '{}')
+      .order('id')
+      .range(from, from + FACET_CHUNK - 1);
+    // 선택지를 못 만들어도 목록은 봐야 한다 — 여기까지 모은 것만 돌려준다
+    if (error) break;
+
+    const rows = (data ?? []) as { area_path: string[] }[];
+    for (const row of rows) {
+      const key = row.area_path.join(' > ');
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push(row.area_path);
+    }
+    if (rows.length < FACET_CHUNK) break;
   }
+
   return out.sort((a, b) => a.join('>').localeCompare(b.join('>'), 'ko'));
 }

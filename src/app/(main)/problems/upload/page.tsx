@@ -87,6 +87,11 @@ export default function ProblemUploadPage() {
 
   const handleStart = async () => {
     if (!file) return;
+    // 새 파일이 아직 안 열렸으면 옛 쪽 선택으로 시작될 수 있다
+    if (!pdf.ready) {
+      toast.error('PDF 를 여는 중이에요. 잠시 뒤에 다시 눌러 주세요.');
+      return;
+    }
 
     const nextErrors = validateSourceForm(values);
     if (Object.keys(nextErrors).length > 0) {
@@ -221,7 +226,11 @@ export default function ProblemUploadPage() {
             <OcrProgress progress={ocr.progress} label={ocr.progressLabel} warnings={ocr.warnings} />
 
             <div className="flex items-center gap-2">
-              <Button type="button" onClick={handleStart} disabled={busy || !ai.enabled}>
+              <Button
+                type="button"
+                onClick={handleStart}
+                disabled={busy || !ai.enabled || !pdf.ready}
+              >
                 {busy ? '읽는 중…' : '읽기 시작'}
               </Button>
               {ocr.running && (
