@@ -82,6 +82,19 @@
 - 코드에서의 사용: `Problem.unit_path`, `buildUnitTree`, `UNIT_DEPTH_LABELS`
 - 관련 파일: src/lib/problem-bank/unit-tree.ts, src/lib/problem-bank/unit-master.ts, sql/18_problem_bank_units.sql
 
+## 문법 분류 (grammar_paths)
+- 정의: 문항이 묻는 문법 개념을 **이름 경로 문자열의 목록**으로 스냅샷한 값
+  (`['단어 > 품사 > 명사', '문장 > 문법 요소 > 피동 표현']`, 문항당 최대 5개).
+  체계는 수능 문법 교재 목차(6개 대분류 / 100개 핵심 개념)이고 마스터는 **코드 상수**다
+- ⚠️ area_path·unit_path 와 **모양이 다르다**: 그쪽은 배열 하나가 경로 하나라 문항에 한 개만
+  붙지만, 문법은 한 문항이 개념 두셋을 걸쳐서 경로를 `' > '` 로 이어 붙인 문자열을 원소로 담는다.
+  그래서 상위 검색이 `contains`(@>)가 아니라 **`overlaps`(&&)** 다 — 고른 가지의 잎을 전부 펴서 찾는다
+- 깊이는 가지마다 다르다(담화·어문 규정은 2단, 나머지는 3단). DB 제약은 경로 길이가 아니라 **개수**다
+- 코드에서의 사용: `Problem.grammar_paths`, `GRAMMAR_TREE`, `grammarPathsUnder`,
+  `expandGrammarAncestors`, `isGrammarArea`, RPC `add_grammar_paths`, 아카이브 필터 `gram`
+- 관련 파일: src/lib/problem-bank/grammar-tree.ts, src/components/problem-review/GrammarTagPicker.tsx,
+  sql/21_problem_bank_grammar.sql
+
 ## 구역 상자 (data-box)
 - 정의: 지문·발문 안의 상자·구간 표시. 값의 종류에 따라 인쇄 모양이 셋이다 —
   `보기`·`자료`·`조건`(+번호)은 〈보기〉 테두리 상자, `가`~`마`는 (가) 머리글, `A`~`E`는 [A] 왼쪽 세로선.

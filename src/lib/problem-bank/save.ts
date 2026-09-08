@@ -129,6 +129,7 @@ export async function insertProblems(
     answer: p.answer ?? '',
     area_path: p.area_path,
     unit_path: p.unit_path,
+    grammar_paths: p.grammar_paths,
     work_title: p.work_title,
     page_no: p.page_no,
     bbox: p.box ? { column: p.box.column, top: p.box.top, bottom: p.box.bottom } : null,

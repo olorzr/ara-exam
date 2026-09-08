@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckSquare, Trash2, X } from 'lucide-react';
+import { CheckSquare, Tag, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface ArchiveSelectionBarProps {
@@ -20,6 +20,8 @@ interface ArchiveSelectionBarProps {
   onExit: () => void;
   onToggleAll: () => void;
   onDelete: () => void;
+  /** 고른 문항에 문법 분류를 붙인다 */
+  onTagGrammar: () => void;
 }
 
 /**
@@ -30,7 +32,7 @@ interface ArchiveSelectionBarProps {
  */
 export default function ArchiveSelectionBar({
   selectMode, count, isAllSelected, disabled, busy,
-  onEnter, onExit, onToggleAll, onDelete,
+  onEnter, onExit, onToggleAll, onDelete, onTagGrammar,
 }: ArchiveSelectionBarProps) {
   if (!selectMode) {
     return (
@@ -59,9 +61,20 @@ export default function ArchiveSelectionBar({
           type="button"
           variant="outline"
           size="sm"
+          onClick={onTagGrammar}
+          disabled={count === 0 || busy || disabled}
+          className="ml-auto text-xs"
+        >
+          <Tag className="h-3.5 w-3.5" />
+          <span className="ml-1">문법 분류</span>
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
           onClick={onDelete}
           disabled={count === 0 || busy || disabled}
-          className="ml-auto text-xs text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600"
+          className="text-xs text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600"
         >
           <Trash2 className="h-3.5 w-3.5" />
           <span className="ml-1">{busy ? '지우는 중…' : `${count}개 삭제`}</span>

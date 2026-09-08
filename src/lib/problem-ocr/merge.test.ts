@@ -13,7 +13,7 @@ function passage(over: Partial<OcrItem> = {}): OcrItem {
     label: '[1~3]', title: '소나기', author: '황순원', html: '<p>지문</p>',
     continued: false, continues: false, question_type: '객관식', stem_html: '',
     choices: [], answer: null, has_figure: false, work_title: null,
-    area_path: [], unit_path: [], ...over,
+    area_path: [], unit_path: [], grammar_paths: [], ...over,
   };
 }
 
@@ -22,7 +22,8 @@ function problem(over: Partial<OcrItem> = {}): OcrItem {
     kind: 'problem', ref: 'Q1', page: 1, box: null, passage_ref: null, number: 1,
     label: null, title: null, author: null, html: '', continued: false, continues: false,
     question_type: '객관식', stem_html: '<p>물음</p>', choices: ['가', '나'],
-    answer: null, has_figure: false, work_title: null, area_path: [], unit_path: [], ...over,
+    answer: null, has_figure: false, work_title: null, area_path: [], unit_path: [],
+    grammar_paths: [], ...over,
   };
 }
 

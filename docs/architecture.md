@@ -166,15 +166,23 @@ src/
   구역 상자 `<blockquote data-box="…">`. **다듬기(normalize-html)가 정화보다 먼저** 돈다 —
   정화기는 허용 목록 밖 `data-box` 값을 되돌릴 수 없게 지운다
 - 배점은 읽지 않는다(2026-09-08). 스키마·프롬프트·정답표 모두에서 뺐다
+- 문법 분류는 모델에게 **마디 배열의 배열**(`[['단어','품사','명사']]`)로 받고 `parse.ts` 가
+  저장 모양인 경로 문자열로 접는다 — `OcrItem.grammar_paths` 는 **접은 뒤**의 모양이라
+  JSON 스키마와 타입이 다르다. 병합에서 이 축만 **합집합**이다(겹쳐 읽은 묶음이 각각 다른
+  개념을 알아볼 수 있어 '빈 칸만 채운다' 규칙을 쓰면 나중 것이 버려진다)
 
 ## lib/problem-bank
 - 역할: 아카이브 조회·쓰기, Storage 경로·서명, 영역·단원 마스터 읽기, 필터·패싯
 - 의존: lib/supabase, lib/supabase-public(읽기 전용), lib/category-master(단원 마스터)
 - 주요 파일: queries.ts, facets.ts, mutations.ts, storage.ts, storage-paths.ts, bbox.ts,
-  area-tree.ts, area-master.ts, unit-tree.ts, unit-master.ts, scope-resolve.ts,
-  source-form.ts, filters.ts, selection.ts, school-exam-tree.ts
-- 분류의 두 축: **영역**(ara-system 마스터, 최대 4단)과 **교과서 단원**(이 앱의 카테고리 관리,
-  2단). 둘 다 노드 id 가 아니라 **이름 경로 스냅샷**으로 저장한다
+  area-tree.ts, area-master.ts, unit-tree.ts, unit-master.ts, grammar-tree.ts,
+  scope-resolve.ts, source-form.ts, filters.ts, selection.ts, school-exam-tree.ts
+- 분류의 세 축: **영역**(ara-system 마스터, 최대 4단), **교과서 단원**(이 앱의 카테고리 관리,
+  2단), **문법**(코드 상수 마스터, 최대 3단). 셋 다 노드 id 가 아니라 **이름 경로 스냅샷**이다
+- 문법 축만 **문항에 여러 개** 붙는다(`grammar_paths`, 원소 하나가 경로 하나). 그래서 저장 모양과
+  조회 연산자가 다르다 — 상위 검색은 `grammarPathsUnder` 로 잎을 펴서 `overlaps(&&)`,
+  필터 선택지는 `expandGrammarAncestors` 로 패싯의 조상을 편다. 마스터가 상수라 트리를
+  못 읽는 fail-soft 경로가 없는 유일한 축이다
 - 훑는 축이 세 가지다: 교과서 단원 트리, **학교 기출 트리**(학교 › 학년도 › 학년 › 학기·시험),
   **작품 트리**(지은이 › 작품, `work-tree.ts`). 셋 다 마스터가 아니라 **실제 패싯**으로 만들고,
   한 트리에서 고르면 다른 트리의 축은 비운다

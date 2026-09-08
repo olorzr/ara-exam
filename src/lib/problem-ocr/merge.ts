@@ -76,6 +76,8 @@ export interface ProblemDraft {
   area_path: string[];
   /** 교과서 단원 이름 경로 [대단원, 소단원] */
   unit_path: string[];
+  /** 문법 분류 경로 문자열 목록 (여러 개) */
+  grammar_paths: string[];
   page_no: number;
   box: OcrBox | null;
   has_figure: boolean;

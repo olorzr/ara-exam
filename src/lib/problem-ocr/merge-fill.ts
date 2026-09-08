@@ -1,3 +1,4 @@
+import { normalizeGrammarPaths } from '@/lib/problem-bank/grammar-tree';
 import { textOf } from './merge-keys';
 import type { OcrItem } from './schema';
 import type { PassageDraft, ProblemDraft } from './merge';
@@ -57,6 +58,7 @@ export function toProblem(item: OcrItem, id: string, passageId: string | null): 
     work_title: item.work_title ?? '',
     area_path: item.area_path,
     unit_path: item.unit_path,
+    grammar_paths: item.grammar_paths,
     page_no: item.page,
     box: item.box,
     has_figure: item.has_figure,
@@ -94,6 +96,14 @@ export function fillGaps(target: ProblemDraft, item: OcrItem): void {
   if (!target.work_title && item.work_title) target.work_title = item.work_title;
   if (target.area_path.length === 0 && item.area_path.length > 0) target.area_path = item.area_path;
   if (target.unit_path.length === 0 && item.unit_path.length > 0) target.unit_path = item.unit_path;
+  // ⚠️ 문법만 **합집합**이다. 나머지 축은 경로 하나라 '비어 있을 때만 채운다' 가 맞지만,
+  //    문법 태그는 서로 배타적이지 않고 겹쳐 읽은 묶음이 각각 다른 개념을 알아봤을 수 있다.
+  //    빈 칸 규칙을 그대로 쓰면 나중 묶음이 본 개념이 통째로 버려진다
+  if (item.grammar_paths.length > 0) {
+    target.grammar_paths = normalizeGrammarPaths([
+      ...target.grammar_paths, ...item.grammar_paths,
+    ]);
+  }
   if (!target.box && item.box) target.box = item.box;
   if (item.has_figure) target.has_figure = true;
 }

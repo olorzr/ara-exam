@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { areaPathLabel } from '@/lib/problem-bank/area-tree';
 import { sourceLabel } from '@/lib/problem-bank/source-label';
+import { parseGrammarPath } from '@/lib/problem-bank/grammar-tree';
 import { unitPathLabel } from '@/lib/problem-bank/unit-tree';
 import type { Problem, ProblemSource } from '@/types/problem-bank';
 
@@ -144,6 +145,17 @@ export default function ProblemCard({
           {problem.work_title && <span>· {problem.work_title}</span>}
           {problem.unit_path.length > 0 && <span>· {unitPathLabel(problem.unit_path)}</span>}
           {problem.area_path.length > 0 && <span>· {areaPathLabel(problem.area_path)}</span>}
+          {/* 문법은 여러 개가 붙으므로 **잎 이름만** 칩으로 낸다 — 전체 경로를 다 쓰면
+              카드 한 줄이 경로 세 벌로 가득 찬다. 전체는 title 로 확인한다 */}
+          {problem.grammar_paths.map((path) => (
+            <span
+              key={path}
+              title={path}
+              className="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600"
+            >
+              {parseGrammarPath(path).at(-1) ?? path}
+            </span>
+          ))}
           {showEditLink && !selectMode && (
             <Link
               href={`/problems/edit/${problem.id}`}

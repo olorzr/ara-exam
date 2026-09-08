@@ -67,6 +67,14 @@ export interface OcrItem {
   area_path: string[];
   /** 교과서 단원 트리의 이름 경로 [대단원, 소단원]. 해당 없으면 빈 배열 */
   unit_path: string[];
+  /**
+   * 문법 분류 — **여기만 경로가 여러 개**다(한 문항이 개념 두셋을 걸친다).
+   *
+   * ⚠️ **JSON 스키마와 모양이 다르다.** 모델에게는 배열의 배열(`[['단어','품사','명사']]`)로
+   *    받는다 — 마디를 하나씩 내야 트리와 대조하기 쉽다. 그것을 `parse.ts` 가 저장 모양인
+   *    경로 문자열(`['단어 > 품사 > 명사']`)로 접는다. 이 타입은 **접은 뒤**의 모양이다.
+   */
+  grammar_paths: string[];
 }
 
 /**
@@ -113,7 +121,7 @@ export const PROBLEM_OCR_SCHEMA = {
         required: [
           'kind', 'ref', 'page', 'box', 'passage_ref', 'number', 'label', 'title', 'author',
           'html', 'continued', 'continues', 'question_type', 'stem_html', 'choices',
-          'answer', 'has_figure', 'work_title', 'area_path', 'unit_path',
+          'answer', 'has_figure', 'work_title', 'area_path', 'unit_path', 'grammar_paths',
         ],
         properties: {
           kind: { type: 'string', enum: ['passage', 'problem'] },
@@ -157,6 +165,16 @@ export const PROBLEM_OCR_SCHEMA = {
             type: 'array',
             maxItems: 2,
             items: { type: 'string', maxLength: 80 },
+          },
+          // 배열의 배열 — 경로 하나가 [대분류, 중분류, 개념] 이고 그것을 여러 개 낸다
+          grammar_paths: {
+            type: 'array',
+            maxItems: 3,
+            items: {
+              type: 'array',
+              maxItems: 3,
+              items: { type: 'string', maxLength: 60 },
+            },
           },
         },
       },

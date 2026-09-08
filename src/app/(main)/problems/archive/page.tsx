@@ -10,11 +10,13 @@ import ArchiveSidePanel from '@/components/problem-bank/ArchiveSidePanel';
 import ArchiveList from '@/components/problem-bank/ArchiveList';
 import ProblemDetailDialog from '@/components/problem-bank/ProblemDetailDialog';
 import ProblemFilterBar from '@/components/problem-bank/ProblemFilterBar';
+import GrammarBulkTagDialog from '@/components/problem-bank/GrammarBulkTagDialog';
 import { useArchiveSelection } from '@/hooks/useArchiveSelection';
 import { useProblemArchive, type ArchiveRow } from '@/hooks/useProblemArchive';
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls';
 import { filtersFromParams, filtersToQueryString, type ProblemFilters } from '@/lib/problem-bank/filters';
-import { countPapersUsing, deleteProblems } from '@/lib/problem-bank/mutations';
+import { formatGrammarPath } from '@/lib/problem-bank/grammar-tree';
+import { addGrammarPaths, countPapersUsing, deleteProblems } from '@/lib/problem-bank/mutations';
 import { PROBLEM_PAGE_SIZE } from '@/lib/problem-bank/queries';
 import { bulkDeleteConfirmMessage, pageAfterDelete } from '@/lib/problem-bank/selection';
 
@@ -44,6 +46,9 @@ function ArchiveContent() {
    */
   const selection = useArchiveSelection(archive.loading ? NO_ROWS : archive.rows);
   const [deleting, setDeleting] = useState(false);
+  /** 일괄 문법 태깅 창 */
+  const [tagOpen, setTagOpen] = useState(false);
+  const [tagging, setTagging] = useState(false);
   /** 상세 창에 띄운 문항 — 목록의 조건·스크롤·선택을 잃지 않으려고 창으로 연다 */
   const [openId, setOpenId] = useState<string | null>(null);
   /**
@@ -160,6 +165,43 @@ function ArchiveContent() {
     }
   };
 
+  /**
+   * 고른 문항에 문법 분류를 붙인다.
+   *
+   * 삭제와 같은 세대 검사를 둔다 — 창이 떠 있는 동안은 체크를 못 바꾸지만, 규약을 갈라 두면
+   * 나중에 창을 모달이 아니게 바꿨을 때 조용히 어긋난다.
+   */
+  const handleApplyGrammar = async (path: string[]) => {
+    const ids = selection.selectedVisible;
+    const label = formatGrammarPath(path);
+    if (ids.length === 0 || !label) return;
+
+    const target = targetSeq.current;
+    setTagging(true);
+    try {
+      if (target !== targetSeq.current) {
+        toast.info('선택이 바뀌어 멈췄어요. 다시 눌러 주세요.');
+        return;
+      }
+      // 고른 경로 **하나만** 붙인다 — 아래 잎으로 펴는 것은 찾을 때 하는 일이다
+      const changed = await addGrammarPaths(ids, [label]);
+      if (!aliveRef.current) return;
+
+      // 이미 붙어 있던 문항은 세지 않는다(RPC 가 실제로 바뀐 행만 돌려준다) —
+      // 개수를 부풀리면 "붙었나?" 하고 다시 누르게 된다
+      toast.success(changed > 0
+        ? `${changed}개 문항에 '${label}' 을 붙였어요.`
+        : '이미 다 붙어 있어요.');
+      setTagOpen(false);
+      selection.exit();
+      archive.reload();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '붙이지 못했어요.');
+    } finally {
+      setTagging(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -201,6 +243,7 @@ function ArchiveContent() {
             facets={archive.facets}
             areaFacets={archive.areaFacets}
             unitFacets={archive.unitFacets}
+            grammarFacets={archive.grammarFacets}
             workFacets={archive.workFacets}
             total={archive.total}
             onChange={patch}
@@ -212,11 +255,12 @@ function ArchiveContent() {
             count={selection.count}
             isAllSelected={selection.isAllSelected}
             disabled={archive.loading || archive.rows.length === 0}
-            busy={deleting}
+            busy={deleting || tagging}
             onEnter={selection.enter}
             onExit={selection.exit}
             onToggleAll={toggleAll}
             onDelete={handleBulkDelete}
+            onTagGrammar={() => setTagOpen(true)}
           />
 
           <ArchiveList
@@ -256,6 +300,14 @@ function ArchiveContent() {
       </div>
 
       <ProblemDetailDialog problemId={openId} onClose={() => setOpenId(null)} />
+
+      <GrammarBulkTagDialog
+        open={tagOpen}
+        count={selection.count}
+        busy={tagging}
+        onClose={() => setTagOpen(false)}
+        onApply={handleApplyGrammar}
+      />
     </div>
   );
 }

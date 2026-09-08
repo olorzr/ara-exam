@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { sanitizeInlineHTML, sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import { normalizeWorkTitle } from '@/lib/problem-bank/work-title';
 import { normalizeCategoryName } from '@/lib/category-name';
+import { normalizeGrammarPaths } from './grammar-tree';
 import type { Bbox, Problem, RenderMode } from '@/types/problem-bank';
 
 /**
@@ -32,6 +33,8 @@ export interface ProblemPatch {
   area_path?: string[];
   /** 교과서 단원 이름 경로 [대단원, 소단원] */
   unit_path?: string[];
+  /** 문법 분류 경로 문자열 목록 (여러 개). 지문에는 이 축이 없다 */
+  grammar_paths?: string[];
   work_title?: string;
   render_mode?: RenderMode;
   bbox?: Bbox | null;
@@ -60,6 +63,10 @@ export async function updateProblem(
   }
   if (patch.choices !== undefined) payload.choices = patch.choices.map(sanitizeInlineHTML);
   if (patch.work_title !== undefined) payload.work_title = normalizeWorkTitle(patch.work_title);
+  // 중복·빈 값을 걷어내고 상한까지 자른다 — 넘치면 DB CHECK 가 저장을 통째로 거부한다
+  if (patch.grammar_paths !== undefined) {
+    payload.grammar_paths = normalizeGrammarPaths(patch.grammar_paths);
+  }
 
   const { data, error } = await supabase
     .from('problems')
@@ -259,6 +266,32 @@ export async function setSourceTextbook(
   });
   if (error) throw error;
   return (data as string) ?? '';
+}
+
+/**
+ * 문항 여러 개에 문법 분류를 **덧붙인다** (아카이브의 일괄 태깅).
+ *
+ * ⚠️ **RPC 한 번으로 보낸다.** PostgREST 로는 배열 append 를 못 해서 행마다
+ *    읽고-합치고-쓰면 한 쪽에 60왕복이고, 그 사이 다른 사람이 붙인 태그를 덮어쓴다.
+ *
+ * 합집합이라 기존 태그를 지우지 않는다 — 그래서 낙관적 동시성 조건이 없다.
+ * 이미 상한(5개)까지 찬 문항에는 아무것도 붙지 않는다(기존 것을 밀어내지 않는다).
+ * @param problemIds - 문항 id 들
+ * @param paths - 붙일 경로 문자열들
+ * @returns 실제로 바뀐 문항 수
+ * @throws 저장 실패 시
+ */
+export async function addGrammarPaths(problemIds: string[], paths: string[]): Promise<number> {
+  const ids = [...new Set(problemIds)];
+  const values = normalizeGrammarPaths(paths);
+  if (ids.length === 0 || values.length === 0) return 0;
+
+  const { data, error } = await supabase.rpc('add_grammar_paths', {
+    p_problem_ids: ids,
+    p_paths: values,
+  });
+  if (error) throw error;
+  return (data as number) ?? 0;
 }
 
 /**
