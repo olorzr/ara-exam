@@ -126,14 +126,18 @@ src/
 
 ```
 [업로드]  출처 정보(학교급 → 학교 → 학년 → … → 교과서, 제목 자동)
-          → PDF → pdf.js 렌더(scale 2) → 쪽 역할 지정(문제/정답표/제외)
+          → PDF(+ 선택: 답지 PDF 하나 또는 사진 여러 장)
+          → pdf.js 렌더(scale 2) → 쪽 역할 지정(문제/정답표/제외, '마지막 N쪽' 단축)
           → Storage(exam-problem-bank) → problem_sources(추출중)
 [OCR]     3쪽씩(겹침 1) 묶어 선생님 PC 의 코덱스 turn → parse → merge
           → passages/problems INSERT → bbox 로 영역 크롭 → 이미지 업로드
-          → 정답표 쪽은 따로 읽어 번호로 붙임 → problem_sources(검수중)
+          → 정답표는 따로 읽어 번호로 붙임(원본 안 쪽 + 별도 답지를 각각 5장 묶음)
+          → problem_sources(검수중)
 [검수]    원본 페이지 이미지 + 영역 오버레이 ↔ TipTap 편집·정답·영역·교과서 단원
-[아카이브] 왼쪽 교과서·단원 트리 + 필터(출처·학교·년도·학년·교과서·단원·영역·검색)
-          + 페이지네이션
+          + 따로 올린 답지 보기
+[아카이브] 왼쪽 패널 탭 2개(교과서·단원 트리 | 학교 기출 트리)
+          + 필터(출처·학교·년도·학년·학기·시험·교과서·단원·영역·검색)
+          + 페이지네이션 + 선택 삭제
 [문제지]  드래그 조합 → RPC create_problem_paper(스냅샷) → A4 인쇄 3종
 ```
 
@@ -147,13 +151,16 @@ src/
 ## lib/pdf
 - 역할: PDF → 캔버스 → JPEG data URL. 썸네일
 - 의존: pdfjs-dist (⚠️ `wasmUrl: '/pdfjs-wasm/'` 필수 — 없으면 스캔본이 백지로 렌더된다)
-- 주요 파일: pdfRenderer.ts, pdfPages.ts
+- 주요 파일: pdfRenderer.ts, pdfPages.ts, imageToJpeg.ts(사진 답지 → JPEG, EXIF 회전 반영)
 
 ## lib/problem-ocr
 - 역할: 프롬프트 조립 → 구조화 출력 파싱 → 묶음 실행 → 병합 → 영역 크롭
 - 의존: lib/ai, lib/pdf, lib/sanitize-problem
 - 주요 파일: schema.ts, prompt.ts, parse.ts, normalize-html.ts, batch-plan.ts, batch-run.ts,
-  merge.ts, merge-keys.ts, crop.ts, run.ts, run-images.ts
+  merge.ts, merge-keys.ts, crop.ts, run.ts, run-images.ts,
+  answer-key.ts, answer-key-input.ts, answer-key-upload.ts, run-answer-key.ts
+- 정답표는 **두 곳**에서 온다: 원본 PDF 안의 '정답표' 쪽과 따로 올린 답지 파일.
+  둘은 다른 문서라 묶음을 섞지 않는다(`run-answer-key.ts` 가 공급원 목록으로 다룬다)
 - 서식 규약: 밑줄 `<u>`, 시행 줄바꿈 `<br>`, 원문의 빈 줄 `<p></p>`, 구분선 `<hr>`,
   구역 상자 `<blockquote data-box="…">`. **다듬기(normalize-html)가 정화보다 먼저** 돈다 —
   정화기는 허용 목록 밖 `data-box` 값을 되돌릴 수 없게 지운다
@@ -164,9 +171,11 @@ src/
 - 의존: lib/supabase, lib/supabase-public(읽기 전용), lib/category-master(단원 마스터)
 - 주요 파일: queries.ts, facets.ts, mutations.ts, storage.ts, storage-paths.ts, bbox.ts,
   area-tree.ts, area-master.ts, unit-tree.ts, unit-master.ts, scope-resolve.ts,
-  source-form.ts, filters.ts
+  source-form.ts, filters.ts, selection.ts, school-exam-tree.ts
 - 분류의 두 축: **영역**(ara-system 마스터, 최대 4단)과 **교과서 단원**(이 앱의 카테고리 관리,
   2단). 둘 다 노드 id 가 아니라 **이름 경로 스냅샷**으로 저장한다
+- 훑는 축도 두 가지다: 교과서 단원 트리와 **학교 기출 트리**(학교 › 학년도 › 학년 › 학기·시험).
+  기출 트리는 마스터가 아니라 **실제 출처 패싯**으로 만든다(`school-exam-tree.ts`)
 - 학교는 관리자시스템 `public.schools` 가 원본이다(`school_id` + 이름 스냅샷). 교과서는
   내신 관리에 등록된 시험범위(`scope-resolve.ts`)에서 자동으로 찾아 준다
 

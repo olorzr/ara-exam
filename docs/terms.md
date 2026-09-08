@@ -109,3 +109,18 @@
 - 정의: 선생님 PC 에서 도는 작은 중계 프로그램. 브라우저가 자기 ChatGPT 로 OCR 을 돌리게 해 준다. 학원 서버는 AI 를 호출하지 않는다
 - 코드에서의 사용: `src/lib/ai/codex/*`, `ws://127.0.0.1:8899`
 - 관련 파일: src/lib/ai/codex/README.md, Ara-system `public/ara-ai/bridge.cjs`
+
+## 답지 (answer_key_paths)
+- 정의: 시험지와 **따로** 받은 정답표 파일. 별지 PDF 하나 또는 사진 여러 장이다. 같은 PDF 안에 정답표가 붙어 있는 경우는 답지가 아니라 **정답표 쪽**(업로드에서 역할로 지정, `ocr_meta.pages`)이다
+- 코드에서의 사용: `ProblemSource.answer_key_paths`(Storage 경로 배열), `AnswerKeyInput`, `sourceAnswerKeyPath(sourceId, index, ext)`
+- 관련 파일: src/lib/problem-ocr/answer-key-input.ts, src/lib/problem-ocr/answer-key-upload.ts, src/lib/problem-ocr/run-answer-key.ts, sql/19_problem_bank_answer_key.sql
+
+## 학교 기출 트리 (school exam tree)
+- 정의: 아카이브 왼쪽에서 **학교 › 학년도 › 학년 › 학기·시험** 으로 훑는 폴더. `source_type='내신기출'` 출처만 나오고, 마스터가 아니라 실제로 읽어 둔 출처(패싯)로 만든다
+- 코드에서의 사용: `SchoolExamFacet`, `buildSchoolExamTree`, `SourceFacets.schoolExams`
+- 관련 파일: src/lib/problem-bank/school-exam-tree.ts, src/components/problem-bank/SchoolExamTreePanel.tsx, src/components/problem-bank/ArchiveSidePanel.tsx
+
+## 미지정만 (UNSPECIFIED_AXIS)
+- 정의: 아카이브 필터에서 **저장값이 비어 있는 행만** 고르는 값(`'__none__'`). 필터의 빈 문자열은 '전체'(조건 없음)라서, '미지정인 것만'은 따로 표시해야 한다
+- 코드에서의 사용: `UNSPECIFIED_AXIS`, `toProblemQuery`(센티널만 `''` 조건으로 바꾼다), `queries.ts`(조건 유무를 `!== undefined` 로 가른다)
+- 관련 파일: src/lib/problem-bank/filters.ts, src/lib/problem-bank/queries.ts, src/lib/problem-bank/school-exam-tree.ts, src/components/problem-bank/ProblemFilterBar.tsx
