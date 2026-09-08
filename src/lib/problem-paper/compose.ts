@@ -128,8 +128,11 @@ function pushOutOfGroup(
 }
 
 /**
- * 항목을 다른 자리로 옮긴다. **자기 지문 묶음 안에서만** 움직인다.
- * 묶음 밖으로 끌면 같은 지문이 흩어지므로 경계에서 멈춘다.
+ * 항목을 다른 자리로 옮긴다.
+ *
+ * 지문에 딸린 문항은 **자기 묶음 안에서만** 움직인다(밖으로 나가면 같은 지문이 흩어진다).
+ * 지문 없는 단독 문항은 자유롭게 움직이되 **남의 묶음 한가운데에는 못 선다** —
+ * 거기 서면 그 지문이 둘로 갈라져 저장이 거부된다(코덱스 리뷰 9R).
  * @param items - 지금 캔버스
  * @param from - 옮길 항목의 현재 index
  * @param to - 목표 index
@@ -140,16 +143,29 @@ export function moveItem(items: readonly PaperItem[], from: number, to: number):
 
   const item = items[from];
   const group = groupsOf(items).find((g) => from >= g.start && from <= g.end);
-  const lower = group && item.passageId !== null ? group.start : 0;
-  const upper = group && item.passageId !== null ? group.end : items.length - 1;
+  const inGroup = group && item.passageId !== null;
+  const lower = inGroup ? group.start : 0;
+  const upper = inGroup ? group.end : items.length - 1;
 
-  const target = Math.min(Math.max(to, lower), upper);
+  let target = Math.min(Math.max(to, lower), upper);
   if (target === from) return [...items];
 
-  const next = [...items];
-  next.splice(from, 1);
-  next.splice(target, 0, item);
-  return next;
+  const rest = [...items];
+  rest.splice(from, 1);
+
+  // 단독 문항이 남의 묶음 한가운데를 가리키면 그 경계로 민다(가는 방향 쪽으로)
+  if (!inGroup) {
+    for (const g of groupsOf(rest)) {
+      if (g.passageId === null || g.start === g.end) continue;
+      if (target > g.start && target <= g.end) {
+        target = target > from ? g.end + 1 : g.start;
+        break;
+      }
+    }
+  }
+
+  rest.splice(target, 0, item);
+  return rest;
 }
 
 /**

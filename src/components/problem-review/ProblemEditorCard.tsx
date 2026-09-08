@@ -38,8 +38,10 @@ interface ProblemEditorCardProps {
   areaTree: AreaTreeNode[];
   selected: boolean;
   onSelect: () => void;
-  onSave: (patch: ProblemPatch) => Promise<boolean>;
-  onToggleVerified: (verified: boolean) => void;
+  /** 저장 후 새 `updated_at` 을 돌려준다. 실패하면 null */
+  onSave: (patch: ProblemPatch) => Promise<string | null>;
+  /** `knownUpdatedAt` 은 방금 저장해 이미 아는 버전 — 화면 state 가 안 돌아도 맞는 값을 쓴다 */
+  onToggleVerified: (verified: boolean, knownUpdatedAt?: string) => void;
   onDelete: () => void;
 }
 
@@ -83,7 +85,7 @@ export default function ProblemEditorCard({
     || area.join('>') !== problem.area_path.join('>')
     || trimTrailingChoices(choices).join('\u0000') !== problem.choices.join('\u0000');
 
-  const handleSave = async (): Promise<boolean> => {
+  const handleSave = async (): Promise<string | null> => {
     // ⚠️ 빈 칸을 걸러내며 압축하면 안 된다 — 정답은 위치 번호라 뒤 선지가 당겨지면
     //    정답이 다른 선지를 가리키게 된다. 뒤쪽만 자르고 가운데는 자리를 지킨다
     const trimmed = trimTrailingChoices(choices);
@@ -93,12 +95,12 @@ export default function ProblemEditorCard({
         `${blanks.join(', ')}번 선지가 비어 있어요.\n`
         + '정답 번호가 자리로 매겨지므로 빈 칸도 그대로 저장합니다. 계속할까요?',
       );
-      if (!ok) return false;
+      if (!ok) return null;
     }
 
     setSaving(true);
     const parsedScore = score.trim() === '' ? null : Number(score);
-    const ok = await onSave({
+    const updatedAt = await onSave({
       stem_html: stem,
       choices: trimmed,
       answer: answer.trim(),
@@ -109,7 +111,7 @@ export default function ProblemEditorCard({
       work_title: workTitle,
     });
     setSaving(false);
-    return ok;
+    return updatedAt;
   };
 
   /**
@@ -118,8 +120,11 @@ export default function ProblemEditorCard({
    */
   const handleVerify = async (next: boolean) => {
     if (next && dirty) {
-      const saved = await handleSave();
-      if (!saved) return;
+      const updatedAt = await handleSave();
+      if (!updatedAt) return;
+      // 방금 받은 버전을 그대로 넘긴다 — 화면 state 는 아직 안 돌았다
+      onToggleVerified(next, updatedAt);
+      return;
     }
     onToggleVerified(next);
   };

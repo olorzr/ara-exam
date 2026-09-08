@@ -74,18 +74,29 @@ export function useProblemReview(sourceId: string) {
     else toast.error(e instanceof Error ? e.message : '저장하지 못했어요.');
   };
 
-  const saveProblem = useCallback(async (id: string, patch: ProblemPatch): Promise<boolean> => {
+  /**
+   * 문항을 저장한다.
+   * @returns 새 `updated_at`. 실패하면 null
+   *
+   * 불리언이 아니라 새 버전을 돌려주는 이유: 저장 직후 검수 완료까지 이어서 누르면
+   * 화면 state 가 아직 안 돌아 **옛 버전으로 검수를 시도해 충돌**한다(코덱스 리뷰 9R).
+   * 호출부가 받은 값을 그대로 넘길 수 있어야 한다.
+   */
+  const saveProblem = useCallback(async (
+    id: string,
+    patch: ProblemPatch,
+  ): Promise<string | null> => {
     const target = problems.find((p) => p.id === id);
-    if (!target) return false;
+    if (!target) return null;
     try {
       const updatedAt = await updateProblem(id, target.updated_at, patch);
       setProblems((list) => list.map((p) => (
         p.id === id ? { ...p, ...patch, updated_at: updatedAt } as Problem : p
       )));
-      return true;
+      return updatedAt;
     } catch (e) {
       reportError(e);
-      return false;
+      return null;
     }
   }, [problems]);
 
@@ -104,14 +115,25 @@ export function useProblemReview(sourceId: string) {
     }
   }, [passages]);
 
-  const toggleVerified = useCallback(async (id: string, verified: boolean) => {
+  /**
+   * 검수 완료 표시를 켜고 끈다.
+   * @param knownUpdatedAt - 방금 저장해서 이미 알고 있는 버전(있으면 이걸 쓴다).
+   *   화면 state 가 아직 안 돈 시점에도 맞는 버전으로 걸 수 있다
+   */
+  const toggleVerified = useCallback(async (
+    id: string,
+    verified: boolean,
+    knownUpdatedAt?: string,
+  ) => {
     const target = problems.find((p) => p.id === id);
     if (!target) return;
     try {
       // 읽어 온 버전을 걸고, 새 버전을 받아 화면도 갱신한다.
       // 조건이 없으면 남이 고친 문항의 새 버전을 물려받은 채 옛 본문을 들고 있게 되고,
       // 다음 저장이 검사를 통과하며 남의 수정을 덮어쓴다
-      const updatedAt = await setProblemVerified(id, target.updated_at, verified);
+      const updatedAt = await setProblemVerified(
+        id, knownUpdatedAt ?? target.updated_at, verified,
+      );
       setProblems((list) => list.map((p) => (
         p.id === id
           ? { ...p, status: verified ? '검수완료' : '초안', updated_at: updatedAt }

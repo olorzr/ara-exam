@@ -111,6 +111,34 @@ describe('moveItem', () => {
     expect(isContiguous(out)).toBe(true);
   });
 
+  it('단독 문항이 지문 묶음 한가운데에 서지 않는다 — 서면 지문이 갈라져 저장이 거부된다', () => {
+    // 코덱스 리뷰 9R: X 를 한 칸 올리면 [A:P, X, B:P] 가 되어 P 가 쪼개졌다
+    const out = moveItem(items('a:P1 b:P1 x'), 2, 1);
+    expect(isContiguous(out)).toBe(true);
+    expect(show(out)).toBe('x a:P1 b:P1');
+  });
+
+  it('아래로 옮길 때도 묶음을 건너뛴다', () => {
+    const out = moveItem(items('x a:P1 b:P1'), 0, 1);
+    expect(isContiguous(out)).toBe(true);
+    expect(show(out)).toBe('a:P1 b:P1 x');
+  });
+
+  it('문항 하나짜리 묶음은 그냥 지나칠 수 있다', () => {
+    const out = moveItem(items('a:P1 x'), 1, 0);
+    expect(isContiguous(out)).toBe(true);
+    expect(show(out)).toBe('x a:P1');
+  });
+
+  it('어떤 이동도 연속성을 깨지 않는다', () => {
+    const source = items('a:P1 b:P1 x c:P2 d:P2 y');
+    for (let from = 0; from < source.length; from += 1) {
+      for (let to = 0; to < source.length; to += 1) {
+        expect(isContiguous(moveItem(source, from, to))).toBe(true);
+      }
+    }
+  });
+
   it('범위 밖 index 는 무시한다', () => {
     expect(show(moveItem(items('a b'), 5, 0))).toBe('a b');
   });

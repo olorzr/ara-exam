@@ -54,16 +54,21 @@ export default function ProblemEditPage() {
     return () => { alive = false; };
   }, [problemId]);
 
-  const save = async (patch: ProblemPatch): Promise<boolean> => {
-    if (!problem) return false;
+  /**
+   * 문항을 저장한다.
+   * @returns 새 `updated_at`. 실패하면 null — 저장 직후 검수까지 이어질 때
+   *   화면 state 가 아직 안 돌아도 맞는 버전을 쓸 수 있어야 한다
+   */
+  const save = async (patch: ProblemPatch): Promise<string | null> => {
+    if (!problem) return null;
     try {
       const updatedAt = await updateProblem(problem.id, problem.updated_at, patch);
       setProblem({ ...problem, ...patch, updated_at: updatedAt } as Problem);
       toast.success('저장했어요.');
-      return true;
+      return updatedAt;
     } catch (e) {
       toast.error(e instanceof ConflictError ? e.message : '저장하지 못했어요.');
-      return false;
+      return null;
     }
   };
 
@@ -106,10 +111,13 @@ export default function ProblemEditPage() {
         selected
         onSelect={() => { /* 단건 화면이라 선택 개념이 없다 */ }}
         onSave={save}
-        onToggleVerified={async (verified) => {
+        onToggleVerified={async (verified, knownUpdatedAt) => {
           try {
-            // 검수 토글도 updated_at 을 바꾼다 — 같이 갱신해야 다음 저장이 충돌하지 않는다
-            const updatedAt = await setProblemVerified(problem.id, problem.updated_at, verified);
+            // 검수 토글도 updated_at 을 바꾼다 — 같이 갱신해야 다음 저장이 충돌하지 않는다.
+            // 방금 저장했다면 그때 받은 버전을 쓴다(화면 state 는 아직 안 돌았다)
+            const updatedAt = await setProblemVerified(
+              problem.id, knownUpdatedAt ?? problem.updated_at, verified,
+            );
             setProblem({
               ...problem,
               status: verified ? '검수완료' : '초안',
