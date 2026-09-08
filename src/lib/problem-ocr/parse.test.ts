@@ -85,6 +85,18 @@ describe('parseOcrDraft — 정답·선지', () => {
     expect(draft.items[0].choices).toEqual(['가나', '다라', '마바', '사아', '자차']);
   });
 
+  it('가운데 빈 선지의 자리를 지킨다 — 압축하면 정답이 다른 선지를 가리킨다', () => {
+    // 코덱스 리뷰 13R: ['A','','C','D','E'] 를 압축하면 정답 '3' 이 D 를 가리킨다
+    const draft = parseOcrDraft(json([item({ choices: ['가', '', '다', '라', '마'] })]), ctx)!;
+    expect(draft.items[0].choices).toEqual(['가', '', '다', '라', '마']);
+    expect(draft.warnings.join()).toContain('2번 선지');
+  });
+
+  it('뒤쪽 빈 선지는 잘라 낸다', () => {
+    const draft = parseOcrDraft(json([item({ choices: ['가', '나', '', ''] })]), ctx)!;
+    expect(draft.items[0].choices).toEqual(['가', '나']);
+  });
+
   it('객관식인데 정답이 선지 번호가 아니면 주관식으로 내린다', () => {
     const draft = parseOcrDraft(json([item({ answer: '역설법' })]), ctx)!;
     expect(draft.items[0].question_type).toBe('주관식');

@@ -56,12 +56,14 @@ export type ImagePathMap = Map<string, string>;
  * @param sourceId - 출처 id
  * @param passages - 병합이 만든 지문 초안
  * @param imagePaths - 지문 id → 잘라 낸 이미지 경로
+ * @param onChunk - 한 묶음이 실제로 들어갈 때마다 부른다 (부분 저장 추적용)
  * @throws 저장 실패 시
  */
 export async function insertPassages(
   sourceId: string,
   passages: PassageDraft[],
   imagePaths: ImagePathMap = new Map(),
+  onChunk?: (count: number) => void,
 ): Promise<void> {
   const rows = passages.map((p) => ({
     id: p.id,
@@ -82,7 +84,7 @@ export async function insertPassages(
     render_mode: p.has_figure && p.pageSpan === 1 && imagePaths.has(p.id) ? 'image' : 'text',
     area_path: p.area_path,
   }));
-  await insertChunked('passages', rows);
+  await insertChunked('passages', rows, onChunk);
 }
 
 /**
@@ -90,12 +92,14 @@ export async function insertPassages(
  * @param sourceId - 출처 id
  * @param problems - 병합이 만든 문항 초안
  * @param imagePaths - 문항 id → 잘라 낸 이미지 경로
+ * @param onChunk - 한 묶음이 실제로 들어갈 때마다 부른다 (부분 저장 추적용)
  * @throws 저장 실패 시
  */
 export async function insertProblems(
   sourceId: string,
   problems: ProblemDraft[],
   imagePaths: ImagePathMap = new Map(),
+  onChunk?: (count: number) => void,
 ): Promise<void> {
   const rows = problems.map((p) => ({
     id: p.id,
@@ -114,13 +118,26 @@ export async function insertProblems(
     image_path: imagePaths.get(p.id) ?? '',
     render_mode: p.has_figure && imagePaths.has(p.id) ? 'image' : 'text',
   }));
-  await insertChunked('problems', rows);
+  await insertChunked('problems', rows, onChunk);
 }
 
-async function insertChunked(table: string, rows: Record<string, unknown>[]): Promise<void> {
+/**
+ * 묶음으로 나눠 넣는다.
+ *
+ * ⚠️ 중간에 실패해도 **앞 묶음은 이미 들어가 있다**(트랜잭션이 아니다).
+ *    호출부가 "하나도 안 들어갔다" 고 오해하면 복구 안내가 거짓말이 되므로,
+ *    묶음이 들어갈 때마다 알린다(코덱스 리뷰 13R).
+ */
+async function insertChunked(
+  table: string,
+  rows: Record<string, unknown>[],
+  onChunk?: (count: number) => void,
+): Promise<void> {
   for (let i = 0; i < rows.length; i += INSERT_CHUNK) {
-    const { error } = await supabase.from(table).insert(rows.slice(i, i + INSERT_CHUNK));
+    const chunk = rows.slice(i, i + INSERT_CHUNK);
+    const { error } = await supabase.from(table).insert(chunk);
     if (error) throw error;
+    onChunk?.(chunk.length);
   }
 }
 

@@ -2,8 +2,9 @@
 
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { authFetch } from '@/lib/auth-fetch';
 import { aiErrorMessage } from '@/lib/ai/errors';
-import { isAiError } from '@/lib/ai/types';
+import { AiError, isAiError } from '@/lib/ai/types';
 import { runProblemOcr, type OcrRunInput, type OcrRunProgress } from '@/lib/problem-ocr/run';
 
 /** 단계별 한글 이름 — 진행률 문구가 화면마다 달라지지 않게 한 곳에 둔다 */
@@ -14,6 +15,25 @@ const PHASE_LABEL: Record<OcrRunProgress['phase'], string> = {
   crop: '문항 이미지 자르는 중',
   save: '저장하는 중',
 };
+
+/**
+ * 서버의 킬스위치를 **시작 직전에** 다시 확인한다.
+ *
+ * `useAiEnabled` 는 화면이 뜰 때 한 번만 물어본다. 탭을 열어 둔 사이에 기능을 껐다면
+ * 그 탭에서는 계속 새 작업이 나가 버린다 — 배포 없이 끄는 스위치가 되지 못한다.
+ * 확인 자체가 실패해도 **막는다**(fail-closed) — 코덱스 리뷰 13R.
+ * @returns 지금 써도 되면 true
+ */
+async function ocrStillEnabled(): Promise<boolean> {
+  try {
+    const res = await authFetch('/api/ai/status');
+    if (!res.ok) return false;
+    const json = await res.json();
+    return json?.enabled === true && json?.features?.problem_ocr === true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * OCR 실행 상태를 들고 있는 훅.
@@ -46,6 +66,9 @@ export function useProblemOcr() {
     setWarnings([]);
 
     try {
+      // 시작 직전 킬스위치 재확인 — 화면이 뜬 뒤 껐을 수 있다
+      if (!(await ocrStillEnabled())) throw new AiError('feature_disabled');
+
       const result = await runProblemOcr(input, {
         signal: controller.signal,
         onProgress: setProgress,

@@ -119,12 +119,21 @@ function parseItem(
   const rawType = str(raw.question_type, 8) as QuestionType;
   let question_type: QuestionType = QUESTION_TYPES.includes(rawType) ? rawType : '객관식';
 
-  const choices = Array.isArray(raw.choices)
-    ? raw.choices
-      .slice(0, 5)
-      .map((c) => sanitizeInlineHTML(str(c, 600).replace(LEADING_MARKER, '')))
-      .filter((c) => c.length > 0)
+  // ⚠️ 빈 선지를 걸러내며 압축하면 안 된다 — 정답은 **자리 번호**라 뒤 선지가 당겨지면
+  //    정답이 다른 선지를 가리킨다(['A','','C','D','E'] + 정답 '3' → 3번이 D 가 된다).
+  //    가운데 빈 자리는 그대로 두고 뒤쪽만 잘라 낸 뒤 경고한다(코덱스 리뷰 13R).
+  const rawChoices = Array.isArray(raw.choices)
+    ? raw.choices.slice(0, 5).map((c) => sanitizeInlineHTML(str(c, 600).replace(LEADING_MARKER, '')))
     : [];
+  let lastChoice = rawChoices.length - 1;
+  while (lastChoice >= 0 && rawChoices[lastChoice] === '') lastChoice -= 1;
+  const choices = rawChoices.slice(0, lastChoice + 1);
+  const blankChoices = choices
+    .map((c, i) => (c === '' ? i + 1 : 0))
+    .filter((n) => n > 0);
+  if (blankChoices.length > 0) {
+    pushWarning(warnings, `${ref}: ${blankChoices.join(', ')}번 선지를 읽지 못했어요. 검수에서 채워 주세요.`);
+  }
 
   let answer = raw.answer === null || raw.answer === undefined
     ? null

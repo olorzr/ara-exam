@@ -124,9 +124,11 @@ export async function runProblemOcr(
     const cropped = await cropRegions(doc, merged, signal, onProgress);
 
     onProgress?.({ phase: 'save', done: 0, total: 1 });
-    await insertPassages(input.sourceId, merged.passages, cropped.passageImages);
-    await insertProblems(input.sourceId, merged.problems, cropped.problemImages);
-    savedAnything = merged.passages.length > 0 || merged.problems.length > 0;
+    // 묶음 하나라도 들어가면 곧바로 표시한다 — 중간에 실패해도 앞 묶음은 남아 있어서,
+    // "하나도 안 들어갔다" 고 안내하면 거짓말이 된다(트랜잭션이 아니다)
+    const markSaved = () => { savedAnything = true; };
+    await insertPassages(input.sourceId, merged.passages, cropped.passageImages, markSaved);
+    await insertProblems(input.sourceId, merged.problems, cropped.problemImages, markSaved);
 
     const meta: OcrMeta = {
       model: pref.model,
