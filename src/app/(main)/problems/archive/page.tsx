@@ -84,7 +84,7 @@ function ArchiveContent() {
             <ProblemCard
               key={row.id}
               problem={row}
-              thumbnailUrl={thumbnails.get(row.image_path) ?? null}
+              thumbnailUrl={thumbnails.urls.get(row.image_path) ?? null}
             />
           ))}
         </div>

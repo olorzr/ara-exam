@@ -79,10 +79,27 @@ export function renderPaperBlocks({ blocks, settings, imageUrls }: RenderArgs): 
   });
 }
 
-/** 서명 URL 이 아직 없으면 자리만 잡아 둔다(레이아웃이 나중에 흔들리지 않게) */
+/**
+ * 이미지 한 장.
+ *
+ * ⚠️ URL 이 없을 때 **빈 자리**를 두면 안 된다. 이미지로 출제한 문항은 그 이미지가
+ *    본문 전체라, 조용히 비워 두면 문항이 통째로 빠진 시험지가 인쇄된다.
+ *    눈에 보이는 자리표시자를 두고, 인쇄 자체는 호출부(문제지 화면)가 막는다.
+ */
 function PrintImage({ path, urls, alt }: { path: string; urls: Map<string, string>; alt: string }) {
   const src = urls.get(path);
-  if (!src) return <div style={{ height: 80 }} aria-hidden />;
+  if (!src) {
+    return (
+      <div
+        style={{
+          border: '1px dashed #b45309', color: '#b45309', fontSize: '9pt',
+          padding: '16px 8px', textAlign: 'center',
+        }}
+      >
+        이미지를 불러오지 못했어요 ({alt})
+      </div>
+    );
+  }
   // 서명 URL 이라 next/image 로 다룰 수 없고, 인쇄에서는 지연 로딩이 치명적이다
   // eslint-disable-next-line @next/next/no-img-element
   return <img src={src} alt={alt} />;

@@ -94,7 +94,7 @@ export default function PaperComposePage() {
                 <ProblemCard
                   key={row.id}
                   problem={row}
-                  thumbnailUrl={thumbnails.get(row.image_path) ?? null}
+                  thumbnailUrl={thumbnails.urls.get(row.image_path) ?? null}
                   added={paper.added.has(row.id)}
                   showEditLink={false}
                   onAdd={() => paper.add(row)}

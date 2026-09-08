@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Printer } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Printer } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -11,6 +11,8 @@ import ProblemPaperView from '@/components/problem-paper/ProblemPaperView';
 import ProblemAnswerKeyView from '@/components/problem-paper/ProblemAnswerKeyView';
 import ProblemAnswerSheetView from '@/components/problem-paper/ProblemAnswerSheetView';
 import { supabase } from '@/lib/supabase';
+import { useSignedImageUrls } from '@/hooks/useSignedImageUrls';
+import { imagePathsOf } from '@/lib/problem-paper/blocks';
 import { normalizePaperSettings } from '@/lib/problem-paper/settings';
 import type { PaperItemSnapshot, ProblemPaper } from '@/types/problem-bank';
 
@@ -35,6 +37,12 @@ export default function ProblemPaperViewPage() {
   const [items, setItems] = useState<PaperItemSnapshot[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [mode, setMode] = useState<ViewMode>('paper');
+
+  // 이미지는 **페이지가 들고 있는다** — 아직 안 왔거나 실패했는지를 알아야 인쇄를 막는다.
+  // 이미지로 출제한 문항은 그 이미지가 본문 전체라, 조용히 비워 인쇄하면
+  // 문항이 통째로 빠진 시험지가 나간다(코덱스 리뷰 7R)
+  const images = useSignedImageUrls(useMemo(() => imagePathsOf(items), [items]));
+  const imagesBlocked = images.loading || images.missing.length > 0;
 
   useEffect(() => {
     let alive = true;
@@ -104,13 +112,33 @@ export default function ProblemPaperViewPage() {
               {v.label}
             </Button>
           ))}
-          <Button type="button" size="sm" onClick={() => window.print()}>
-            <Printer className="h-3.5 w-3.5" /><span className="ml-1">인쇄</span>
+          <Button
+            type="button" size="sm"
+            onClick={() => window.print()}
+            disabled={mode === 'paper' && imagesBlocked}
+          >
+            <Printer className="h-3.5 w-3.5" />
+            <span className="ml-1">{images.loading && mode === 'paper' ? '이미지 준비 중…' : '인쇄'}</span>
           </Button>
         </div>
       </div>
 
-      {mode === 'paper' && <ProblemPaperView paper={paper} items={items} />}
+      {mode === 'paper' && images.missing.length > 0 && (
+        <div
+          className="flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
+          data-no-print
+        >
+          <AlertTriangle className="h-4 w-4" />
+          <span>
+            이미지 {images.missing.length}개를 불러오지 못했어요. 지금 인쇄하면 그 문항이 빈칸으로 나갑니다.
+          </span>
+          <Button type="button" variant="outline" size="sm" onClick={images.reload}>
+            다시 시도
+          </Button>
+        </div>
+      )}
+
+      {mode === 'paper' && <ProblemPaperView paper={paper} items={items} imageUrls={images.urls} />}
       {mode === 'key' && <ProblemAnswerKeyView paper={paper} items={items} />}
       {mode === 'sheet' && <ProblemAnswerSheetView paper={paper} items={items} />}
     </div>
