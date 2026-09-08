@@ -306,8 +306,15 @@ async function cropRegions(
 
   try {
     let done = 0;
-    for (const target of targets) {
-      if (signal?.aborted) break;
+    for (let i = 0; i < targets.length; i += 1) {
+      const target = targets[i];
+      if (signal?.aborted) {
+        // ⚠️ 취소로 멈춰도 **남은 그림 항목은 경고에 넣는다.** 호출부는 여기까지 읽은
+        //    결과를 그대로 저장하는데, 이미지 없이 저장된 그림 문항은 글만으로는
+        //    내용이 빠진 상태다 — 조용히 아카이브에 들어가면 안 된다(코덱스 리뷰 19R)
+        failed.push(...targets.slice(i).filter((t) => t.needsImage).map((t) => t.label));
+        break;
+      }
       const blob = await cropper.crop(target.page, boxToBbox(target.box));
       let ok = false;
       if (blob) {

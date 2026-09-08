@@ -4,7 +4,8 @@ import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/auth-fetch';
 import { aiErrorMessage } from '@/lib/ai/errors';
-import { AiError, isAiError } from '@/lib/ai/types';
+import { isAiError } from '@/lib/ai/types';
+import { updateSource } from '@/lib/problem-bank/save';
 import { runProblemOcr, type OcrRunInput, type OcrRunProgress } from '@/lib/problem-ocr/run';
 
 /** 단계별 한글 이름 — 진행률 문구가 화면마다 달라지지 않게 한 곳에 둔다 */
@@ -59,6 +60,23 @@ export function useProblemOcr() {
   const start = useCallback(async (input: OcrRunInput): Promise<boolean> => {
     if (abortRef.current) return false;
 
+    // ⚠️ 킬스위치 재확인은 **출처 상태를 만지기 전에** 끝낸다.
+    //    호출부가 이미 '추출중' 으로 만들어 둔 상태라, 여기서 그냥 던지면
+    //    run.ts 의 정리 코드를 못 거쳐 **영영 돌고 있는 것처럼** 남는다(코덱스 리뷰 19R).
+    if (!(await ocrStillEnabled())) {
+      toast.error(aiErrorMessage('feature_disabled'));
+      await updateSource(input.sourceId, {
+        status: '업로드',
+        ocr_meta: {
+          ranAt: new Date().toISOString(),
+          warnings: ['AI 읽기가 꺼져 있어 시작하지 못했어요. 관리자에게 문의해 주세요.'],
+        },
+      }).catch(() => {
+        // 상태 정리까지 실패하면 어쩔 수 없다 — 원래 안내를 가리지 않는다
+      });
+      return false;
+    }
+
     const controller = new AbortController();
     abortRef.current = controller;
     setRunning(true);
@@ -66,8 +84,6 @@ export function useProblemOcr() {
     setWarnings([]);
 
     try {
-      // 시작 직전 킬스위치 재확인 — 화면이 뜬 뒤 껐을 수 있다
-      if (!(await ocrStillEnabled())) throw new AiError('feature_disabled');
 
       const result = await runProblemOcr(input, {
         signal: controller.signal,
