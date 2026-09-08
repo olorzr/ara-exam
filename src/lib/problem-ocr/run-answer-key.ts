@@ -178,6 +178,9 @@ export async function readAnswerKeys(
 
     ctx.merged.warnings.push(...run.warnings);
     for (const { draft } of run.drafts) {
+      // ⚠️ 모델이 정답표를 읽으며 남긴 말도 함께 옮긴다 — 빠뜨리면 "정답표가 흐려서
+      //    몇 번을 못 읽었다" 같은 안내가 어디에도 안 나와 정답이 왜 비었는지 알 수 없다
+      ctx.merged.warnings.push(...draft.warnings.map((w) => ({ message: w.message })));
       const applied = applyAnswerKey(ctx.merged.problems, draft.answers);
       ctx.merged.warnings.push(...applied.warnings);
     }

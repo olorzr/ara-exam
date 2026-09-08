@@ -4,7 +4,12 @@ import { UNIT_DEPTH_MAX } from '@/lib/problem-bank/unit-tree';
 import { normalizeOcrPassageHtml, normalizeOcrStemHtml } from './normalize-html';
 import type { QuestionType } from '@/types/problem-bank';
 import { OCR_MAX_ITEMS_PER_BATCH, OCR_MAX_WARNINGS } from './constants';
-import type { AnswerKeyDraft, AnswerKeyRow, OcrBox, OcrDraft, OcrItem } from './schema';
+import {
+  int, isRecord, LEADING_MARKER, normalizeChoice, normalizeWork, nullableStr, parseBox,
+  QUESTION_TYPES, str,
+} from './parse-values';
+import type { AnswerKeyDraft, AnswerKeyRow, OcrDraft, OcrItem } from './schema';
+import type { DraftWarning } from './warnings';
 
 /**
  * AI 출력(JSON 문자열) → 검증된 초안.
@@ -21,67 +26,6 @@ import type { AnswerKeyDraft, AnswerKeyRow, OcrBox, OcrDraft, OcrItem } from './
  * DB 로 가기 전에 여기서 반드시 한 번 거른다.
  */
 
-/**
- * 정답지에 인쇄된 선택지 글자 → 저장 형식('1'~'5').
- *
- * ⚠️ 이게 없으면 실제 시험지 대부분이 깨진다. 한국 시험지는 정답을 ①~⑤ 로 찍는데,
- *    그대로 두면 아래 객관식 검사가 "1~5 가 아니네" 하고 **주관식으로 강등**해 버린다.
- */
-const CHOICE_GLYPHS: Record<string, string> = {
-  '①': '1', '②': '2', '③': '3', '④': '4', '⑤': '5',
-  '➀': '1', '➁': '2', '➂': '3', '➃': '4', '➄': '5',
-  '⑴': '1', '⑵': '2', '⑶': '3', '⑷': '4', '⑸': '5',
-  '１': '1', '２': '2', '３': '3', '４': '4', '５': '5',
-};
-
-/** 선지 본문 앞에 남은 번호 표시 — 렌더가 기호를 다시 붙이므로 지운다 */
-const LEADING_MARKER = /^\s*(?:[①-⑤➀-➄⑴-⑸]|\(\s*[1-5]\s*\)|[1-5１-５]\s*[.)]|[1-5]\s*번)\s*/;
-
-const QUESTION_TYPES: readonly QuestionType[] = ['객관식', '주관식', '서술형'];
-
-/** '①' / '(1)' / '1번' / '１' → '1'. 못 알아보면 원문 그대로 */
-function normalizeChoice(answer: string): string {
-  const trimmed = answer.trim();
-  const direct = CHOICE_GLYPHS[trimmed];
-  if (direct) return direct;
-  const m = trimmed.match(/^\(?\s*([1-5])\s*\)?\s*(?:번|\.)?$/);
-  return m ? m[1] : trimmed;
-}
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return !!v && typeof v === 'object' && !Array.isArray(v);
-}
-
-function str(v: unknown, max: number): string {
-  return typeof v === 'string' ? v.trim().slice(0, max) : '';
-}
-
-function nullableStr(v: unknown, max: number): string | null {
-  const s = str(v, max);
-  return s ? s : null;
-}
-
-function int(v: unknown): number | null {
-  return typeof v === 'number' && Number.isInteger(v) && Number.isFinite(v) ? v : null;
-}
-
-/**
- * 좌표를 0~1 로 가두고 뒤집힌 값을 버린다.
- * 좌표가 없으면 크롭만 못 할 뿐 본문은 멀쩡하므로 항목을 버리지 않는다.
- */
-function parseBox(v: unknown): OcrBox | null {
-  if (!isRecord(v)) return null;
-  const column = v.column;
-  if (column !== 0 && column !== 1 && column !== 2) return null;
-  const top = typeof v.top === 'number' ? v.top : NaN;
-  const bottom = typeof v.bottom === 'number' ? v.bottom : NaN;
-  if (!Number.isFinite(top) || !Number.isFinite(bottom)) return null;
-  const t = Math.min(Math.max(top, 0), 1);
-  const b = Math.min(Math.max(bottom, 0), 1);
-  if (b <= t) return null;
-  return { column, top: t, bottom: b };
-}
-
 /** 파서에 넘길 맥락 — 이 묶음이 무엇을 보냈는지 알아야 헛것을 걸러낼 수 있다 */
 export interface ParseContext {
   /** 이 묶음에 실제로 보낸 쪽 번호들 */
@@ -92,8 +36,16 @@ export interface ParseContext {
   unitTree?: AreaTreeNode[];
 }
 
-function pushWarning(warnings: string[], message: string): void {
-  if (warnings.length < OCR_MAX_WARNINGS) warnings.push(message);
+/**
+ * 경고를 담는다.
+ *
+ * ⚠️ 메시지에 `ref` 를 적지 않는다. 'Q3' 는 **이 묶음 안에서만** 유효한 이름이라
+ *    화면 어디에도 그런 이름이 없다 — 어느 문항 얘기인지 아무도 모른다.
+ *    위치는 `ref`/`page`/`number` 로 **따로** 실어 보내고, 병합이 그것을 진짜 행 id 와
+ *    사람이 읽는 이름('3번')으로 바꾼다.
+ */
+function pushWarning(warnings: DraftWarning[], warning: DraftWarning): void {
+  if (warnings.length < OCR_MAX_WARNINGS) warnings.push(warning);
 }
 
 /**
@@ -103,22 +55,31 @@ function parseItem(
   raw: unknown,
   ctx: ParseContext,
   pageSet: Set<number>,
-  warnings: string[],
+  warnings: DraftWarning[],
 ): OcrItem | null {
   if (!isRecord(raw)) return null;
 
-  const kind = raw.kind === 'passage' ? 'passage' : raw.kind === 'problem' ? 'problem' : null;
+  const kind: 'passage' | 'problem' | null = raw.kind === 'passage'
+    ? 'passage'
+    : raw.kind === 'problem' ? 'problem' : null;
   if (!kind) return null;
 
   const ref = str(raw.ref, 16);
   if (!ref) return null;
 
   const page = int(raw.page);
-  // 보내지 않은 쪽을 지어냈다면 그 항목은 근거가 없다 — 버린다
+  // 보내지 않은 쪽을 지어냈다면 그 항목은 근거가 없다 — 버린다.
+  // 버린 항목에는 행이 안 생기므로 ref 를 싣지 않는다(가리킬 카드가 없다)
   if (page === null || !pageSet.has(page)) {
-    pushWarning(warnings, `${ref}: 보내지 않은 쪽(${page ?? '?'})을 가리켜 건너뛰었어요.`);
+    pushWarning(warnings, {
+      message: `보내지 않은 쪽(${page ?? '?'})을 가리킨 항목이 있어 건너뛰었어요.`,
+    });
     return null;
   }
+
+  const number = int(raw.number);
+  /** 이 항목을 가리키는 정보 — 병합이 여기에 행 id 를 붙인다 */
+  const at: Omit<DraftWarning, 'message'> = { ref, kind, page, number };
 
   const rawType = str(raw.question_type, 8) as QuestionType;
   let question_type: QuestionType = QUESTION_TYPES.includes(rawType) ? rawType : '객관식';
@@ -136,7 +97,10 @@ function parseItem(
     .map((c, i) => (c === '' ? i + 1 : 0))
     .filter((n) => n > 0);
   if (blankChoices.length > 0) {
-    pushWarning(warnings, `${ref}: ${blankChoices.join(', ')}번 선지를 읽지 못했어요. 검수에서 채워 주세요.`);
+    pushWarning(warnings, {
+      ...at,
+      message: `${blankChoices.join(', ')}번 선지를 읽지 못했어요. 검수에서 채워 주세요.`,
+    });
   }
 
   let answer = raw.answer === null || raw.answer === undefined
@@ -147,7 +111,10 @@ function parseItem(
   // 객관식인데 정답이 1~5 가 아니면 주관식으로 본다.
   // 그대로 두면 채점·정답표에서 선지 번호와 대조가 어긋난다.
   if (question_type === '객관식' && answer !== null && !/^[1-5]$/.test(answer)) {
-    pushWarning(warnings, `${ref}: 정답 '${answer}' 이 선지 번호가 아니라 주관식으로 뒀어요.`);
+    pushWarning(warnings, {
+      ...at,
+      message: `정답 '${answer}' 이 선지 번호가 아니라 주관식으로 뒀어요.`,
+    });
     question_type = '주관식';
   }
 
@@ -158,7 +125,10 @@ function parseItem(
     ? longestKnownPrefix(ctx.areaTree ?? [], rawArea)
     : [];
   if (rawArea.length > 0 && area_path.length < rawArea.length) {
-    pushWarning(warnings, `${ref}: 영역 '${rawArea.join(' > ')}' 가 분류표에 없어 일부만 남겼어요.`);
+    pushWarning(warnings, {
+      ...at,
+      message: `영역 '${rawArea.join(' > ')}' 가 분류표에 없어 일부만 남겼어요.`,
+    });
   }
 
   const rawUnit = Array.isArray(raw.unit_path)
@@ -170,7 +140,10 @@ function parseItem(
     ? longestKnownPrefix(ctx.unitTree ?? [], rawUnit, UNIT_DEPTH_MAX)
     : [];
   if (rawUnit.length > 0 && unit_path.length < rawUnit.length) {
-    pushWarning(warnings, `${ref}: 단원 '${rawUnit.join(' > ')}' 가 교과서 단원표에 없어 일부만 남겼어요.`);
+    pushWarning(warnings, {
+      ...at,
+      message: `단원 '${rawUnit.join(' > ')}' 가 교과서 단원표에 없어 일부만 남겼어요.`,
+    });
   }
 
   return {
@@ -179,10 +152,12 @@ function parseItem(
     page,
     box: parseBox(raw.box),
     passage_ref: nullableStr(raw.passage_ref, 16),
-    number: int(raw.number),
+    number,
     label: nullableStr(raw.label, 40),
-    title: nullableStr(raw.title, 120),
-    author: nullableStr(raw.author, 60),
+    // ⚠️ 작품명은 **여기서** 다듬는다. 저장 경로(save.ts)는 모델 값을 그대로 넣으므로
+    //    여기서 안 하면 「동백꽃」·동백꽃·"동백꽃" 이 서로 다른 작품으로 쌓인다
+    title: normalizeWork(nullableStr(raw.title, 120)),
+    author: normalizeWork(nullableStr(raw.author, 60)),
     // ⚠️ 다듬기가 **정화보다 먼저**다. 정화기는 허용 목록 밖 data-box 를 되돌릴 수 없게
     //    지우므로, 순서가 바뀌면 모델이 낸 '(가)' 상자 표시가 조용히 사라진다
     html: sanitizeProblemHTML(normalizeOcrPassageHtml(str(raw.html, 6000))),
@@ -193,7 +168,7 @@ function parseItem(
     choices,
     answer,
     has_figure: raw.has_figure === true,
-    work_title: nullableStr(raw.work_title, 120),
+    work_title: normalizeWork(nullableStr(raw.work_title, 120)),
     area_path,
     unit_path,
   };
@@ -214,8 +189,13 @@ export function parseOcrDraft(raw: string, ctx: ParseContext): OcrDraft | null {
   }
   if (!isRecord(parsed) || !Array.isArray(parsed.items)) return null;
 
-  const warnings: string[] = Array.isArray(parsed.warnings)
-    ? parsed.warnings.map((w) => str(w, 300)).filter(Boolean).slice(0, OCR_MAX_WARNINGS)
+  // 모델이 스스로 적은 경고 — 어느 항목인지는 모델 말 안에만 있다(프롬프트가 쪽·번호를
+  // 함께 적으라고 시킨다). 우리가 붙일 수 있는 위치 정보는 없으므로 메시지만 담는다
+  const warnings: DraftWarning[] = Array.isArray(parsed.warnings)
+    ? parsed.warnings
+      .map((w) => str(w, 300)).filter(Boolean)
+      .slice(0, OCR_MAX_WARNINGS)
+      .map((message) => ({ message }))
     : [];
 
   const pageSet = new Set(ctx.pages);
@@ -223,13 +203,29 @@ export function parseOcrDraft(raw: string, ctx: ParseContext): OcrDraft | null {
   const refs = new Set<string>();
 
   for (const rawItem of parsed.items.slice(0, OCR_MAX_ITEMS_PER_BATCH)) {
-    const item = parseItem(rawItem, ctx, pageSet, warnings);
-    if (!item) continue;
-    // 같은 ref 가 두 번 오면 뒤에 오는 참조가 어느 쪽을 가리키는지 알 수 없다 — 먼저 온 것을 남긴다
-    if (refs.has(item.ref)) {
-      pushWarning(warnings, `${item.ref}: 같은 이름이 두 번 나와 뒤엣것을 버렸어요.`);
+    // ⚠️ 항목별 경고는 **따로 받는다.** 곧바로 본 목록에 넣으면, 그 항목이 아래에서
+    //    중복으로 버려질 때 경고에 남은 ref 가 **살아남은 다른 항목**으로 풀려
+    //    엉뚱한 카드에 "선지가 비었어요" 가 붙는다(코덱스 리뷰 P2).
+    const itemWarnings: DraftWarning[] = [];
+    const item = parseItem(rawItem, ctx, pageSet, itemWarnings);
+    if (!item) {
+      for (const w of itemWarnings) pushWarning(warnings, w);
       continue;
     }
+
+    // 같은 ref 가 두 번 오면 뒤에 오는 참조가 어느 쪽을 가리키는지 알 수 없다 — 먼저 온 것을 남긴다
+    if (refs.has(item.ref)) {
+      pushWarning(warnings, {
+        message: '같은 항목을 두 번 읽어 뒤엣것을 버렸어요.',
+        page: item.page,
+      });
+      // 버린 쪽의 경고는 **ref 를 떼고** 남긴다 — 남은 항목을 가리키면 거짓이 되지만,
+      // 통째로 지우면 그 읽기에서만 보인 문제가 조용히 사라진다
+      for (const w of itemWarnings) pushWarning(warnings, { ...w, ref: undefined });
+      continue;
+    }
+
+    for (const w of itemWarnings) pushWarning(warnings, w);
     refs.add(item.ref);
     items.push(item);
   }
@@ -239,7 +235,13 @@ export function parseOcrDraft(raw: string, ctx: ParseContext): OcrDraft | null {
   const passageRefs = new Set(items.filter((i) => i.kind === 'passage').map((i) => i.ref));
   for (const item of items) {
     if (item.passage_ref && !passageRefs.has(item.passage_ref)) {
-      pushWarning(warnings, `${item.ref}: 가리킨 지문(${item.passage_ref})을 못 찾아 지문 없이 뒀어요.`);
+      pushWarning(warnings, {
+        ref: item.ref,
+        kind: item.kind,
+        page: item.page,
+        number: item.number,
+        message: '딸린 지문을 이 묶음에서 못 찾아 지문 없이 뒀어요.',
+      });
       item.passage_ref = null;
     }
   }
@@ -265,8 +267,11 @@ export function parseAnswerKeyDraft(
   }
   if (!isRecord(parsed) || !Array.isArray(parsed.answers)) return null;
 
-  const warnings: string[] = Array.isArray(parsed.warnings)
-    ? parsed.warnings.map((w) => str(w, 300)).filter(Boolean).slice(0, OCR_MAX_WARNINGS)
+  const warnings: DraftWarning[] = Array.isArray(parsed.warnings)
+    ? parsed.warnings
+      .map((w) => str(w, 300)).filter(Boolean)
+      .slice(0, OCR_MAX_WARNINGS)
+      .map((message) => ({ message }))
     : [];
 
   const seen = new Set<number>();
@@ -277,12 +282,12 @@ export function parseAnswerKeyDraft(
     const no = int(raw.no);
     if (no === null || no < 1) continue;
     if (opts.maxNumber !== undefined && no > opts.maxNumber) {
-      pushWarning(warnings, `${no}번은 이 시험지의 문항 범위를 벗어나 버렸어요.`);
+      pushWarning(warnings, { message: `정답표의 ${no}번은 이 시험지의 문항 범위를 벗어나 버렸어요.` });
       continue;
     }
     // 같은 번호가 두 번 오면 먼저 온 것을 남긴다(정답표는 보통 한 번만 인쇄된다)
     if (seen.has(no)) {
-      pushWarning(warnings, `${no}번 정답이 두 번 나와 먼저 읽은 값을 남겼어요.`);
+      pushWarning(warnings, { message: `정답표에 ${no}번이 두 번 나와 먼저 읽은 값을 남겼어요.` });
       continue;
     }
     const answer = normalizeChoice(str(raw.answer, 200));

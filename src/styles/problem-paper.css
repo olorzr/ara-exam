@@ -265,3 +265,32 @@
   border-bottom: 1px solid #d1d5db;
   min-width: 60px;
 }
+
+/* ── 화면에서 읽을 때 ─────────────────────────────── */
+/*
+ * 아카이브 상세 창은 **인쇄와 같은 스코프(.pb-sheet)** 를 쓴다 — 〈보기〉 상자·(가) 머리글·
+ * [A] 세로선의 규칙을 세 번째로 베끼면 어느 한 벌만 고쳐져 화면과 인쇄가 갈라진다.
+ * 여기서는 글자 크기만 화면에 맞게 키운다(인쇄는 10pt, 화면은 그보다 커야 읽힌다).
+ */
+.pb-sheet--screen {
+  font-size: 14px;
+  line-height: 1.7;
+}
+.pb-sheet--screen .pb-q__choice { font-size: 13.5px; }
+.pb-sheet--screen .pb-q__meta { font-size: 12px; }
+.pb-sheet--screen th,
+.pb-sheet--screen td { font-size: 13px; }
+.pb-sheet--screen blockquote[data-box]::before { font-size: 12px; }
+
+/* 정답 선지 — 색만으로 알리지 않는다(옆에 '정답' 글자를 함께 둔다) */
+.pb-q__choice--answer {
+  background: #F0FAF9;
+  border-radius: 4px;
+  font-weight: 600;
+}
+.pb-q__choice-answer-mark {
+  margin-left: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #2F8F86;
+}

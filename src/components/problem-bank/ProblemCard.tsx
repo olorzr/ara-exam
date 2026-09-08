@@ -36,6 +36,8 @@ interface ProblemCardProps {
   selected?: boolean;
   /** 선택 토글 */
   onToggleSelect?: () => void;
+  /** 카드를 누르면 상세 창을 연다 (선택 모드에서는 선택이 우선이다) */
+  onOpen?: () => void;
 }
 
 /**
@@ -46,22 +48,52 @@ interface ProblemCardProps {
  */
 export default function ProblemCard({
   problem, thumbnailUrl, onAdd, added, dragHandlers, showEditLink = true,
-  selectMode, selected, onToggleSelect,
+  selectMode, selected, onToggleSelect, onOpen,
 }: ProblemCardProps) {
   const selectable = Boolean(selectMode && onToggleSelect);
+  const openable = Boolean(onOpen) && !selectable;
+
+  /**
+   * 카드를 눌렀다 — 상세 창을 연다.
+   *
+   * ⚠️ 글자를 끌어 선택하고 손을 떼도 click 이 온다. 그때 창이 열리면 **읽으려고 긁은
+   *    사람이 창에 갇힌다** — 선택한 글자가 있으면 열지 않는다.
+   */
+  const handleOpen = () => {
+    if (window.getSelection()?.toString()) return;
+    onOpen?.();
+  };
+
+  /** 안쪽 조작(편집·담기·손잡이)이 카드 클릭까지 번지지 않게 */
+  const stop = (e: React.MouseEvent) => e.stopPropagation();
+
   return (
     <div
       data-drag-item
+      role={openable ? 'button' : undefined}
+      tabIndex={openable ? 0 : undefined}
+      aria-label={openable
+        ? `${problem.number !== null ? `${problem.number}번 ` : ''}문항 자세히 보기`
+        : undefined}
       className={`flex gap-3 rounded-lg border p-3 transition ${
         added ? 'border-primary bg-primary/5'
           : selected ? 'border-primary ring-1 ring-primary/30'
             : 'border-gray-200 hover:border-gray-300'
-      } ${selectable ? 'cursor-pointer' : ''}`}
-      onClick={selectable ? onToggleSelect : undefined}
+      } ${selectable || openable ? 'cursor-pointer' : ''}`}
+      onClick={selectable ? onToggleSelect : openable ? handleOpen : undefined}
+      onKeyDown={openable ? (e) => {
+        // ⚠️ 안쪽 버튼·링크에서 올라온 Enter·Space 는 그 컨트롤의 것이다.
+        //    가로채면 키보드로는 편집 링크를 열 수 없고 상세 창만 뜬다(코덱스 리뷰 P2)
+        if (e.target !== e.currentTarget) return;
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleOpen();
+        }
+      } : undefined}
     >
       {selectable && (
         // 체크박스 자체의 클릭이 카드 클릭으로 두 번 세지 않게 막는다
-        <div className="shrink-0 self-start pt-0.5" onClick={(e) => e.stopPropagation()}>
+        <div className="shrink-0 self-start pt-0.5" onClick={stop}>
           <Checkbox
             checked={!!selected}
             onCheckedChange={onToggleSelect}
@@ -74,6 +106,10 @@ export default function ProblemCard({
         <button
           type="button"
           {...dragHandlers}
+          // ⚠️ 손잡이는 click 도 막아야 한다. useListDrag 의 preventDefault 는 호환
+          //    mouse 이벤트만 막고, 포인터를 잡아 둔 탓에 pointerup 대상이 손잡이라
+          //    **끌기를 끝낼 때마다** click 이 카드로 번져 상세 창이 열린다
+          onClick={stop}
           className="shrink-0 cursor-grab touch-none self-start rounded p-1 text-gray-400 hover:bg-gray-100 active:cursor-grabbing"
           aria-label="끌어서 문제지에 담기"
         >
@@ -111,6 +147,7 @@ export default function ProblemCard({
           {showEditLink && !selectMode && (
             <Link
               href={`/problems/edit/${problem.id}`}
+              onClick={stop}
               className="ml-auto text-primary underline underline-offset-2"
             >
               편집
@@ -122,7 +159,7 @@ export default function ProblemCard({
       {onAdd && (
         <button
           type="button"
-          onClick={onAdd}
+          onClick={(e) => { stop(e); onAdd(); }}
           disabled={added}
           className="shrink-0 self-start rounded p-1 text-gray-400 hover:bg-gray-100 disabled:opacity-40"
           aria-label={added ? '이미 담김' : '문제지에 담기'}

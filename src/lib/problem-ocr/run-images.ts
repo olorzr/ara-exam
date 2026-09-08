@@ -9,6 +9,7 @@ import { boxToBbox } from './crop';
 import { PageCropper } from './crop-dom';
 import type { MergeResult } from './merge';
 import type { OcrRunProgress } from './run';
+import { itemTargetLabel, listSomeLabels, type OcrWarning, type OcrWarningTarget } from './warnings';
 
 /** 쪽 이미지를 올리는 데 필요한 것만 — run.ts 를 되참조하지 않으려고 좁혀 둔다 */
 export interface PageUploadInput {
@@ -75,12 +76,12 @@ export async function cropRegions(
 ): Promise<{
   passageImages: Map<string, string>;
   problemImages: Map<string, string>;
-  warnings: string[];
+  warnings: OcrWarning[];
 }> {
   const cropper = new PageCropper(doc);
   const passageImages = new Map<string, string>();
   const problemImages = new Map<string, string>();
-  const warnings: string[] = [];
+  const warnings: OcrWarning[] = [];
 
   interface CropTarget {
     id: string;
@@ -92,25 +93,35 @@ export async function cropRegions(
     label: string;
   }
 
+  /** 크롭 대상 → 경고가 가리킬 항목. 이름만이 아니라 **행 id 까지** 넘겨야 카드를 짚을 수 있다 */
+  const targetOf = (t: Pick<CropTarget, 'id' | 'page' | 'kind' | 'label'>): OcrWarningTarget => ({
+    kind: t.kind, id: t.id, page: t.page, label: t.label,
+  });
+
   const targets: CropTarget[] = [
     ...merged.passages.filter((p) => p.box).map((p) => ({
       id: p.id, page: p.page_no, box: p.box!, kind: 'passage' as const,
-      needsImage: p.has_figure, label: `${p.page_no}쪽 지문`,
+      needsImage: p.has_figure, label: itemTargetLabel({ kind: 'passage', page: p.page_no }),
     })),
     ...merged.problems.filter((p) => p.box).map((p) => ({
       id: p.id, page: p.page_no, box: p.box!, kind: 'problem' as const,
       needsImage: p.has_figure,
-      label: p.number !== null ? `${p.number}번` : `${p.page_no}쪽 문항`,
+      label: itemTargetLabel({ kind: 'problem', page: p.page_no, number: p.number }),
     })),
   ];
 
   // 그림이 있다고 표시됐는데 좌표가 없으면 애초에 자를 수가 없다 — 그것도 알린다
-  const noBox = [
-    ...merged.passages.filter((p) => p.has_figure && !p.box).map((p) => `${p.page_no}쪽 지문`),
-    ...merged.problems.filter((p) => p.has_figure && !p.box)
-      .map((p) => (p.number !== null ? `${p.number}번` : `${p.page_no}쪽 문항`)),
+  const noBox: OcrWarningTarget[] = [
+    ...merged.passages.filter((p) => p.has_figure && !p.box).map((p) => targetOf({
+      id: p.id, page: p.page_no, kind: 'passage',
+      label: itemTargetLabel({ kind: 'passage', page: p.page_no }),
+    })),
+    ...merged.problems.filter((p) => p.has_figure && !p.box).map((p) => targetOf({
+      id: p.id, page: p.page_no, kind: 'problem',
+      label: itemTargetLabel({ kind: 'problem', page: p.page_no, number: p.number }),
+    })),
   ];
-  const failed: string[] = [...noBox];
+  const failed: OcrWarningTarget[] = [...noBox];
 
   try {
     let done = 0;
@@ -120,7 +131,7 @@ export async function cropRegions(
         // ⚠️ 취소로 멈춰도 **남은 그림 항목은 경고에 넣는다.** 호출부는 여기까지 읽은
         //    결과를 그대로 저장하는데, 이미지 없이 저장된 그림 문항은 글만으로는
         //    내용이 빠진 상태다 — 조용히 아카이브에 들어가면 안 된다(코덱스 리뷰 19R)
-        failed.push(...targets.slice(i).filter((t) => t.needsImage).map((t) => t.label));
+        failed.push(...targets.slice(i).filter((t) => t.needsImage).map(targetOf));
         break;
       }
       const blob = await cropper.crop(target.page, boxToBbox(target.box));
@@ -139,7 +150,7 @@ export async function cropRegions(
       }
       // ⚠️ 그림이 있는 항목은 다르다. 프롬프트가 "옮길 수 있는 글자만 적으라" 고 시켰으므로
       //    글만으로는 온전하지 않다. 이미지를 못 만들었으면 **반드시 알린다**(코덱스 리뷰 17R)
-      if (!ok && target.needsImage) failed.push(target.label);
+      if (!ok && target.needsImage) failed.push(targetOf(target));
       done += 1;
       onProgress?.({ phase: 'crop', done, total: targets.length });
     }
@@ -148,11 +159,13 @@ export async function cropRegions(
   }
 
   if (failed.length > 0) {
-    warnings.push(
-      `그림·표가 있는 항목의 이미지를 만들지 못했어요(${failed.slice(0, 8).join(', ')}`
-      + `${failed.length > 8 ? ` 외 ${failed.length - 8}개` : ''}). `
-      + '글만으로는 내용이 빠질 수 있으니 검수에서 확인해 주세요.',
-    );
+    // 메시지에는 몇 개만 적고(줄줄이 나오면 안 읽는다) 대상은 **전부** 싣는다 —
+    // 카드마다 '확인 필요' 표시가 붙어야 하나도 놓치지 않는다
+    warnings.push({
+      message: `그림·표가 있는 항목의 이미지를 만들지 못했어요(${listSomeLabels(failed.map((t) => t.label))}). `
+        + '글만으로는 내용이 빠질 수 있으니 검수에서 확인해 주세요.',
+      targets: failed,
+    });
   }
 
   return { passageImages, problemImages, warnings };

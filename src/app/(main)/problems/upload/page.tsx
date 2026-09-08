@@ -63,6 +63,11 @@ export default function ProblemUploadPage() {
   const [form, setForm] = useState({ values: EMPTY_FORM, titleAuto: true });
   const [errors, setErrors] = useState<SourceFormErrors>({});
   const [uploading, setUploading] = useState(false);
+  /**
+   * 방금 만든 출처 id — 경고가 가리키는 항목을 검수 화면에서 곧바로 열 수 있게 한다.
+   * 읽기가 끝나면 곧 검수 화면으로 넘어가지만, 실패해서 남았을 때도 길이 있어야 한다.
+   */
+  const [startedSourceId, setStartedSourceId] = useState<string | null>(null);
 
   const values = form.values;
   const pdf = usePdfPages(file);
@@ -121,6 +126,7 @@ export default function ProblemUploadPage() {
 
     setUploading(true);
     const sourceId = crypto.randomUUID();
+    setStartedSourceId(sourceId);
     const payload = toSourcePayload(values);
 
     try {
@@ -237,7 +243,17 @@ export default function ProblemUploadPage() {
               {batchCount}묶음 (ChatGPT 약 {batchCount + answerBatches}번)
             </p>
 
-            <OcrProgress progress={ocr.progress} label={ocr.progressLabel} warnings={ocr.warnings} />
+            <OcrProgress
+              progress={ocr.progress}
+              label={ocr.progressLabel}
+              warnings={ocr.warnings}
+              // 이 화면에는 문항 카드가 없다 — 대상을 누르면 검수 화면의 그 항목으로 보낸다
+              targetHref={(target) => (
+                startedSourceId && target.id
+                  ? `/problems/sources/${startedSourceId}?item=${target.id}`
+                  : null
+              )}
+            />
 
             <div className="flex items-center gap-2">
               <Button

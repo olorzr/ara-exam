@@ -1,23 +1,23 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { Suspense, useCallback, useMemo, useState } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useProblemReview } from '@/hooks/useProblemReview';
+import { useReviewFocus } from '@/hooks/useReviewFocus';
 import { useSourceTrees } from '@/hooks/useSourceTrees';
 import { setSourceStatus } from '@/lib/problem-bank/mutations';
 import { sourceLabel } from '@/lib/problem-bank/source-label';
 import PageImageWithBoxes, { type BoxOverlay } from '@/components/problem-review/PageImageWithBoxes';
-import PassageEditorCard from '@/components/problem-review/PassageEditorCard';
-import ProblemEditorCard from '@/components/problem-review/ProblemEditorCard';
+import ReviewCardList, { type ReviewRow } from '@/components/problem-review/ReviewCardList';
 import SourceTextbookPicker from '@/components/problem-review/SourceTextbookPicker';
 import AnswerKeyFiles from '@/components/problem-review/AnswerKeyFiles';
 import OcrProgress from '@/components/problem-ocr/OcrProgress';
 import { toBbox } from '@/lib/problem-bank/bbox';
+import { issuesByTargetId } from '@/lib/problem-ocr/warnings';
 
 /**
  * 기출 검수 화면 (`/problems/sources/[id]`).
@@ -25,14 +25,14 @@ import { toBbox } from '@/lib/problem-bank/bbox';
  * 왼쪽에 원본 페이지, 오른쪽에 읽어 낸 지문·문항을 둔다.
  * **원본과 대조**하는 것이 검수의 핵심이라 두 화면을 나란히 본다.
  */
-export default function ProblemSourceReviewPage() {
+function ProblemSourceReviewContent() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const sourceId = params?.id ?? '';
   const review = useProblemReview(sourceId);
 
   const { areaTree, unitTree } = useSourceTrees(review.source);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   /**
    * 저장하지 않은 수정이 있는 문항.
    *
@@ -40,7 +40,6 @@ export default function ProblemSourceReviewPage() {
    *    알고 그대로 인쇄하게 된다(코덱스 리뷰 14R).
    */
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
-  const [wantedPage, setPage] = useState(1);
 
   // 화면에 보이는 쪽 목록.
   //
@@ -55,9 +54,16 @@ export default function ProblemSourceReviewPage() {
     return [...set].filter((n) => Number.isInteger(n) && n >= 1).sort((a, b) => a - b);
   }, [review.passages, review.problems, review.source]);
 
-  // 보고 있던 쪽이 목록에서 사라지면(항목을 다 지웠을 때) 첫 쪽으로 떨어뜨린다.
-  // state 를 효과로 되돌리지 않고 **파생**한다 — 렌더가 한 번 더 도는 것을 막는다.
-  const page = pages.includes(wantedPage) ? wantedPage : pages[0] ?? 1;
+  // 어디를 보고 있는가(쪽·강조·스크롤)는 훅 하나가 맡는다 — 상자·카드·경고 칩이
+  // 서로 다르게 움직이면 "경고를 눌렀는데 다른 쪽이 보이는" 일이 생긴다
+  const focus = useReviewFocus({
+    pages,
+    items: [...review.passages, ...review.problems],
+    loading: review.loading,
+    // 주소는 처음 한 번만 읽는다 — 이후 선택은 화면이 들고 있다
+    wantedItem: useState(() => searchParams.get('item'))[0],
+  });
+  const { page } = focus;
 
   const boxes = useMemo<BoxOverlay[]>(() => {
     const out: BoxOverlay[] = [];
@@ -83,7 +89,7 @@ export default function ProblemSourceReviewPage() {
 
   /** 지문 다음에 그 지문의 문항이 오도록 늘어놓는다 — 검수 순서가 읽는 순서와 같아야 한다 */
   const ordered = useMemo(() => {
-    const rows: ({ kind: 'passage'; id: string } | { kind: 'problem'; id: string })[] = [];
+    const rows: ReviewRow[] = [];
     const used = new Set<string>();
     for (const passage of review.passages) {
       rows.push({ kind: 'passage', id: passage.id });
@@ -100,8 +106,14 @@ export default function ProblemSourceReviewPage() {
     return rows;
   }, [review.passages, review.problems]);
 
-  const problemCountFor = (passageId: string) =>
-    review.problems.filter((p) => p.passage_id === passageId).length;
+  /**
+   * OCR 경고를 항목별로 나눈다 — 위 배너와 **같은 말**이 그 카드에도 붙는다.
+   * 배너만 있으면 "어느 문항?" 을 사람이 눈으로 찾아야 한다.
+   */
+  const issues = useMemo(
+    () => issuesByTargetId(review.source?.ocr_meta?.warnings ?? []),
+    [review.source],
+  );
 
   const markDirty = useCallback((id: string, dirty: boolean) => {
     setDirtyIds((prev) => {
@@ -128,6 +140,48 @@ export default function ProblemSourceReviewPage() {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '상태를 바꾸지 못했어요.');
     }
+  };
+
+  /**
+   * 지문을 지운다 — 딸린 문항을 다시 읽으면서 **모든 카드가 다시 마운트된다**.
+   * 다른 카드에서 고치던 내용까지 사라지므로 먼저 알린다
+   * (지우는 카드 자신은 어차피 없어지므로 셈에서 뺀다 — 코덱스 리뷰 16R).
+   */
+  const removePassageWithGuard = (passageId: string) => {
+    const others = [...dirtyIds].filter((id) => id !== passageId);
+    if (others.length > 0) {
+      const ok = window.confirm(
+        `다른 카드에 저장하지 않은 수정이 ${others.length}개 있어요.\n`
+        + '지문을 지우면 문항을 다시 읽어 오면서 그 수정이 사라집니다. 계속할까요?',
+      );
+      if (!ok) return;
+    }
+    review.removePassage(passageId);
+  };
+
+  /**
+   * 지문을 저장한다.
+   *
+   * ⚠️ **작품명을 바꾸면 딸린 문항의 작품명까지 DB 트리거가 함께 바꾼다.** 그러면 그
+   *    문항들의 `updated_at` 이 올라가므로 훅이 본문을 다시 읽고 **그 문항 카드만**
+   *    다시 마운트한다 — 거기서 고치던 내용은 사라진다. 상관없는 카드는 그대로 둔다.
+   */
+  const savePassageWithGuard = async (passageId: string, patch: Parameters<typeof review.savePassage>[1]) => {
+    const passage = review.passages.find((p) => p.id === passageId);
+    const titleChanged = patch.title !== undefined && passage && patch.title !== passage.title;
+    if (titleChanged) {
+      // 실제로 영향받는 것은 **이 지문에 딸린 문항**뿐이다 — 개수를 부풀려 겁주지 않는다
+      const affected = review.problems
+        .filter((p) => p.passage_id === passageId && dirtyIds.has(p.id));
+      if (affected.length > 0) {
+        const ok = window.confirm(
+          '작품명을 바꾸면 딸린 문항의 작품명도 함께 바뀝니다.\n'
+          + `그 문항을 다시 읽어 오므로 저장하지 않은 수정 ${affected.length}개가 사라집니다. 계속할까요?`,
+        );
+        if (!ok) return false;
+      }
+    }
+    return review.savePassage(passageId, patch);
   };
 
   if (review.loading || review.busy) {
@@ -175,7 +229,12 @@ export default function ProblemSourceReviewPage() {
         </div>
       </div>
 
-      <OcrProgress progress={null} label="" warnings={source.ocr_meta?.warnings ?? []} />
+      <OcrProgress
+        progress={null}
+        label=""
+        warnings={source.ocr_meta?.warnings ?? []}
+        onTarget={focus.goToTarget}
+      />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         <div className="space-y-2 lg:sticky lg:top-4 lg:self-start">
@@ -185,7 +244,7 @@ export default function ProblemSourceReviewPage() {
               <Button
                 key={n} type="button" size="sm"
                 variant={n === page ? 'default' : 'outline'}
-                onClick={() => setPage(n)}
+                onClick={() => focus.setPage(n)}
               >
                 {n}
               </Button>
@@ -195,97 +254,40 @@ export default function ProblemSourceReviewPage() {
           <PageImageWithBoxes
             src={review.pageUrlFor(page)}
             boxes={boxes}
-            selectedId={selectedId}
-            onSelect={(id) => {
-              setSelectedId(id);
-              document
-                .querySelector(`[data-problem-id="${id}"], [data-passage-id="${id}"]`)
-                ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }}
+            selectedId={focus.selectedId}
+            onSelect={(id) => focus.focusItem(id)}
           />
         </div>
 
         <div className="space-y-3">
-          {ordered.length === 0 && (
-            <Card>
-              <CardContent className="space-y-3 py-12 text-center text-sm text-gray-500">
-                <p>읽어 낸 문항이 없어요.</p>
-                {/* 실패·취소한 작업에서 실제로 돌아갈 곳을 준다 — 안내만 하고 길이 없으면 막힌다 */}
-                <Link
-                  href="/problems/upload"
-                  className="inline-block rounded-md bg-primary px-3 py-2 text-sm text-white"
-                >
-                  다시 업로드하기
-                </Link>
-              </CardContent>
-            </Card>
-          )}
-
-          {ordered.map((row) => {
-            if (row.kind === 'passage') {
-              const passage = review.passages.find((p) => p.id === row.id);
-              if (!passage) return null;
-              return (
-                <PassageEditorCard
-                  key={`${passage.id}:${review.reloadSeq}`}
-                  passage={passage}
-                  problemCount={problemCountFor(passage.id)}
-                  areaTree={areaTree}
-                  unitTree={unitTree}
-                  selected={selectedId === passage.id}
-                  // 이미 고른 항목을 다시 누르거나(편집 중 포커스) 하면 쪽은 그대로 둔다 —
-                  // 여러 쪽에 걸친 지문을 이어지는 쪽과 대조하며 고칠 수 있어야 한다
-                  onSelect={() => {
-                    if (selectedId !== passage.id) setPage(passage.page_no);
-                    setSelectedId(passage.id);
-                  }}
-                  onSave={(patch) => review.savePassage(passage.id, patch)}
-                  onDirtyChange={(dirty) => markDirty(passage.id, dirty)}
-                  onDelete={() => {
-                    // 지문을 지우면 딸린 문항을 다시 읽어 오면서 **모든 카드가 다시
-                    // 마운트된다** — 다른 카드에서 고치던 내용까지 사라진다.
-                    // 지우는 카드 자신은 어차피 없어지므로 셈에서 뺀다(코덱스 리뷰 16R)
-                    const others = [...dirtyIds].filter((id) => id !== passage.id);
-                    if (others.length > 0) {
-                      const ok = window.confirm(
-                        `다른 카드에 저장하지 않은 수정이 ${others.length}개 있어요.\n`
-                        + '지문을 지우면 문항을 다시 읽어 오면서 그 수정이 사라집니다. 계속할까요?',
-                      );
-                      if (!ok) return;
-                    }
-                    review.removePassage(passage.id);
-                  }}
-                />
-              );
-            }
-            const problem = review.problems.find((p) => p.id === row.id);
-            if (!problem) return null;
-            return (
-              <ProblemEditorCard
-                // 서버 본문을 다시 읽으면 카드도 다시 마운트한다 —
-                // 옛 입력이 남은 채 새 토큰으로 저장되면 남의 수정을 덮어쓴다
-                key={`${problem.id}:${review.reloadSeq}`}
-                problem={problem}
-                areaTree={areaTree}
-                unitTree={unitTree}
-                selected={selectedId === problem.id}
-                onSelect={() => {
-                  if (selectedId !== problem.id) setPage(problem.page_no);
-                  setSelectedId(problem.id);
-                }}
-                onSave={(patch) => review.saveProblem(problem.id, patch)}
-                onDirtyChange={(dirty) => markDirty(problem.id, dirty)}
-                // 방금 저장해서 알고 있는 버전을 **그대로 넘긴다** — 버리면 저장 직후
-                // 검수가 옛 버전으로 걸려 아무도 안 고쳤는데 충돌한다
-                onToggleVerified={(v, knownUpdatedAt) => (
-                  review.toggleVerified(problem.id, v, knownUpdatedAt)
-                )}
-                onDelete={() => review.removeProblem(problem.id)}
-              />
-            );
-          })}
+          <ReviewCardList
+            rows={ordered}
+            passages={review.passages}
+            problems={review.problems}
+            mountKey={review.mountKey}
+            areaTree={areaTree}
+            unitTree={unitTree}
+            selectedId={focus.selectedId}
+            issues={issues}
+            onSelect={focus.selectCard}
+            onDirtyChange={markDirty}
+            savePassage={savePassageWithGuard}
+            saveProblem={review.saveProblem}
+            toggleVerified={review.toggleVerified}
+            deletePassage={removePassageWithGuard}
+            deleteProblem={review.removeProblem}
+          />
         </div>
       </div>
     </div>
+  );
+}
+
+/** useSearchParams 는 Suspense 경계가 필요하다(Next 규약) */
+export default function ProblemSourceReviewPage() {
+  return (
+    <Suspense fallback={<div className="py-16 text-center text-sm text-gray-500">불러오는 중…</div>}>
+      <ProblemSourceReviewContent />
+    </Suspense>
   );
 }

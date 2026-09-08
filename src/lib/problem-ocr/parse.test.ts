@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseAnswerKeyDraft, parseOcrDraft } from './parse';
+import { warningText } from './warnings';
 import type { AreaTreeNode } from '@/lib/problem-bank/area-tree';
 
 const TREE: AreaTreeNode[] = [
@@ -25,6 +26,9 @@ const UNITS: AreaTreeNode[] = [
 const ctx = { pages: [1, 2, 3], areaTree: TREE, unitTree: UNITS };
 const json = (items: unknown[], warnings: string[] = []) => JSON.stringify({ items, warnings });
 
+/** 경고 메시지를 한 줄로 이어 본다 */
+const said = (warnings: { message: string }[]) => warnings.map((w) => w.message).join(' | ');
+
 describe('parseOcrDraft — 구조', () => {
   it('JSON 이 아니면 null (형식 오류와 스키마 불일치를 구분하려고 null 로 돌려준다)', () => {
     expect(parseOcrDraft('설명 문장입니다', ctx)).toBeNull();
@@ -43,7 +47,7 @@ describe('parseOcrDraft — 구조', () => {
 
   it('모델 경고를 그대로 가져온다', () => {
     const draft = parseOcrDraft(json([item()], ['정답표가 안 보여요']), ctx)!;
-    expect(draft.warnings).toContain('정답표가 안 보여요');
+    expect(draft.warnings).toEqual([{ message: '정답표가 안 보여요' }]);
   });
 });
 
@@ -56,7 +60,15 @@ describe('parseOcrDraft — 항목 관대성', () => {
   it('보내지 않은 쪽을 가리키면 버리고 경고한다', () => {
     const draft = parseOcrDraft(json([item({ ref: 'Q9', page: 99 })]), ctx)!;
     expect(draft.items).toHaveLength(0);
-    expect(draft.warnings.join()).toContain('Q9');
+    expect(said(draft.warnings)).toContain('보내지 않은 쪽(99)');
+    // 버린 항목에는 행이 안 생긴다 — ref 를 실으면 병합이 엉뚱한 카드를 짚는다
+    expect(draft.warnings[0].ref).toBeUndefined();
+  });
+
+  it('경고가 어느 항목인지 데이터로 나른다 — 메시지의 Q3 는 화면 어디에도 없는 이름이다', () => {
+    const draft = parseOcrDraft(json([item({ ref: 'Q7', number: 7, choices: ['가', '', '다'] })]), ctx)!;
+    expect(draft.warnings[0]).toMatchObject({ ref: 'Q7', kind: 'problem', page: 1, number: 7 });
+    expect(draft.warnings[0].message).not.toContain('Q7');
   });
 
   it('같은 ref 가 두 번이면 먼저 온 것을 남긴다', () => {
@@ -65,6 +77,19 @@ describe('parseOcrDraft — 항목 관대성', () => {
     )!;
     expect(draft.items).toHaveLength(1);
     expect(draft.items[0].number).toBe(1);
+  });
+
+  it('버린 중복의 경고는 ref 를 떼고 남긴다 — 살아남은 항목을 짚으면 거짓이 된다', () => {
+    const draft = parseOcrDraft(json([
+      item({ ref: 'Q1', number: 1 }),
+      // 버려질 쪽에만 빈 선지가 있다
+      item({ ref: 'Q1', number: 1, choices: ['가', '', '다'] }),
+    ]), ctx)!;
+    expect(draft.items).toHaveLength(1);
+    const blank = draft.warnings.find((w) => w.message.includes('선지'));
+    expect(blank).toBeDefined();
+    expect(blank!.ref).toBeUndefined();
+    expect(blank!.page).toBe(1);
   });
 });
 
@@ -93,7 +118,7 @@ describe('parseOcrDraft — 정답·선지', () => {
     // 코덱스 리뷰 13R: ['A','','C','D','E'] 를 압축하면 정답 '3' 이 D 를 가리킨다
     const draft = parseOcrDraft(json([item({ choices: ['가', '', '다', '라', '마'] })]), ctx)!;
     expect(draft.items[0].choices).toEqual(['가', '', '다', '라', '마']);
-    expect(draft.warnings.join()).toContain('2번 선지');
+    expect(said(draft.warnings)).toContain('2번 선지');
   });
 
   it('뒤쪽 빈 선지는 잘라 낸다', () => {
@@ -105,7 +130,7 @@ describe('parseOcrDraft — 정답·선지', () => {
     const draft = parseOcrDraft(json([item({ answer: '역설법' })]), ctx)!;
     expect(draft.items[0].question_type).toBe('주관식');
     expect(draft.items[0].answer).toBe('역설법');
-    expect(draft.warnings.join()).toContain('역설법');
+    expect(said(draft.warnings)).toContain('역설법');
   });
 
   it('정답이 없으면 null 로 둔다 — 추측으로 채우지 않는다', () => {
@@ -156,7 +181,7 @@ describe('parseOcrDraft — 단원', () => {
   it('트리에 없는 소단원은 잘라 내고 알린다 — 대단원까지는 멀쩡한 정보다', () => {
     const draft = parseOcrDraft(json([item({ unit_path: ['1. 문학', '없는 소단원'] })]), ctx)!;
     expect(draft.items[0].unit_path).toEqual(['1. 문학']);
-    expect(draft.warnings.join()).toContain('단원');
+    expect(said(draft.warnings)).toContain('단원');
   });
 
   it('트리에 아예 없으면 빈 배열', () => {
@@ -213,7 +238,7 @@ describe('parseOcrDraft — 영역·지문 참조', () => {
       json([item({ area_path: ['문학', '현대시', '심상'] })]), ctx,
     )!;
     expect(draft.items[0].area_path).toEqual(['문학', '현대시']);
-    expect(draft.warnings.join()).toContain('심상');
+    expect(said(draft.warnings)).toContain('심상');
   });
 
   it('트리에 없는 영역은 비운다', () => {
@@ -227,9 +252,11 @@ describe('parseOcrDraft — 영역·지문 참조', () => {
   });
 
   it('묶음 안에 없는 지문을 가리키면 끊는다 — 엉뚱한 지문에 붙는 것보다 낫다', () => {
-    const draft = parseOcrDraft(json([item({ passage_ref: 'P9' })]), ctx)!;
+    const draft = parseOcrDraft(json([item({ ref: 'Q4', passage_ref: 'P9' })]), ctx)!;
     expect(draft.items[0].passage_ref).toBeNull();
-    expect(draft.warnings.join()).toContain('P9');
+    // 가리킬 카드는 **그 문항**이다(못 찾은 지문이 아니라)
+    expect(draft.warnings[0]).toMatchObject({ ref: 'Q4', kind: 'problem' });
+    expect(said(draft.warnings)).toContain('딸린 지문');
   });
 
   it('같은 묶음의 지문 참조는 유지한다', () => {
@@ -268,7 +295,7 @@ describe('parseAnswerKeyDraft', () => {
   it('문항 범위를 벗어난 번호는 버린다', () => {
     const draft = parseAnswerKeyDraft(key([{ no: 99, answer: '1' }]), { maxNumber: 20 })!;
     expect(draft.answers).toHaveLength(0);
-    expect(draft.warnings.join()).toContain('99');
+    expect(said(draft.warnings)).toContain('99');
   });
 
   it('같은 번호가 두 번이면 먼저 읽은 값을 남긴다', () => {
@@ -276,6 +303,7 @@ describe('parseAnswerKeyDraft', () => {
       key([{ no: 1, answer: '1' }, { no: 1, answer: '5' }]),
     )!;
     expect(draft.answers).toEqual([{ no: 1, answer: '1' }]);
+    expect(warningText(draft.warnings[0])).toContain('1번이 두 번');
   });
 
   it('모양이 깨지면 null', () => {

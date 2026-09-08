@@ -168,6 +168,7 @@ export interface ProblemQuery {
   area_path?: string[];
   /** 교과서 단원 경로 — 대단원만 주면 그 아래 소단원 문항까지 걸린다 */
   unit_path?: string[];
+  /** 작품명. 이 조건이 걸리면 목록이 **지문 순서**로 정렬된다 */
   work_title?: string;
   /** 발문·선지·작품명 평문 검색 */
   search?: string;
@@ -198,13 +199,28 @@ export async function fetchProblemPage(query: ProblemQuery): Promise<ProblemPage
 
   let request = supabase
     .from('problems')
-    .select(`${PROBLEM_LIST_COLUMNS}, source:problem_sources!inner(*)`, { count: 'exact' })
-    .order('created_at', { ascending: false })
-    // ⚠️ created_at 만으로 정렬하면 안 된다 — OCR 은 50건씩 한 트랜잭션으로 넣어서
-    //    한 묶음의 모든 행이 **같은 now()** 를 받는다. 동률이 페이지 경계에 걸리면
-    //    쪽을 넘길 때마다 어떤 문항은 두 번 나오고 어떤 문항은 영영 안 나온다(코덱스 리뷰 5R)
-    .order('id', { ascending: false })
-    .range(from, from + PROBLEM_PAGE_SIZE - 1);
+    .select(`${PROBLEM_LIST_COLUMNS}, source:problem_sources!inner(*)`, { count: 'exact' });
+
+  if (query.work_title !== undefined) {
+    // 작품으로 볼 때는 **지문 순서**로 늘어놓는다 — 화면이 지문별로 묶어 그리므로
+    // 같은 지문의 문항이 흩어지면 같은 지문 머리가 여러 번 나온다.
+    // 출처를 먼저 묶는 이유: 같은 작품이라도 학교마다 실린 대목이 다르다
+    request = request
+      .order('source_id')
+      .order('passage_id', { nullsFirst: false })
+      .order('page_no')
+      .order('number', { nullsFirst: false })
+      .order('id');
+  } else {
+    request = request
+      .order('created_at', { ascending: false })
+      // ⚠️ created_at 만으로 정렬하면 안 된다 — OCR 은 50건씩 한 트랜잭션으로 넣어서
+      //    한 묶음의 모든 행이 **같은 now()** 를 받는다. 동률이 페이지 경계에 걸리면
+      //    쪽을 넘길 때마다 어떤 문항은 두 번 나오고 어떤 문항은 영영 안 나온다(코덱스 리뷰 5R)
+      .order('id', { ascending: false });
+  }
+
+  request = request.range(from, from + PROBLEM_PAGE_SIZE - 1);
 
   // ⚠️ 임베드에 별칭(`source:`)을 주면 필터 경로도 **별칭**을 써야 한다.
   //    `problem_sources.year` 로 쓰면 PostgREST 가 "그런 임베드 없음" 으로 요청을 거부한다.
@@ -217,7 +233,8 @@ export async function fetchProblemPage(query: ProblemQuery): Promise<ProblemPage
   if (query.semester !== undefined) request = request.eq('source.semester', query.semester);
   if (query.exam_type !== undefined) request = request.eq('source.exam_type', query.exam_type);
   if (query.textbook !== undefined) request = request.eq('source.textbook', query.textbook);
-  if (query.work_title) request = request.eq('work_title', query.work_title);
+  // ⚠️ 참거짓이 아니라 undefined 로 가른다 — filters.ts 의 규약(빈 문자열은 '미지정만')
+  if (query.work_title !== undefined) request = request.eq('work_title', query.work_title);
   if (query.verifiedOnly) request = request.eq('status', '검수완료');
   if (query.area_path && query.area_path.length > 0) {
     // 배열 포함 — '문학' 으로 찾으면 '문학 > 현대시' 문항도 걸린다

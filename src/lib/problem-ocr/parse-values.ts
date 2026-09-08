@@ -1,0 +1,78 @@
+import type { QuestionType } from '@/types/problem-bank';
+import { normalizeWorkTitle } from '@/lib/problem-bank/work-title';
+import type { OcrBox } from './schema';
+
+/**
+ * OCR 응답의 **값 하나하나**를 검증·정규화하는 도구들 (순수 함수).
+ *
+ * 항목 조립(`parse.ts`)에서 떼어 둔 이유는 결이 달라서다 — 여기 있는 것들은
+ * "이 값이 쓸 만한가"만 보고, 저기서는 "이 항목을 살릴까 버릴까"를 정한다.
+ */
+
+/**
+ * 정답지에 인쇄된 선택지 글자 → 저장 형식('1'~'5').
+ *
+ * ⚠️ 이게 없으면 실제 시험지 대부분이 깨진다. 한국 시험지는 정답을 ①~⑤ 로 찍는데,
+ *    그대로 두면 아래 객관식 검사가 "1~5 가 아니네" 하고 **주관식으로 강등**해 버린다.
+ */
+const CHOICE_GLYPHS: Record<string, string> = {
+  '①': '1', '②': '2', '③': '3', '④': '4', '⑤': '5',
+  '➀': '1', '➁': '2', '➂': '3', '➃': '4', '➄': '5',
+  '⑴': '1', '⑵': '2', '⑶': '3', '⑷': '4', '⑸': '5',
+  '１': '1', '２': '2', '３': '3', '４': '4', '５': '5',
+};
+
+/** 선지 본문 앞에 남은 번호 표시 — 렌더가 기호를 다시 붙이므로 지운다 */
+export const LEADING_MARKER = /^\s*(?:[①-⑤➀-➄⑴-⑸]|\(\s*[1-5]\s*\)|[1-5１-５]\s*[.)]|[1-5]\s*번)\s*/;
+
+export const QUESTION_TYPES: readonly QuestionType[] = ['객관식', '주관식', '서술형'];
+
+/** '①' / '(1)' / '1번' / '１' → '1'. 못 알아보면 원문 그대로 */
+export function normalizeChoice(answer: string): string {
+  const trimmed = answer.trim();
+  const direct = CHOICE_GLYPHS[trimmed];
+  if (direct) return direct;
+  const m = trimmed.match(/^\(?\s*([1-5])\s*\)?\s*(?:번|\.)?$/);
+  return m ? m[1] : trimmed;
+}
+
+export function isRecord(v: unknown): v is Record<string, unknown> {
+  return !!v && typeof v === 'object' && !Array.isArray(v);
+}
+
+export function str(v: unknown, max: number): string {
+  return typeof v === 'string' ? v.trim().slice(0, max) : '';
+}
+
+export function nullableStr(v: unknown, max: number): string | null {
+  const s = str(v, max);
+  return s ? s : null;
+}
+
+/** 작품명·지은이를 표준 표기로 — 다듬고 나서 비면 null 로 되돌린다 */
+export function normalizeWork(value: string | null): string | null {
+  if (value === null) return null;
+  const normalized = normalizeWorkTitle(value);
+  return normalized ? normalized : null;
+}
+
+export function int(v: unknown): number | null {
+  return typeof v === 'number' && Number.isInteger(v) && Number.isFinite(v) ? v : null;
+}
+
+/**
+ * 좌표를 0~1 로 가두고 뒤집힌 값을 버린다.
+ * 좌표가 없으면 크롭만 못 할 뿐 본문은 멀쩡하므로 항목을 버리지 않는다.
+ */
+export function parseBox(v: unknown): OcrBox | null {
+  if (!isRecord(v)) return null;
+  const column = v.column;
+  if (column !== 0 && column !== 1 && column !== 2) return null;
+  const top = typeof v.top === 'number' ? v.top : NaN;
+  const bottom = typeof v.bottom === 'number' ? v.bottom : NaN;
+  if (!Number.isFinite(top) || !Number.isFinite(bottom)) return null;
+  const t = Math.min(Math.max(top, 0), 1);
+  const b = Math.min(Math.max(bottom, 0), 1);
+  if (b <= t) return null;
+  return { column, top: t, bottom: b };
+}

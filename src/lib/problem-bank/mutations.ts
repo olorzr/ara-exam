@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { sanitizeInlineHTML, sanitizeProblemHTML } from '@/lib/sanitize-problem';
+import { normalizeWorkTitle } from '@/lib/problem-bank/work-title';
 import { normalizeCategoryName } from '@/lib/category-name';
 import type { Bbox, Problem, RenderMode } from '@/types/problem-bank';
 
@@ -58,7 +59,7 @@ export async function updateProblem(
     payload.explanation_html = sanitizeProblemHTML(patch.explanation_html);
   }
   if (patch.choices !== undefined) payload.choices = patch.choices.map(sanitizeInlineHTML);
-  if (patch.work_title !== undefined) payload.work_title = normalizeCategoryName(patch.work_title);
+  if (patch.work_title !== undefined) payload.work_title = normalizeWorkTitle(patch.work_title);
 
   const { data, error } = await supabase
     .from('problems')
@@ -100,7 +101,10 @@ export async function updatePassage(
 ): Promise<string> {
   const payload: Record<string, unknown> = { ...patch };
   if (patch.html !== undefined) payload.html = sanitizeProblemHTML(patch.html);
-  if (patch.title !== undefined) payload.title = normalizeCategoryName(patch.title);
+  // ⚠️ 지은이도 함께 다듬는다 — 작품 트리가 지은이로 폴더를 나누므로, 한쪽만 다듬으면
+  //    '김유정' 과 '김유정 ' 이 두 폴더가 된다
+  if (patch.title !== undefined) payload.title = normalizeWorkTitle(patch.title);
+  if (patch.author !== undefined) payload.author = normalizeWorkTitle(patch.author);
 
   const { data, error } = await supabase
     .from('passages')

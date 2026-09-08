@@ -5,10 +5,10 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import ArchiveSelectionBar from '@/components/problem-bank/ArchiveSelectionBar';
 import ArchiveSidePanel from '@/components/problem-bank/ArchiveSidePanel';
-import ProblemCard from '@/components/problem-bank/ProblemCard';
+import ArchiveList from '@/components/problem-bank/ArchiveList';
+import ProblemDetailDialog from '@/components/problem-bank/ProblemDetailDialog';
 import ProblemFilterBar from '@/components/problem-bank/ProblemFilterBar';
 import { useArchiveSelection } from '@/hooks/useArchiveSelection';
 import { useProblemArchive, type ArchiveRow } from '@/hooks/useProblemArchive';
@@ -44,6 +44,8 @@ function ArchiveContent() {
    */
   const selection = useArchiveSelection(archive.loading ? NO_ROWS : archive.rows);
   const [deleting, setDeleting] = useState(false);
+  /** 상세 창에 띄운 문항 — 목록의 조건·스크롤·선택을 잃지 않으려고 창으로 연다 */
+  const [openId, setOpenId] = useState<string | null>(null);
   /**
    * 세대 둘. 지우는 동안 무엇이 바뀌었는지에 따라 할 일이 다르기 때문이다
    * (usePdfPages 의 genRef 와 같은 규약).
@@ -188,6 +190,7 @@ function ArchiveContent() {
           <ArchiveSidePanel
             filters={archive.filters}
             schoolExams={archive.facets.schoolExams}
+            works={archive.workFacets}
             onChange={patch}
           />
         </div>
@@ -198,6 +201,7 @@ function ArchiveContent() {
             facets={archive.facets}
             areaFacets={archive.areaFacets}
             unitFacets={archive.unitFacets}
+            workFacets={archive.workFacets}
             total={archive.total}
             onChange={patch}
             onReset={reset}
@@ -215,30 +219,17 @@ function ArchiveContent() {
             onDelete={handleBulkDelete}
           />
 
-          {archive.loading ? (
-            <div className="flex justify-center py-16">
-              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
-            </div>
-          ) : archive.rows.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center text-sm text-gray-500">
-                조건에 맞는 문항이 없어요.
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-2">
-              {archive.rows.map((row) => (
-                <ProblemCard
-                  key={row.id}
-                  problem={row}
-                  thumbnailUrl={thumbnails.urls.get(row.image_path) ?? null}
-                  selectMode={selection.selectMode}
-                  selected={selection.isSelected(row.id)}
-                  onToggleSelect={() => toggleOne(row.id)}
-                />
-              ))}
-            </div>
-          )}
+          <ArchiveList
+            rows={archive.rows}
+            loading={archive.loading}
+            thumbnails={thumbnails.urls}
+            selectMode={selection.selectMode}
+            isSelected={selection.isSelected}
+            onToggleSelect={toggleOne}
+            onOpen={setOpenId}
+            // 작품을 고른 동안만 지문별로 묶는다 — 그때만 '어느 대목인가' 가 뜻이 있다
+            groupByPassage={Boolean(archive.filters.work_title)}
+          />
 
           {archive.pageCount > 1 && (
             <div className="flex items-center justify-center gap-2">
@@ -263,6 +254,8 @@ function ArchiveContent() {
           )}
         </div>
       </div>
+
+      <ProblemDetailDialog problemId={openId} onClose={() => setOpenId(null)} />
     </div>
   );
 }

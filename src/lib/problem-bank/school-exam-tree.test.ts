@@ -97,7 +97,7 @@ describe('schoolExamFilterPatch', () => {
     const patch = schoolExamFilterPatch(facet());
     expect(patch).toEqual({
       source_type: '내신기출', school_name: '상현중', year: '2026', grade: '중2',
-      semester: '1학기', exam_type: '중간', textbook: '', unit_path: [], page: 0,
+      semester: '1학기', exam_type: '중간', textbook: '', unit_path: [], work_title: '', page: 0,
     });
   });
 });
@@ -134,5 +134,14 @@ describe('initialSideTab', () => {
 
   it('아무 조건도 없으면 교과서 탭', () => {
     expect(initialSideTab(EMPTY_FILTERS)).toBe('units');
+  });
+
+  it('작품 조건만 있으면 작품 탭 — 링크를 받아 열었을 때 왜 이 목록인지 보여야 한다', () => {
+    expect(initialSideTab({ ...EMPTY_FILTERS, work_title: '동백꽃' })).toBe('works');
+  });
+
+  it('단원 조건이 함께 있으면 교과서 탭', () => {
+    expect(initialSideTab({ ...EMPTY_FILTERS, work_title: '동백꽃', unit_path: ['1. 문학'] }))
+      .toBe('units');
   });
 });

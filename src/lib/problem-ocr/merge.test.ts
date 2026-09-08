@@ -1,6 +1,7 @@
 import { beforeEach, describe, it, expect } from 'vitest';
 import { mergeOcrDrafts, type DraftWithPages } from './merge';
 import type { OcrItem } from './schema';
+import { toWarningObject, warningText, type DraftWarning } from './warnings';
 
 let seq = 0;
 const newId = () => `id${++seq}`;
@@ -25,8 +26,13 @@ function problem(over: Partial<OcrItem> = {}): OcrItem {
   };
 }
 
-const batch = (items: OcrItem[], pages: number[], warnings: string[] = []): DraftWithPages =>
-  ({ draft: { items, warnings }, pages });
+const batch = (
+  items: OcrItem[], pages: number[], warnings: DraftWarning[] = [],
+): DraftWithPages => ({ draft: { items, warnings }, pages });
+
+/** 경고를 한 줄로 이어 본다 (대상 이름까지) */
+const said = (res: { warnings: Parameters<typeof warningText>[0][] }) =>
+  res.warnings.map(warningText).join(' | ');
 
 describe('mergeOcrDrafts — 기본', () => {
   it('지문과 문항을 담고 참조를 id 로 잇는다', () => {
@@ -239,7 +245,7 @@ describe('mergeOcrDrafts — 지문 합치기', () => {
       batch([passage({ page: 4, label: null, html: '<p>조각</p>', continued: true })], [4]),
     ], { newId });
     expect(res.passages).toHaveLength(1);
-    expect(res.warnings.join()).toContain('이어지는 지문');
+    expect(said(res)).toContain('이어지는 지문');
   });
 
   it('바로 앞 쪽에서 끊긴 지문에만 붙인다 — 멀리 있는 글에 잘못 붙으면 두 글이 섞인다', () => {
@@ -288,11 +294,15 @@ describe('mergeOcrDrafts — 지문 합치기', () => {
     expect(res.passages[0].pageSpan).toBe(1);
   });
 
-  it('끝내 안 닫힌 지문이 있으면 알린다', () => {
+  it('끝내 안 닫힌 지문이 있으면 알린다 — 어느 지문인지까지 짚는다', () => {
     const res = mergeOcrDrafts([
       batch([passage({ continues: true })], [1]),
     ], { newId });
-    expect(res.warnings.join()).toContain('이어지는 지문');
+    expect(said(res)).toContain('이어지는 지문');
+    // 개수만 알려 주면 어느 지문인지 찾을 방법이 없다
+    expect(toWarningObject(res.warnings[0]).targets).toEqual([
+      { kind: 'passage', id: res.passages[0].id, page: 1, label: '1쪽 지문' },
+    ]);
   });
 
   it('문항이 뒤늦게 온전해진 지문에 연결된다', () => {
@@ -309,10 +319,66 @@ describe('mergeOcrDrafts — 지문 합치기', () => {
 describe('mergeOcrDrafts — 경고', () => {
   it('묶음 경고를 모으고 중복은 한 번만 남긴다', () => {
     const res = mergeOcrDrafts([
-      batch([problem()], [1], ['정답표가 안 보여요']),
-      batch([problem({ page: 2, number: 2 })], [2], ['정답표가 안 보여요']),
+      batch([problem()], [1], [{ message: '정답표가 안 보여요' }]),
+      batch([problem({ page: 2, number: 2 })], [2], [{ message: '정답표가 안 보여요' }]),
     ], { newId });
-    expect(res.warnings.filter((w) => w === '정답표가 안 보여요')).toHaveLength(1);
+    expect(res.warnings.filter((w) => warningText(w) === '정답표가 안 보여요')).toHaveLength(1);
+  });
+
+  it('메시지가 같아도 대상이 다르면 남긴다 — 문항마다 알려야 한다', () => {
+    const res = mergeOcrDrafts([
+      batch(
+        [problem({ ref: 'Q1', number: 1 }), problem({ ref: 'Q2', number: 2 })],
+        [1],
+        [
+          { message: '선지를 읽지 못했어요.', ref: 'Q1', kind: 'problem', page: 1, number: 1 },
+          { message: '선지를 읽지 못했어요.', ref: 'Q2', kind: 'problem', page: 1, number: 2 },
+        ],
+      ),
+    ], { newId });
+    expect(res.warnings).toHaveLength(2);
+    expect(said(res)).toContain('1번');
+    expect(said(res)).toContain('2번');
+  });
+
+  it('파서 경고의 ref 가 문항 id 로 풀린다 — 이게 없으면 어느 카드인지 알 수 없다', () => {
+    const res = mergeOcrDrafts([
+      batch([problem({ ref: 'Q3', page: 2, number: 7 })], [2], [
+        { message: '2번 선지를 읽지 못했어요.', ref: 'Q3', kind: 'problem', page: 2, number: 7 },
+      ]),
+    ], { newId });
+    expect(toWarningObject(res.warnings[0]).targets).toEqual([
+      { kind: 'problem', id: res.problems[0].id, page: 2, label: '7번' },
+    ]);
+  });
+
+  it('지문 ref 도 지문 id 로 푼다', () => {
+    const res = mergeOcrDrafts([
+      batch([passage({ ref: 'P1', page: 4 })], [4], [
+        { message: '작품명을 못 읽었어요.', ref: 'P1', kind: 'passage', page: 4 },
+      ]),
+    ], { newId });
+    expect(toWarningObject(res.warnings[0]).targets?.[0])
+      .toMatchObject({ kind: 'passage', id: res.passages[0].id, label: '4쪽 지문' });
+  });
+
+  it('겹쳐 읽어 이미 담은 문항의 ref 도 푼다 — 두 번째 묶음의 경고가 길을 잃으면 안 된다', () => {
+    const res = mergeOcrDrafts([
+      batch([problem({ ref: 'Q1', page: 3, number: 5 })], [1, 2, 3]),
+      batch([problem({ ref: 'Q9', page: 3, number: 5 })], [3, 4, 5], [
+        { message: '정답을 못 읽었어요.', ref: 'Q9', kind: 'problem', page: 3, number: 5 },
+      ]),
+    ], { newId });
+    expect(res.problems).toHaveLength(1);
+    expect(toWarningObject(res.warnings[0]).targets?.[0].id).toBe(res.problems[0].id);
+  });
+
+  it('버려진 항목의 경고는 쪽을 가리킨다 — 가리킬 카드가 없다', () => {
+    const res = mergeOcrDrafts([
+      batch([problem()], [1], [{ message: '같은 항목을 두 번 읽었어요.', page: 5 }]),
+    ], { newId });
+    expect(toWarningObject(res.warnings[0]).targets)
+      .toEqual([{ kind: 'page', page: 5, label: '5쪽' }]);
   });
 
   it('선행 경고(렌더 실패 등)를 앞에 붙인다', () => {
@@ -322,9 +388,10 @@ describe('mergeOcrDrafts — 경고', () => {
     expect(res.warnings[0]).toBe('2묶음을 읽지 못했어요');
   });
 
-  it('경고 개수에 상한이 있다', () => {
-    const many = Array.from({ length: 40 }, (_, i) => `경고${i}`);
+  it('경고 개수에 상한이 있다 — 항목마다 붙으므로 묶음 상한보다 넉넉하다', () => {
+    const many = Array.from({ length: 90 }, (_, i) => ({ message: `경고${i}` }));
     const res = mergeOcrDrafts([batch([problem()], [1], many)], { newId });
-    expect(res.warnings.length).toBeLessThanOrEqual(20);
+    expect(res.warnings.length).toBeLessThanOrEqual(60);
+    expect(res.warnings.length).toBeGreaterThan(20);
   });
 });

@@ -2,12 +2,10 @@
 
 import type { ReactNode } from 'react';
 import { sanitizeInlineHTML, sanitizeProblemHTML } from '@/lib/sanitize-problem';
+import { choiceGlyph } from '@/lib/problem-bank/choices';
 import type { PaperBlock } from '@/lib/problem-paper/blocks';
 import { stripTrailingEmptyParagraphs } from '@/lib/problem-paper/html-trim';
 import type { PaperItemSnapshot, PaperSettings } from '@/types/problem-bank';
-
-/** 선지 기호 — 인쇄에서 React 가 붙인다(본문에는 기호를 저장하지 않는다) */
-const CHOICE_GLYPHS = ['①', '②', '③', '④', '⑤'];
 
 /**
  * 인쇄 블록을 실제 React 노드로 그린다.
@@ -143,7 +141,7 @@ function ProblemBlock({ number, snapshot, settings, imageUrls }: ProblemBlockPro
         <div className="pb-q__choices">
           {snapshot.choices.map((choice, i) => (
             <span key={i} className="pb-q__choice">
-              <span className="pb-q__choice-glyph">{CHOICE_GLYPHS[i] ?? `(${i + 1})`}</span>
+              <span className="pb-q__choice-glyph">{choiceGlyph(i)}</span>
               <span dangerouslySetInnerHTML={{ __html: sanitizeInlineHTML(choice) }} />
             </span>
           ))}

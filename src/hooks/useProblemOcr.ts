@@ -7,6 +7,7 @@ import { aiErrorMessage } from '@/lib/ai/errors';
 import { isAiError } from '@/lib/ai/types';
 import { updateSource } from '@/lib/problem-bank/save';
 import { runProblemOcr, type OcrRunInput, type OcrRunProgress } from '@/lib/problem-ocr/run';
+import type { OcrWarning } from '@/lib/problem-ocr/warnings';
 
 /** 단계별 한글 이름 — 진행률 문구가 화면마다 달라지지 않게 한 곳에 둔다 */
 const PHASE_LABEL: Record<OcrRunProgress['phase'], string> = {
@@ -45,7 +46,7 @@ async function ocrStillEnabled(): Promise<boolean> {
 export function useProblemOcr() {
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<OcrRunProgress | null>(null);
-  const [warnings, setWarnings] = useState<string[]>([]);
+  const [warnings, setWarnings] = useState<OcrWarning[]>([]);
   const abortRef = useRef<AbortController | null>(null);
 
   // 화면이 사라지면 진행 중인 생성을 끊는다.

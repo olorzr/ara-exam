@@ -52,8 +52,20 @@ export function answerKeyTurnBudgetMs(pageCount: number): number {
 /** 한 묶음에서 받아들일 최대 항목 수 — 모델이 폭주해도 화면·DB 를 지킨다 */
 export const OCR_MAX_ITEMS_PER_BATCH = 60;
 
-/** 경고 표시 상한. 병합도 같은 상한을 써야 목록이 무한정 늘지 않는다 */
+/**
+ * 한 단계(모델 응답 하나·묶음 실행 하나)가 낼 수 있는 경고 수.
+ * JSON 스키마의 `maxItems` 이기도 하다 — 모델이 폭주해도 화면·DB 를 지킨다.
+ */
 export const OCR_MAX_WARNINGS = 20;
+
+/**
+ * 합쳐 둔 최종 경고 수의 상한.
+ *
+ * 단계별 상한(20)보다 큰 이유: 경고가 이제 **항목마다 따로** 붙는다(어느 문항 얘기인지
+ * 알려야 하므로 하나로 뭉칠 수 없다). 30문항 시험지에서 선지 빠짐이 여러 개면
+ * 20 에서 잘려 뒤쪽 문항의 문제가 통째로 안 보인다.
+ */
+export const OCR_MAX_MERGED_WARNINGS = 60;
 
 /**
  * 묶음이 이 개수를 넘으면 시작 전에 사람에게 확인받는다.

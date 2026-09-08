@@ -21,6 +21,8 @@ export interface ProblemFilters {
   area_path: string[];
   /** 교과서 단원 이름 경로 [대단원, 소단원] */
   unit_path: string[];
+  /** 작품명 (`problems.work_title`). 자유 텍스트라 '미지정만' 을 쓰지 않는다 */
+  work_title: string;
   search: string;
   verifiedOnly: boolean;
   page: number;
@@ -28,7 +30,7 @@ export interface ProblemFilters {
 
 export const EMPTY_FILTERS: ProblemFilters = {
   source_type: '', school_name: '', year: '', grade: '', semester: '', exam_type: '', textbook: '',
-  area_path: [], unit_path: [], search: '', verifiedOnly: false, page: 0,
+  area_path: [], unit_path: [], work_title: '', search: '', verifiedOnly: false, page: 0,
 };
 
 /** 영역 경로를 주소에 실을 때 쓰는 구분자 — 이름에 들어갈 일이 없는 글자 */
@@ -80,6 +82,7 @@ export function filtersToQueryString(filters: ProblemFilters): string {
   if (filters.textbook) params.set('book', filters.textbook);
   if (filters.area_path.length > 0) params.set('area', filters.area_path.join(AREA_SEPARATOR));
   if (filters.unit_path.length > 0) params.set('unit', filters.unit_path.join(AREA_SEPARATOR));
+  if (filters.work_title) params.set('work', filters.work_title);
   if (filters.search) params.set('q', filters.search);
   if (filters.verifiedOnly) params.set('verified', '1');
   if (filters.page > 0) params.set('page', String(filters.page + 1));
@@ -106,6 +109,7 @@ export function filtersFromParams(params: URLSearchParams): ProblemFilters {
     textbook: params.get('book') ?? '',
     area_path: area ? area.split(AREA_SEPARATOR).filter(Boolean) : [],
     unit_path: unit ? unit.split(AREA_SEPARATOR).filter(Boolean) : [],
+    work_title: params.get('work') ?? '',
     search: params.get('q') ?? '',
     verifiedOnly: params.get('verified') === '1',
     // 주소는 사람이 읽는 1-based, 내부는 0-based
@@ -130,6 +134,8 @@ export function toProblemQuery(filters: ProblemFilters): ProblemQuery {
     ...axisEntry('textbook', filters.textbook),
     ...(filters.area_path.length > 0 ? { area_path: filters.area_path } : {}),
     ...(filters.unit_path.length > 0 ? { unit_path: filters.unit_path } : {}),
+    // 작품명은 자유 텍스트다 — '미지정만' 을 허용하면 그런 이름의 작품과 겹친다
+    ...axisEntry('work_title', filters.work_title),
     ...(filters.search.trim() ? { search: filters.search.trim() } : {}),
     ...(filters.verifiedOnly ? { verifiedOnly: true } : {}),
     page: filters.page,
@@ -145,6 +151,6 @@ export function hasActiveFilters(filters: ProblemFilters): boolean {
   return Boolean(
     filters.source_type || filters.school_name || filters.year || filters.grade
     || filters.semester || filters.exam_type || filters.textbook || filters.area_path.length > 0
-    || filters.unit_path.length > 0 || filters.search || filters.verifiedOnly,
+    || filters.unit_path.length > 0 || filters.work_title || filters.search || filters.verifiedOnly,
   );
 }

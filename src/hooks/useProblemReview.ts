@@ -37,6 +37,14 @@ export function useProblemReview(sourceId: string) {
    */
   const [reloadSeq, setReloadSeq] = useState(0);
   /**
+   * 문항별 다시 마운트 세대.
+   *
+   * 지문 작품명을 바꾸면 **그 지문에 딸린 문항만** 서버에서 값이 바뀐다. 그런데
+   * `reloadSeq` 는 화면의 카드를 통째로 다시 마운트하므로, 상관없는 문항에서 고치던
+   * 내용까지 함께 사라진다. 바뀐 문항만 골라 세대를 올려 **피해를 그 문항들로 좁힌다**.
+   */
+  const [itemSeq, setItemSeq] = useState<Map<string, number>>(new Map());
+  /**
    * 화면 전체를 잠가야 하는 일이 도는 중인가(교과서 변경).
    * 끝나면 카드를 다시 마운트하므로, 그 사이 새로 친 내용은 어차피 사라진다 —
    * 아예 못 치게 걷어 내는 편이 정직하다.
@@ -107,20 +115,67 @@ export function useProblemReview(sourceId: string) {
     }
   }, [problems]);
 
+  /**
+   * 지문을 저장한다.
+   *
+   * ⚠️ **작품명을 바꾸면 딸린 문항까지 움직인다.** DB 트리거(`passages_sync_work_title`)가
+   *    같은 트랜잭션에서 그 문항들의 `work_title` 을 따라 바꾸고, 그 UPDATE 가
+   *    `updated_at` 트리거를 건드린다. 화면이 옛 버전을 들고 있으면 이후 그 문항의
+   *    저장·검수가 **아무도 안 고쳤는데 충돌로 튕긴다** — 지문 삭제(removePassage)와
+   *    똑같은 이유다. 그래서 문항을 다시 읽고 카드도 다시 마운트한다.
+   *
+   * ⚠️ 다시 마운트하는 것은 **그 지문에 딸린 문항뿐**이다(`itemSeq`). 화면 전체를
+   *    다시 마운트하면 상관없는 문항에서 고치던 내용까지 사라지고, `busy` 로 카드를
+   *    걷어 내면 **조회가 실패했을 때도** 입력이 날아간다(코덱스 리뷰 2R).
+   * ⚠️ 그리고 **딸린 문항의 행만** 새 값으로 갈아 끼운다. 조회해 온 목록을 통째로 덮으면
+   *    상관없는 카드가 **새 버전 토큰 + 옛 입력** 조합이 되어, 그 카드의 다음 저장이
+   *    동시성 검사를 통과하며 **남이 그 사이 고친 것을 조용히 덮어쓴다**(코덱스 리뷰 3R).
+   * ⚠️ 남은 한계: 조회가 도는 동안(한 왕복) 딸린 문항 카드를 계속 칠 수 있고, 그때 친
+   *    내용은 사라진다. 지문 삭제·교과서 변경과 같은 성질의 창이라 같은 수준으로 둔다.
+   * @param id - 지문 id
+   * @param patch - 바꿀 값
+   * @returns 저장에 성공했는가
+   */
   const savePassage = useCallback(async (id: string, patch: PassagePatch): Promise<boolean> => {
     const target = passages.find((p) => p.id === id);
     if (!target) return false;
+    const titleChanged = patch.title !== undefined && patch.title !== target.title;
     try {
       const updatedAt = await updatePassage(id, target.updated_at, patch);
       setPassages((list) => list.map((p) => (
         p.id === id ? { ...p, ...patch, updated_at: updatedAt } as Passage : p
       )));
+
+      if (titleChanged) {
+        // 트리거는 이 UPDATE 와 한 트랜잭션이라, 응답을 받은 시점에는 이미 반영돼 있다
+        let fresh: Problem[];
+        try {
+          fresh = await fetchProblemsOfSource(sourceId);
+        } catch {
+          // 작품명은 이미 저장됐고 딸린 문항의 버전도 서버에서 올라갔다. 화면만 못 따라온
+          // 상태라 그 문항의 다음 저장이 충돌로 튕긴다 — 무엇을 해야 하는지 정확히 알린다
+          toast.error('작품명은 저장했지만 딸린 문항을 다시 읽지 못했어요. 새로고침해 주세요.');
+          return true;
+        }
+
+        const byId = new Map(fresh.map((p) => [p.id, p]));
+        const affected = fresh.filter((p) => p.passage_id === id).map((p) => p.id);
+        // 딸린 문항만 갈아 끼운다(위 주석 참조)
+        setProblems((list) => list.map((p) => (
+          affected.includes(p.id) ? byId.get(p.id) ?? p : p
+        )));
+        setItemSeq((prev) => {
+          const next = new Map(prev);
+          for (const problemId of affected) next.set(problemId, (next.get(problemId) ?? 0) + 1);
+          return next;
+        });
+      }
       return true;
     } catch (e) {
       reportError(e);
       return false;
     }
-  }, [passages]);
+  }, [passages, sourceId]);
 
   /**
    * 검수 완료 표시를 켜고 끈다.
@@ -241,8 +296,19 @@ export function useProblemReview(sourceId: string) {
     [pageUrls, sourceId],
   );
 
+  /**
+   * 이 카드를 몇 번째로 마운트하는가 — 호출부가 `key` 에 섞는다.
+   * 전체 세대(`reloadSeq`)와 문항별 세대를 합친다.
+   * @param id - 문항·지문 id
+   * @returns 세대 문자열
+   */
+  const mountKey = useCallback(
+    (id: string) => `${reloadSeq}:${itemSeq.get(id) ?? 0}`,
+    [reloadSeq, itemSeq],
+  );
+
   return {
-    source, passages, problems, loading, busy, error, verifiedCount, reloadSeq,
+    source, passages, problems, loading, busy, error, verifiedCount, reloadSeq, mountKey,
     reload: load, saveProblem, savePassage, toggleVerified, changeTextbook,
     removeProblem, removePassage, pageUrlFor,
   };

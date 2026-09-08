@@ -1,6 +1,9 @@
 import { OCR_MAX_WARNINGS } from './constants';
 import type { AnswerKeyRow } from './schema';
 import type { ProblemDraft } from './merge';
+import {
+  capWarnings, itemTargetLabel, listSome, type OcrWarning, type OcrWarningTarget,
+} from './warnings';
 
 /**
  * 정답표에서 읽은 값을 문항에 붙인다 (순수 함수).
@@ -20,13 +23,27 @@ export interface ApplyAnswerKeyResult {
   filled: number;
   /** 정답표에는 있는데 붙일 문항을 못 찾은 번호 */
   unmatched: number[];
-  /** 이미 있던 값과 정답표가 다른 문항 — 덮어쓰지 않고 알리기만 한다 */
-  conflicts: { number: number; current: string; fromKey: string }[];
-  warnings: string[];
+  /**
+   * 이미 있던 값과 정답표가 다른 문항 — 덮어쓰지 않고 알리기만 한다.
+   * `page` 를 함께 담는다 — 없으면 검수 화면이 카드만 강조하고 **원본은 딴 쪽이 보인다**
+   * (대조가 검수의 핵심인데 정작 그 쪽을 못 편다 — 코덱스 리뷰 P2).
+   */
+  conflicts: { id: string; number: number; page: number; current: string; fromKey: string }[];
+  warnings: OcrWarning[];
 }
 
 /** 객관식 정답으로 인정하는 형태 */
 const CHOICE_ANSWER = /^[1-5]$/;
+
+/** 문항 초안을 경고 대상으로 */
+function problemTarget(problem: ProblemDraft): OcrWarningTarget {
+  return {
+    kind: 'problem',
+    id: problem.id,
+    page: problem.page_no,
+    label: itemTargetLabel({ kind: 'problem', page: problem.page_no, number: problem.number }),
+  };
+}
 
 /**
  * 정답표 값을 문항 목록에 반영한다. 목록은 **제자리에서** 수정된다.
@@ -63,9 +80,11 @@ export function applyAnswerKey(
     // 같은 번호가 여럿이면(문제집처럼 절마다 번호가 반복) 어느 것인지 알 수 없다.
     // 잘못 붙이는 것보다 안 붙이는 게 낫다.
     if (targets.length > 1) {
-      result.warnings.push(
-        `${row.no}번이 여러 곳에 있어 정답을 붙이지 않았어요. 검수에서 직접 넣어 주세요.`,
-      );
+      result.warnings.push({
+        message: `${row.no}번이 여러 곳에 있어 정답을 붙이지 않았어요. 검수에서 직접 넣어 주세요.`,
+        // 후보를 전부 짚는다 — 어느 것이 그 번호인지는 사람이 원본을 보고 정한다
+        targets: targets.map((t) => problemTarget(t)),
+      });
       continue;
     }
 
@@ -82,7 +101,13 @@ export function applyAnswerKey(
       }
       touched = true;
     } else if (target.answer !== row.answer) {
-      result.conflicts.push({ number: row.no, current: target.answer, fromKey: row.answer });
+      result.conflicts.push({
+        id: target.id,
+        number: row.no,
+        page: target.page_no,
+        current: target.answer,
+        fromKey: row.answer,
+      });
     }
 
     if (touched) result.filled += 1;
@@ -94,13 +119,24 @@ export function applyAnswerKey(
     );
   }
   if (result.conflicts.length > 0) {
-    result.warnings.push(
-      `이미 입력된 정답과 다른 문항이 있어요(덮어쓰지 않았어요): `
-      + `${listSome(result.conflicts.map((c) => c.number))}번`,
-    );
+    // 두 값을 함께 적는다 — 개수만 알려 주면 어느 쪽이 맞는지 원본을 다시 열어야 한다
+    const detail = result.conflicts
+      .slice(0, 8)
+      .map((c) => `${c.number}번(입력 ${c.current} · 정답표 ${c.fromKey})`)
+      .join(', ');
+    result.warnings.push({
+      message: '이미 입력된 정답과 다른 문항이 있어요(덮어쓰지 않았어요): '
+        + `${detail}${result.conflicts.length > 8 ? ` 외 ${result.conflicts.length - 8}개` : ''}`,
+      targets: result.conflicts.map((c) => ({
+        kind: 'problem' as const,
+        id: c.id,
+        page: c.page,
+        label: itemTargetLabel({ kind: 'problem', page: c.page, number: c.number }),
+      })),
+    });
   }
 
-  result.warnings = result.warnings.slice(0, OCR_MAX_WARNINGS);
+  result.warnings = capWarnings(result.warnings, OCR_MAX_WARNINGS);
   return result;
 }
 
@@ -121,9 +157,3 @@ export function maxProblemNumber(problems: readonly { number: number | null }[])
   return max;
 }
 
-/** 번호를 몇 개만 보여 준다 — 20개가 줄줄이 나오면 아무도 안 읽는다 */
-function listSome(numbers: number[], limit = 8): string {
-  const uniq = [...new Set(numbers)].sort((a, b) => a - b);
-  const head = uniq.slice(0, limit).join(', ');
-  return uniq.length > limit ? `${head} 외 ${uniq.length - limit}개` : head;
-}

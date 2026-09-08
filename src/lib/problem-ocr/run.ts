@@ -15,6 +15,8 @@ import { representativeFailure, runOcrBatches } from './batch-run';
 import { ocrTurnBudgetMs } from './constants';
 import { mergeOcrDrafts } from './merge';
 import type { MergeResult } from './merge';
+import { OCR_MAX_MERGED_WARNINGS } from './constants';
+import { capWarnings, dedupeWarnings, itemTargetLabel } from './warnings';
 import { parseOcrDraft } from './parse';
 import { buildProblemOcrPrompt, type OcrSourceMeta } from './prompt';
 import {
@@ -142,11 +144,17 @@ export async function runProblemOcr(
     //    자동으로 고를 수 없으니 검수에서 사람이 보게 드러낸다(코덱스 리뷰 20R).
     const splitFigures = merged.passages.filter((p) => p.has_figure && p.pageSpan > 1);
     if (splitFigures.length > 0) {
-      merged.warnings.push(
-        `그림·표가 있으면서 여러 쪽에 걸친 지문이 ${splitFigures.length}개 있어요`
-        + `(${splitFigures.map((p) => `${p.page_no}쪽`).slice(0, 5).join(', ')}). `
-        + '글만으로는 그림이 빠지고 이미지로 두면 뒷부분이 빠지니, 검수에서 직접 확인해 주세요.',
-      );
+      merged.warnings.push({
+        message: `그림·표가 있으면서 여러 쪽에 걸친 지문이 ${splitFigures.length}개 있어요`
+          + `(${splitFigures.map((p) => `${p.page_no}쪽`).slice(0, 5).join(', ')}). `
+          + '글만으로는 그림이 빠지고 이미지로 두면 뒷부분이 빠지니, 검수에서 직접 확인해 주세요.',
+        targets: splitFigures.map((p) => ({
+          kind: 'passage' as const,
+          id: p.id,
+          page: p.page_no,
+          label: itemTargetLabel({ kind: 'passage', page: p.page_no }),
+        })),
+      });
     }
 
     onProgress?.({ phase: 'save', done: 0, total: 1 });
@@ -155,6 +163,10 @@ export async function runProblemOcr(
     const markSaved = () => { savedAnything = true; };
     await insertPassages(input.sourceId, merged.passages, cropped.passageImages, markSaved);
     await insertProblems(input.sourceId, merged.problems, cropped.problemImages, markSaved);
+
+    // ⚠️ 병합 뒤에 붙은 경고들(정답표·크롭·그림 지문)은 각자 상한을 안 거쳤다 —
+    //    저장 직전에 한 번 정리한다. 안 그러면 ocr_meta 가 끝없이 커진다
+    merged.warnings = capWarnings(dedupeWarnings(merged.warnings), OCR_MAX_MERGED_WARNINGS);
 
     const meta: OcrMeta = {
       model: pref.model,
