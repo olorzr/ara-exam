@@ -44,6 +44,8 @@ export async function fetchSources(
     .from('problem_sources')
     .select('*', { count: 'exact' })
     .order('created_at', { ascending: false })
+    // 같은 이유로 안정적인 2차 정렬 키를 둔다(위 fetchProblemPage 주석 참조)
+    .order('id', { ascending: false })
     .range(from, from + SOURCE_PAGE_SIZE - 1);
   if (opts.status) query = query.eq('status', opts.status);
 
@@ -163,6 +165,10 @@ export async function fetchProblemPage(query: ProblemQuery): Promise<ProblemPage
     .from('problems')
     .select(`${PROBLEM_LIST_COLUMNS}, source:problem_sources!inner(*)`, { count: 'exact' })
     .order('created_at', { ascending: false })
+    // ⚠️ created_at 만으로 정렬하면 안 된다 — OCR 은 50건씩 한 트랜잭션으로 넣어서
+    //    한 묶음의 모든 행이 **같은 now()** 를 받는다. 동률이 페이지 경계에 걸리면
+    //    쪽을 넘길 때마다 어떤 문항은 두 번 나오고 어떤 문항은 영영 안 나온다(코덱스 리뷰 5R)
+    .order('id', { ascending: false })
     .range(from, from + PROBLEM_PAGE_SIZE - 1);
 
   // ⚠️ 임베드에 별칭(`source:`)을 주면 필터 경로도 **별칭**을 써야 한다.

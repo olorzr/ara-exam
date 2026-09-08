@@ -16,6 +16,23 @@ import type { Problem, QuestionType } from '@/types/problem-bank';
 
 const QUESTION_TYPES: QuestionType[] = ['객관식', '주관식', '서술형'];
 
+/** 국어는 5지선다다 — 입력 칸은 늘 다섯 개 */
+const CHOICE_SLOTS = 5;
+
+/**
+ * 선지 칸 하나를 고친 새 배열.
+ *
+ * ⚠️ `[...choices]` 에 뒤 자리를 바로 대입하면 **구멍이 뚫린 배열**이 된다.
+ *    다음 타이핑에서 그 구멍이 `undefined` 로 펼쳐져 저장할 때 터진다
+ *    (선지가 다섯 개보다 적거나 뒤 칸부터 채울 때 실제로 난다 — 코덱스 리뷰 5R).
+ *    항상 다섯 칸을 빈 문자열로 채워 두고 고친다.
+ */
+function withChoiceAt(choices: readonly string[], index: number, value: string): string[] {
+  const next = Array.from({ length: CHOICE_SLOTS }, (_, i) => choices[i] ?? '');
+  next[index] = value;
+  return next;
+}
+
 interface ProblemEditorCardProps {
   problem: Problem;
   areaTree: AreaTreeNode[];
@@ -141,11 +158,7 @@ export default function ProblemEditorCard({
                 <span className="w-5 text-sm text-gray-500">{glyph}</span>
                 <Input
                   value={choices[i] ?? ''}
-                  onChange={(e) => {
-                    const next = [...choices];
-                    next[i] = e.target.value;
-                    setChoices(next);
-                  }}
+                  onChange={(e) => setChoices(withChoiceAt(choices, i, e.target.value))}
                   className="h-8 text-sm"
                   aria-label={`${i + 1}번 선지`}
                 />
