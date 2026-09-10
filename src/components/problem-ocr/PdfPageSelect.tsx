@@ -73,6 +73,11 @@ export default function PdfPageSelect({
         </div>
       </div>
 
+      {/* 쪽 순서가 실제로 보이는 유일한 화면이라, 여기서 한 번 더 못 박는다 */}
+      <p className="text-xs text-gray-400">
+        썸네일 순서가 시험지 순서와 다르면 여기서는 고칠 수 없어요 — PDF 를 다시 만들어 올려 주세요
+      </p>
+
       <div className="flex flex-wrap gap-1 text-xs">
         <span className="text-gray-500 mr-1">보이는 쪽 전체를</span>
         {(Object.keys(ROLE_STYLE) as PageRole[]).map((role) => (

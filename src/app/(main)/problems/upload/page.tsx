@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAiEnabled } from '@/hooks/useAiEnabled';
@@ -174,6 +175,13 @@ export default function ProblemUploadPage() {
         <p className="mt-1 text-sm text-gray-500">
           학교 기출·모의고사·문제집 PDF 를 올리면 선생님 컴퓨터의 ChatGPT 가 읽어 문항으로 옮깁니다.
         </p>
+        <p className="mt-2 flex items-start gap-1.5 text-sm font-medium text-amber-700">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>
+            파일은 <strong>반드시 순서대로</strong> 올려 주세요. AI 는 순서를 바로잡지 않고
+            올라온 순서 그대로 읽습니다 — 쪽이 섞인 PDF 는 문항 번호가 어긋납니다.
+          </span>
+        </p>
       </div>
 
       {!ai.enabled && (
@@ -237,11 +245,16 @@ export default function ProblemUploadPage() {
         <Card>
           <CardHeader><CardTitle className="text-base">3. 읽기</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-gray-600">
-              문제 {problemPages.length}쪽 · 정답표 {answerPages.length}쪽
-              {answerKey && ` · ${answerKeySummary(answerKey)}`} ·{' '}
-              {batchCount}묶음 (ChatGPT 약 {batchCount + answerBatches}번)
-            </p>
+            <div className="space-y-1">
+              <p className="text-sm text-gray-600">
+                문제 {problemPages.length}쪽 · 정답표 {answerPages.length}쪽
+                {answerKey && ` · ${answerKeySummary(answerKey)}`} ·{' '}
+                {batchCount}묶음 (ChatGPT 약 {batchCount + answerBatches}번)
+              </p>
+              <p className="text-xs text-gray-400">
+                시작하면 이 순서 그대로 읽습니다 — 쪽 순서를 한 번만 확인해 주세요.
+              </p>
+            </div>
 
             <OcrProgress
               progress={ocr.progress}
