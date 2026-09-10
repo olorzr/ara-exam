@@ -45,7 +45,8 @@ export const FORBIDDEN_METHODS = [
  * app-server 실행 시 `--disable`로 꺼야 하는 기능들.
  * **실측 확인**: 이 목록을 적용하면 `mcpServer/startupStatus/updated` 알림이 사라진다
  * (적용 전에는 `codex_apps` MCP가 자동 기동됨).
- * 시작 스크립트(public/ara-ai/start-codex.cmd)와 반드시 동기화할 것.
+ * codex 를 실제로 띄우는 곳(ara-system `public/ara-ai/bridge.cjs` 의 buildCodexArgs)과
+ * 반드시 동기화할 것 — 윈도우 .cmd 도 맥 LaunchAgent 도 결국 그 파일을 실행한다.
  * → __tests__/lib/aiDisabledFeaturesSync.test.ts 가 두 목록을 대조해 어긋나면 실패시킨다.
  */
 export const DISABLED_FEATURES = [

@@ -7,7 +7,8 @@
 /** 설치 파일을 내려받는 곳 (ara-system 프로덕션) */
 export const ARA_AI_FILES_ORIGIN = 'https://www.araeducation.co.kr';
 
-/** 설치 파일 목록 — 세 개를 **같은 폴더**에 받아야 동작한다 */
+/** 설치 파일 목록 (**윈도우 전용**) — 세 개를 **같은 폴더**에 받아야 동작한다.
+ *  맥은 파일을 받지 않는다 — `macInstaller.ts` 의 터미널 명령 한 줄로 설치한다. */
 export const ARA_AI_FILES = [
   { name: 'install-autostart.cmd', desc: '이것만 두 번 눌러 설치합니다' },
   { name: 'start-codex.cmd', desc: '설치가 실행하는 시작 스크립트' },

@@ -5,15 +5,22 @@
 // 회귀가 조용히 통과한다. 문구 자체(JSX)는 컴포넌트가 그리고, **무엇을 그릴지는 여기서 정한다.**
 
 import type { LocalStatus } from './codex/localClient'
+import type { BrowserKind } from './setupOs'
 
 /** 연결 실패 시 보여줄 안내의 종류. */
-export type HintKind = 'login_required' | 'browser_blocked' | 'not_running'
+export type HintKind = 'login_required' | 'browser_blocked' | 'not_running' | 'browser_unsupported'
 
 type FailedStatus = Exclude<LocalStatus, { kind: 'connected' }>
 
-/** 카드 부제에 뜨는 한 줄 상태. */
-export function statusLabel(s: LocalStatus | null): string {
+/**
+ * 카드 부제에 뜨는 한 줄 상태.
+ *
+ * ⚠️ Safari 는 연결 자체가 불가능하므로(아래 hintKind 주석) 'ARA AI 실행 안 됨' 이라고
+ *   적으면 거짓말이 된다 — 브릿지는 이미 켜져 있는데 브라우저가 막은 것이다.
+ */
+export function statusLabel(s: LocalStatus | null, browser: BrowserKind = 'other'): string {
   if (!s) return '확인 중…'
+  if (s.kind !== 'connected' && browser === 'safari') return 'Safari에서는 쓸 수 없음'
   if (s.kind === 'not_running') {
     return s.reason === 'browser_blocked' ? '브라우저가 연결을 막음' : 'Codex 실행 안 됨'
   }
@@ -32,13 +39,17 @@ export function statusLabel(s: LocalStatus | null): string {
  *   한 번도 물어본 적 없는 origin의 기본 상태가 'prompt'라, codex가 그냥 꺼져 있는
  *   압도적 다수의 경우도 'prompt'로 나오기 때문이다.
  */
-export function hintKind(s: FailedStatus): HintKind {
+export function hintKind(s: FailedStatus, browser: BrowserKind = 'other'): HintKind {
+  // Safari 가 가장 먼저다 — 로그인도 브릿지 실행도 이 문제를 풀지 못한다.
+  // WebKit 은 https 문서의 ws://127.0.0.1 을 mixed content 로 동기 차단한다(setupOs.ts 참조).
+  if (browser === 'safari') return 'browser_unsupported'
   if (s.kind === 'not_logged_in') return 'login_required'
   if (s.reason === 'browser_blocked') return 'browser_blocked'
   return 'not_running'
 }
 
 /** 기존 "Codex 실행 안 됨" 안내에 권한 프롬프트 보조 설명을 덧붙일지. */
-export function showsPromptNote(s: FailedStatus): boolean {
+export function showsPromptNote(s: FailedStatus, browser: BrowserKind = 'other'): boolean {
+  if (browser === 'safari') return false
   return s.kind === 'not_running' && s.reason === 'browser_prompt'
 }

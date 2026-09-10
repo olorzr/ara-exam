@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { readLocalStatus, readLocalUsage, type LocalStatus, type UsageInfo } from '@/lib/ai/codex/localClient';
 import { DEFAULT_CODEX_PORT, getCodexPort, isValidPort, setCodexPort } from '@/lib/ai/localPort';
 import { hintKind, showsPromptNote, statusLabel } from '@/lib/ai/connectionStatusText';
+import { detectBrowser, detectSetupOs } from '@/lib/ai/setupOs';
 import ConnectionHint from './ConnectionHint';
 import AiModelSelect from './AiModelSelect';
 
@@ -22,6 +23,9 @@ import AiModelSelect from './AiModelSelect';
  * 미실행(프로그램 켜기) / 미로그인(codex login) / 연결됨(바로 사용).
  */
 export default function AiConnectionCard() {
+  // 안내 문구가 갈리는 축. lazy 초기화 — 효과에서 setState 하면 lint 가 막는다.
+  // (윈도우/맥 전환은 아래 '처음 설치하기' 안내에 있다. 여기 감지는 문구용 기본값일 뿐)
+  const [env] = useState(() => ({ os: detectSetupOs(), browser: detectBrowser() }));
   const [port, setPort] = useState(DEFAULT_CODEX_PORT);
   const [portInput, setPortInput] = useState(String(DEFAULT_CODEX_PORT));
   const [status, setStatus] = useState<LocalStatus | null>(null);
@@ -82,7 +86,7 @@ export default function AiConnectionCard() {
       >
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="font-semibold text-gray-900">{statusLabel(status)}</p>
+            <p className="font-semibold text-gray-900">{statusLabel(status, env.browser)}</p>
             {connected && status.email && (
               <p className="mt-0.5 text-sm text-gray-600">{status.email}</p>
             )}
@@ -98,7 +102,11 @@ export default function AiConnectionCard() {
       </div>
 
       {status && !connected && (
-        <ConnectionHint kind={hintKind(status)} showPromptNote={showsPromptNote(status)} />
+        <ConnectionHint
+          kind={hintKind(status, env.browser)}
+          showPromptNote={showsPromptNote(status, env.browser)}
+          os={env.os}
+        />
       )}
 
       {connected && <AiModelSelect port={port} />}
@@ -118,9 +126,11 @@ export default function AiConnectionCard() {
           </Button>
         </div>
         <p className="text-xs text-gray-500">
-          기본값은 {DEFAULT_CODEX_PORT} 입니다. 바꿨다면 start-codex.cmd 안의{' '}
-          <code className="rounded bg-gray-100 px-1 py-0.5">set &quot;CODEX_PORT=...&quot;</code> 도 같은
-          번호로 맞춰 주세요.
+          기본값은 {DEFAULT_CODEX_PORT} 입니다. 바꿨다면 브릿지도 같은 번호로 맞춰야 합니다 —
+          윈도우는 <code className="rounded bg-gray-100 px-1 py-0.5">start-codex.cmd</code> 안의{' '}
+          <code className="rounded bg-gray-100 px-1 py-0.5">set &quot;CODEX_PORT=...&quot;</code> 를 고치고,
+          맥은 <strong>처음 설치하기 → 맥</strong>의 설치 명령을 다시 실행하세요.
+          (바꾼 뒤 새로고침하면 안내에도 반영됩니다)
         </p>
       </div>
     </div>

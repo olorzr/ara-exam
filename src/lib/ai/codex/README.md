@@ -135,7 +135,19 @@ Origin 없는 도구(Node/curl)로 한 것이었고, 브라우저는 아니었�
 - 첫 HTTP Upgrade 요청에서 **`Origin:` 한 줄만 제거**(`stripOriginHeader`), 이후 양방향 raw TCP splice.
   `Sec-WebSocket-Key`는 바이트 보존 → codex의 101 accept가 브라우저 검증을 통과.
 - 기동 시 `selfTestHandshake`로 codex에 Origin 없는 핸드셰이크를 쏴 101을 확인
-  (`handshake self-test: OK`) — 맥엔 codex가 없어 e2e를 못 하므로 이게 선생님 PC의 게이트.
+  (`handshake self-test: OK`) — 선생님 PC에서 실제로 붙는지 확인하는 게이트다.
+  맥은 LaunchAgent로 배경에서 도는 탓에 이 줄을 화면으로 볼 수 없으니 `~/.ara-ai/ara-ai.log`에서 읽는다.
+
+### ⚠️ Safari 는 아예 못 붙는다 (2026-09-10 실측)
+
+**WebKit 은 https 문서의 `ws://127.0.0.1` 을 mixed content 로 동기 차단한다.** 권한도, 설정도,
+브릿지를 켜는 것도 이 문제를 풀지 못한다 — 맥 선생님은 **Chrome 을 써야 한다.**
+
+근거: 같은 https 문서에서 `wss://127.0.0.1:8899` 는 차단 지점을 통과해 TLS 까지 갔고(브릿지가
+평문이라 거기서 멈춤), `ws://` 는 0ms 만에 onerror 였다. 같은 주소가 http 문서에서는 열린다.
+
+⚠️ 아래의 "127.0.0.1 은 potentially trustworthy 라 https 에서도 ws:// 가 차단되지 않는다" 는
+**Chromium 기준**이다. 화면 분기는 `src/lib/ai/setupOs.ts` 의 `detectBrowser` 가 한다.
 
 ### 브라우저 게이트 (Local Network Access) — 부차적
 

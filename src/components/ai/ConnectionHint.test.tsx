@@ -1,0 +1,77 @@
+import { describe, expect, it } from 'vitest';
+import { renderToStaticMarkup } from 'react-dom/server';
+import ConnectionHint from './ConnectionHint';
+import type { HintKind } from '@/lib/ai/connectionStatusText';
+import type { SetupOs } from '@/lib/ai/setupOs';
+
+// 실제 렌더 결과를 본다 — 순수 함수만 검증하면 컴포넌트가 그 결과를 무시하거나
+// 잘못 매핑해도 테스트가 통과한다.
+function render(kind: HintKind, os: SetupOs = 'windows', showPromptNote = false) {
+  return renderToStaticMarkup(<ConnectionHint kind={kind} os={os} showPromptNote={showPromptNote} />);
+}
+
+const NOT_RUNNING = 'ARA AI 가 실행되어 있지 않아요';
+const SAFARI = 'Safari에서는 쓸 수 없어요';
+
+describe('ConnectionHint — 원인마다 맞는 조치를 보여준다', () => {
+  it('로그인이 안 됐으면 codex login 안내', () => {
+    const html = render('login_required');
+    expect(html).toContain('codex login');
+    expect(html).toContain('명령 프롬프트');
+  });
+
+  it('브라우저가 막았으면 권한 복구 안내', () => {
+    const html = render('browser_blocked');
+    expect(html).toContain('로컬 네트워크');
+    expect(html).not.toContain(NOT_RUNNING);
+  });
+
+  it('윈도우는 바탕화면 아이콘을 누르라고 한다', () => {
+    const html = render('not_running', 'windows');
+    expect(html).toContain('바탕화면');
+    expect(html).toContain('다시 내려받아야');
+  });
+});
+
+// 맥은 프로그램을 더블클릭하지 않는다 — LaunchAgent 가 로그인할 때 배경에서 띄운다.
+describe('맥 — 윈도우와 조치가 다르다', () => {
+  it('실행 안 됨: 바탕화면 아이콘 대신 자동 시작을 설명한다', () => {
+    // 프로그램 이름(ARA AI)은 맥에서도 그대로다 — 없어야 하는 건 찾을 수 없는 물건이다.
+    const html = render('not_running', 'mac');
+    expect(html).not.toContain('바탕화면');
+    expect(html).not.toContain('두 번 눌러');
+    expect(html).toContain('배경에서 저절로 켜집니다');
+    // 맥은 파일을 받지 않으므로 '다시 내려받기' 가 아니라 '명령 재실행' 이다.
+    expect(html).not.toContain('다시 내려받아야');
+    expect(html).toContain('설치 명령을 다시 실행하면');
+  });
+
+  it('로그인 필요: 명령 프롬프트가 아니라 터미널이다', () => {
+    const html = render('login_required', 'mac');
+    expect(html).toContain('codex login');
+    expect(html).toContain('터미널');
+    expect(html).not.toContain('명령 프롬프트');
+  });
+
+  it('브라우저 차단 안내는 OS 와 무관하게 같다', () => {
+    expect(render('browser_blocked', 'mac')).toBe(render('browser_blocked', 'windows'));
+  });
+});
+
+// Safari 는 https 문서에서 ws://127.0.0.1 을 mixed content 로 막는다(2026-09-10 실측).
+describe('Safari — 무엇을 해도 안 되므로 단독 안내', () => {
+  it('Chrome 으로 바꾸라고만 말한다', () => {
+    const html = render('browser_unsupported', 'mac');
+    expect(html).toContain(SAFARI);
+    expect(html).toContain('Chrome');
+    // 켜라거나 로그인하라거나 권한을 바꾸라는 말이 함께 나오면 헤맨다.
+    expect(html).not.toContain(NOT_RUNNING);
+    expect(html).not.toContain('codex login');
+    expect(html).not.toContain('로컬 네트워크');
+  });
+
+  it('설치를 다시 하라고 하지 않는다', () => {
+    // 설치는 멀쩡하다 — 브라우저만 바꾸면 된다.
+    expect(render('browser_unsupported', 'mac')).toContain('설치는 다시 하지 않아도 됩니다');
+  });
+});

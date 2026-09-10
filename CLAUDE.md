@@ -231,6 +231,11 @@
   - **`passages`·`problems` 의 INSERT 는 감사하지 않는다.** OCR 한 번이 수백 행이라 본문 HTML 째로 `audit_log` 에 복사하면 표가 폭발한다. "언제 누가 무엇을 읽었나"는 `problem_sources.ocr_meta` + 그 행의 UPDATE 감사로 남는다. 사람이 하는 수정·삭제는 전부 감사한다
   - **`UNIQUE(source_id, number)` 를 두지 않았다.** 문제집·프린트는 절마다 번호가 1부터 다시 시작하고, PostgREST 일괄 INSERT 는 원자적이라 중복 하나에 OCR 결과 전체가 실패한다. 중복 정리는 클라이언트 병합이 맡는다
   - Storage 버킷 `exam-problem-bank`(비공개). **UPDATE 정책을 일부러 만들지 않았다** — 있으면 클라이언트가 `upsert:true` 로 되돌아가도 통과해 버리는데, 그 조합은 ara-system `exam-papers` 버킷을 1년 가까이 조용히 죽여 놨던 형태다. 바꿔 올릴 땐 지우고 새로 올린다(`replaceProblemFile`)
+- [2026-09-10] **맥 지원 — 설치는 터미널 한 줄, 실행은 LaunchAgent**. 되돌리지 말아야 할 판단들:
+  - **Safari 로는 못 쓴다.** WebKit 은 https 문서의 `ws://127.0.0.1` 을 mixed content 로 **동기 차단**한다(실측: 프로덕션 페이지에서 0ms onerror, 같은 문서의 `wss://` 는 차단 지점을 통과, 같은 주소가 http 문서에서는 열림). 127.0.0.1 을 예외로 두는 것은 **Chromium 뿐**이라, [codex/README.md](src/lib/ai/codex/README.md)·[localNetworkAccess.ts](src/lib/ai/localNetworkAccess.ts) 의 "mixed content 가 아니다" 주석은 Chrome 기준으로 읽어야 한다. 권한도 브릿지 실행도 이걸 풀지 못하므로 `hintKind` 가 **다른 어떤 판정보다 먼저** `browser_unsupported` 를 낸다 — 순서를 내리면 이미 브릿지를 켠 선생님에게 "브릿지를 켜세요" 가 나가 원인을 영영 못 찾는다
+  - **설치 스크립트(`install-mac.sh`)도 ara-system 이 호스팅한다.** 브릿지와 같은 이유다 — 선생님 PC 에 한 벌만 깔리고, 여기서 다시 배포하면 포트 8899 를 두고 프로세스가 다툰다. 이 앱은 [macInstaller.ts](src/lib/ai/macInstaller.ts) 로 **명령 문자열만** 만든다
+  - **OS 자동 감지는 어느 탭을 먼저 펼칠지만 정한다** — 탭을 없애지 말 것. 선생님이 다른 선생님 컴퓨터에 깔아 주려고 이 화면을 여는 경우가 실제로 있다
+  - 맥 안내에서 **'다시 내려받기'·'바탕화면 아이콘' 어휘를 쓰지 말 것**. 맥은 받는 파일이 없고 배경에서 도는지라 찾을 수 없는 물건을 찾게 만든다. [ConnectionHint.test.tsx](src/components/ai/ConnectionHint.test.tsx) 가 고정한다
 - [2026-09-08] **AI 는 서버가 아니라 선생님 PC 에서 돈다**(ara-system 의 코덱스 브릿지를 이식). 학원 서버는 `AI_OCR_BETA` 플래그만 판정하고 `/api/ai/status` 로 알려 줄 뿐 AI 를 호출하지 않는다 — 그래서 토큰 비용이 0 이고 `auth.json` 이 선생님 PC 를 벗어나지 않는다. 대신 **컴퓨터마다 설치가 필요**하고 브릿지가 안 떠 있으면 못 쓴다. 자세한 프로토콜 함정은 [src/lib/ai/codex/README.md](src/lib/ai/codex/README.md)
   - **브릿지는 두 앱이 한 벌을 공유한다.** 원본은 ara-system `public/ara-ai/bridge.cjs` 이고 거기 `ALLOWED_ORIGINS` 에 이 앱 주소가 들어 있어야 한다(v2 부터). 여기서 파일을 다시 호스팅하면 포트 8899 를 두고 프로세스 둘이 다툰다
 - [2026-03-09] 포인트 컬러 `#81D8D0`을 CSS 변수 `--primary`로 통합 → Tailwind `text-primary`, `bg-primary` 등으로 일관되게 사용
