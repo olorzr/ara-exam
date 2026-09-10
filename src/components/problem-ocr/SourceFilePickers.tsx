@@ -23,6 +23,11 @@ interface SourceFilePickersProps {
  *
  * 답지는 **따로 오는 일이 흔하다** — 별지 PDF 로 받거나 휴대폰으로 찍어 온다.
  * 같은 PDF 안에 붙어 있으면 여기 말고 아래 쪽 선택에서 '정답표' 로 지정하면 된다.
+ *
+ * ⚠️ **순서는 앱이 고쳐 주지 않는다.** OCR 은 올라온 순서를 그대로 믿는다 —
+ *    진짜 순서는 쪽 내용을 읽어야 알 수 있고 그건 그 자체로 또 한 번의 OCR(토큰)이다.
+ *    파일명 정렬도 답이 아니다(카톡으로 받은 사진·스캐너 기본 이름에는 순서가 안 담겨 있고,
+ *    선생님이 일부러 정한 순서를 뒤집는다). 그래서 정렬 대신 **안내로 못 박는다**.
  */
 export default function SourceFilePickers({
   file, onFile, answerKey, onAnswerKey, onPending, disabled,
@@ -104,6 +109,10 @@ export default function SourceFilePickers({
       >
         <Upload className="h-8 w-8" />
         <span className="text-sm">{file ? file.name : 'PDF 파일을 고르세요'}</span>
+        {/* 순서 경고는 부가 설명이 아니다 — 회색으로 두면 안 읽힌다 */}
+        <span className="text-xs font-medium text-amber-700">
+          쪽 순서가 시험지와 같은 PDF 만 올려 주세요 — 섞여 있으면 섞인 그대로 읽습니다
+        </span>
       </button>
       <input
         ref={fileInputRef}
@@ -124,6 +133,9 @@ export default function SourceFilePickers({
           <span className="text-sm">
             {answerKey ? answerKeySummary(answerKey) : '답지 (선택) — PDF 하나 또는 사진 여러 장'}
           </span>
+          <span className="text-xs font-medium text-amber-700">
+            사진은 반드시 앞장부터 순서대로 고르세요 — 고른 순서가 곧 문항 번호입니다
+          </span>
           <span className="text-xs text-gray-400">
             같은 PDF 안에 붙어 있으면 아래에서 그 쪽을 &lsquo;정답표&rsquo;로 지정하세요
           </span>
@@ -139,7 +151,11 @@ export default function SourceFilePickers({
 
         {answerKey && (
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-xs text-gray-500">
-            <span className="truncate">{answerNames.join(', ')}</span>
+            {answerNames.map((name, i) => (
+              <span key={`${i}-${name}`} className="break-all">
+                {answerKey.kind === 'images' ? `${i + 1}. ${name}` : name}
+              </span>
+            ))}
             <button
               type="button"
               className="text-primary underline underline-offset-2"
