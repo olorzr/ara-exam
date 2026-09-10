@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAiEnabled } from '@/hooks/useAiEnabled';
+import { getCodexPort } from '@/lib/ai/localPort';
 import AiConnectionCard from '@/components/ai/AiConnectionCard';
 import AiSetupGuide from '@/components/ai/AiSetupGuide';
 
@@ -13,6 +15,10 @@ import AiSetupGuide from '@/components/ai/AiSetupGuide';
  */
 export default function AiSettingsPage() {
   const ai = useAiEnabled();
+  // 연결 포트의 **단일 출처**. 두 카드가 한 화면에 있어, 여기서 들고 있지 않으면
+  // 포트를 바꾼 직후 바로 아래 설치 명령이 옛 번호로 남는다(그대로 실행하면 연결이 안 된다).
+  // lazy 초기화 — 효과에서 setState 하면 `react-hooks/set-state-in-effect` 에 걸린다.
+  const [port, setPort] = useState(() => getCodexPort());
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -37,7 +43,7 @@ export default function AiSettingsPage() {
               <CardTitle className="text-base">연결 상태</CardTitle>
             </CardHeader>
             <CardContent>
-              <AiConnectionCard />
+              <AiConnectionCard port={port} onPortChange={setPort} />
             </CardContent>
           </Card>
 
@@ -46,7 +52,7 @@ export default function AiSettingsPage() {
               <CardTitle className="text-base">처음 설치하기</CardTitle>
             </CardHeader>
             <CardContent>
-              <AiSetupGuide />
+              <AiSetupGuide port={port} />
             </CardContent>
           </Card>
         </>

@@ -7,11 +7,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { readLocalStatus, readLocalUsage, type LocalStatus, type UsageInfo } from '@/lib/ai/codex/localClient';
-import { DEFAULT_CODEX_PORT, getCodexPort, isValidPort, setCodexPort } from '@/lib/ai/localPort';
+import { DEFAULT_CODEX_PORT, isValidPort, setCodexPort } from '@/lib/ai/localPort';
 import { hintKind, showsPromptNote, statusLabel } from '@/lib/ai/connectionStatusText';
 import { detectBrowser, detectSetupOs } from '@/lib/ai/setupOs';
 import ConnectionHint from './ConnectionHint';
 import AiModelSelect from './AiModelSelect';
+
+interface AiConnectionCardProps {
+  /** 연결 포트 (페이지가 들고 있는 값) */
+  port: number;
+  /** 저장 버튼을 눌렀을 때 페이지에 알린다 */
+  onPortChange: (port: number) => void;
+}
 
 /**
  * 개인 ChatGPT 연결 상태 카드.
@@ -21,13 +28,17 @@ import AiModelSelect from './AiModelSelect';
  *
  * 상태를 셋으로 나누는 이유는 선생님이 할 일이 각각 다르기 때문이다:
  * 미실행(프로그램 켜기) / 미로그인(codex login) / 연결됨(바로 사용).
+ *
+ * ⚠️ 포트는 **페이지가 들고 있다**. 같은 화면의 설치 안내가 같은 번호를 써야 하기 때문이다 —
+ *   여기서만 갖고 있으면 포트를 바꾼 직후 맥 설치 명령이 옛 번호로 남아, 그대로 실행하면
+ *   브릿지가 옛 포트로 뜬다.
  */
-export default function AiConnectionCard() {
+export default function AiConnectionCard({ port, onPortChange }: AiConnectionCardProps) {
   // 안내 문구가 갈리는 축. lazy 초기화 — 효과에서 setState 하면 lint 가 막는다.
   // (윈도우/맥 전환은 아래 '처음 설치하기' 안내에 있다. 여기 감지는 문구용 기본값일 뿐)
   const [env] = useState(() => ({ os: detectSetupOs(), browser: detectBrowser() }));
-  const [port, setPort] = useState(DEFAULT_CODEX_PORT);
-  const [portInput, setPortInput] = useState(String(DEFAULT_CODEX_PORT));
+  // 입력 중인 문자열만 여기 둔다. 저장된 값은 페이지가 갖는다.
+  const [portInput, setPortInput] = useState(() => String(port));
   const [status, setStatus] = useState<LocalStatus | null>(null);
   const [usage, setUsage] = useState<UsageInfo | null>(null);
   const [checking, setChecking] = useState(false);
@@ -35,9 +46,6 @@ export default function AiConnectionCard() {
 
   useEffect(() => {
     aliveRef.current = true;
-    const saved = getCodexPort();
-    setPort(saved);
-    setPortInput(String(saved));
     return () => {
       aliveRef.current = false;
     };
@@ -71,7 +79,7 @@ export default function AiConnectionCard() {
       return;
     }
     setCodexPort(n);
-    setPort(n);
+    onPortChange(n);
     toast.success('포트를 저장했어요.');
   };
 
@@ -129,8 +137,8 @@ export default function AiConnectionCard() {
           기본값은 {DEFAULT_CODEX_PORT} 입니다. 바꿨다면 브릿지도 같은 번호로 맞춰야 합니다 —
           윈도우는 <code className="rounded bg-gray-100 px-1 py-0.5">start-codex.cmd</code> 안의{' '}
           <code className="rounded bg-gray-100 px-1 py-0.5">set &quot;CODEX_PORT=...&quot;</code> 를 고치고,
-          맥은 <strong>처음 설치하기 → 맥</strong>의 설치 명령을 다시 실행하세요.
-          (바꾼 뒤 새로고침하면 안내에도 반영됩니다)
+          맥은 <strong>처음 설치하기 → 맥</strong>의 설치 명령을 다시 실행하세요
+          (저장하면 아래 안내의 명령에도 바로 반영됩니다).
         </p>
       </div>
     </div>

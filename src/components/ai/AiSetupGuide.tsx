@@ -2,10 +2,14 @@
 
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { getCodexPort } from '@/lib/ai/localPort';
 import { detectSetupOs } from '@/lib/ai/setupOs';
 import AiSetupStepsMac from './AiSetupStepsMac';
 import AiSetupStepsWindows from './AiSetupStepsWindows';
+
+interface AiSetupGuideProps {
+  /** 연결 포트. **페이지가 들고 있는 값**이라 카드에서 바꾸면 설치 명령도 함께 바뀐다 */
+  port: number;
+}
 
 /**
  * 처음 설치하는 선생님을 위한 안내. 윈도우·맥 두 갈래다.
@@ -13,12 +17,11 @@ import AiSetupStepsWindows from './AiSetupStepsWindows';
  * ⚠️ OS 자동 감지는 **어느 탭을 먼저 펼칠지만** 정한다 — 탭을 없애지 말 것.
  *   선생님이 다른 선생님 컴퓨터에 깔아 주려고 이 화면을 여는 경우가 실제로 있다.
  *
- * 포트는 마운트할 때 한 번 읽는다(연결 카드에서 바꾸면 새로고침이 필요하다).
- * 효과에서 setState 하면 `react-hooks/set-state-in-effect` 에 걸리므로 lazy 초기화를 쓴다.
+ * ⚠️ 포트를 여기서 읽지 말 것. 같은 화면의 연결 카드에서 방금 바꾼 번호가 반영되지 않아,
+ *   맥 설치 명령을 그대로 복사하면 브릿지가 옛 포트로 뜬다.
  */
-export default function AiSetupGuide() {
+export default function AiSetupGuide({ port }: AiSetupGuideProps) {
   const [os] = useState(() => detectSetupOs());
-  const [port] = useState(() => getCodexPort());
 
   return (
     <div className="space-y-4 text-sm text-gray-700">
