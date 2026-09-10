@@ -8,17 +8,31 @@ import { DEFAULT_CODEX_PORT } from '@/lib/ai/localPort';
 const render = (port: number) => renderToStaticMarkup(<AiSetupStepsMac port={port} />);
 
 describe('맥 설치 안내', () => {
-  it('터미널 한 줄로 설치한다', () => {
+  it('터미널 한 줄로 끝난다', () => {
     const html = render(DEFAULT_CODEX_PORT);
     expect(html).toContain('curl -fsSL https://www.araeducation.co.kr/ara-ai/install-mac.sh | bash');
-    expect(html).toContain('sudo npm install -g @openai/codex');
-    expect(html).toContain('codex login');
+  });
+
+  it('선생님이 붙여넣는 명령은 설치용 하나뿐이다', () => {
+    // 붙여넣기 횟수가 곧 실패 지점이다 — npm 설치·codex login 을 다시 꺼내지 말 것.
+    const html = render(DEFAULT_CODEX_PORT);
+    expect(html).not.toContain('npm install');
+    expect(html).not.toContain('codex login');
+    expect(html).not.toContain('sudo');
+  });
+
+  it('중간에 ChatGPT 로그인 창이 뜬다고 미리 알린다', () => {
+    // 예고 없이 브라우저가 열리면 선생님이 무엇을 하는 창인지 모른다.
+    const html = render(DEFAULT_CODEX_PORT);
+    expect(html).toContain('ChatGPT 로그인 창');
+    expect(html).toContain('OpenAI 공식 화면');
   });
 
   it('윈도우 어휘가 섞이지 않는다', () => {
     // 맥에는 시작 버튼도, 바탕화면 아이콘도, .cmd 파일도 없다.
     const html = render(DEFAULT_CODEX_PORT);
-    for (const word of ['명령 프롬프트', '바탕화면', '.cmd', '더블클릭', '내려받고']) {
+    // ('더블클릭' 은 Node.js 설치 프로그램에 한해 맥에서도 맞는 말이라 뺀다)
+    for (const word of ['명령 프롬프트', '바탕화면', '.cmd', '내려받고']) {
       expect(html, `맥 안내에 "${word}" 가 있다`).not.toContain(word);
     }
     expect(html).toContain('터미널');

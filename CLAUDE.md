@@ -233,6 +233,7 @@
   - Storage 버킷 `exam-problem-bank`(비공개). **UPDATE 정책을 일부러 만들지 않았다** — 있으면 클라이언트가 `upsert:true` 로 되돌아가도 통과해 버리는데, 그 조합은 ara-system `exam-papers` 버킷을 1년 가까이 조용히 죽여 놨던 형태다. 바꿔 올릴 땐 지우고 새로 올린다(`replaceProblemFile`)
 - [2026-09-10] **맥 지원 — 설치는 터미널 한 줄, 실행은 LaunchAgent**. 되돌리지 말아야 할 판단들:
   - **Safari 로는 못 쓴다.** WebKit 은 https 문서의 `ws://127.0.0.1` 을 mixed content 로 **동기 차단**한다(실측: 프로덕션 페이지에서 0ms onerror, 같은 문서의 `wss://` 는 차단 지점을 통과, 같은 주소가 http 문서에서는 열림). 127.0.0.1 을 예외로 두는 것은 **Chromium 뿐**이라, [codex/README.md](src/lib/ai/codex/README.md)·[localNetworkAccess.ts](src/lib/ai/localNetworkAccess.ts) 의 "mixed content 가 아니다" 주석은 Chrome 기준으로 읽어야 한다. 권한도 브릿지 실행도 이걸 풀지 못하므로 `hintKind` 가 **다른 어떤 판정보다 먼저** `browser_unsupported` 를 낸다 — 순서를 내리면 이미 브릿지를 켠 선생님에게 "브릿지를 켜세요" 가 나가 원인을 영영 못 찾는다
+  - **선생님이 터미널에 붙여넣는 것은 한 줄뿐이다.** 그 스크립트가 codex 설치(`npm install -g --prefix ~/.ara-ai/npm` — 전역은 root 소유라 sudo 가 필요해서 홈에 깐다)와 `codex login` 까지 한다. ⚠️ 그래서 **맥에는 `codex login` 을 치라고 안내하면 안 된다** — 선생님 셸 PATH 에 `codex` 가 없어 command not found 다. 맥의 복구 경로는 언제나 **설치 명령 재실행**이다
   - **설치 스크립트(`install-mac.sh`)도 ara-system 이 호스팅한다.** 브릿지와 같은 이유다 — 선생님 PC 에 한 벌만 깔리고, 여기서 다시 배포하면 포트 8899 를 두고 프로세스가 다툰다. 이 앱은 [macInstaller.ts](src/lib/ai/macInstaller.ts) 로 **명령 문자열만** 만든다
   - **OS 자동 감지는 어느 탭을 먼저 펼칠지만 정한다** — 탭을 없애지 말 것. 선생님이 다른 선생님 컴퓨터에 깔아 주려고 이 화면을 여는 경우가 실제로 있다
   - 맥 안내에서 **'다시 내려받기'·'바탕화면 아이콘' 어휘를 쓰지 말 것**. 맥은 받는 파일이 없고 배경에서 도는지라 찾을 수 없는 물건을 찾게 만든다. [ConnectionHint.test.tsx](src/components/ai/ConnectionHint.test.tsx) 가 고정한다

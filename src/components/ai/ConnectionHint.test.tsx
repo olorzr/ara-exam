@@ -46,11 +46,13 @@ describe('맥 — 윈도우와 조치가 다르다', () => {
     expect(html).toContain('설치 명령을 다시 실행하면');
   });
 
-  it('로그인 필요: 명령 프롬프트가 아니라 터미널이다', () => {
+  it('로그인 필요: codex login 을 치라고 하지 않는다', () => {
+    // 설치 스크립트가 sudo 를 피하려고 codex 를 ~/.ara-ai/npm 에 깔기 때문에
+    // 선생님 셸 PATH 에는 codex 가 없다 — 그대로 치면 command not found 다.
     const html = render('login_required', 'mac');
-    expect(html).toContain('codex login');
-    expect(html).toContain('터미널');
+    expect(html).not.toContain('codex login');
     expect(html).not.toContain('명령 프롬프트');
+    expect(html).toContain('터미널에 다시');
   });
 
   it('브라우저 차단 안내는 OS 와 무관하게 같다', () => {

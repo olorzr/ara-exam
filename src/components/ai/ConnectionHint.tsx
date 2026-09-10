@@ -18,6 +18,10 @@ interface ConnectionHintProps {
  *
  * ⚠️ 맥은 프로그램을 더블클릭하지 않는다 — LaunchAgent 가 로그인할 때 배경에서 띄운다.
  *   윈도우 문구를 그대로 보여주면 있지도 않은 아이콘을 찾게 만든다.
+ *
+ * ⚠️ 맥에는 **`codex login` 을 치라고 하면 안 된다.** 설치 스크립트가 sudo 를 피하려고
+ *   codex 를 `~/.ara-ai/npm` 에 깔기 때문에 선생님 셸 PATH 에는 `codex` 가 없다
+ *   (command not found). 맥의 복구 경로는 언제나 **설치 명령 재실행** 하나다.
  */
 export default function ConnectionHint({ kind, showPromptNote, os = 'windows' }: ConnectionHintProps) {
   // Safari 는 무엇을 해도 안 된다 — 다른 안내보다 먼저, 그리고 단독으로 나와야 한다.
@@ -38,11 +42,18 @@ export default function ConnectionHint({ kind, showPromptNote, os = 'windows' }:
     return (
       <div className="rounded-md bg-amber-50 border border-amber-200 p-4 text-sm text-amber-900">
         <p className="font-semibold">ChatGPT 로그인이 필요해요.</p>
-        <p className="mt-1">
-          내 컴퓨터에서 {os === 'mac' ? '터미널' : '명령 프롬프트'}을 열고{' '}
-          <code className="px-1 bg-amber-100 rounded">codex login</code> 을 실행한 뒤 브라우저에서
-          ChatGPT 에 로그인해 주세요. 로그인 정보는 내 컴퓨터에만 저장됩니다.
-        </p>
+        {os === 'mac' ? (
+          <p className="mt-1">
+            아래 <strong>처음 설치하기</strong> → <strong>맥</strong>의 명령을 터미널에 다시
+            붙여넣어 주세요. 로그인 창이 열립니다. 로그인 정보는 내 컴퓨터에만 저장됩니다.
+          </p>
+        ) : (
+          <p className="mt-1">
+            내 컴퓨터에서 명령 프롬프트를 열고{' '}
+            <code className="px-1 bg-amber-100 rounded">codex login</code> 을 실행한 뒤 브라우저에서
+            ChatGPT 에 로그인해 주세요. 로그인 정보는 내 컴퓨터에만 저장됩니다.
+          </p>
+        )}
       </div>
     );
   }

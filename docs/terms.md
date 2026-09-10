@@ -122,7 +122,8 @@
 - 정의: 선생님 PC 에서 도는 작은 중계 프로그램. 브라우저가 자기 ChatGPT 로 OCR 을 돌리게 해 준다. 학원 서버는 AI 를 호출하지 않는다
 - 코드에서의 사용: `src/lib/ai/codex/*`, `ws://127.0.0.1:8899`
 - 설치: 윈도우는 파일 3개 다운로드(`install-autostart.cmd` 더블클릭), 맥은 터미널 한 줄
-  (`install-mac.sh` → LaunchAgent `kr.co.araeducation.ara-ai`). 둘 다 ara-system 이 호스팅한다
+  (`install-mac.sh` → codex 설치 + ChatGPT 로그인 + LaunchAgent `kr.co.araeducation.ara-ai`).
+  둘 다 ara-system 이 호스팅한다. 맥의 codex 는 `~/.ara-ai/npm` 에 깔려 셸 PATH 에는 없다
 - ⚠️ **Safari 로는 붙지 못한다** — WebKit 이 https 문서의 `ws://127.0.0.1` 을 mixed content 로
   막는다. 맥 선생님은 Chrome 을 써야 한다
 - 관련 파일: src/lib/ai/codex/README.md, Ara-system `public/ara-ai/bridge.cjs`
