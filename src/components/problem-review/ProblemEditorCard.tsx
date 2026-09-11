@@ -130,6 +130,8 @@ export default function ProblemEditorCard({
     || area.join('>') !== problem.area_path.join('>')
     || unit.join('>') !== problem.unit_path.join('>')
     || grammar.join('\u0000') !== problem.grammar_paths.join('\u0000')
+    // ⚠️ 그림 경로도 센다 — 뺐는데 저장이 실패하면 화면에서만 사라진 채 검수완료로 굳는다
+    || figurePaths.join('\u0000') !== problem.figure_paths.join('\u0000')
     || trimTrailingChoices(choices).join('\u0000') !== problem.choices.join('\u0000');
 
   // 화면이 '검수 마치기' 를 막을 수 있게 알린다. 렌더 중 부모 state 를 건드리지 않도록

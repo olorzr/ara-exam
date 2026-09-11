@@ -474,6 +474,41 @@ describe('mergeOcrDrafts — 모델이 이어짐 표시를 빠뜨릴 때', () =>
   });
 });
 
+describe('mergeOcrDrafts — 문항의 그림', () => {
+  const fig = (n: number) => `<figure data-figure="${n}"></figure>`;
+  const box = (top: number) => ({ column: 1 as const, top, bottom: top + 0.1 });
+
+  it('빈 발문을 갈아 끼울 때 그림도 함께 간다 — 발문만 갈면 1번 자리에 딴 그림이 그려진다', () => {
+    const res = mergeOcrDrafts([
+      // 첫 판은 그림 자리표시자만 있고 글이 없다
+      batch([problem({ ref: 'Q1', number: 5, stem_html: fig(1), figures: [box(0.2)] })], [1]),
+      // 겹쳐 읽은 판이 발문을 읽었고 그림도 다시 잡았다
+      batch([problem({
+        ref: 'Q1', number: 5, stem_html: `<p>다음 그래프는?</p>${fig(1)}`, figures: [box(0.6)],
+      })], [1, 2]),
+    ], { newId });
+
+    expect(res.problems[0].stem_html).toContain('다음 그래프는?');
+    expect(res.problems[0].figures).toEqual([{ page: 1, box: box(0.6) }]);
+  });
+
+  it('발문이 멀쩡하면 그림만 따로 채운다 — 자리표시자가 있을 때만', () => {
+    const res = mergeOcrDrafts([
+      batch([problem({ ref: 'Q1', number: 5, stem_html: `<p>물음</p>${fig(1)}`, figures: [] })], [1]),
+      batch([problem({ ref: 'Q1', number: 5, stem_html: `<p>물음</p>${fig(1)}`, figures: [box(0.3)] })], [1, 2]),
+    ], { newId });
+    expect(res.problems[0].figures).toEqual([{ page: 1, box: box(0.3) }]);
+  });
+
+  it('자리표시자가 없으면 그림을 받지 않는다 — 받아 봐야 그릴 자리가 없다', () => {
+    const res = mergeOcrDrafts([
+      batch([problem({ ref: 'Q1', number: 5, stem_html: '<p>물음</p>', figures: [] })], [1]),
+      batch([problem({ ref: 'Q1', number: 5, stem_html: '<p>물음</p>', figures: [box(0.3)] })], [1, 2]),
+    ], { newId });
+    expect(res.problems[0].figures).toEqual([]);
+  });
+});
+
 describe('mergeOcrDrafts — 쪽을 넘어가는 지문의 그림', () => {
   const fig = (n: number) => `<figure data-figure="${n}"></figure>`;
   const box = (top: number) => ({ column: 1 as const, top, bottom: top + 0.1 });

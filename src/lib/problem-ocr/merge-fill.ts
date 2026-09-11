@@ -1,6 +1,6 @@
 import { normalizeGrammarPaths } from '@/lib/problem-bank/grammar-tree';
 import {
-  MAX_FIGURES, reconcileFigurePlaceholders, shiftFigurePlaceholders,
+  figureNumbersIn, MAX_FIGURES, reconcileFigurePlaceholders, shiftFigurePlaceholders,
 } from '@/lib/problem-bank/figure-placeholders';
 import { textOf } from './merge-keys';
 import type { OcrItem } from './schema';
@@ -219,7 +219,12 @@ export function fillPassageGaps(draft: PassageDraft, item: OcrItem): void {
 
 /** 이미 담은 문항의 빈 칸만 채운다 */
 export function fillGaps(target: ProblemDraft, item: OcrItem): void {
-  if (!textOf(target.stem_html) && item.stem_html) target.stem_html = item.stem_html;
+  if (!textOf(target.stem_html) && item.stem_html) {
+    // ⚠️ 발문과 그림을 **함께** 간다. 자리표시자 번호는 그 판의 그림 목록 기준이라,
+    //    발문만 갈면 1번 자리에 딴 그림이 그려진다(지문 쪽 replaceFragment 와 같은 규약)
+    target.stem_html = item.stem_html;
+    target.figures = item.figures.map((box) => ({ page: item.page, box }));
+  }
   if (target.choices.length === 0 && item.choices.length > 0) target.choices = item.choices;
   // 정답과 유형은 한 덩어리다 — 유형이 바뀌면 정답의 의미가 달라진다
   if (target.answer === null && item.answer !== null) {
@@ -239,7 +244,15 @@ export function fillGaps(target: ProblemDraft, item: OcrItem): void {
   }
   if (!target.box && item.box) target.box = item.box;
   if (item.has_figure) target.has_figure = true;
-  if (target.figures.length === 0 && item.figures.length > 0 && item.page === target.page_no) {
+  // ⚠️ 그림만 따로 채우는 것은 **발문이 비어 있지 않을 때**뿐이고, 그때도 지금 발문에
+  //    자리표시자가 없으면 채워 봐야 그릴 자리가 없다 — 그래서 자리표시자가 있을 때만
+  //    받는다. 좌표와 쪽은 짝이라 같은 쪽에서 읽은 것만 받는다
+  if (
+    target.figures.length === 0
+    && item.figures.length > 0
+    && item.page === target.page_no
+    && figureNumbersIn(target.stem_html).length > 0
+  ) {
     target.figures = item.figures.map((box) => ({ page: item.page, box }));
   }
 }

@@ -81,7 +81,7 @@ export default function PassageEditorCard({
    * ⚠️ 이미지 출제 지문에 뒷부분을 이어 붙여도, 인쇄는 **잘라 둔 시작 쪽 이미지**를 쓰므로
    *    되찾은 글이 여전히 안 나간다. 저장할 때 함께 바꿔야 한다(코덱스 리뷰).
    */
-  const [backToText, setBackToText] = useState(false);
+  const [backToText, setBackToText, backToTextRef] = useTrackedState(false);
   const [saving, setSaving] = useState(false);
 
   /**
@@ -95,8 +95,17 @@ export default function PassageEditorCard({
     apply: (next) => { setHtml(next.html); setFigurePaths(next.paths); },
     id: passage.id,
     save: async (next) => {
-      const ok = await onSave({ html: next.html, figure_paths: next.paths });
-      if (ok) setFigurePaths(next.paths);
+      // ⚠️ 밀린 '글로 출제' 도 함께 싣는다. 이 저장만으로 카드가 깨끗해지므로,
+      //    빠뜨리면 검수를 마쳐도 인쇄는 시작 쪽 이미지만 쓴다
+      const ok = await onSave({
+        html: next.html,
+        figure_paths: next.paths,
+        ...(backToTextRef.current ? { render_mode: 'text' as const } : {}),
+      });
+      if (ok) {
+        setFigurePaths(next.paths);
+        setBackToText(false);
+      }
       return ok;
     },
   });
@@ -105,6 +114,10 @@ export default function PassageEditorCard({
   const dirty = html !== passage.html
     || title !== passage.title
     || author !== passage.author
+    // ⚠️ 그림 경로와 밀린 출제 방식도 센다. 그림을 뺐는데 저장이 실패하면 화면에서만
+    //    사라진 채 '저장 안 됨' 표시가 안 떠, 검수를 마친 뒤 되살아난다
+    || backToText
+    || figurePaths.join('\u0000') !== (passage.figure_paths ?? []).join('\u0000')
     || area.join('>') !== passage.area_path.join('>')
     || unit.join('>') !== passage.unit_path.join('>');
 
