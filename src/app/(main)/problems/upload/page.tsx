@@ -14,7 +14,7 @@ import { insertSource } from '@/lib/problem-bank/save';
 import { uploadProblemFile } from '@/lib/problem-bank/storage';
 import { sourcePdfPath } from '@/lib/problem-bank/storage-paths';
 import {
-  applySourcePatch, toSourcePayload, validateSourceForm,
+  applySourcePatch, applyTextbookHint, initialSourceFormState, toSourcePayload, validateSourceForm,
   type SourceFormErrors, type SourceFormValues,
 } from '@/lib/problem-bank/source-form';
 import { planPageBatches } from '@/lib/problem-ocr/batch-plan';
@@ -57,11 +57,11 @@ export default function ProblemUploadPage() {
    */
   const [answerKeyPending, setAnswerKeyPending] = useState(false);
   /**
-   * 폼 값과 '제목을 아직 손대지 않았는가'를 **한 덩어리로** 들고 있는다.
+   * 폼 값과 '제목·교과서를 아직 손대지 않았는가'를 **한 덩어리로** 들고 있는다.
    * 따로 두면 값 갱신 함수 안에서 다른 state 를 만지게 되는데, 그 갱신 함수는
-   * 순수해야 한다(React 가 두 번 부를 수 있다). `applySourcePatch` 가 둘을 함께 돌려준다.
+   * 순수해야 한다(React 가 두 번 부를 수 있다). `applySourcePatch` 가 함께 돌려준다.
    */
-  const [form, setForm] = useState({ values: EMPTY_FORM, titleAuto: true });
+  const [form, setForm] = useState(() => initialSourceFormState(EMPTY_FORM));
   const [errors, setErrors] = useState<SourceFormErrors>({});
   const [uploading, setUploading] = useState(false);
   /**
@@ -74,14 +74,16 @@ export default function ProblemUploadPage() {
   const pdf = usePdfPages(file);
 
   const onChange = useCallback((patch: Partial<SourceFormValues>) => {
-    setForm((f) => applySourcePatch(f.values, patch, f.titleAuto));
+    setForm((f) => applySourcePatch(f, patch));
     setErrors({});
   }, []);
 
-  // 마스터(학교·교과서·영역·단원)와 내신 범위 힌트는 훅 하나가 맡는다
+  // 마스터(학교·교과서·영역·단원)와 내신 범위 힌트는 훅 하나가 맡는다.
+  // ⚠️ 힌트를 `onChange({ textbook })` 로 돌리면 안 된다 — 자동으로 채운 값이 '직접 고른 값'
+  //    으로 둔갑해, 그다음 학년·학교를 바꿔도 따라오지 않는다
   const masters = useSourceMasters(values, useCallback(
-    (textbook: string) => onChange({ textbook }),
-    [onChange],
+    (matched: string | null) => setForm((f) => applyTextbookHint(f, matched)),
+    [],
   ));
 
   const problemPages = useMemo(() => pdf.pagesWithRole('problem'), [pdf]);

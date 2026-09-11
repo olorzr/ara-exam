@@ -28,6 +28,23 @@ export interface ScopeSlotRow {
   noExam: boolean;
 }
 
+/**
+ * public.school_exam_scopes 한 행 — **학교 단위로 전부** 읽을 때의 모양.
+ *
+ * `ScopeSlotRow` 가 슬롯 하나의 내용(범위·날짜)이라면, 이쪽은 어느 슬롯인지(학년·학년도·
+ * 학기·시험)를 함께 든다. 기출 업로드가 폼 조건에 **가장 가까운** 슬롯의 교과서를 고를 때 쓴다.
+ * ⚠️ `noExam` 이 true 인 행에도 `textbook_id` 가 남아 있다(ara-system mig379) — 교과서로 쓰지 말 것.
+ */
+export interface SchoolScopeRow {
+  grade: string;
+  year: number;
+  semester: 1 | 2;
+  exam_type: '중간' | '기말';
+  textbook_id: string | null;
+  units: string[];
+  noExam: boolean;
+}
+
 /** public.curriculum_textbooks 행 (원본은 이 앱의 exam.publishers/major_chapters 마스터에서 동기화) */
 export interface PublicTextbook {
   id: string;
