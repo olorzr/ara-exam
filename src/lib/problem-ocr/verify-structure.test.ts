@@ -84,6 +84,22 @@ describe('verifyStructure — 빠진 번호', () => {
 });
 
 describe('verifyStructure — 선지 수', () => {
+  it('객관식인데 선지가 하나도 없으면 알린다 — 아무도 말해 주지 않는 자리다', () => {
+    const merged = {
+      passages: [],
+      problems: [problem({ number: 1, stem_html: '<p>다음 중 옳은 것은?</p>', choices: [] })],
+    };
+    expect(said(verifyStructure(merged))).toContain('선지를 하나도 읽지 못했어요');
+  });
+
+  it('발문도 없으면 말하지 않는다 — 다른 경고가 이미 붙는 자리다', () => {
+    const merged = {
+      passages: [],
+      problems: [problem({ number: 1, stem_html: '', choices: [] })],
+    };
+    expect(said(verifyStructure(merged))).not.toContain('선지를 하나도');
+  });
+
   it('선지가 하나뿐이면 알린다', () => {
     const merged = { passages: [], problems: [problem({ number: 1, choices: ['가'] })] };
     expect(said(verifyStructure(merged))).toContain('선지를 1개만');

@@ -1,4 +1,4 @@
-import { normalizeLabel } from './merge-keys';
+import { normalizeLabel, textOf } from './merge-keys';
 import type { MergeResult, PassageDraft, ProblemDraft } from './merge';
 import { itemTargetLabel, listSome, pageTarget, type OcrWarning } from './warnings';
 
@@ -135,8 +135,20 @@ export function verifyStructure(merged: Pick<MergeResult, 'passages' | 'problems
   const typical = typicalChoiceCount(problems);
   for (const problem of problems) {
     if (problem.question_type !== '객관식') continue;
+    // 뒤쪽 빈 선지는 파서가 잘라 내므로 남은 개수가 곧 읽은 개수다
     const count = problem.choices.length;
-    if (count === 0) continue; // 정답표만 읽힌 문항 — 다른 경고가 이미 붙는다
+    if (count === 0) {
+      // ⚠️ 선지가 하나도 없는 객관식은 **아무도 말해 주지 않는다** — 파서는 빈 배열을
+      //    이상하게 보지 않고, 화면에는 빈 선지 칸 다섯 개만 뜬다. 발문이 있는데
+      //    선지가 없으면 통째로 못 읽은 것이다
+      if (textOf(problem.stem_html)) {
+        out.push({
+          message: '객관식인데 선지를 하나도 읽지 못했어요. 원본과 맞춰 채워 주세요.',
+          targets: [problemTarget(problem)],
+        });
+      }
+      continue;
+    }
     if (count < MIN_CHOICES) {
       out.push({
         message: `선지를 ${count}개만 읽었어요. 원본과 맞춰 채워 주세요.`,

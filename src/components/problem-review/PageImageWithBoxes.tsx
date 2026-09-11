@@ -107,6 +107,10 @@ export default function PageImageWithBoxes({
     <div
       ref={wrapRef}
       className={`relative inline-block w-full${capturing ? ' cursor-crosshair select-none' : ''}`}
+      // ⚠️ 손가락으로 끌면 브라우저가 **화면을 스크롤**하며 포인터 흐름을 끊는다
+      //    (`pointercancel`). 기본 끌어놓기를 막는 것만으로는 안 되고 이것까지 꺼야
+      //    태블릿에서 그림 잡기가 끝까지 간다
+      style={capturing ? { touchAction: 'none' } : undefined}
       onPointerDown={startDrag}
       onPointerMove={moveDrag}
       onPointerUp={endDrag}
