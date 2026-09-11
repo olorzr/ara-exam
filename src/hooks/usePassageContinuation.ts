@@ -39,6 +39,7 @@ function toOcrMeta(source: ProblemSource): OcrSourceMeta {
 export interface ContinuationRead {
   html: string;
   continues: boolean;
+  hasFigure: boolean;
   warnings: string[];
 }
 
@@ -96,6 +97,11 @@ export function usePassageContinuation(source: ProblemSource | null) {
         return result;
       }
       toast.success(`${page}쪽에서 이어지는 글을 읽었어요. 확인하고 저장해 주세요.`);
+      // ⚠️ 이 길은 그림을 잘라 내지 못한다 — 있으면 사람이 직접 넣어야 한다.
+      //    말 안 하면 인쇄물에서 그림만 빠진 지문이 나간다
+      if (result.hasFigure) {
+        toast.warning(`${page}쪽 이어지는 부분에 그림이 있어요. '그림 추가' 로 직접 잘라 넣어 주세요.`);
+      }
       return result;
     } catch (e) {
       if (isAiError(e)) {

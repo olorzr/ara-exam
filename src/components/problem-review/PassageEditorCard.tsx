@@ -116,12 +116,14 @@ export default function PassageEditorCard({
     setSaving(true);
     // ⚠️ `figure_paths` 도 함께 보낸다 — 그림을 붙이는 저장이 실패했을 때 사람이 다시
     //    눌러 고칠 길이 이것뿐이다(자리표시자만 남고 경로가 안 들어간 상태를 푼다)
-    await onSave({
+    const ok = await onSave({
       html, title, author, area_path: area, unit_path: unit, figure_paths: figurePaths,
       // 이어 읽어 붙였으면 글로 되돌린다 — 잘라 둔 이미지는 시작 쪽만 담고 있다
       ...(backToText ? { render_mode: 'text' as const } : {}),
     });
-    setBackToText(false);
+    // ⚠️ **성공했을 때만** 내린다. 실패했는데 내리면 다시 눌러도 이미지 출제인 채로 남아
+    //    되찾은 글이 영영 인쇄물에 안 나간다
+    if (ok) setBackToText(false);
     setSaving(false);
   };
 
