@@ -561,6 +561,19 @@ describe('mergeOcrDrafts — 쪽을 넘어가는 지문의 그림', () => {
     expect(res.passages[0].html).toContain('data-figure="1"');
   });
 
+  it('글이 똑같아도 이번에만 알아본 그림은 살린다 — 길이만 보면 못 알아챈다', () => {
+    // textOf 가 자리표시자를 지우므로 두 판의 글 길이가 똑같다
+    const res = mergeOcrDrafts([
+      batch([passage({ ref: 'P1', page: 2, html: '<p>같은 지문 본문</p>', figures: [] })], [1, 2]),
+      batch([passage({
+        ref: 'P1', page: 2, html: `<p>같은 지문 본문</p>${fig(1)}`, figures: [box(0.4)],
+      })], [2, 3]),
+    ], { newId });
+
+    expect(res.passages[0].figures).toEqual([{ page: 2, box: box(0.4) }]);
+    expect(res.passages[0].html).toContain('data-figure="1"');
+  });
+
   it('겹쳐 읽은 그림은 같은 쪽에서 읽은 것만 받는다 — 좌표와 쪽은 짝이다', () => {
     const res = mergeOcrDrafts([
       batch([passage({ ref: 'P1', page: 2, html: '<p>지문</p>', figures: [] })], [1, 2]),

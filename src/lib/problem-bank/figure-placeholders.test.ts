@@ -27,6 +27,19 @@ describe('splitByFigurePlaceholders', () => {
     expect(figureNumbersIn("<figure data-figure='3'>")).toEqual([3]);
   });
 
+  it('다른 속성이 섞여도 알아본다 — 편집기 HTML 은 정화 전에 지역 state 로 들어온다', () => {
+    expect(figureNumbersIn('<figure class="pb-figure-slot" data-figure="1"></figure>')).toEqual([1]);
+    expect(figureNumbersIn('<figure data-figure="2" class="x" draggable="true"></figure>')).toEqual([2]);
+  });
+
+  it('속성이 섞인 자리표시자도 제대로 빼고 번호를 당긴다', () => {
+    const html = '<figure class="pb-figure-slot" data-figure="1"></figure>'
+      + '<p>글</p><figure class="pb-figure-slot" data-figure="2"></figure>';
+    const res = removeFigureAt(html, ['a.jpg', 'b.jpg'], 1);
+    expect(res.paths).toEqual(['b.jpg']);
+    expect(res.html).toBe(`<p>글</p>${fig(1)}`);
+  });
+
   it('그림만 있는 본문도 다룬다', () => {
     expect(splitByFigurePlaceholders(fig(1))).toEqual([{ kind: 'figure', index: 1 }]);
   });

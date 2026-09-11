@@ -37,7 +37,10 @@ export const FigurePlaceholderNode = Node.create({
 
   renderHTML({ HTMLAttributes }) {
     // ⚠️ 내용(자식)을 두지 않는다 — 저장 HTML 은 **빈** figure 여야 정화를 통과하고,
-    //    그리는 쪽이 그 자리에서 갈라 서명 URL 이미지를 끼운다
-    return ['figure', { ...HTMLAttributes, class: 'pb-figure-slot' }];
+    //    그리는 쪽이 그 자리에서 갈라 서명 URL 이미지를 끼운다.
+    // ⚠️ `class` 도 붙이지 않는다 — 정화가 어차피 지우고, 붙여 두면 정화 전 HTML 을
+    //    다루는 자리(지역 state)에서 자리표시자를 못 알아보는 길이 하나 더 생긴다.
+    //    편집기 모양은 `figure[data-figure]` 선택자가 맡는다(globals.css)
+    return ['figure', HTMLAttributes];
   },
 });

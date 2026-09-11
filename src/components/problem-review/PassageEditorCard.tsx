@@ -84,6 +84,8 @@ export default function PassageEditorCard({
   const figures = useFigureEditor({
     kind: 'passage',
     read: () => ({ html: bodyRef.current, paths: pathsRef.current }),
+    // ⚠️ 저장을 **기다리기 전에** 화면에 반영한다 — 그 왕복 동안 친 글을 잃지 않는다
+    apply: (next) => { setHtml(next.html); setFigurePaths(next.paths); },
     id: passage.id,
     save: async (next) => {
       const ok = await onSave({ html: next.html, figure_paths: next.paths });
@@ -105,19 +107,15 @@ export default function PassageEditorCard({
 
   const handleSave = async () => {
     setSaving(true);
-    await onSave({ html, title, author, area_path: area, unit_path: unit });
+    // ⚠️ `figure_paths` 도 함께 보낸다 — 그림을 붙이는 저장이 실패했을 때 사람이 다시
+    //    눌러 고칠 길이 이것뿐이다(자리표시자만 남고 경로가 안 들어간 상태를 푼다)
+    await onSave({
+      html, title, author, area_path: area, unit_path: unit, figure_paths: figurePaths,
+    });
     setSaving(false);
   };
 
-  const handleCapture = async (bbox: Bbox, pageUrl: string) => {
-    const next = await figures.capture(bbox, pageUrl);
-    if (next !== null) setHtml(next);
-  };
 
-  const handleRemoveFigure = async (index: number) => {
-    const next = await figures.remove(index);
-    if (next !== null) setHtml(next);
-  };
 
   /**
    * 다음 쪽에서 이어지는 글을 읽어 **본문 끝에 붙인다.**
@@ -222,8 +220,8 @@ export default function PassageEditorCard({
         <FigureStrip
           paths={figurePaths}
           urls={figureUrls ?? new Map()}
-          onRemove={handleRemoveFigure}
-          onStartCapture={onStartCapture ? () => onStartCapture(handleCapture) : undefined}
+          onRemove={figures.remove}
+          onStartCapture={onStartCapture ? () => onStartCapture(figures.capture) : undefined}
           capturing={capturing}
           busy={figures.busy}
         />

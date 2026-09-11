@@ -187,7 +187,12 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
         // 겹쳐 읽은 **같은 조각** — 더 완전한(긴) 쪽을 남긴다.
         // 비교 대상이 합본이 아니라 조각이라 앞부분을 잃지 않는다
         const current = existing.work.fragments[existing.index] ?? '';
-        if (textOf(item.html).length > textOf(current).length) {
+        const grew = textOf(item.html).length - textOf(current).length;
+        // ⚠️ 그림은 **글 길이와 따로** 본다. `textOf` 가 자리표시자를 지우므로, 같은 글을
+        //    옮겼는데 이번에만 도표를 알아본 경우 길이가 똑같아 갈아 끼우지 못했다 —
+        //    그러면 그 그림이 잘리지도 저장되지도 않는다(코덱스 리뷰)
+        const moreFigures = item.figures.length > (existing.work.figures[existing.index] ?? []).length;
+        if (grew > 0 || (grew === 0 && moreFigures)) {
           // 글과 그림을 **함께** 간다 — 글만 갈면 새로 알아본 그림이 사라진다
           replaceFragment(existing.work, existing.index, item);
         }

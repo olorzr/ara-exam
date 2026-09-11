@@ -21,8 +21,15 @@
 /** 한 항목에 달 수 있는 그림 수. 한 자리 수라야 정화 규칙이 단순하다 */
 export const MAX_FIGURES = 9;
 
-/** 자리표시자 한 개. 속성 순서·따옴표·닫는 태그 유무를 너그럽게 받는다 */
-const FIGURE_RE = /<figure\s+data-figure=["']?([1-9])["']?\s*>\s*<\/figure>|<figure\s+data-figure=["']?([1-9])["']?\s*\/?>/gi;
+/**
+ * 자리표시자 한 개.
+ *
+ * ⚠️ **다른 속성이 섞여도 알아봐야 한다.** 편집기(TipTap)는 `class` 를 함께 내고, 그 HTML 이
+ *    정화를 거치기 **전에** 지역 state 로 들어온다. 속성 순서까지 따지는 규칙을 쓰면
+ *    그때 자리표시자를 못 알아봐, 그림을 뺄 때 경로만 빠지고 본문 표시는 그대로 남는다 —
+ *    그러면 남은 그림이 엉뚱한 자리에 그려진다(코덱스 리뷰).
+ */
+const FIGURE_RE = /<figure\b[^>]*\bdata-figure\s*=\s*["']?([1-9])["']?[^>]*>(?:\s*<\/figure>)?/gi;
 
 /** 본문을 갈랐을 때의 조각 */
 export type FigureChunk =
@@ -42,7 +49,7 @@ export function splitByFigurePlaceholders(html: string): FigureChunk[] {
   for (let m = FIGURE_RE.exec(html); m !== null; m = FIGURE_RE.exec(html)) {
     const before = html.slice(last, m.index);
     if (before.trim()) out.push({ kind: 'html', html: before });
-    out.push({ kind: 'figure', index: Number(m[1] ?? m[2]) });
+    out.push({ kind: 'figure', index: Number(m[1]) });
     last = m.index + m[0].length;
   }
 

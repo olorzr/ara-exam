@@ -101,6 +101,8 @@ export default function ProblemEditorCard({
   const figures = useFigureEditor({
     kind: 'problem',
     read: () => ({ html: bodyRef.current, paths: pathsRef.current }),
+    // ⚠️ 저장을 **기다리기 전에** 화면에 반영한다 — 그 왕복 동안 친 글을 잃지 않는다
+    apply: (next) => { setStem(next.html); setFigurePaths(next.paths); },
     id: problem.id,
     save: async (next) => {
       const updatedAt = await onSave({ stem_html: next.html, figure_paths: next.paths });
@@ -109,15 +111,7 @@ export default function ProblemEditorCard({
     },
   });
 
-  const handleCapture = async (bbox: Bbox, pageUrl: string) => {
-    const next = await figures.capture(bbox, pageUrl);
-    if (next !== null) setStem(next);
-  };
 
-  const handleRemoveFigure = async (index: number) => {
-    const next = await figures.remove(index);
-    if (next !== null) setStem(next);
-  };
 
   const verified = problem.status === '검수완료';
   const missingAnswer = !answer.trim();
@@ -167,6 +161,8 @@ export default function ProblemEditorCard({
       unit_path: unit,
       grammar_paths: grammar,
       work_title: workTitle,
+      // ⚠️ 그림 경로도 함께 — 그림 저장이 실패했을 때 사람이 다시 눌러 고칠 길이다
+      figure_paths: figurePaths,
     });
     setSaving(false);
     return updatedAt;
@@ -256,8 +252,8 @@ export default function ProblemEditorCard({
         <FigureStrip
           paths={figurePaths}
           urls={figureUrls ?? new Map()}
-          onRemove={handleRemoveFigure}
-          onStartCapture={onStartCapture ? () => onStartCapture(handleCapture) : undefined}
+          onRemove={figures.remove}
+          onStartCapture={onStartCapture ? () => onStartCapture(figures.capture) : undefined}
           capturing={capturing}
           busy={figures.busy}
         />
