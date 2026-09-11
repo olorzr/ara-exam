@@ -225,10 +225,25 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
         if (open) {
           // 앞 묶음이 이 지문을 통째로 읽어 뒷부분까지 이미 담았을 수 있다.
           // 그때 또 붙이면 같은 글이 두 번 인쇄된다 — 참조만 잇고 넘어간다
-          if (alreadyContains(open, item)) {
+          const verdict = alreadyContains(open, item);
+          if (verdict === 'duplicate') {
             fillPassageGaps(open.draft, item);
             refToId.set(item.ref, open.draft.id);
             continue;
+          }
+          // ⚠️ 앞부분만 겹치면 **붙인다.** 앞 묶음이 다음 쪽 첫 문단까지만 읽어 둔 경우가
+          //    흔한데, 겹친다고 버리면 되찾은 뒷부분이 사라진다. 겹쳐 보이는 편이
+          //    사라지는 것보다 낫고(눈에 띈다), 검수에서 지울 수 있다
+          if (verdict === 'partial') {
+            warn({
+              message: '이어지는 글의 앞부분이 겹쳐 보일 수 있어요. 검수에서 확인해 주세요.',
+              targets: [{
+                kind: 'passage',
+                id: open.draft.id,
+                page: open.draft.page_no,
+                label: itemTargetLabel({ kind: 'passage', page: open.draft.page_no }),
+              }],
+            });
           }
           appendFragment(open, item);
           // 이어지는 조각에서만 작품명·영역·단원을 알아볼 때가 있다(앞 쪽은 머리글이 없다)

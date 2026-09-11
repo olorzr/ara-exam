@@ -424,6 +424,24 @@ describe('mergeOcrDrafts — 모델이 이어짐 표시를 빠뜨릴 때', () =>
     expect(res.passages[0].html.match(/뒷부분이 여기 다 있다/g)).toHaveLength(1);
   });
 
+  it('앞 묶음이 다음 쪽 **첫 문단까지만** 읽어 뒀으면 뒷부분을 붙인다', () => {
+    // 앞 40자가 맞는다고 통째로 버리면 되찾은 뒷부분이 사라진다
+    const res = mergeOcrDrafts([
+      batch([passage({
+        ref: 'P1', page: 3,
+        html: '<p>앞 쪽 글</p><p>다음 쪽 첫 문단이 여기까지만 읽혔다</p>',
+      })], [3, 4]),
+      batch([passage({
+        ref: 'P1', page: 4, label: null, continued: true,
+        html: '<p>다음 쪽 첫 문단이 여기까지만 읽혔다</p><p>그리고 이어지는 뒷문단이 더 있다</p>',
+      })], [4, 5]),
+    ], { newId });
+
+    expect(res.passages).toHaveLength(1);
+    expect(res.passages[0].html).toContain('이어지는 뒷문단');
+    expect(said(res)).toContain('앞부분이 겹쳐 보일 수 있어요');
+  });
+
   it('중복이라 안 붙여도 그 조각을 가리킨 문항은 이 지문에 붙는다', () => {
     const res = mergeOcrDrafts([
       batch([passage({ ref: 'P1', page: 3, html: '<p>앞</p><p>뒤가 여기 다 있다</p>' })], [3, 4]),

@@ -35,8 +35,29 @@ export interface FragmentRef {
   index: number;
 }
 
-/** 이어지는 조각이 같은 글인지 가릴 때 견줄 글자 수 */
-const CONTINUATION_PROBE = 40;
+/**
+ * 이어지는 조각의 **앞부분**이 이미 있는지 볼 때 견줄 글자 수.
+ *
+ * 짧게 잡는다 — 앞 묶음이 다음 쪽의 **첫 문단까지만** 읽어 둔 경우를 알아채야 하는데,
+ * 첫 문단이 스무 글자쯤인 시는 흔하다.
+ */
+const HEAD_PROBE = 20;
+
+/**
+ * **끝부분**이 이미 있는지 볼 때 견줄 글자 수.
+ *
+ * 넉넉히 잡는다 — 여기서 맞으면 조각을 통째로 버리므로 확신이 있어야 한다.
+ */
+const TAIL_PROBE = 40;
+
+/** 이어지는 조각이 이미 담겨 있는가에 대한 판정 */
+export type ContainmentVerdict =
+  /** 통째로 이미 있다 — 또 붙이면 같은 글이 두 번 인쇄된다 */
+  | 'duplicate'
+  /** 처음 보는 글이다 */
+  | 'new'
+  /** **앞부분만** 이미 있다 — 뒷부분은 새 글이다 */
+  | 'partial';
 
 /**
  * 이 지문이 **이미** 이 조각을 담고 있는가.
@@ -45,17 +66,27 @@ const CONTINUATION_PROBE = 40;
  *    통째로 한 항목으로 읽어 두면(흔하다), 겹쳐 읽은 다음 묶음이 그 뒷부분만 다시
  *    '이어지는 조각' 으로 내놓는데 그것을 그대로 이어 붙이면 본문이 겹쳐 인쇄된다.
  *
+ * ⚠️ 앞부분만 견주면 안 된다. 앞 묶음이 다음 쪽의 **첫 문단까지만** 읽어 둔 경우가
+ *    흔한데, 앞 40자가 맞는다고 조각을 통째로 버리면 **되찾은 뒷부분이 사라진다.**
+ *    끝부분까지 맞을 때만 '통째로 있다' 로 본다(코덱스 리뷰).
+ *
  * ⚠️ 글이 없는 조각(**그림만 있는 이어짐**)은 견줄 것이 없어 무조건 '이미 있다' 로
  *    떨어졌다. 그러면 그 그림이 잘리지도 저장되지도 않는다 — 쪽 머리에 도표만 이어지는
  *    지문이 실제로 그렇다. 그림이 있으면 새 조각으로 본다.
  * @param work - 붙일 대상 지문
  * @param item - 붙이려는 조각
- * @returns 이미 담겨 있으면 true
+ * @returns 판정
  */
-export function alreadyContains(work: PassageWork, item: OcrItem): boolean {
-  const probe = textOf(item.html).slice(0, CONTINUATION_PROBE);
-  if (!probe) return item.figures.length === 0;
-  return textOf(work.fragments.join(' ')).includes(probe);
+export function alreadyContains(work: PassageWork, item: OcrItem): ContainmentVerdict {
+  const text = textOf(item.html);
+  if (!text) return item.figures.length === 0 ? 'duplicate' : 'new';
+
+  const soFar = textOf(work.fragments.join(' '));
+  if (!soFar.includes(text.slice(0, HEAD_PROBE))) return 'new';
+  // 끝부분까지 있어야 통째로 있는 것이다. 그림이 늘었어도 아직 담을 것이 남았다
+  const tail = text.slice(-TAIL_PROBE);
+  const whole = soFar.includes(tail) && item.figures.length <= (work.figures.flat().length);
+  return whole ? 'duplicate' : 'partial';
 }
 
 export function toPassage(item: OcrItem, id: string): PassageWork {

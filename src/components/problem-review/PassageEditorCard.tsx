@@ -75,6 +75,13 @@ export default function PassageEditorCard({
   const [figurePaths, setFigurePaths, pathsRef] = useTrackedState<string[]>(
     passage.figure_paths ?? [],
   );
+  /**
+   * 저장할 때 '글로 출제' 로 되돌려야 하는가.
+   *
+   * ⚠️ 이미지 출제 지문에 뒷부분을 이어 붙여도, 인쇄는 **잘라 둔 시작 쪽 이미지**를 쓰므로
+   *    되찾은 글이 여전히 안 나간다. 저장할 때 함께 바꿔야 한다(코덱스 리뷰).
+   */
+  const [backToText, setBackToText] = useState(false);
   const [saving, setSaving] = useState(false);
 
   /**
@@ -111,7 +118,10 @@ export default function PassageEditorCard({
     //    눌러 고칠 길이 이것뿐이다(자리표시자만 남고 경로가 안 들어간 상태를 푼다)
     await onSave({
       html, title, author, area_path: area, unit_path: unit, figure_paths: figurePaths,
+      // 이어 읽어 붙였으면 글로 되돌린다 — 잘라 둔 이미지는 시작 쪽만 담고 있다
+      ...(backToText ? { render_mode: 'text' as const } : {}),
     });
+    setBackToText(false);
     setSaving(false);
   };
 
@@ -129,6 +139,8 @@ export default function PassageEditorCard({
     // ⚠️ 읽는 동안(수십 초) 친 글을 잃지 않게 **끝난 뒤의** 본문 뒤에 붙인다
     const now = bodyRef.current;
     setHtml(now ? `${now}\n${result.html}` : result.html);
+    // 이미지 출제인 채로 두면 되찾은 글이 인쇄물에 안 나간다
+    if (passage.render_mode === 'image') setBackToText(true);
   };
 
   const toggleRenderMode = () => {
@@ -153,6 +165,9 @@ export default function PassageEditorCard({
         <Badge variant="outline">{passage.page_no}쪽</Badge>
         <Badge variant="outline">문항 {problemCount}개</Badge>
         {passage.render_mode === 'image' && <Badge variant="outline">이미지 출제</Badge>}
+        {backToText && (
+          <Badge className="bg-sky-500 text-white">저장하면 글로 출제</Badge>
+        )}
         {dirty && <Badge className="bg-sky-500 text-white">저장 안 됨</Badge>}
         {issues && issues.length > 0 && (
           <Badge className="bg-amber-500 text-white">확인 필요 {issues.length}</Badge>

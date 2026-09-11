@@ -66,6 +66,9 @@ export default function PageImageWithBoxes({
     if (!capturing) return;
     const at = pointAt(e);
     if (!at) return;
+    // ⚠️ 기본 동작을 막아야 한다. 안 막으면 브라우저가 **이미지 끌어놓기**를 시작하면서
+    //    포인터 흐름이 끊겨 `pointercancel` 로 끝난다 — 끌어 잡기가 아예 안 된다
+    e.preventDefault();
     // 포인터를 잡아 둔다 — 이미지 밖으로 끌고 나가도 끝까지 따라온다
     e.currentTarget.setPointerCapture(e.pointerId);
     setDrag({ x0: at.x, y0: at.y, x1: at.x, y1: at.y });
@@ -116,6 +119,9 @@ export default function PageImageWithBoxes({
         src={src}
         alt="원본 페이지"
         className="block w-full rounded border border-gray-200"
+        // 끌어 잡기와 부딪히는 브라우저 기본 끌어놓기를 아예 끈다
+        draggable={false}
+        onDragStart={(e) => e.preventDefault()}
         onLoad={() => setLoadedSrc(src)}
       />
       {/* 끌어 잡는 중에는 영역 단추를 걷어 낸다 — 겹치면 드래그가 상자에 먹힌다 */}
