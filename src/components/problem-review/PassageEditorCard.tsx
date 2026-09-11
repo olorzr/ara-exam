@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Image as ImageIcon, Trash2, Type } from 'lucide-react';
+import { ArrowUpToLine, Image as ImageIcon, Trash2, Type } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import ProblemHtmlEditor from '@/components/problem-editor/ProblemHtmlEditor';
+import PassageContinueButton from './PassageContinueButton';
 import AreaPathPicker from './AreaPathPicker';
 import type { AreaTreeNode } from '@/lib/problem-bank/area-tree';
 import { UNIT_DEPTH_LABELS } from '@/lib/problem-bank/unit-tree';
@@ -28,6 +29,20 @@ interface PassageEditorCardProps {
   onDirtyChange?: (dirty: boolean) => void;
   /** OCR 이 이 지문에 남긴 확인거리 — 위 배너의 경고를 카드에도 붙인다 */
   issues?: string[];
+  /**
+   * 다음 쪽에서 이어지는 본문을 읽어 온다. AI 가 꺼져 있거나 원본이 없으면 없다.
+   * 읽어 온 글은 **본문 끝에 붙여 보여 주기만** 하고 저장은 사람이 누른다.
+   */
+  onContinue?: (page: number, soFarHtml: string) => Promise<{ html: string } | null>;
+  /** 이 지문의 이어 읽기가 도는 중인가 */
+  continuing?: boolean;
+  /** 원본 문서의 쪽 수 — 없는 쪽을 읽으러 가지 않게 가둔다 */
+  sourcePageCount?: number;
+  /**
+   * 이 지문을 **앞 지문에 이어 붙인다.** 읽는 순서상 앞 지문이 있을 때만 온다.
+   * 쪽을 넘어가는 지문이 둘로 갈라져 저장됐을 때 손으로 합치는 길이다.
+   */
+  onMergeIntoPrevious?: () => void;
 }
 
 /**
@@ -37,7 +52,7 @@ interface PassageEditorCardProps {
  */
 export default function PassageEditorCard({
   passage, problemCount, areaTree, unitTree, selected, onSelect, onSave, onDelete, onDirtyChange,
-  issues,
+  issues, onContinue, continuing, sourcePageCount, onMergeIntoPrevious,
 }: PassageEditorCardProps) {
   const [html, setHtml] = useState(passage.html);
   const [title, setTitle] = useState(passage.title);
@@ -61,6 +76,18 @@ export default function PassageEditorCard({
     setSaving(true);
     await onSave({ html, title, author, area_path: area, unit_path: unit });
     setSaving(false);
+  };
+
+  /**
+   * 다음 쪽에서 이어지는 글을 읽어 **본문 끝에 붙인다.**
+   *
+   * ⚠️ 저장하지 않는다 — 카드가 '저장 안 됨' 이 되고 사람이 확인한 뒤 누른다.
+   *    잘못 읽었을 때 되돌릴 길이 있어야 한다.
+   */
+  const handleContinue = async (page: number) => {
+    const result = await onContinue?.(page, html);
+    if (!result?.html) return;
+    setHtml((prev) => (prev ? `${prev}\n${result.html}` : result.html));
   };
 
   const toggleRenderMode = () => {
@@ -96,6 +123,16 @@ export default function PassageEditorCard({
               {passage.render_mode === 'image'
                 ? <><Type className="h-3.5 w-3.5" /><span className="ml-1">글로 출제</span></>
                 : <><ImageIcon className="h-3.5 w-3.5" /><span className="ml-1">이미지로 출제</span></>}
+            </Button>
+          )}
+          {onMergeIntoPrevious && (
+            <Button
+              type="button" variant="outline" size="sm"
+              onClick={onMergeIntoPrevious}
+              title="이 지문을 바로 앞 지문의 뒤에 붙입니다"
+            >
+              <ArrowUpToLine className="h-3.5 w-3.5" />
+              <span className="ml-1">앞 지문에 붙이기</span>
             </Button>
           )}
           <Button
@@ -138,6 +175,15 @@ export default function PassageEditorCard({
           <Label className="text-xs text-gray-500">본문</Label>
           <ProblemHtmlEditor value={html} onChange={setHtml} minHeight={200} ariaLabel="지문 본문" />
         </div>
+
+        {onContinue && (
+          <PassageContinueButton
+            defaultPage={passage.page_no + 1}
+            maxPage={sourcePageCount ?? 0}
+            busy={continuing ?? false}
+            onRead={handleContinue}
+          />
+        )}
 
         <AreaPathPicker tree={areaTree} value={area} onChange={setArea} />
         <AreaPathPicker

@@ -24,9 +24,12 @@ const PHASE_LABEL: Record<OcrRunProgress['phase'], string> = {
  * `useAiEnabled` 는 화면이 뜰 때 한 번만 물어본다. 탭을 열어 둔 사이에 기능을 껐다면
  * 그 탭에서는 계속 새 작업이 나가 버린다 — 배포 없이 끄는 스위치가 되지 못한다.
  * 확인 자체가 실패해도 **막는다**(fail-closed) — 코덱스 리뷰 13R.
+ *
+ * 검수 화면의 '다음 쪽 이어 읽기' 도 같은 것을 쓴다 — 게이트가 두 벌이면
+ * 한쪽만 고쳐져 꺼 둔 기능이 계속 나간다.
  * @returns 지금 써도 되면 true
  */
-async function ocrStillEnabled(): Promise<boolean> {
+export async function ocrStillEnabled(): Promise<boolean> {
   try {
     const res = await authFetch('/api/ai/status');
     if (!res.ok) return false;

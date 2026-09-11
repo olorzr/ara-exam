@@ -29,6 +29,14 @@ interface ReviewCardListProps {
   toggleVerified: (id: string, verified: boolean, knownUpdatedAt?: string) => void;
   deletePassage: (id: string) => void;
   deleteProblem: (id: string) => void;
+  /** 다음 쪽에서 이어지는 본문 읽어 오기. AI 가 꺼져 있으면 없다 */
+  continuePassage?: (id: string, page: number, soFarHtml: string) => Promise<{ html: string } | null>;
+  /** 이어 읽기가 도는 지문 id */
+  continuingId?: string | null;
+  /** 원본 문서의 쪽 수 */
+  sourcePageCount?: number;
+  /** 지문 둘을 하나로 — 뒤 지문을 앞 지문에 붙인다 */
+  mergePassage?: (targetId: string, sourceId: string) => void;
 }
 
 /**
@@ -40,6 +48,7 @@ interface ReviewCardListProps {
 export default function ReviewCardList({
   rows, passages, problems, mountKey, areaTree, unitTree, selectedId, issues,
   onSelect, onDirtyChange, savePassage, saveProblem, toggleVerified, deletePassage, deleteProblem,
+  continuePassage, continuingId, sourcePageCount, mergePassage,
 }: ReviewCardListProps) {
   if (rows.length === 0) {
     return (
@@ -65,8 +74,11 @@ export default function ReviewCardList({
     <>
       {rows.map((row) => {
         if (row.kind === 'passage') {
-          const passage = passages.find((p) => p.id === row.id);
+          const index = passages.findIndex((p) => p.id === row.id);
+          const passage = passages[index];
           if (!passage) return null;
+          // 읽는 순서상 바로 앞 지문 — 갈라진 지문은 대개 그 뒤에 붙는다
+          const previous = index > 0 ? passages[index - 1] : null;
           return (
             <PassageEditorCard
               key={`${passage.id}:${mountKey(passage.id)}`}
@@ -82,6 +94,14 @@ export default function ReviewCardList({
               onSave={(patch) => savePassage(passage.id, patch)}
               onDirtyChange={(dirty) => onDirtyChange(passage.id, dirty)}
               onDelete={() => deletePassage(passage.id)}
+              onContinue={continuePassage
+                ? (page, soFarHtml) => continuePassage(passage.id, page, soFarHtml)
+                : undefined}
+              continuing={continuingId === passage.id}
+              sourcePageCount={sourcePageCount}
+              onMergeIntoPrevious={mergePassage && previous
+                ? () => mergePassage(previous.id, passage.id)
+                : undefined}
             />
           );
         }

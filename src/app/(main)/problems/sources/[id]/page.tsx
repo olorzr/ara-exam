@@ -9,7 +9,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useProblemReview } from '@/hooks/useProblemReview';
 import { useReviewFocus } from '@/hooks/useReviewFocus';
 import { useSourceTrees } from '@/hooks/useSourceTrees';
-import { setSourceStatus } from '@/lib/problem-bank/mutations';
+import { useAiEnabled } from '@/hooks/useAiEnabled';
+import { usePassageContinuation } from '@/hooks/usePassageContinuation';
+import { useReviewGuards } from '@/hooks/useReviewGuards';
+import { setSourceStatus } from '@/lib/problem-bank/mutations-source';
 import { sourceLabel } from '@/lib/problem-bank/source-label';
 import PageImageWithBoxes, { type BoxOverlay } from '@/components/problem-review/PageImageWithBoxes';
 import ReviewCardList, { type ReviewRow } from '@/components/problem-review/ReviewCardList';
@@ -33,6 +36,9 @@ function ProblemSourceReviewContent() {
   const review = useProblemReview(sourceId);
 
   const { areaTree, unitTree } = useSourceTrees(review.source);
+  const ai = useAiEnabled();
+  // 이미 저장된 지문이 잘려 있을 때 그 쪽 한 장만 다시 읽는다(ChatGPT 1회)
+  const continuation = usePassageContinuation(review.source);
   /**
    * 저장하지 않은 수정이 있는 문항.
    *
@@ -115,6 +121,9 @@ function ProblemSourceReviewContent() {
     [review.source],
   );
 
+  // 미저장 수정을 지키는 확인 절차는 한 곳에 모아 둔다 — 세 가지가 규칙이 서로 다르다
+  const guards = useReviewGuards(review, dirtyIds);
+
   const markDirty = useCallback((id: string, dirty: boolean) => {
     setDirtyIds((prev) => {
       if (prev.has(id) === dirty) return prev;
@@ -140,48 +149,6 @@ function ProblemSourceReviewContent() {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '상태를 바꾸지 못했어요.');
     }
-  };
-
-  /**
-   * 지문을 지운다 — 딸린 문항을 다시 읽으면서 **모든 카드가 다시 마운트된다**.
-   * 다른 카드에서 고치던 내용까지 사라지므로 먼저 알린다
-   * (지우는 카드 자신은 어차피 없어지므로 셈에서 뺀다 — 코덱스 리뷰 16R).
-   */
-  const removePassageWithGuard = (passageId: string) => {
-    const others = [...dirtyIds].filter((id) => id !== passageId);
-    if (others.length > 0) {
-      const ok = window.confirm(
-        `다른 카드에 저장하지 않은 수정이 ${others.length}개 있어요.\n`
-        + '지문을 지우면 문항을 다시 읽어 오면서 그 수정이 사라집니다. 계속할까요?',
-      );
-      if (!ok) return;
-    }
-    review.removePassage(passageId);
-  };
-
-  /**
-   * 지문을 저장한다.
-   *
-   * ⚠️ **작품명을 바꾸면 딸린 문항의 작품명까지 DB 트리거가 함께 바꾼다.** 그러면 그
-   *    문항들의 `updated_at` 이 올라가므로 훅이 본문을 다시 읽고 **그 문항 카드만**
-   *    다시 마운트한다 — 거기서 고치던 내용은 사라진다. 상관없는 카드는 그대로 둔다.
-   */
-  const savePassageWithGuard = async (passageId: string, patch: Parameters<typeof review.savePassage>[1]) => {
-    const passage = review.passages.find((p) => p.id === passageId);
-    const titleChanged = patch.title !== undefined && passage && patch.title !== passage.title;
-    if (titleChanged) {
-      // 실제로 영향받는 것은 **이 지문에 딸린 문항**뿐이다 — 개수를 부풀려 겁주지 않는다
-      const affected = review.problems
-        .filter((p) => p.passage_id === passageId && dirtyIds.has(p.id));
-      if (affected.length > 0) {
-        const ok = window.confirm(
-          '작품명을 바꾸면 딸린 문항의 작품명도 함께 바뀝니다.\n'
-          + `그 문항을 다시 읽어 오므로 저장하지 않은 수정 ${affected.length}개가 사라집니다. 계속할까요?`,
-        );
-        if (!ok) return false;
-      }
-    }
-    return review.savePassage(passageId, patch);
   };
 
   if (review.loading || review.busy) {
@@ -270,11 +237,17 @@ function ProblemSourceReviewContent() {
             issues={issues}
             onSelect={focus.selectCard}
             onDirtyChange={markDirty}
-            savePassage={savePassageWithGuard}
+            savePassage={guards.savePassage}
             saveProblem={review.saveProblem}
             toggleVerified={review.toggleVerified}
-            deletePassage={removePassageWithGuard}
+            deletePassage={guards.removePassage}
             deleteProblem={review.removeProblem}
+            continuePassage={ai.features.problem_ocr
+              ? (id, page, soFarHtml) => continuation.read(id, page, soFarHtml)
+              : undefined}
+            continuingId={continuation.busyId}
+            sourcePageCount={source.page_count}
+            mergePassage={guards.mergePassage}
           />
         </div>
       </div>

@@ -1,7 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { sanitizeInlineHTML, sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import { normalizeWorkTitle } from '@/lib/problem-bank/work-title';
-import { normalizeCategoryName } from '@/lib/category-name';
 import { normalizeGrammarPaths } from './grammar-tree';
 import type { Bbox, Problem, RenderMode } from '@/types/problem-bank';
 
@@ -201,18 +200,6 @@ export async function deletePassage(id: string): Promise<void> {
 }
 
 /**
- * 출처를 지운다. 지문·문항이 CASCADE 로 함께 사라진다.
- *
- * ⚠️ 이미 만든 문제지는 **스냅샷**이라 계속 인쇄된다(항목의 problem_id 만 null 이 된다).
- * @param id - 출처 id
- * @throws 삭제 실패 시
- */
-export async function deleteSource(id: string): Promise<void> {
-  const { error } = await supabase.from('problem_sources').delete().eq('id', id);
-  if (error) throw error;
-}
-
-/**
  * 이 문항들이 이미 쓰인 문제지 수 — 지우기 전에 알려 주려고 센다.
  * @param problemIds - 문항 id 들
  * @returns 문제지 개수
@@ -229,86 +216,25 @@ export async function countPapersUsing(problemIds: string[]): Promise<number> {
 }
 
 /**
- * 출처 상태를 바꾼다(검수중 → 완료).
- * @param id - 출처 id
- * @param status - 새 상태
- * @throws 저장 실패 시
- */
-export async function setSourceStatus(id: string, status: string): Promise<void> {
-  const { error } = await supabase.from('problem_sources').update({ status }).eq('id', id);
-  if (error) throw error;
-}
-
-/**
- * 출처의 교과서를 바꾼다 — 이미 붙은 단원 태그도 같은 트랜잭션에서 정리한다.
+ * 갈라진 지문 둘을 하나로 — 뒤 지문을 앞 지문에 이어 붙인다.
  *
- * 업로드 때 못 골랐거나 잘못 고른 것을 검수에서 고칠 수 있어야 한다 — 교과서가 없으면
- * 단원 칸 자체가 안 뜨므로, 이 경로가 없으면 옛 출처는 **영영 분류할 수 없다**
- * (코덱스 리뷰 1R).
+ * 쪽을 넘어가는 지문이 두 개로 저장되는 일이 있다(모델이 '이어진다' 표시를 빠뜨렸거나,
+ * 겹쳐 읽은 묶음이 뒷부분만 따로 내놓았을 때). 앱이 대부분을 자동으로 잇지만
+ * 이미 아카이브에 들어간 것은 손으로 합칠 길이 있어야 한다.
  *
- * ⚠️ **RPC 한 번으로 보낸다.** 문항·지문·출처를 UPDATE 세 번으로 나누면 중간에 하나가
- *    실패했을 때 "태그만 사라지고 교과서는 그대로" 가 되어 손으로 붙인 분류를 잃는다
- *    (코덱스 리뷰 3R). DB 함수가 한 트랜잭션으로 처리한다.
- * @param id - 출처 id
- * @param textbook - 교과서 이름 ('' 는 미지정)
- * @param clearUnits - 이미 붙은 단원 태그를 함께 지울지
- * @returns 저장된 이름
+ * ⚠️ **RPC 한 번으로 보낸다.** 본문·문항·삭제를 UPDATE 셋으로 나누면 중간에 하나가
+ *    실패했을 때 '본문은 합쳐졌는데 문항은 옛 지문에 남은' 상태가 되고, 인쇄에서
+ *    같은 지문이 두 번 나온다(setSourceTextbook 과 같은 까닭).
+ * @param targetId - 앞 지문 (남는 쪽)
+ * @param sourceId - 뒤 지문 (사라지는 쪽)
+ * @returns 앞 지문의 새 updated_at
+ * @throws 합치지 못했을 때
  */
-export async function setSourceTextbook(
-  id: string,
-  textbook: string,
-  clearUnits: boolean,
-): Promise<string> {
-  const { data, error } = await supabase.rpc('set_source_textbook', {
-    p_source_id: id,
-    p_textbook: normalizeCategoryName(textbook),
-    p_clear_units: clearUnits,
+export async function mergePassages(targetId: string, sourceId: string): Promise<string> {
+  const { data, error } = await supabase.rpc('merge_passages', {
+    p_target: targetId,
+    p_source: sourceId,
   });
   if (error) throw error;
   return (data as string) ?? '';
 }
-
-/**
- * 문항 여러 개에 문법 분류를 **덧붙인다** (아카이브의 일괄 태깅).
- *
- * ⚠️ **RPC 한 번으로 보낸다.** PostgREST 로는 배열 append 를 못 해서 행마다
- *    읽고-합치고-쓰면 한 쪽에 60왕복이고, 그 사이 다른 사람이 붙인 태그를 덮어쓴다.
- *
- * 합집합이라 기존 태그를 지우지 않는다 — 그래서 낙관적 동시성 조건이 없다.
- * 이미 상한(5개)까지 찬 문항에는 아무것도 붙지 않는다(기존 것을 밀어내지 않는다).
- * @param problemIds - 문항 id 들
- * @param paths - 붙일 경로 문자열들
- * @returns 실제로 바뀐 문항 수
- * @throws 저장 실패 시
- */
-export async function addGrammarPaths(problemIds: string[], paths: string[]): Promise<number> {
-  const ids = [...new Set(problemIds)];
-  const values = normalizeGrammarPaths(paths);
-  if (ids.length === 0 || values.length === 0) return 0;
-
-  const { data, error } = await supabase.rpc('add_grammar_paths', {
-    p_problem_ids: ids,
-    p_paths: values,
-  });
-  if (error) throw error;
-  return (data as number) ?? 0;
-}
-
-/**
- * 이 출처에서 단원이 붙어 있는 문항·지문 수를 센다.
- * @param sourceId - 출처 id
- * @returns 태깅된 행 수
- */
-export async function countTaggedUnits(sourceId: string): Promise<number> {
-  const counts = await Promise.all(['problems', 'passages'].map(async (table) => {
-    const { count, error } = await supabase
-      .from(table)
-      .select('id', { count: 'exact', head: true })
-      .eq('source_id', sourceId)
-      .not('unit_path', 'eq', '{}');
-    if (error) throw error;
-    return count ?? 0;
-  }));
-  return counts[0] + counts[1];
-}
-

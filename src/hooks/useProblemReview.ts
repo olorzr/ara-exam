@@ -1,16 +1,16 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useReviewMountKeys } from './useReviewMountKeys';
 import { toast } from 'sonner';
+import { fetchProblemsOfSource } from '@/lib/problem-bank/queries';
+import { loadReviewData } from '@/lib/problem-bank/review-data';
 import {
-  fetchPassages, fetchProblemsOfSource, fetchSource,
-} from '@/lib/problem-bank/queries';
-import {
-  ConflictError, countTaggedUnits, deletePassage, deleteProblem,
-  setProblemVerified, setSourceTextbook, updatePassage, updateProblem,
+  ConflictError, deletePassage, deleteProblem, mergePassages,
+  setProblemVerified, updatePassage, updateProblem,
   type PassagePatch, type ProblemPatch,
 } from '@/lib/problem-bank/mutations';
-import { signProblemFiles } from '@/lib/problem-bank/storage';
+import { countTaggedUnits, setSourceTextbook } from '@/lib/problem-bank/mutations-source';
 import { sourcePagePath } from '@/lib/problem-bank/storage-paths';
 import type { Passage, Problem, ProblemSource } from '@/types/problem-bank';
 
@@ -27,51 +27,22 @@ export function useProblemReview(sourceId: string) {
   const [pageUrls, setPageUrls] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  /**
-   * 서버에서 본문을 통째로 다시 읽어 온 횟수.
-   *
-   * ⚠️ 편집 카드는 폼 값을 **지역 state** 로 들고 있다. 서버 본문을 새로 받아 놓고
-   *    카드를 그대로 두면, 화면에는 옛 입력이 남은 채 새 버전 토큰만 붙는다 —
-   *    그 상태로 저장하면 **남의 수정을 조용히 덮어쓴다**(코덱스 리뷰 4R).
-   *    호출부가 이 값을 카드 key 에 섞어 다시 마운트하게 한다.
-   */
-  const [reloadSeq, setReloadSeq] = useState(0);
-  /**
-   * 문항별 다시 마운트 세대.
-   *
-   * 지문 작품명을 바꾸면 **그 지문에 딸린 문항만** 서버에서 값이 바뀐다. 그런데
-   * `reloadSeq` 는 화면의 카드를 통째로 다시 마운트하므로, 상관없는 문항에서 고치던
-   * 내용까지 함께 사라진다. 바뀐 문항만 골라 세대를 올려 **피해를 그 문항들로 좁힌다**.
-   */
-  const [itemSeq, setItemSeq] = useState<Map<string, number>>(new Map());
-  /**
-   * 화면 전체를 잠가야 하는 일이 도는 중인가(교과서 변경).
-   * 끝나면 카드를 다시 마운트하므로, 그 사이 새로 친 내용은 어차피 사라진다 —
-   * 아예 못 치게 걷어 내는 편이 정직하다.
-   */
+  const { reloadSeq, mountKey, bumpAll, bumpItems } = useReviewMountKeys();
+
+  // 화면 전체를 잠가야 하는 일이 도는 중인가(교과서 변경·지문 합치기).
+  // 끝나면 카드를 다시 마운트하므로 그 사이 새로 친 내용은 어차피 사라진다 —
+  // 아예 못 치게 걷어 내는 편이 정직하다.
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [src, ps, qs] = await Promise.all([
-        fetchSource(sourceId),
-        fetchPassages(sourceId),
-        fetchProblemsOfSource(sourceId),
-      ]);
-      setSource(src);
-      setPassages(ps);
-      setProblems(qs);
-
-      // 원본 대조용 페이지 이미지 — 쓰인 쪽만 한 번에 서명한다
-      const pages = [...new Set([...ps.map((p) => p.page_no), ...qs.map((q) => q.page_no)])]
-        .filter((n) => n >= 1);
-      // 원본 대조용 페이지 이미지 — OCR 이 읽은 쪽(정답표·이어지는 쪽 포함)을 모두 서명한다.
-      // 항목이 있는 쪽만 서명하면 정답표 쪽이 빠져 정답을 대조할 수 없다
-      const ocrPages = (src?.ocr_meta?.pages ?? []).filter((n) => Number.isInteger(n) && n >= 1);
-      const allPages = [...new Set([...pages, ...ocrPages])].sort((a, b) => a - b);
-      setPageUrls(await signProblemFiles(allPages.map((n) => sourcePagePath(sourceId, n))));
+      const data = await loadReviewData(sourceId);
+      setSource(data.source);
+      setPassages(data.passages);
+      setProblems(data.problems);
+      setPageUrls(data.pageUrls);
     } catch (e) {
       setError(e instanceof Error ? e.message : '불러오지 못했어요.');
     } finally {
@@ -164,18 +135,14 @@ export function useProblemReview(sourceId: string) {
         setProblems((list) => list.map((p) => (
           affected.includes(p.id) ? byId.get(p.id) ?? p : p
         )));
-        setItemSeq((prev) => {
-          const next = new Map(prev);
-          for (const problemId of affected) next.set(problemId, (next.get(problemId) ?? 0) + 1);
-          return next;
-        });
+        bumpItems(affected);
       }
       return true;
     } catch (e) {
       reportError(e);
       return false;
     }
-  }, [passages, sourceId]);
+  }, [passages, sourceId, bumpItems]);
 
   /**
    * 검수 완료 표시를 켜고 끈다.
@@ -230,14 +197,14 @@ export function useProblemReview(sourceId: string) {
         setProblems(await fetchProblemsOfSource(sourceId));
         // 편집 카드도 다시 마운트시킨다 — 새 본문 위에 옛 입력이 남으면
         // 그대로 저장할 때 남의 수정을 덮어쓴다
-        setReloadSeq((n) => n + 1);
+        bumpAll();
       }
 
       toast.success('지문을 지웠어요. 문항은 남아 있어요.');
     } catch (e) {
       reportError(e);
     }
-  }, [problems, sourceId]);
+  }, [problems, sourceId, bumpAll]);
 
   /**
    * 교과서를 바꾼다 — 단원 트리가 여기에 달려 있어 검수 중에도 고칠 수 있어야 한다.
@@ -277,14 +244,43 @@ export function useProblemReview(sourceId: string) {
       setSource((prev) => (prev ? { ...prev, textbook: saved } : prev));
       // 카드가 들고 있던 옛 단원·입력을 버린다 — 태그 개수와 무관하게 늘 다시 읽고 마운트한다
       await load();
-      setReloadSeq((n) => n + 1);
+      bumpAll();
       toast.success(saved ? `교과서를 '${saved}' 로 바꿨어요.` : '교과서를 지웠어요.');
     } catch (e) {
       reportError(e);
     } finally {
       setBusy(false);
     }
-  }, [sourceId, load]);
+  }, [sourceId, load, bumpAll]);
+
+  /**
+   * 갈라진 지문 둘을 하나로 — 뒤 지문을 앞 지문에 이어 붙인다.
+   *
+   * ⚠️ 끝나면 **통째로 다시 읽고 카드도 다시 마운트한다.** 문항이 지문을 옮겨 가고
+   *    한 지문이 사라지므로, 어느 카드가 영향받았는지 좁힐 수 없다 — 교과서 변경과
+   *    같은 성질이라 같은 방식으로 다룬다. 그래서 호출부가 **먼저 물어봐야** 한다.
+   * @param targetId - 앞 지문 (남는 쪽)
+   * @param sourceId - 뒤 지문 (사라지는 쪽)
+   * @returns 합쳤는가
+   */
+  const mergePassageInto = useCallback(async (
+    targetId: string,
+    sourceId: string,
+  ): Promise<boolean> => {
+    setBusy(true);
+    try {
+      await mergePassages(targetId, sourceId);
+      await load();
+      bumpAll();
+      toast.success('지문을 이어 붙였어요. 본문을 확인해 주세요.');
+      return true;
+    } catch (e) {
+      reportError(e);
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, [load, bumpAll]);
 
   const verifiedCount = useMemo(
     () => problems.filter((p) => p.status === '검수완료').length,
@@ -296,20 +292,9 @@ export function useProblemReview(sourceId: string) {
     [pageUrls, sourceId],
   );
 
-  /**
-   * 이 카드를 몇 번째로 마운트하는가 — 호출부가 `key` 에 섞는다.
-   * 전체 세대(`reloadSeq`)와 문항별 세대를 합친다.
-   * @param id - 문항·지문 id
-   * @returns 세대 문자열
-   */
-  const mountKey = useCallback(
-    (id: string) => `${reloadSeq}:${itemSeq.get(id) ?? 0}`,
-    [reloadSeq, itemSeq],
-  );
-
   return {
     source, passages, problems, loading, busy, error, verifiedCount, reloadSeq, mountKey,
     reload: load, saveProblem, savePassage, toggleVerified, changeTextbook,
-    removeProblem, removePassage, pageUrlFor,
+    removeProblem, removePassage, mergePassageInto, pageUrlFor,
   };
 }

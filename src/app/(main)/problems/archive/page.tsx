@@ -16,7 +16,8 @@ import { useProblemArchive, type ArchiveRow } from '@/hooks/useProblemArchive';
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls';
 import { filtersFromParams, filtersToQueryString, type ProblemFilters } from '@/lib/problem-bank/filters';
 import { formatGrammarPath } from '@/lib/problem-bank/grammar-tree';
-import { addGrammarPaths, countPapersUsing, deleteProblems } from '@/lib/problem-bank/mutations';
+import { countPapersUsing, deleteProblems } from '@/lib/problem-bank/mutations';
+import { addGrammarPaths } from '@/lib/problem-bank/mutations-source';
 import { PROBLEM_PAGE_SIZE } from '@/lib/problem-bank/queries';
 import { bulkDeleteConfirmMessage, pageAfterDelete } from '@/lib/problem-bank/selection';
 
