@@ -46,9 +46,19 @@ BEGIN
     RAISE EXCEPTION '다른 출처의 지문끼리는 합칠 수 없습니다' USING ERRCODE = 'invalid_parameter_value';
   END IF;
 
-  -- 뒤 지문의 그림은 앞 지문 것 **뒤로** 밀린다. 상한을 넘는 것은 붙이지 않는다
+  -- 뒤 지문의 그림은 앞 지문 것 **뒤로** 밀린다.
   v_offset := cardinality(v_target.figure_paths);
   v_room   := GREATEST(c_max_figures - v_offset, 0);
+
+  -- ⚠️ 자리가 모자라면 **아무것도 건드리지 않고 멈춘다.** 넘치는 그림만 조용히 버리고
+  --    성공했다고 알리면, 지문은 지워진 뒤라 되돌릴 길이 없다. 사람이 먼저 그림을
+  --    정리하도록 까닭을 그대로 알린다
+  IF cardinality(v_source.figure_paths) > v_room THEN
+    RAISE EXCEPTION
+      '두 지문의 그림이 %개라 합칠 수 없습니다(최대 %개). 그림을 먼저 정리해 주세요.',
+      v_offset + cardinality(v_source.figure_paths), c_max_figures
+      USING ERRCODE = 'check_violation';
+  END IF;
 
   -- 뒤 지문 본문의 자리표시자 번호를 그만큼 민다. 밀지 않으면 뒤 지문의 '1번' 이
   -- 앞 지문의 1번 그림을 가리킨다. 자리가 없어 못 붙인 그림의 표시는 지운다.
@@ -56,13 +66,14 @@ BEGIN
   v_html := COALESCE(v_source.html, '');
   IF v_offset > 0 THEN
     FOR i IN REVERSE c_max_figures..1 LOOP
-      IF i <= cardinality(v_source.figure_paths) AND i <= v_room THEN
+      IF i <= cardinality(v_source.figure_paths) THEN
         v_html := replace(
           v_html,
           '<figure data-figure="' || i || '"></figure>',
           '<figure data-figure="' || (i + v_offset) || '"></figure>'
         );
       ELSE
+        -- 가리킬 그림이 없는 표시는 지운다(경로보다 표시가 많은 어긋난 행)
         v_html := replace(v_html, '<figure data-figure="' || i || '"></figure>', '');
       END IF;
     END LOOP;
@@ -76,7 +87,7 @@ BEGIN
       ELSE v_target.html || E'\n' || v_html
     END,
     -- 그림 경로도 같은 순서로 이어 붙인다 — 본문 자리표시자와 순번으로 짝을 이룬다
-    figure_paths = v_target.figure_paths || v_source.figure_paths[1:v_room],
+    figure_paths = v_target.figure_paths || v_source.figure_paths,
     -- 빈 칸만 채운다 — 앞 지문에 이미 있는 값은 건드리지 않는다(앱의 병합 규칙과 같다).
     -- 뒤 조각에서만 작품명·지은이를 알아본 경우가 흔하다(앞 쪽에는 머리글이 없다)
     title      = CASE WHEN COALESCE(v_target.title, '')  = '' THEN v_source.title  ELSE v_target.title  END,

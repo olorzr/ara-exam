@@ -528,6 +528,27 @@ describe('mergeOcrDrafts — 모델이 이어짐 표시를 빠뜨릴 때', () =>
 
     expect(res.passages).toHaveLength(1);
     expect(res.passages[0].html).toContain('지문 앞부분');
+    // ⚠️ 갈아 끼우지 않되 **새로 읽어 낸 것도 버리지 않는다**
+    expect(res.passages[0].html).toContain('훨씬 더 길게 읽힌');
+    expect(said(res)).toContain('앞부분이 겹쳐 보일 수 있어요');
+  });
+
+  it('가리키기만 하는 자리를 다시 봐도 통째로 같으면 두 번 붙이지 않는다', () => {
+    const res = mergeOcrDrafts([
+      batch([passage({
+        ref: 'P1', page: 3, html: '<p>지문 앞부분</p><p>뒷부분 글이 여기 다 들어 있다</p>',
+      })], [3, 4]),
+      batch([passage({
+        ref: 'P1', page: 4, label: null, continued: true,
+        html: '<p>뒷부분 글이 여기 다 들어 있다</p>',
+      })], [4, 5]),
+      batch([passage({
+        ref: 'P1', page: 4, label: null, continued: true,
+        html: '<p>뒷부분 글이 여기 다 들어 있다</p>',
+      })], [4, 5, 6]),
+    ], { newId });
+
+    expect(res.passages[0].html.match(/뒷부분 글이 여기 다 들어 있다/g)).toHaveLength(1);
   });
 
   it('중복이라 안 붙여도 그 조각을 가리킨 문항은 이 지문에 붙는다', () => {

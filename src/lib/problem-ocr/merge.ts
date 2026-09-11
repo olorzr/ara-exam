@@ -189,6 +189,22 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
         //    지문 앞부분과 그림이 통째로 날아간다
         if (existing.alias) {
           fillPassageGaps(existing.work.draft, item);
+          // ⚠️ 갈아 끼우지는 않되 **새로 읽어 낸 것은 버리지 않는다.** 이번 판이 글을
+          //    더 읽었거나 그림을 알아봤을 수 있는데, 그냥 넘기면 그것이 사라진다
+          if (alreadyContains(existing.work, item) !== 'duplicate') {
+            appendFragment(existing.work, item);
+            warn({
+              message: '이어지는 글의 앞부분이 겹쳐 보일 수 있어요. 검수에서 확인해 주세요.',
+              targets: [{
+                kind: 'passage',
+                id: existing.work.draft.id,
+                page: existing.work.draft.page_no,
+                label: itemTargetLabel({
+                  kind: 'passage', page: existing.work.draft.page_no,
+                }),
+              }],
+            });
+          }
           refToId.set(item.ref, existing.work.draft.id);
           continue;
         }
