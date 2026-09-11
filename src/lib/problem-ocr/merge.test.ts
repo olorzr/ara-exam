@@ -543,6 +543,24 @@ describe('mergeOcrDrafts — 쪽을 넘어가는 지문의 그림', () => {
     expect(res.passages[0].html).toContain('data-figure="1"');
   });
 
+  it('겹쳐 읽은 판에서 새로 알아본 그림을 살린다 — 글만 갈면 그 그림이 사라진다', () => {
+    const res = mergeOcrDrafts([
+      batch([passage({ ref: 'P1', page: 3, html: '<p>앞</p>', continues: true })], [3]),
+      // 처음에는 그림을 못 알아봤다
+      batch([passage({
+        ref: 'P1', page: 4, label: null, html: '<p>뒤</p>', figures: [], continued: true,
+      })], [4]),
+      // 겹쳐 읽은 묶음이 같은 조각을 더 온전히 보며 도표를 알아봤다
+      batch([passage({
+        ref: 'P1', page: 4, label: null, html: `<p>뒤가 더 온전하게 읽혔다</p>${fig(1)}`,
+        figures: [box(0.5)], continued: true,
+      })], [4, 5]),
+    ], { newId });
+
+    expect(res.passages[0].figures).toEqual([{ page: 4, box: box(0.5) }]);
+    expect(res.passages[0].html).toContain('data-figure="1"');
+  });
+
   it('겹쳐 읽은 그림은 같은 쪽에서 읽은 것만 받는다 — 좌표와 쪽은 짝이다', () => {
     const res = mergeOcrDrafts([
       batch([passage({ ref: 'P1', page: 2, html: '<p>지문</p>', figures: [] })], [1, 2]),

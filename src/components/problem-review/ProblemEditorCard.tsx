@@ -13,6 +13,7 @@ import { sanitizeInlineHTML } from '@/lib/sanitize-problem';
 import AreaPathPicker from './AreaPathPicker';
 import FigureStrip from './FigureStrip';
 import { useFigureEditor } from '@/hooks/useFigureEditor';
+import { useTrackedState } from '@/hooks/useTrackedState';
 import type { Bbox } from '@/types/problem-bank';
 import GrammarTagPicker from './GrammarTagPicker';
 import type { AreaTreeNode } from '@/lib/problem-bank/area-tree';
@@ -78,7 +79,9 @@ export default function ProblemEditorCard({
   problem, areaTree, unitTree, selected, onSelect, onSave, onToggleVerified, onDelete, onDirtyChange,
   issues, figureUrls, onStartCapture, capturing,
 }: ProblemEditorCardProps) {
-  const [stem, setStem] = useState(problem.stem_html);
+  // 값과 함께 최신 ref 를 든다 — 그림을 붙이는 동안 친 글을 잃지 않으려면
+  // 다 올린 **뒤에** 발문을 읽어야 한다
+  const [stem, setStem, bodyRef] = useTrackedState(problem.stem_html);
   const [choices, setChoices] = useState<string[]>(problem.choices);
   const [answer, setAnswer] = useState(problem.answer);
   const [type, setType] = useState<QuestionType>(problem.question_type);
@@ -86,7 +89,9 @@ export default function ProblemEditorCard({
   const [unit, setUnit] = useState<string[]>(problem.unit_path);
   const [grammar, setGrammar] = useState<string[]>(problem.grammar_paths);
   const [workTitle, setWorkTitle] = useState(problem.work_title);
-  const [figurePaths, setFigurePaths] = useState<string[]>(problem.figure_paths);
+  const [figurePaths, setFigurePaths, pathsRef] = useTrackedState<string[]>(
+    problem.figure_paths,
+  );
   const [saving, setSaving] = useState(false);
 
   /**
@@ -95,6 +100,7 @@ export default function ProblemEditorCard({
    */
   const figures = useFigureEditor({
     kind: 'problem',
+    read: () => ({ html: bodyRef.current, paths: pathsRef.current }),
     id: problem.id,
     save: async (next) => {
       const updatedAt = await onSave({ stem_html: next.html, figure_paths: next.paths });
@@ -104,12 +110,12 @@ export default function ProblemEditorCard({
   });
 
   const handleCapture = async (bbox: Bbox, pageUrl: string) => {
-    const next = await figures.capture(bbox, pageUrl, stem, figurePaths);
+    const next = await figures.capture(bbox, pageUrl);
     if (next !== null) setStem(next);
   };
 
   const handleRemoveFigure = async (index: number) => {
-    const next = await figures.remove(index, stem, figurePaths);
+    const next = await figures.remove(index);
     if (next !== null) setStem(next);
   };
 

@@ -2,9 +2,7 @@
 
 import type { Bbox } from '@/types/problem-bank';
 import { bboxToPixelRect } from '@/lib/problem-ocr/crop';
-import {
-  figurePlaceholder, MAX_FIGURES, removeFigureAt,
-} from './figure-placeholders';
+import { removeFigureAt } from './figure-placeholders';
 import { capturedFigurePath, newFigureToken } from './storage-paths';
 import { uploadProblemFile } from './storage';
 
@@ -70,28 +68,18 @@ export interface CaptureInput {
   /** 자를 원본 쪽 이미지의 서명 URL */
   pageUrl: string;
   bbox: Bbox;
-  /** 지금 달려 있는 그림 경로들 */
-  paths: readonly string[];
-  /** 지금 본문 — 끝에 자리표시자를 붙여 돌려준다 */
-  html: string;
 }
 
 /**
- * 영역을 잘라 올리고 본문 **끝에** 자리표시자를 붙인다.
+ * 영역을 잘라 올린다. **본문은 건드리지 않는다.**
  *
- * 자리는 끝이다 — 우리가 짐작해 문단 사이에 꽂으면 엉뚱한 데 들어간다.
- * 사람이 편집기에서 '그림 n' 칩을 끌어 옮긴다.
+ * 자리표시자 붙이기를 여기서 하지 않는 이유: 파일을 올리는 동안에도 선생님은 계속
+ * 글을 친다. 여기서 본문을 받아 두면 그 사이 친 글자가 되돌아간다 — 호출부가
+ * 올린 **뒤에** 본문을 읽어 붙인다(useFigureEditor).
  * @param input - 무엇을 어디서 자를지
- * @returns 새 경로 목록과 본문. 실패하면 null
- * @throws 상한을 넘겼을 때
+ * @returns 올린 경로. 잘라내지 못하면 null
  */
-export async function captureFigure(
-  input: CaptureInput,
-): Promise<{ paths: string[]; html: string } | null> {
-  if (input.paths.length >= MAX_FIGURES) {
-    throw new Error(`그림은 ${MAX_FIGURES}개까지 붙일 수 있어요.`);
-  }
-
+export async function uploadFigure(input: CaptureInput): Promise<string | null> {
   const blob = await cropImageUrl(input.pageUrl, input.bbox);
   if (!blob) return null;
 
@@ -100,11 +88,7 @@ export async function captureFigure(
   //    그러면 인쇄물에서만 그 그림이 딴 것으로 바뀐다. 늘 새 이름이라 upsert 도 필요 없다
   const path = capturedFigurePath(input.kind, input.id, newFigureToken());
   await uploadProblemFile(path, blob, 'image/jpeg');
-
-  return {
-    paths: [...input.paths, path],
-    html: `${input.html}${figurePlaceholder(input.paths.length + 1)}`,
-  };
+  return path;
 }
 
 

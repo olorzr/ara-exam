@@ -10,6 +10,7 @@ import ProblemHtmlEditor from '@/components/problem-editor/ProblemHtmlEditor';
 import PassageContinueButton from './PassageContinueButton';
 import FigureStrip from './FigureStrip';
 import { useFigureEditor } from '@/hooks/useFigureEditor';
+import { useTrackedState } from '@/hooks/useTrackedState';
 import type { Bbox } from '@/types/problem-bank';
 import AreaPathPicker from './AreaPathPicker';
 import type { AreaTreeNode } from '@/lib/problem-bank/area-tree';
@@ -64,12 +65,16 @@ export default function PassageEditorCard({
   issues, onContinue, continuing, sourcePageCount, onMergeIntoPrevious,
   figureUrls, onStartCapture, capturing,
 }: PassageEditorCardProps) {
-  const [html, setHtml] = useState(passage.html);
+  // 값과 함께 최신 ref 를 든다 — 그림을 붙이는 동안 친 글을 잃지 않으려면
+  // 다 올린 **뒤에** 본문을 읽어야 한다
+  const [html, setHtml, bodyRef] = useTrackedState(passage.html);
   const [title, setTitle] = useState(passage.title);
   const [author, setAuthor] = useState(passage.author);
   const [area, setArea] = useState<string[]>(passage.area_path);
   const [unit, setUnit] = useState<string[]>(passage.unit_path);
-  const [figurePaths, setFigurePaths] = useState<string[]>(passage.figure_paths ?? []);
+  const [figurePaths, setFigurePaths, pathsRef] = useTrackedState<string[]>(
+    passage.figure_paths ?? [],
+  );
   const [saving, setSaving] = useState(false);
 
   /**
@@ -78,6 +83,7 @@ export default function PassageEditorCard({
    */
   const figures = useFigureEditor({
     kind: 'passage',
+    read: () => ({ html: bodyRef.current, paths: pathsRef.current }),
     id: passage.id,
     save: async (next) => {
       const ok = await onSave({ html: next.html, figure_paths: next.paths });
@@ -104,12 +110,12 @@ export default function PassageEditorCard({
   };
 
   const handleCapture = async (bbox: Bbox, pageUrl: string) => {
-    const next = await figures.capture(bbox, pageUrl, html, figurePaths);
+    const next = await figures.capture(bbox, pageUrl);
     if (next !== null) setHtml(next);
   };
 
   const handleRemoveFigure = async (index: number) => {
-    const next = await figures.remove(index, html, figurePaths);
+    const next = await figures.remove(index);
     if (next !== null) setHtml(next);
   };
 
@@ -120,9 +126,11 @@ export default function PassageEditorCard({
    *    잘못 읽었을 때 되돌릴 길이 있어야 한다.
    */
   const handleContinue = async (page: number) => {
-    const result = await onContinue?.(page, html);
+    const result = await onContinue?.(page, bodyRef.current);
     if (!result?.html) return;
-    setHtml((prev) => (prev ? `${prev}\n${result.html}` : result.html));
+    // ⚠️ 읽는 동안(수십 초) 친 글을 잃지 않게 **끝난 뒤의** 본문 뒤에 붙인다
+    const now = bodyRef.current;
+    setHtml(now ? `${now}\n${result.html}` : result.html);
   };
 
   const toggleRenderMode = () => {

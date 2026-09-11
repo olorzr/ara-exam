@@ -1,8 +1,10 @@
 import { normalizeGrammarPaths } from '@/lib/problem-bank/grammar-tree';
-import { MAX_FIGURES, shiftFigurePlaceholders } from '@/lib/problem-bank/figure-placeholders';
+import {
+  MAX_FIGURES, reconcileFigurePlaceholders, shiftFigurePlaceholders,
+} from '@/lib/problem-bank/figure-placeholders';
 import { textOf } from './merge-keys';
 import type { OcrItem } from './schema';
-import type { PassageDraft, ProblemDraft } from './merge';
+import type { FigureRegion, PassageDraft, ProblemDraft } from './merge';
 
 /**
  * 묶음 결과 → 저장 직전 초안으로 옮기기와 **빈 칸 채우기** (순수 함수).
@@ -17,13 +19,14 @@ export interface PassageWork {
   draft: PassageDraft;
   fragments: string[];
   /**
-   * 조각마다 그림 번호를 얼마나 밀었는가 — `fragments` 와 자리·길이가 같다.
+   * 조각마다의 그림 — `fragments` 와 자리·길이가 같다.
    *
-   * ⚠️ 이 값이 없으면 **겹쳐 읽은 더 온전한 판으로 조각을 갈아 끼울 때 밀기가 풀린다.**
-   *    모델이 낸 원문은 늘 1번부터 세므로, 그대로 넣으면 뒤 조각의 '1번 그림' 이
-   *    앞 조각의 그림을 가리킨다.
+   * ⚠️ **조각의 html 은 모델이 낸 그대로**(번호가 그 조각 안에서 1번부터)이고, 번호 밀기는
+   *    합칠 때 한 번만 한다. 밀어 둔 글을 들고 있으면 겹쳐 읽은 더 온전한 판으로 갈아 끼울
+   *    때마다 밀기를 되걸어야 하고, 그때 그림 목록까지 함께 갈지 않으면 **새로 알아본 그림이
+   *    조용히 사라진다.** 조각이 자기 그림을 들고 있으면 그 어긋남이 생기지 않는다.
    */
-  offsets: number[];
+  figures: FigureRegion[][];
 }
 
 /** 중복 판정 키가 가리키는 자리 — 어느 지문의 몇 번째 조각인가 */
@@ -74,7 +77,34 @@ export function toPassage(item: OcrItem, id: string): PassageWork {
       pageSpan: 1,
     },
     fragments: [item.html],
-    offsets: [0],
+    figures: [item.figures.map((box) => ({ page: item.page, box }))],
+  };
+}
+
+/**
+ * 조각들을 합치며 그림 번호를 민다 — **여기서 한 번만** 민다.
+ * @param work - 합칠 지문
+ * @returns 이어 붙인 본문과 조각 순서대로의 그림
+ */
+export function joinFragments(work: PassageWork): { html: string; figures: FigureRegion[] } {
+  const figures: FigureRegion[] = [];
+  const parts: string[] = [];
+
+  for (const [i, fragment] of work.fragments.entries()) {
+    const mine = work.figures[i] ?? [];
+    // 상한을 넘는 그림은 붙이지 않는다 — 자리표시자도 아래 reconcile 이 지운다
+    const room = Math.max(MAX_FIGURES - figures.length, 0);
+    const kept = mine.slice(0, room);
+    const shifted = shiftFigurePlaceholders(fragment, figures.length);
+    figures.push(...kept);
+    const trimmed = shifted.trim();
+    if (trimmed) parts.push(trimmed);
+  }
+
+  return {
+    // 조각을 갈아 끼우는 사이 남거나 모자란 번호가 생길 수 있다 — 마지막에 한 번 맞춘다
+    html: reconcileFigurePlaceholders(parts.join('\n'), figures.length),
+    figures,
   };
 }
 
@@ -109,15 +139,32 @@ export function toProblem(item: OcrItem, id: string, passageId: string | null): 
  * @param item - 이어지는 조각
  */
 export function appendFragment(work: PassageWork, item: OcrItem): void {
-  const offset = work.draft.figures.length;
-  work.fragments.push(shiftFigurePlaceholders(item.html, offset));
-  work.offsets.push(offset);
-  for (const box of item.figures) {
-    if (work.draft.figures.length >= MAX_FIGURES) break;
-    work.draft.figures.push({ page: item.page, box });
-  }
+  // ⚠️ 번호를 **여기서 밀지 않는다.** 조각은 모델이 낸 그대로 들고 있다가 합칠 때 한 번만
+  //    민다(joinFragments) — 그래야 갈아 끼우기와 밀기가 서로 어긋나지 않는다
+  work.fragments.push(item.html);
+  work.figures.push(item.figures.map((box) => ({ page: item.page, box })));
   work.draft.open = item.continues;
   work.draft.pageSpan += 1;
+}
+
+/**
+ * 겹쳐 읽어 **더 온전한 판**이 왔을 때 그 조각을 갈아 끼운다.
+ *
+ * ⚠️ 글만 갈고 **그림을 그대로 두면 새로 알아본 그림이 사라진다** — 자리표시자는 늘었는데
+ *    가리킬 그림이 없어 합칠 때 지워지기 때문이다. 둘을 **함께** 간다.
+ * @param work - 대상 지문
+ * @param index - 갈아 끼울 조각 자리
+ * @param item - 더 온전한 판
+ */
+export function replaceFragment(work: PassageWork, index: number, item: OcrItem): void {
+  work.fragments[index] = item.html;
+  const mine = work.figures[index] ?? [];
+  // 그림은 **더 많이 알아본 쪽**을 남긴다(글과 달리 빠뜨리기만 하고 지어내지는 않는다)
+  if (item.figures.length >= mine.length) {
+    work.figures[index] = item.figures.map((box) => ({ page: item.page, box }));
+  }
+  // 이 조각이 마지막이었다면 '아직 이어지는가' 도 새 값으로 바꾼다
+  if (index === work.fragments.length - 1) work.draft.open = item.continues;
 }
 
 /**
@@ -137,11 +184,9 @@ export function fillPassageGaps(draft: PassageDraft, item: OcrItem): void {
   if (draft.area_path.length === 0 && item.area_path.length > 0) draft.area_path = item.area_path;
   if (draft.unit_path.length === 0 && item.unit_path.length > 0) draft.unit_path = item.unit_path;
   if (item.has_figure) draft.has_figure = true;
-  // ⚠️ 그림은 **같은 쪽에서 읽은 것만** 받는다(좌표와 쪽은 짝이다 — box 와 같은 규칙).
-  //    겹쳐 읽은 묶음이 그림을 더 잘 봤을 때만 채운다
-  if (draft.figures.length === 0 && item.figures.length > 0 && item.page === draft.page_no) {
-    draft.figures = item.figures.map((box) => ({ page: item.page, box }));
-  }
+  // ⚠️ 그림은 여기서 채우지 않는다 — **조각마다 따로** 들고 있다가 합칠 때 모은다
+  //    (replaceFragment / appendFragment). 지문 전체에 대고 채우면 어느 조각의 그림인지
+  //    알 수 없어 번호가 어긋난다
 }
 
 /** 이미 담은 문항의 빈 칸만 채운다 */

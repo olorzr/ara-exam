@@ -1,8 +1,5 @@
 import type { QuestionType } from '@/types/problem-bank';
 import { OCR_MAX_MERGED_WARNINGS } from './constants';
-import {
-  reconcileFigurePlaceholders, shiftFigurePlaceholders,
-} from '@/lib/problem-bank/figure-placeholders';
 import type { OcrBox, OcrDraft } from './schema';
 import {
   capWarnings, itemTargetLabel, resolveDraftWarning, warningKey,
@@ -10,7 +7,8 @@ import {
 } from './warnings';
 import { passageKeyIn, problemKeyIn, textOf } from './merge-keys';
 import {
-  alreadyContains, appendFragment, fillGaps, fillPassageGaps, toPassage, toProblem,
+  alreadyContains, appendFragment, fillGaps, fillPassageGaps, joinFragments,
+  replaceFragment, toPassage, toProblem,
   type FragmentRef, type PassageWork,
 } from './merge-fill';
 
@@ -190,15 +188,8 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
         // 비교 대상이 합본이 아니라 조각이라 앞부분을 잃지 않는다
         const current = existing.work.fragments[existing.index] ?? '';
         if (textOf(item.html).length > textOf(current).length) {
-          // ⚠️ 모델이 낸 원문은 늘 그림 1번부터 센다 — 이 조각에 적용했던 밀기를
-          //    **다시 걸어야** 뒤 조각의 그림이 앞 조각 것을 가리키지 않는다
-          existing.work.fragments[existing.index] = shiftFigurePlaceholders(
-            item.html, existing.work.offsets[existing.index] ?? 0,
-          );
-          // 이 조각이 마지막이었다면 '아직 이어지는가'도 새 값으로 바꾼다
-          if (existing.index === existing.work.fragments.length - 1) {
-            existing.work.draft.open = item.continues;
-          }
+          // 글과 그림을 **함께** 간다 — 글만 갈면 새로 알아본 그림이 사라진다
+          replaceFragment(existing.work, existing.index, item);
         }
         // ⚠️ 빈 칸 채우기는 **글 길이와 상관없이** 한다. 같은 글을 두 번 읽었는데
         //    두 번째에만 작품·영역·단원을 알아본 경우가 흔한데, 길이 비교 안에 두면
@@ -269,15 +260,8 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
   }
 
   // 조각을 이제 합친다 — 조각별 비교가 다 끝난 뒤여야 한다.
-  // 합친 뒤 자리표시자를 실제 그림 수에 **다시 맞춘다** — 조각을 갈아 끼우는 사이
-  // 남거나 모자란 번호가 생길 수 있고, 어긋난 채 저장하면 빈칸이 되거나 그림이 사라진다
-  const passages = works.map((w) => ({
-    ...w.draft,
-    html: reconcileFigurePlaceholders(
-      w.fragments.map((f) => f.trim()).filter(Boolean).join('\n'),
-      w.draft.figures.length,
-    ),
-  }));
+  // 그림 번호 밀기도 여기서 **한 번만** 한다(joinFragments)
+  const passages = works.map((w) => ({ ...w.draft, ...joinFragments(w) }));
 
   // 지문이 끝내 안 닫혔으면 뒷부분이 빠졌을 수 있다 — 조용히 넘기지 않는다.
   // 개수만 세지 말고 **어느 지문인지** 짚는다(개수만으로는 찾을 방법이 없다)

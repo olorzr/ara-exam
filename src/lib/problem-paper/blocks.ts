@@ -103,6 +103,22 @@ export function buildPaperBlocks(items: readonly PaperItemSnapshot[]): PaperBloc
           }
         });
 
+        // ⚠️ 자리표시자가 없는 그림은 **본문 끝에** 붙인다. 화면(`BodyWithFigures`)이
+        //    그렇게 그리는데 인쇄만 빠뜨리면, 선생님이 화면에서 본 그림이 인쇄물에서만
+        //    사라진다 — 가장 알아채기 어려운 결함이다(검수에서 칩만 지운 지문이 그렇다)
+        const placed = new Set(
+          chunks.filter((c) => c.kind === 'figure').map((c) => c.index),
+        );
+        figures.forEach((path, i) => {
+          if (!path || placed.has(i + 1)) return;
+          parts.push({
+            kind: 'passage-figure',
+            key: `pf-${group.start}-x${i}`,
+            path,
+            label: passage.title || passage.label,
+          });
+        });
+
         // 상자 윤곽이 단·쪽을 넘어도 이어져 보이도록 위·아래 테두리를 **글 조각의**
         // 처음·끝에만 표시한다. 그림 블록을 세면 테두리가 그림 위아래에 붙는다
         const textParts = parts.filter((b) => b.kind === 'passage-part');

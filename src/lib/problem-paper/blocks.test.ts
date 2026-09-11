@@ -220,6 +220,22 @@ describe('buildPaperBlocks — 지문 안 그림', () => {
     expect(build([snap({ passage: p })]).some((b) => b.kind === 'passage-figure')).toBe(false);
   });
 
+  it('자리표시자가 없는 그림도 본문 끝에 붙인다 — 화면에만 나오고 인쇄에서 빠지면 안 된다', () => {
+    // 검수에서 편집기의 '그림 1' 칩만 지우고 저장한 지문이 이렇게 된다
+    const p = { ...passage('p1', '<p>글</p>'), figure_paths: ['orphan.jpg'] };
+    const blocks = build([snap({ passage: p })]);
+    expect(blocks.some((b) => b.kind === 'passage-figure')).toBe(true);
+    // 글 뒤에 온다
+    const kinds = blocks.map((b) => b.kind);
+    expect(kinds.indexOf('passage-figure')).toBeGreaterThan(kinds.indexOf('passage-part'));
+  });
+
+  it('자리에 놓인 그림은 끝에 또 붙이지 않는다', () => {
+    const p = { ...passage('p1', `<p>글</p>${fig(1)}`), figure_paths: ['g.jpg'] };
+    const count = build([snap({ passage: p })]).filter((b) => b.kind === 'passage-figure').length;
+    expect(count).toBe(1);
+  });
+
   it('그림이 없는 지문은 예전과 똑같이 쪼갠다', () => {
     const p = passage('p1', '<p>한 문단</p><p>두 문단</p>');
     const kinds = build([snap({ passage: p })]).map((b) => b.kind);
