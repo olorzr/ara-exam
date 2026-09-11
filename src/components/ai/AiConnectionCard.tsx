@@ -135,10 +135,8 @@ export default function AiConnectionCard({ port, onPortChange }: AiConnectionCar
         </div>
         <p className="text-xs text-gray-500">
           기본값은 {DEFAULT_CODEX_PORT} 입니다. 바꿨다면 브릿지도 같은 번호로 맞춰야 합니다 —
-          윈도우는 <code className="rounded bg-gray-100 px-1 py-0.5">start-codex.cmd</code> 안의{' '}
-          <code className="rounded bg-gray-100 px-1 py-0.5">set &quot;CODEX_PORT=...&quot;</code> 를 고치고,
-          맥은 <strong>처음 설치하기 → 맥</strong>의 설치 명령을 다시 실행하세요
-          (저장하면 아래 안내의 명령에도 바로 반영됩니다).
+          <strong>처음 설치하기</strong>의 <strong>윈도우</strong>·<strong>맥</strong> 탭에 나오는
+          명령을 그 번호로 다시 실행하세요 (저장하면 그 명령에 바로 반영됩니다).
         </p>
       </div>
     </div>

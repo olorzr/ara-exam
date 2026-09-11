@@ -152,10 +152,11 @@ src/
 - 역할: 선생님 PC 의 코덱스 브릿지와 통신. **서버는 AI 를 호출하지 않는다**
 - 의존: 없음(순수 프로토콜) — 원본은 ara-system `app/lib/ai/`
 - 주요 파일: codex/protocol.ts, codex/localClient.ts, codex/generateDraft.ts, errors.ts, flags.ts
-- 환경 판정: setupOs.ts(윈도우/맥 · Safari 여부), macInstaller.ts(맥 설치 명령 조립).
+- 환경 판정: setupOs.ts(윈도우/맥 · Safari 여부), winInstaller.ts·macInstaller.ts(설치 주소·명령 조립).
   ⚠️ **Safari 는 https 문서에서 로컬 연결을 막아 쓸 수 없다** — 맥은 Chrome 필수
 - 설치 안내: components/ai/AiSetupGuide(탭) → AiSetupSteps{Windows,Mac}. 설치 파일·스크립트는
   전부 ara-system 호스팅이고 이 앱은 링크·명령 문자열만 만든다
+  (윈도우 `ara-ai.cmd` 하나 / 맥 `install-mac.sh` 한 줄. 윈도우는 켤 때마다 스스로 갱신된다)
 
 ## lib/pdf
 - 역할: PDF → 캔버스 → JPEG data URL. 썸네일. 글자 레이어 읽기

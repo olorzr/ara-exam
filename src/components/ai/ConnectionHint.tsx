@@ -94,9 +94,15 @@ export default function ConnectionHint({ kind, showPromptNote, os = 'windows' }:
             이 화면은 브릿지 v{BRIDGE_MIN_VERSION} 이상이 필요합니다.
           </>
         ) : (
+          /* ⚠️ 옛 3파일 설치의 바로가기는 start-codex.cmd 를 가리켜 **갱신을 하지 않는다.**
+             "알아서 최신이 된다" 고만 적으면 그분들은 낡은 브릿지를 영원히 다시 켜게 되는데,
+             그게 정확히 2026-09-11 장애가 길어진 이유다(틀린 복구 경로 안내). 그래서
+             '한 번만 새로 받으세요' 를 **먼저** 말하고 자동 갱신은 그 뒤라고 밝힌다. */
           <>
-            예전에 설치했다면 <strong>다시 내려받아야</strong> 할 수 있어요 — 이 화면은 브릿지 v
-            {BRIDGE_MIN_VERSION} 이상이 필요합니다({ARA_AI_FILES_ORIGIN.replace('https://', '')} 에서 받은 파일).
+            예전에 <strong>파일 세 개</strong>로 설치했다면 <strong>새 설치 파일 하나</strong>를
+            한 번만 받아 실행해 주세요 — 그 뒤로는 켤 때마다 알아서 최신이 됩니다.
+            이 화면은 브릿지 v{BRIDGE_MIN_VERSION} 이상이 필요합니다
+            ({ARA_AI_FILES_ORIGIN.replace('https://', '')} 에서 받은 파일).
           </>
         )}
       </p>
