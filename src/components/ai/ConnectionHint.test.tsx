@@ -29,7 +29,19 @@ describe('ConnectionHint — 원인마다 맞는 조치를 보여준다', () => 
   it('윈도우는 바탕화면 아이콘을 누르라고 한다', () => {
     const html = render('not_running', 'windows');
     expect(html).toContain('바탕화면');
-    expect(html).toContain('다시 내려받아야');
+  });
+
+  // ⚠️ 옛 3파일 설치의 바로가기는 갱신을 하지 않는다. "알아서 최신이 된다" 고만 적으면
+  // 그분들은 낡은 브릿지를 영원히 다시 켜게 된다 — 2026-09-11 장애가 길어진 이유다.
+  it('옛 설치는 새 파일을 한 번 받으라고 먼저 말한다', () => {
+    const html = render('not_running', 'windows');
+    expect(html).toContain('새 설치 파일');
+    expect(html).toContain('한 번만');
+
+    const once = html.indexOf('한 번만');
+    const auto = html.indexOf('켤 때마다 알아서 최신');
+    expect(auto, '자동 갱신 문장이 없다').toBeGreaterThan(-1);
+    expect(once, '자동 갱신을 먼저 말해 옛 설치가 그냥 넘어간다').toBeLessThan(auto);
   });
 });
 
@@ -41,8 +53,8 @@ describe('맥 — 윈도우와 조치가 다르다', () => {
     expect(html).not.toContain('바탕화면');
     expect(html).not.toContain('두 번 눌러');
     expect(html).toContain('배경에서 저절로 켜집니다');
-    // 맥은 파일을 받지 않으므로 '다시 내려받기' 가 아니라 '명령 재실행' 이다.
-    expect(html).not.toContain('다시 내려받아야');
+    // 맥은 파일을 받지 않으므로 '새로 받기' 가 아니라 '명령 재실행' 이다.
+    expect(html).not.toContain('새 설치 파일');
     expect(html).toContain('설치 명령을 다시 실행하면');
   });
 

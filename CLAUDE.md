@@ -314,6 +314,11 @@
   - 맥 안내에서 **'다시 내려받기'·'바탕화면 아이콘' 어휘를 쓰지 말 것**. 맥은 받는 파일이 없고 배경에서 도는지라 찾을 수 없는 물건을 찾게 만든다. [ConnectionHint.test.tsx](src/components/ai/ConnectionHint.test.tsx) 가 고정한다
 - [2026-09-08] **AI 는 서버가 아니라 선생님 PC 에서 돈다**(ara-system 의 코덱스 브릿지를 이식). 학원 서버는 `AI_OCR_BETA` 플래그만 판정하고 `/api/ai/status` 로 알려 줄 뿐 AI 를 호출하지 않는다 — 그래서 토큰 비용이 0 이고 `auth.json` 이 선생님 PC 를 벗어나지 않는다. 대신 **컴퓨터마다 설치가 필요**하고 브릿지가 안 떠 있으면 못 쓴다. 자세한 프로토콜 함정은 [src/lib/ai/codex/README.md](src/lib/ai/codex/README.md)
   - **브릿지는 두 앱이 한 벌을 공유한다.** 원본은 ara-system `public/ara-ai/bridge.cjs` 이고 거기 `ALLOWED_ORIGINS` 에 이 앱 주소가 들어 있어야 한다(v2 부터). 여기서 파일을 다시 호스팅하면 포트 8899 를 두고 프로세스 둘이 다툰다
+- [2026-09-12] **윈도우 설치는 파일 하나(`ara-ai.cmd`)이고 브릿지는 켤 때마다 스스로 갱신된다**(ara-system `bridge.cjs --update`, v4). 되돌리지 말아야 할 판단들:
+  - **이 앱은 링크·명령 문자열만 만든다**([winInstaller.ts](src/lib/ai/winInstaller.ts) — `macInstaller.ts` 의 거울). 파일 본체는 ara-system 이 호스팅한다
+  - ⚠️ **옛 3파일 설치에 "알아서 최신이 된다" 고 말하면 안 된다.** 그분들의 바로가기는 `start-codex.cmd` 를 가리켜 **갱신을 하지 않는다** — 낡은 브릿지를 영원히 다시 켜게 되고, 그게 2026-09-11 장애가 길어진 것과 **정확히 같은 잘못**(틀린 복구 경로 안내)이다. '한 번만 새로 받으세요' 를 **먼저** 말하고 자동 갱신은 그 뒤라고 밝힌다. [ConnectionHint.test.tsx](src/components/ai/ConnectionHint.test.tsx) 가 **순서까지** 고정한다
+  - **`BRIDGE_MIN_VERSION` 은 브릿지가 새 주소를 배운 버전과 맞춘다.** 브라우저는 버전을 알아낼 방법이 없어(핸드셰이크 뒤는 raw TCP) 안내문이 이 숫자에 기댄다 — 안 올리면 "v2 면 됩니다" 라고 거짓말을 한다
+  - **포트 변경 안내는 깔린 자리(`%LOCALAPPDATA%\ara-ai\ara-ai.cmd`)를 가리킨다.** 받은 폴더(다운로드)는 선생님이 치우는 자리라 몇 주 뒤에 깨진다
 - [2026-03-09] 포인트 컬러 `#81D8D0`을 CSS 변수 `--primary`로 통합 → Tailwind `text-primary`, `bg-primary` 등으로 일관되게 사용
 - [2026-03-09] 카테고리 포맷팅/그룹화 로직을 `lib/format.ts`로 추출 → words, exam/create 등 여러 페이지에서 중복 제거
 - [2026-03-09] words/new 페이지를 CategoryForm + WordEntryTable로 분리 → 300줄 제한 준수

@@ -37,7 +37,7 @@ export default function AiSetupGuide({ port }: AiSetupGuideProps) {
         </TabsList>
 
         <TabsContent value="windows" className="pt-4">
-          <AiSetupStepsWindows />
+          <AiSetupStepsWindows port={port} />
         </TabsContent>
 
         <TabsContent value="mac" className="pt-4">
@@ -46,9 +46,11 @@ export default function AiSetupGuide({ port }: AiSetupGuideProps) {
       </Tabs>
 
       <p className="rounded-md bg-blue-50 border border-blue-200 p-3 text-xs text-blue-900">
-        학원 관리 시스템에서 이미 설치했다면 다시 설치할 필요는 없지만,{' '}
-        <strong>2026년 9월 이전에 받은 파일이라면 다시 받아야</strong> 합니다 — 예전 파일은 이
-        사이트 주소를 모르기 때문에 연결을 거부합니다. (맥은 설치 명령을 다시 실행하면 갱신됩니다)
+        학원 관리 시스템에서 이미 설치했다면 다시 설치할 필요는 없습니다. 다만{' '}
+        <strong>2026년 9월 이전에 파일 세 개로 설치하셨다면 위 2단계를 한 번만 다시</strong> 해
+        주세요 — 예전 파일은 이 사이트 주소를 모르는 데다 <strong>스스로 갱신하지도 못해서</strong>,
+        그대로 두면 계속 연결을 거부합니다. 한 번 새로 설치하면 그 뒤로는 켤 때마다 알아서
+        최신이 됩니다. (맥은 설치 명령을 다시 실행하면 갱신됩니다)
       </p>
     </div>
   );
