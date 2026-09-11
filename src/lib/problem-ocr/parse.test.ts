@@ -355,14 +355,19 @@ describe('parseOcrDraft — 길이', () => {
 
 describe('parseOcrDraft — 본문 속 그림', () => {
   const fig = (n: number) => `<figure data-figure="${n}"></figure>`;
-  const box = (top: number) => ({ column: 1, top, bottom: top + 0.1 });
+  // 그림은 자기 쪽 번호를 들고 다닌다 — 안 주면 항목의 쪽으로 떨어진다
+  const box = (top: number, page?: number) => ({
+    column: 1, top, bottom: top + 0.1, ...(page ? { page } : {}),
+  });
 
   it('그림 좌표와 자리표시자를 함께 담는다', () => {
     const draft = parseOcrDraft(json([item({
       stem_html: `<p>다음 그래프는?</p>${fig(1)}`,
       figures: [box(0.2)],
     })]), ctx)!;
-    expect(draft.items[0].figures).toEqual([{ column: 1, top: 0.2, bottom: 0.30000000000000004 }]);
+    expect(draft.items[0].figures).toEqual([
+      { column: 1, top: 0.2, bottom: 0.30000000000000004, page: 1 },
+    ]);
     expect(draft.items[0].stem_html).toContain('data-figure="1"');
   });
 
@@ -394,7 +399,7 @@ describe('parseOcrDraft — 본문 속 그림', () => {
       figures: [{ column: 1, top: 0.8, bottom: 0.2 }, box(0.5)],
     })]), ctx)!;
 
-    expect(draft.items[0].figures).toEqual([{ column: 1, top: 0.5, bottom: 0.6 }]);
+    expect(draft.items[0].figures).toEqual([{ column: 1, top: 0.5, bottom: 0.6, page: 1 }]);
     // 살아남은 그림은 **자기 자리**(원래 2번 자리)에 남는다
     expect(draft.items[0].stem_html).toBe('<p>물음</p><p>사이</p><figure data-figure="1"></figure>');
     expect(said(draft.warnings)).toContain('그림 위치를 못 읽어');
@@ -407,6 +412,22 @@ describe('parseOcrDraft — 본문 속 그림', () => {
     })]), ctx)!;
     expect(draft.items[0].figures).toEqual([]);
     expect(draft.items[0].stem_html).not.toContain('figure');
+  });
+
+  it('그림마다 **자기 쪽**을 쓴다 — 쪽 넘김 지문을 한 항목으로 내면 다음 쪽 그림이 어긋난다', () => {
+    const draft = parseOcrDraft(json([item({
+      kind: 'passage', ref: 'P1', number: null, page: 2,
+      html: `<p>지문</p>${fig(1)}${fig(2)}`,
+      figures: [box(0.2, 2), box(0.4, 3)],
+    })]), ctx)!;
+    expect(draft.items[0].figures.map((f) => f.page)).toEqual([2, 3]);
+  });
+
+  it('안 보낸 쪽을 가리키면 항목의 쪽으로 떨어뜨린다 — 잘라 놓고 검수에서 고칠 수 있다', () => {
+    const draft = parseOcrDraft(json([item({
+      page: 2, stem_html: `<p>물음</p>${fig(1)}`, figures: [box(0.2, 99)],
+    })]), ctx)!;
+    expect(draft.items[0].figures[0].page).toBe(2);
   });
 
   it('그림이 있으면 has_figure 를 켠다 — 모델이 빠뜨려도 우리가 안다', () => {

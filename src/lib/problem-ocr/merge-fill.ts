@@ -3,7 +3,7 @@ import {
   figureNumbersIn, MAX_FIGURES, reconcileFigurePlaceholders, shiftFigurePlaceholders,
 } from '@/lib/problem-bank/figure-placeholders';
 import { textOf } from './merge-keys';
-import type { OcrBox, OcrItem } from './schema';
+import type { OcrBox, OcrFigure, OcrItem } from './schema';
 import type { FigureRegion, PassageDraft, ProblemDraft } from './merge';
 
 /**
@@ -49,6 +49,12 @@ const HEAD_PROBE = 20;
  * 넉넉히 잡는다 — 여기서 맞으면 조각을 통째로 버리므로 확신이 있어야 한다.
  */
 const TAIL_PROBE = 40;
+
+/** 그림 자리를 잘라 낼 모양으로 — 쪽은 **그림이 들고 있는 것**을 쓴다 */
+function toRegion(figure: OcrFigure): FigureRegion {
+  const { page, ...box } = figure;
+  return { page, box };
+}
 
 /** 같은 자리를 가리키는 좌표인가 — 모델이 낸 값이라 딱 떨어지지 않는다 */
 function sameBox(a: OcrBox, b: OcrBox): boolean {
@@ -99,7 +105,7 @@ export function alreadyContains(work: PassageWork, item: OcrItem): ContainmentVe
   //    되어 그 새 그림이 잘리지도 저장되지도 않는다(코덱스 리뷰)
   const mine = work.figures.flat();
   const newFigure = item.figures.some(
-    (box) => !mine.some((had) => had.page === item.page && sameBox(had.box, box)),
+    (fig) => !mine.some((had) => had.page === fig.page && sameBox(had.box, fig)),
   );
   const whole = soFar.includes(text.slice(-TAIL_PROBE)) && !newFigure;
   return whole ? 'duplicate' : 'partial';
@@ -118,13 +124,13 @@ export function toPassage(item: OcrItem, id: string): PassageWork {
       area_path: item.area_path,
       unit_path: item.unit_path,
       has_figure: item.has_figure,
-      figures: item.figures.map((box) => ({ page: item.page, box })),
+      figures: item.figures.map(toRegion),
       lastPage: item.page,
       open: item.continues,
       pageSpan: 1,
     },
     fragments: [item.html],
-    figures: [item.figures.map((box) => ({ page: item.page, box }))],
+    figures: [item.figures.map(toRegion)],
   };
 }
 
@@ -173,7 +179,7 @@ export function toProblem(item: OcrItem, id: string, passageId: string | null): 
     page_no: item.page,
     box: item.box,
     has_figure: item.has_figure,
-    figures: item.figures.map((box) => ({ page: item.page, box })),
+    figures: item.figures.map(toRegion),
   };
 }
 
@@ -189,7 +195,7 @@ export function appendFragment(work: PassageWork, item: OcrItem): void {
   // ⚠️ 번호를 **여기서 밀지 않는다.** 조각은 모델이 낸 그대로 들고 있다가 합칠 때 한 번만
   //    민다(joinFragments) — 그래야 갈아 끼우기와 밀기가 서로 어긋나지 않는다
   work.fragments.push(item.html);
-  work.figures.push(item.figures.map((box) => ({ page: item.page, box })));
+  work.figures.push(item.figures.map(toRegion));
   work.draft.open = item.continues;
 }
 
@@ -205,7 +211,7 @@ export function appendFragment(work: PassageWork, item: OcrItem): void {
  */
 export function replaceFragment(work: PassageWork, index: number, item: OcrItem): void {
   work.fragments[index] = item.html;
-  work.figures[index] = item.figures.map((box) => ({ page: item.page, box }));
+  work.figures[index] = item.figures.map(toRegion);
   // 이 조각이 마지막이었다면 '아직 이어지는가' 도 새 값으로 바꾼다
   if (index === work.fragments.length - 1) work.draft.open = item.continues;
 }
@@ -243,7 +249,7 @@ export function fillGaps(target: ProblemDraft, item: OcrItem): void {
     // ⚠️ 발문과 그림을 **함께** 간다. 자리표시자 번호는 그 판의 그림 목록 기준이라,
     //    발문만 갈면 1번 자리에 딴 그림이 그려진다(지문 쪽 replaceFragment 와 같은 규약)
     target.stem_html = item.stem_html;
-    target.figures = item.figures.map((box) => ({ page: item.page, box }));
+    target.figures = item.figures.map(toRegion);
   }
   if (target.choices.length === 0 && item.choices.length > 0) target.choices = item.choices;
   // 정답과 유형은 한 덩어리다 — 유형이 바뀌면 정답의 의미가 달라진다
@@ -273,6 +279,6 @@ export function fillGaps(target: ProblemDraft, item: OcrItem): void {
     && item.page === target.page_no
     && figureNumbersIn(target.stem_html).length > 0
   ) {
-    target.figures = item.figures.map((box) => ({ page: item.page, box }));
+    target.figures = item.figures.map(toRegion);
   }
 }

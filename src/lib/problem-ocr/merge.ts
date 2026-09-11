@@ -232,6 +232,12 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
             //    안 옮기면 pageSpan 이 1로 남아 `save.ts` 가 이미지 출제를 고르고,
             //    시작 쪽 이미지 하나만 인쇄돼 뒷부분이 사라진다
             open.draft.open = item.continues;
+            // ⚠️ **이 조각 키를 등록한다.** 안 하면 겹쳐 읽은 다음 묶음이 같은 이어짐을
+            //    또 냈을 때 표에서 못 찾고, 그 사이 lastPage 가 그 쪽까지 와 있어
+            //    `findOpenPassage` 도 이 지문을 거른다 — 주인 없는 지문이 하나 더 생기고
+            //    처음 보는 문항이 거기에 붙는다. 마지막 조각을 가리켜 두면 다음번엔
+            //    중복 판정 길로 들어온다(글이 짧아 갈아 끼우지도 않는다)
+            fragmentByKey.set(key, { work: open, index: open.fragments.length - 1 });
             refToId.set(item.ref, open.draft.id);
             continue;
           }

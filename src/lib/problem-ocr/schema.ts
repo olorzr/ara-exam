@@ -32,6 +32,17 @@ export interface OcrBox {
   bottom: number;
 }
 
+/**
+ * 그림 하나의 자리 — 위치에 **쪽 번호**가 붙는다.
+ *
+ * ⚠️ 항목의 `page` 를 쓰면 안 된다. 모델은 쪽을 넘어가는 지문을 **한 항목으로** 내놓을
+ *    때가 많은데(그러라고 겹쳐 읽는다), 그러면 다음 쪽에 있는 그림이 시작 쪽에서 잘려
+ *    **엉뚱한 자리**가 그림으로 들어간다. 업로드는 성공하므로 아무도 못 알아챈다.
+ */
+export interface OcrFigure extends OcrBox {
+  page: number;
+}
+
 /** 모델이 읽어 낸 항목 하나 (지문 또는 문항) */
 export interface OcrItem {
   kind: 'passage' | 'problem';
@@ -71,7 +82,7 @@ export interface OcrItem {
    * 본문 HTML 의 `<figure data-figure="n">` 자리표시자와 순서로 짝을 이룬다
    * (figures[0] 이 1번).
    */
-  figures: OcrBox[];
+  figures: OcrFigure[];
   work_title: string | null;
   /** 영역 세트 트리의 이름 경로. 해당 없으면 빈 배열 */
   area_path: string[];
@@ -165,15 +176,17 @@ export const PROBLEM_OCR_SCHEMA = {
           },
           answer: { ...nullableString, maxLength: 200 },
           has_figure: { type: 'boolean' },
-          // 항목 전체가 아니라 **그림 부분만**의 자리. box 와 같은 모양이다
+          // 항목 전체가 아니라 **그림 부분만**의 자리. box 에 쪽 번호가 붙은 모양이다 —
+          // 쪽을 넘어가는 지문 하나에 그림이 여러 쪽에 흩어져 있을 수 있다
           figures: {
             type: 'array',
             maxItems: OCR_MAX_FIGURES_PER_ITEM,
             items: {
               type: 'object',
               additionalProperties: false,
-              required: ['column', 'top', 'bottom'],
+              required: ['page', 'column', 'top', 'bottom'],
               properties: {
+                page: { type: 'integer', minimum: 1 },
                 column: { type: 'integer', enum: [0, 1, 2] },
                 top: { type: 'number', minimum: 0, maximum: 1 },
                 bottom: { type: 'number', minimum: 0, maximum: 1 },

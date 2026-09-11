@@ -11,9 +11,9 @@ import {
 } from './constants';
 import {
   int, isRecord, isOverLength, LEADING_MARKER, normalizeChoice, normalizeWork, nullableStr,
-  parseBox, QUESTION_TYPES, str,
+  parseBox, parseFigure, QUESTION_TYPES, str,
 } from './parse-values';
-import type { OcrBox, OcrDraft, OcrItem } from './schema';
+import type { OcrDraft, OcrFigure, OcrItem } from './schema';
 import {
   reconcileFigurePlaceholders, remapFigurePlaceholders,
 } from '@/lib/problem-bank/figure-placeholders';
@@ -190,9 +190,11 @@ function parseItem(
   // 그냥 버리면 뒤엣것이 앞으로 당겨져 1번 자리에 2번 그림이 그려진다
   const rawFigures = (Array.isArray(raw.figures) ? raw.figures : [])
     .slice(0, OCR_MAX_FIGURES_PER_ITEM);
-  const figures: OcrBox[] = [];
+  const figures: OcrFigure[] = [];
   const figureMap = rawFigures.map((entry) => {
-    const box = parseBox(entry);
+    // 그림마다 **자기 쪽**을 쓴다 — 쪽을 넘어가는 지문을 한 항목으로 내면 다음 쪽 그림이
+    // 시작 쪽에서 잘려 엉뚱한 자리가 들어간다(업로드는 성공하므로 아무도 못 알아챈다)
+    const box = parseFigure(entry, pageSet, page);
     // push 가 돌려주는 새 길이가 곧 새 1-based 번호다
     return box ? figures.push(box) : null;
   });

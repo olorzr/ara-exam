@@ -1,6 +1,6 @@
 import type { QuestionType } from '@/types/problem-bank';
 import { normalizeWorkTitle } from '@/lib/problem-bank/work-title';
-import type { OcrBox } from './schema';
+import type { OcrBox, OcrFigure } from './schema';
 
 /**
  * OCR 응답의 **값 하나하나**를 검증·정규화하는 도구들 (순수 함수).
@@ -77,6 +77,27 @@ export function int(v: unknown): number | null {
  * 좌표를 0~1 로 가두고 뒤집힌 값을 버린다.
  * 좌표가 없으면 크롭만 못 할 뿐 본문은 멀쩡하므로 항목을 버리지 않는다.
  */
+/**
+ * 그림 자리를 검증한다 — 좌표에 **쪽 번호**가 붙는다.
+ *
+ * 쪽이 없거나 이 묶음이 안 본 쪽이면 **항목의 쪽으로 떨어뜨린다**(대개 맞고, 틀려도
+ * 잘라 낸 그림을 사람이 검수에서 보고 고칠 수 있다).
+ * @param v - 모델이 낸 값
+ * @param pages - 이 묶음이 실제로 본 쪽
+ * @param fallbackPage - 쪽을 못 믿을 때 쓸 항목의 쪽
+ * @returns 검증된 자리. 좌표가 이상하면 null
+ */
+export function parseFigure(
+  v: unknown,
+  pages: ReadonlySet<number>,
+  fallbackPage: number,
+): OcrFigure | null {
+  const box = parseBox(v);
+  if (!box) return null;
+  const page = isRecord(v) ? int(v.page) : null;
+  return { ...box, page: page !== null && pages.has(page) ? page : fallbackPage };
+}
+
 export function parseBox(v: unknown): OcrBox | null {
   if (!isRecord(v)) return null;
   const column = v.column;
