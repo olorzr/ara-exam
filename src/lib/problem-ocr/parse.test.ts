@@ -388,6 +388,18 @@ describe('parseOcrDraft — 본문 속 그림', () => {
     expect(draft.items[0].html).toContain('data-figure="1"');
   });
 
+  it('앞 그림의 좌표만 못 읽으면 **뒷 그림의 번호를 옮겨 붙인다** — 안 그러면 1번 자리에 2번이 그려진다', () => {
+    const draft = parseOcrDraft(json([item({
+      stem_html: `<p>물음</p>${fig(1)}<p>사이</p>${fig(2)}`,
+      figures: [{ column: 1, top: 0.8, bottom: 0.2 }, box(0.5)],
+    })]), ctx)!;
+
+    expect(draft.items[0].figures).toEqual([{ column: 1, top: 0.5, bottom: 0.6 }]);
+    // 살아남은 그림은 **자기 자리**(원래 2번 자리)에 남는다
+    expect(draft.items[0].stem_html).toBe('<p>물음</p><p>사이</p><figure data-figure="1"></figure>');
+    expect(said(draft.warnings)).toContain('그림 위치를 못 읽어');
+  });
+
   it('뒤집힌 좌표는 버리고 자리표시자도 함께 지운다', () => {
     const draft = parseOcrDraft(json([item({
       stem_html: `<p>물음</p>${fig(1)}`,

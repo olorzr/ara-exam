@@ -13,8 +13,10 @@ import {
   int, isRecord, isOverLength, LEADING_MARKER, normalizeChoice, normalizeWork, nullableStr,
   parseBox, QUESTION_TYPES, str,
 } from './parse-values';
-import type { OcrDraft, OcrItem } from './schema';
-import { reconcileFigurePlaceholders } from '@/lib/problem-bank/figure-placeholders';
+import type { OcrBox, OcrDraft, OcrItem } from './schema';
+import {
+  reconcileFigurePlaceholders, remapFigurePlaceholders,
+} from '@/lib/problem-bank/figure-placeholders';
 import { normalizeLabel } from './merge-keys';
 import { pushDraftWarning as pushWarning, type DraftWarning } from './warnings';
 
@@ -41,6 +43,20 @@ export interface ParseContext {
   areaTree?: AreaTreeNode[];
   /** 교과서 단원 트리. 비어 있으면 단원 검증을 건너뛴다 */
   unitTree?: AreaTreeNode[];
+}
+
+/**
+ * 본문의 그림 자리표시자를 **살아남은 그림에 맞춘다.**
+ *
+ * 두 단계다: ① 버린 그림 때문에 밀린 번호를 옮겨 붙이고, ② 그러고도 남거나 모자란
+ * 번호를 실제 개수에 맞춘다. ①을 건너뛰면 1번 자리에 2번 그림이 그려진다.
+ * @param html - 정화까지 끝난 본문
+ * @param mapping - 옛 번호 → 새 번호 (`null` 은 버린 것)
+ * @param count - 살아남은 그림 수
+ * @returns 맞춰진 본문
+ */
+function fitFigures(html: string, mapping: readonly (number | null)[], count: number): string {
+  return reconcileFigurePlaceholders(remapFigurePlaceholders(html, mapping), count);
 }
 
 /**
@@ -170,11 +186,22 @@ function parseItem(
     });
   }
 
-  // 그림 좌표. 못 알아본 것은 버린다 — 자리표시자도 함께 맞춰 준다
-  const figures = (Array.isArray(raw.figures) ? raw.figures : [])
-    .map(parseBox)
-    .filter((box): box is NonNullable<typeof box> => box !== null)
+  // 그림 좌표. 못 알아본 것은 버리되 **자리표시자 번호를 옮겨 붙인다** —
+  // 그냥 버리면 뒤엣것이 앞으로 당겨져 1번 자리에 2번 그림이 그려진다
+  const rawFigures = (Array.isArray(raw.figures) ? raw.figures : [])
     .slice(0, OCR_MAX_FIGURES_PER_ITEM);
+  const figures: OcrBox[] = [];
+  const figureMap = rawFigures.map((entry) => {
+    const box = parseBox(entry);
+    // push 가 돌려주는 새 길이가 곧 새 1-based 번호다
+    return box ? figures.push(box) : null;
+  });
+  if (figures.length < rawFigures.length) {
+    pushWarning(warnings, {
+      ...at,
+      message: '그림 위치를 못 읽어 그 그림이 빠졌어요. 검수에서 직접 잘라 넣어 주세요.',
+    });
+  }
 
   return {
     kind,
@@ -194,15 +221,17 @@ function parseItem(
     //    지우므로, 순서가 바뀌면 모델이 낸 '(가)' 상자 표시가 조용히 사라진다
     // ⚠️ 자리표시자를 **실제 그림 수에 맞춘다.** 모델이 한쪽만 내는 일이 흔한데,
     //    어긋난 채 저장하면 없는 그림을 찾다 빈칸이 되거나 잘라 둔 그림이 안 나온다
-    html: reconcileFigurePlaceholders(
+    html: fitFigures(
       sanitizeProblemHTML(normalizeOcrPassageHtml(str(raw.html, OCR_HTML_MAX))),
+      kind === 'passage' ? figureMap : [],
       kind === 'passage' ? figures.length : 0,
     ),
     continued: raw.continued === true,
     continues: raw.continues === true,
     question_type,
-    stem_html: reconcileFigurePlaceholders(
+    stem_html: fitFigures(
       sanitizeProblemHTML(normalizeOcrStemHtml(str(raw.stem_html, OCR_HTML_MAX))),
+      kind === 'problem' ? figureMap : [],
       kind === 'problem' ? figures.length : 0,
     ),
     choices,

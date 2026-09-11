@@ -191,9 +191,24 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
         // ⚠️ 그림은 **글 길이와 따로** 본다. `textOf` 가 자리표시자를 지우므로, 같은 글을
         //    옮겼는데 이번에만 도표를 알아본 경우 길이가 똑같아 갈아 끼우지 못했다 —
         //    그러면 그 그림이 잘리지도 저장되지도 않는다(코덱스 리뷰)
-        const moreFigures = item.figures.length > (existing.work.figures[existing.index] ?? []).length;
+        const mine = existing.work.figures[existing.index] ?? [];
+        const moreFigures = item.figures.length > mine.length;
         if (grew > 0 || (grew === 0 && moreFigures)) {
-          // 글과 그림을 **함께** 간다 — 글만 갈면 새로 알아본 그림이 사라진다
+          // ⚠️ 글만 고르고 그림을 남길 수는 없다 — 자리표시자 번호가 **그 판의 그림 목록**
+          //    기준이라 짝이 어긋나면 1번 자리에 딴 그림이 그려진다. 그래서 함께 간다.
+          //    버리는 판이 그림을 더 알아봤다면 조용히 넘기지 않고 알린다
+          if (item.figures.length < mine.length) {
+            warn({
+              message: '같은 지문을 두 번 읽었는데 글이 더 온전한 쪽이 그림을 덜 알아봤어요. '
+                + '빠진 그림이 없는지 확인하고, 필요하면 원본에서 끌어 넣어 주세요.',
+              targets: [{
+                kind: 'passage',
+                id: existing.work.draft.id,
+                page: existing.work.draft.page_no,
+                label: itemTargetLabel({ kind: 'passage', page: existing.work.draft.page_no }),
+              }],
+            });
+          }
           replaceFragment(existing.work, existing.index, item);
         }
         // ⚠️ 빈 칸 채우기는 **글 길이와 상관없이** 한다. 같은 글을 두 번 읽었는데

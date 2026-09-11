@@ -574,6 +574,25 @@ describe('mergeOcrDrafts — 쪽을 넘어가는 지문의 그림', () => {
     expect(res.passages[0].html).toContain('data-figure="1"');
   });
 
+  it('글이 더 온전한 판이 그림을 덜 알아봤으면 **글·그림을 함께 갈고 알린다**', () => {
+    // 짝이 어긋나면 1번 자리에 딴 그림이 그려진다 — 없는 것보다 나쁘다
+    const res = mergeOcrDrafts([
+      batch([passage({
+        ref: 'P1', page: 2, html: `<p>지문</p>${fig(1)}${fig(2)}`,
+        figures: [box(0.2), box(0.5)],
+      })], [1, 2]),
+      batch([passage({
+        ref: 'P1', page: 2, html: `<p>지문이 더 온전하게 읽혔다</p>${fig(1)}`,
+        figures: [box(0.5)],
+      })], [2, 3]),
+    ], { newId });
+
+    expect(res.passages[0].html).toContain('더 온전하게');
+    // 그림 목록도 새 판의 것이다 — 개수와 자리표시자가 맞는다
+    expect(res.passages[0].figures).toEqual([{ page: 2, box: box(0.5) }]);
+    expect(said(res)).toContain('그림을 덜 알아봤어요');
+  });
+
   it('겹쳐 읽은 그림은 같은 쪽에서 읽은 것만 받는다 — 좌표와 쪽은 짝이다', () => {
     const res = mergeOcrDrafts([
       batch([passage({ ref: 'P1', page: 2, html: '<p>지문</p>', figures: [] })], [1, 2]),

@@ -150,19 +150,16 @@ export function appendFragment(work: PassageWork, item: OcrItem): void {
 /**
  * 겹쳐 읽어 **더 온전한 판**이 왔을 때 그 조각을 갈아 끼운다.
  *
- * ⚠️ 글만 갈고 **그림을 그대로 두면 새로 알아본 그림이 사라진다** — 자리표시자는 늘었는데
- *    가리킬 그림이 없어 합칠 때 지워지기 때문이다. 둘을 **함께** 간다.
+ * ⚠️ 글과 그림을 **늘 함께** 간다. 자리표시자 번호는 **그 판의 그림 목록** 기준이라,
+ *    한쪽만 갈면 1번 자리에 딴 그림이 그려진다 — 없는 것보다 나쁘다(없는 것은 눈에
+ *    띄지만 딴 그림은 안 띈다). 버리는 판이 그림을 더 알아봤다면 호출부가 알린다.
  * @param work - 대상 지문
  * @param index - 갈아 끼울 조각 자리
  * @param item - 더 온전한 판
  */
 export function replaceFragment(work: PassageWork, index: number, item: OcrItem): void {
   work.fragments[index] = item.html;
-  const mine = work.figures[index] ?? [];
-  // 그림은 **더 많이 알아본 쪽**을 남긴다(글과 달리 빠뜨리기만 하고 지어내지는 않는다)
-  if (item.figures.length >= mine.length) {
-    work.figures[index] = item.figures.map((box) => ({ page: item.page, box }));
-  }
+  work.figures[index] = item.figures.map((box) => ({ page: item.page, box }));
   // 이 조각이 마지막이었다면 '아직 이어지는가' 도 새 값으로 바꾼다
   if (index === work.fragments.length - 1) work.draft.open = item.continues;
 }

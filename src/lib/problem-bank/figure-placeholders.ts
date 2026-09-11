@@ -103,6 +103,27 @@ export function reconcileFigurePlaceholders(html: string, count: number): string
 }
 
 /**
+ * 자리표시자 번호를 **옮겨 붙인 표대로** 바꾼다.
+ *
+ * ⚠️ 그림 목록에서 몇 개를 버리면 뒤엣것들이 앞으로 당겨진다. 본문을 그대로 두면
+ *    1번 자리에 원래 2번 그림이 그려진다 — **버린 자리를 그냥 지우는 것보다 나쁘다**
+ *    (없는 것은 보이지만 딴 그림은 안 보인다).
+ * @param html - 본문 HTML
+ * @param mapping - 옛 번호(1-based) → 새 번호. `null` 이면 그 자리표시자를 지운다
+ * @returns 번호가 옮겨진 HTML
+ */
+export function remapFigurePlaceholders(
+  html: string,
+  mapping: readonly (number | null)[],
+): string {
+  return splitByFigurePlaceholders(html).map((chunk) => {
+    if (chunk.kind === 'html') return chunk.html;
+    const next = mapping[chunk.index - 1];
+    return next ? figurePlaceholder(next) : '';
+  }).join('');
+}
+
+/**
  * 자리표시자 번호를 한꺼번에 민다 (지문 조각을 이어 붙일 때).
  *
  * 쪽을 넘어가는 지문은 조각마다 그림이 따로 있다. 조각을 뒤에 붙이면서 번호를 안 밀면
