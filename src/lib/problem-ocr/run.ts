@@ -14,6 +14,8 @@ import { planPageBatches } from './batch-plan';
 import { representativeFailure, runOcrBatches } from './batch-run';
 import { OCR_SPLIT_COLUMNS, ocrTurnBudgetMs } from './constants';
 import { mergeOcrDrafts } from './merge';
+import { collectPageTexts, textSourceOf, type PageText } from './page-text';
+import { verifyAgainstText } from './verify-text';
 import type { MergeResult } from './merge';
 import { OCR_MAX_MERGED_WARNINGS } from './constants';
 import { capWarnings, dedupeWarnings, itemTargetLabel } from './warnings';
@@ -89,6 +91,10 @@ export async function runProblemOcr(
 
     const batches = planPageBatches(input.problemPages);
 
+    // PDF 에 글자가 박혀 있으면 이미지와 **함께** 보낸다 — 글자는 그쪽이 정확하다.
+    // 기출은 대부분 스캔본이라 보통 비어 있고, 없다고 읽기를 멈추지 않는다
+    const pageTexts: PageText[] = [];
+
     const ocrRun = await runOcrBatches({
       batches,
       // 2단 쪽은 단별로 갈라 보낸다 — 읽을 순서가 하나뿐이라 두 단이 뒤섞이지 않고,
@@ -97,12 +103,18 @@ export async function runProblemOcr(
         signal, splitColumns: OCR_SPLIT_COLUMNS,
       }),
       runBatch: async ({ pages, rendered, images, index, total }) => {
+        const texts = await collectPageTexts(doc, pages);
+        for (const text of texts) {
+          // 겹쳐 읽는 쪽이 있어 같은 쪽이 두 번 온다 — 검사에 쓸 표는 한 벌이면 된다
+          if (!pageTexts.some((t) => t.page === text.page)) pageTexts.push(text);
+        }
         const raw = await generateDraft({
           port,
           prompt: buildProblemOcrPrompt({
             source: input.meta,
             pages,
             rendered,
+            pageTexts: texts,
             batch: { index, total },
             areaTree: input.areaTree,
             unitTree: input.unitTree,
@@ -139,6 +151,8 @@ export async function runProblemOcr(
     // 문항의 어긋남)은 우리가 찾아 카드에 붙인다. 이게 없으면 30문항을 처음부터 끝까지
     // 원본과 대조하는 수밖에 없다
     merged.warnings.push(...verifyStructure(merged));
+    // PDF 에 박힌 글자가 있으면 옮겨 적은 글과 대조한다 — 지어냈거나 통째로 빠뜨린 것을 잡는다
+    merged.warnings.push(...verifyAgainstText(merged, pageTexts));
 
     // 정답표는 따로 읽는다 — 본문과 같은 프롬프트로 읽으면 모델이 문제를 풀려 든다.
     // 원본 안의 정답표 쪽과 따로 올린 답지를 한 번에 훑는다.
@@ -192,6 +206,7 @@ export async function runProblemOcr(
       pages: [...input.problemPages, ...input.answerPages].sort((a, b) => a - b),
       batches: batches.length,
       retries: ocrRun.retries + answerRun.retries,
+      textSource: textSourceOf(input.problemPages.length, pageTexts.length),
       durationMs: Date.now() - startedAt,
       imagesSent: ocrRun.imagesSent + answerRun.imagesSent,
       warnings: merged.warnings,

@@ -39,6 +39,11 @@ export interface OcrMeta {
   batches?: number;
   /** 실패한 묶음을 쪽 단위로 다시 읽은 횟수 — "왜 오래 걸렸나"를 설명한다 */
   retries?: number;
+  /**
+   * PDF 에 박힌 글자를 참고로 썼는가 — 'layer'(모든 쪽)·'partial'(일부)·'none'(스캔본).
+   * 검수 화면이 "글자 데이터를 썼으니 오독이 적다" 를 알리는 데 쓴다.
+   */
+  textSource?: 'layer' | 'partial' | 'none';
   durationMs?: number;
   imagesSent?: number;
   /**

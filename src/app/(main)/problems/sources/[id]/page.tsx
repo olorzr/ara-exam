@@ -3,7 +3,6 @@
 import { Suspense, useCallback, useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useProblemReview } from '@/hooks/useProblemReview';
@@ -13,10 +12,9 @@ import { useAiEnabled } from '@/hooks/useAiEnabled';
 import { usePassageContinuation } from '@/hooks/usePassageContinuation';
 import { useReviewGuards } from '@/hooks/useReviewGuards';
 import { setSourceStatus } from '@/lib/problem-bank/mutations-source';
-import { sourceLabel } from '@/lib/problem-bank/source-label';
 import PageImageWithBoxes, { type BoxOverlay } from '@/components/problem-review/PageImageWithBoxes';
 import ReviewCardList, { type ReviewRow } from '@/components/problem-review/ReviewCardList';
-import SourceTextbookPicker from '@/components/problem-review/SourceTextbookPicker';
+import ReviewHeader from '@/components/problem-review/ReviewHeader';
 import AnswerKeyFiles from '@/components/problem-review/AnswerKeyFiles';
 import OcrProgress from '@/components/problem-ocr/OcrProgress';
 import { toBbox } from '@/lib/problem-bank/bbox';
@@ -179,27 +177,13 @@ function ProblemSourceReviewContent() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{source.title}</h1>
-          <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
-            <Badge variant="outline">{source.source_type}</Badge>
-            {sourceLabel(source)}
-            <span>· 문항 {review.problems.length}개 (검수 {review.verifiedCount})</span>
-          </p>
-        </div>
-        <div className="flex items-end gap-3">
-          {/* 교과서가 있어야 단원 칸이 뜬다 — 여기서 고칠 수 있어야 옛 출처도 분류된다 */}
-          <SourceTextbookPicker
-            source={source}
-            // 묻는 순간의 미저장 개수를 센다 — 부를 때 값을 굳히면 그 사이 친 내용이 안 잡힌다
-            onChange={(textbook) => review.changeTextbook(textbook, () => dirtyIds.size)}
-          />
-          <Button type="button" onClick={finish} disabled={source.status === '완료'}>
-            {source.status === '완료' ? '검수 완료됨' : '검수 마치기'}
-          </Button>
-        </div>
-      </div>
+      <ReviewHeader
+        source={source}
+        problemCount={review.problems.length}
+        verifiedCount={review.verifiedCount}
+        onTextbook={(textbook) => review.changeTextbook(textbook, () => dirtyIds.size)}
+        onFinish={finish}
+      />
 
       <OcrProgress
         progress={null}
