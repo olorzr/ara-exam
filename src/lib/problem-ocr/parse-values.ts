@@ -44,6 +44,19 @@ export function str(v: unknown, max: number): string {
   return typeof v === 'string' ? v.trim().slice(0, max) : '';
 }
 
+/**
+ * 이 값이 상한을 넘어 **잘릴** 참인가.
+ *
+ * `str()` 은 조용히 `slice` 하므로, 호출부는 자르기 전에 이걸로 물어보고 경고를 남긴다.
+ * 긴 지문의 뒷부분이 말없이 사라지던 경로가 여기였다.
+ * @param v - 검사할 값
+ * @param max - 상한(글자)
+ * @returns 넘으면 true
+ */
+export function isOverLength(v: unknown, max: number): boolean {
+  return typeof v === 'string' && v.trim().length > max;
+}
+
 export function nullableStr(v: unknown, max: number): string | null {
   const s = str(v, max);
   return s ? s : null;

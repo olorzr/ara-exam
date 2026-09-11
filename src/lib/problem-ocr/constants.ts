@@ -72,3 +72,15 @@ export const OCR_MAX_MERGED_WARNINGS = 60;
  * 묶음 하나 = 선생님 ChatGPT 1회라, 30쪽짜리를 무심코 누르면 15회가 나간다.
  */
 export const OCR_CONFIRM_BATCH_THRESHOLD = 3;
+
+/**
+ * 본문 HTML 한 덩어리의 상한(글자).
+ *
+ * ⚠️ 예전 값은 6,000 이었고 **말없이 잘렸다.** 쪽을 넘어가는 고전소설·장문 독서 지문이
+ *    여기서 뒷부분을 잃었는데, 파서가 `slice` 만 하고 아무 말도 하지 않아
+ *    "AI 가 안 읽었다" 와 "우리가 잘랐다" 를 구분할 방법이 없었다.
+ *    지금은 넉넉히 두고, 그래도 넘으면 **반드시 경고**한다(parse.ts).
+ *
+ * DB 쪽 제약은 없다(`html`·`stem_html` 은 그냥 TEXT).
+ */
+export const OCR_HTML_MAX = 20000;

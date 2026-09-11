@@ -1,3 +1,5 @@
+import { OCR_MAX_WARNINGS } from './constants';
+
 /**
  * OCR 경고에 **어느 항목 얘기인지**를 붙이는 규약 (순수 함수).
  *
@@ -46,6 +48,25 @@ export interface DraftWarning {
   page?: number;
   /** 시험지에 인쇄된 문항 번호 */
   number?: number | null;
+}
+
+/**
+ * 파서 경고를 상한 안에서 담는다.
+ *
+ * ⚠️ 메시지에 `ref` 를 적지 않는다. 'Q3' 는 **그 묶음 안에서만** 유효한 이름이라
+ *    화면 어디에도 그런 이름이 없다 — 어느 문항 얘기인지 아무도 모른다.
+ *    위치는 `ref`/`page`/`number` 로 **따로** 실어 보내고, 병합이 그것을 진짜 행 id 와
+ *    사람이 읽는 이름('3번')으로 바꾼다.
+ * @param warnings - 담을 목록 (제자리에서 늘어난다)
+ * @param warning - 담을 경고
+ * @param max - 상한. 넘으면 조용히 버린다
+ */
+export function pushDraftWarning(
+  warnings: DraftWarning[],
+  warning: DraftWarning,
+  max: number = OCR_MAX_WARNINGS,
+): void {
+  if (warnings.length < max) warnings.push(warning);
 }
 
 /** 항목 하나를 가리키는 이름 — 번호를 모르면 쪽으로 말한다 */

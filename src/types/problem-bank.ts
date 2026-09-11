@@ -37,6 +37,8 @@ export interface OcrMeta {
   /** 읽은 쪽 번호들 */
   pages?: number[];
   batches?: number;
+  /** 실패한 묶음을 쪽 단위로 다시 읽은 횟수 — "왜 오래 걸렸나"를 설명한다 */
+  retries?: number;
   durationMs?: number;
   imagesSent?: number;
   /**

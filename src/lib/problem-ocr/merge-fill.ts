@@ -23,6 +23,25 @@ export interface FragmentRef {
   index: number;
 }
 
+/** 이어지는 조각이 같은 글인지 가릴 때 견줄 글자 수 */
+const CONTINUATION_PROBE = 40;
+
+/**
+ * 이 지문이 **이미** 이 조각을 담고 있는가.
+ *
+ * ⚠️ 이 검사가 없으면 같은 뒷부분이 두 번 붙는다. 앞 묶음이 쪽 경계를 넘는 지문을
+ *    통째로 한 항목으로 읽어 두면(흔하다), 겹쳐 읽은 다음 묶음이 그 뒷부분만 다시
+ *    '이어지는 조각' 으로 내놓는데 그것을 그대로 이어 붙이면 본문이 겹쳐 인쇄된다.
+ * @param work - 붙일 대상 지문
+ * @param html - 붙이려는 조각
+ * @returns 이미 담겨 있으면 true
+ */
+export function alreadyContains(work: PassageWork, html: string): boolean {
+  const probe = textOf(html).slice(0, CONTINUATION_PROBE);
+  if (!probe) return true;
+  return textOf(work.fragments.join(' ')).includes(probe);
+}
+
 export function toPassage(item: OcrItem, id: string): PassageWork {
   return {
     draft: {

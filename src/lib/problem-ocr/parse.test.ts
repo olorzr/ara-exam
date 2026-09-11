@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { parseAnswerKeyDraft, parseOcrDraft } from './parse';
-import { warningText } from './warnings';
+import { parseOcrDraft } from './parse';
+import { OCR_HTML_MAX } from './constants';
 import type { AreaTreeNode } from '@/lib/problem-bank/area-tree';
 
 const TREE: AreaTreeNode[] = [
@@ -327,32 +327,28 @@ describe('parseOcrDraft — 정화', () => {
   });
 });
 
-describe('parseAnswerKeyDraft', () => {
-  const key = (answers: unknown[], warnings: string[] = []) =>
-    JSON.stringify({ answers, warnings });
+describe('parseOcrDraft — 길이', () => {
+  const long = (n: number) => `<p>${'가'.repeat(n)}</p>`;
 
-  it('번호와 정답을 담는다', () => {
-    const draft = parseAnswerKeyDraft(key([{ no: 1, answer: '③', score: 3.5 }]))!;
-    // 배점은 스키마에서 뺐다 — 모델이 보내도 담지 않는다
-    expect(draft.answers).toEqual([{ no: 1, answer: '3' }]);
-  });
-
-  it('문항 범위를 벗어난 번호는 버린다', () => {
-    const draft = parseAnswerKeyDraft(key([{ no: 99, answer: '1' }]), { maxNumber: 20 })!;
-    expect(draft.answers).toHaveLength(0);
-    expect(said(draft.warnings)).toContain('99');
-  });
-
-  it('같은 번호가 두 번이면 먼저 읽은 값을 남긴다', () => {
-    const draft = parseAnswerKeyDraft(
-      key([{ no: 1, answer: '1' }, { no: 1, answer: '5' }]),
+  it('상한을 넘는 지문은 자르되 **반드시 알린다** — 말없이 자르면 안 읽은 것과 구분이 안 된다', () => {
+    const draft = parseOcrDraft(
+      json([item({ kind: 'passage', ref: 'P1', number: null, html: long(OCR_HTML_MAX + 100) })]),
+      ctx,
     )!;
-    expect(draft.answers).toEqual([{ no: 1, answer: '1' }]);
-    expect(warningText(draft.warnings[0])).toContain('1번이 두 번');
+    // 정화기가 열린 태그를 닫아 주므로 딱 상한은 아니다 — 잘렸다는 사실만 본다
+    expect(draft.items[0].html.length).toBeLessThan(OCR_HTML_MAX + 100);
+    expect(said(draft.warnings)).toContain('뒷부분이 잘렸어요');
+    // 어느 지문 얘기인지 데이터로 나른다 — 병합이 카드 id 로 바꾼다
+    expect(draft.warnings[0]).toMatchObject({ ref: 'P1', kind: 'passage', page: 1 });
   });
 
-  it('모양이 깨지면 null', () => {
-    expect(parseAnswerKeyDraft('{}')).toBeNull();
-    expect(parseAnswerKeyDraft('아니오')).toBeNull();
+  it('발문이 길어도 같은 경고를 낸다', () => {
+    const draft = parseOcrDraft(json([item({ stem_html: long(OCR_HTML_MAX + 1) })]), ctx)!;
+    expect(said(draft.warnings)).toContain('뒷부분이 잘렸어요');
+  });
+
+  it('상한 안이면 아무 말도 하지 않는다', () => {
+    const draft = parseOcrDraft(json([item({ kind: 'passage', ref: 'P1', number: null, html: long(100) })]), ctx)!;
+    expect(said(draft.warnings)).not.toContain('잘렸어요');
   });
 });

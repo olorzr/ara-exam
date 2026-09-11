@@ -12,7 +12,7 @@ import { planPageBatches } from './batch-plan';
 import { runOcrBatches } from './batch-run';
 import { ANSWER_KEY_PAGES_PER_BATCH, answerKeyTurnBudgetMs } from './constants';
 import type { MergeResult } from './merge';
-import { parseAnswerKeyDraft } from './parse';
+import { parseAnswerKeyDraft } from './parse-answer-key';
 import { buildAnswerKeyPrompt, type OcrSourceMeta } from './prompt';
 import { ANSWER_KEY_SCHEMA } from './schema';
 
@@ -130,7 +130,7 @@ export async function separateAnswerKey(
 export async function readAnswerKeys(
   sources: AnswerKeySource[],
   ctx: AnswerKeyContext,
-): Promise<{ imagesSent: number; rawLength: number }> {
+): Promise<{ imagesSent: number; rawLength: number; retries: number }> {
   const plans = sources.map((source) => ({
     source,
     batches: planPageBatches(source.pages, {
@@ -143,6 +143,7 @@ export async function readAnswerKeys(
 
   let imagesSent = 0;
   let rawLength = 0;
+  let retries = 0;
   let done = 0;
 
   for (const { source, batches } of plans) {
@@ -187,8 +188,9 @@ export async function readAnswerKeys(
 
     imagesSent += run.imagesSent;
     rawLength += run.rawLength;
+    retries += run.retries;
     done += batches.length;
   }
 
-  return { imagesSent, rawLength };
+  return { imagesSent, rawLength, retries };
 }

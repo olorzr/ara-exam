@@ -7,6 +7,27 @@ import type { OcrItem } from './schema';
  * 실제로 코덱스 리뷰에서 잡힌 것들이고, 테스트로 따로 고정해 둔다.
  */
 
+/**
+ * 지문 머리글 표기를 하나로 맞춘다 (`[1~3]` · `[1 ∼ 3]` · `[ 1 - 3 ]` → `1~3`).
+ *
+ * ⚠️ 이게 없으면 **같은 지문이 둘로 남는다.** 겹쳐 읽은 두 묶음이 같은 머리글을 서로 다른
+ *    물결표로 옮기면 중복 판정 키가 갈리고, 그러면 잘린 지문 두 개가 저장된다.
+ *    저장값도 같은 함수로 다듬어 화면·검사에서 같은 글자를 보게 한다.
+ * @param label - 모델이 읽은 머리글
+ * @returns 다듬은 표기. 빈 값이면 빈 문자열
+ */
+export function normalizeLabel(label: string | null | undefined): string {
+  if (!label) return '';
+  return label
+    .normalize('NFKC')
+    // 감싼 괄호를 벗긴다 — '[1~3]' 과 '1~3' 은 같은 머리글이다
+    .replace(/^[[(（［【〔<〈]+|[\])）］】〕>〉]+$/g, '')
+    // 물결·붙임표 변종을 하나로 (NFKC 가 전각 숫자·괄호는 이미 폈다)
+    .replace(/[~∼〜～\u2012-\u2015\u2212-]/g, '~')
+    .replace(/\s+/g, '')
+    .trim();
+}
+
 /** 태그를 걷어낸 본문 — 길이 비교와 중복 판정에 쓴다 */
 export function textOf(html: string): string {
   return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -21,7 +42,7 @@ export function textOf(html: string): string {
  */
 export function passageKeyBase(item: OcrItem): string {
   if (item.continued) return `${item.page}|C`;
-  const label = (item.label ?? '').trim();
+  const label = normalizeLabel(item.label);
   return label
     ? `${item.page}|L|${label}`
     : `${item.page}|H|${textOf(item.html).slice(0, 40)}`;

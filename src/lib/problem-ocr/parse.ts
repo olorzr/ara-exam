@@ -6,13 +6,14 @@ import {
 import { UNIT_DEPTH_MAX } from '@/lib/problem-bank/unit-tree';
 import { normalizeOcrPassageHtml, normalizeOcrStemHtml } from './normalize-html';
 import type { QuestionType } from '@/types/problem-bank';
-import { OCR_MAX_ITEMS_PER_BATCH, OCR_MAX_WARNINGS } from './constants';
+import { OCR_HTML_MAX, OCR_MAX_ITEMS_PER_BATCH, OCR_MAX_WARNINGS } from './constants';
 import {
-  int, isRecord, LEADING_MARKER, normalizeChoice, normalizeWork, nullableStr, parseBox,
-  QUESTION_TYPES, str,
+  int, isRecord, isOverLength, LEADING_MARKER, normalizeChoice, normalizeWork, nullableStr,
+  parseBox, QUESTION_TYPES, str,
 } from './parse-values';
-import type { AnswerKeyDraft, AnswerKeyRow, OcrDraft, OcrItem } from './schema';
-import type { DraftWarning } from './warnings';
+import type { OcrDraft, OcrItem } from './schema';
+import { normalizeLabel } from './merge-keys';
+import { pushDraftWarning as pushWarning, type DraftWarning } from './warnings';
 
 /**
  * AI 출력(JSON 문자열) → 검증된 초안.
@@ -37,18 +38,6 @@ export interface ParseContext {
   areaTree?: AreaTreeNode[];
   /** 교과서 단원 트리. 비어 있으면 단원 검증을 건너뛴다 */
   unitTree?: AreaTreeNode[];
-}
-
-/**
- * 경고를 담는다.
- *
- * ⚠️ 메시지에 `ref` 를 적지 않는다. 'Q3' 는 **이 묶음 안에서만** 유효한 이름이라
- *    화면 어디에도 그런 이름이 없다 — 어느 문항 얘기인지 아무도 모른다.
- *    위치는 `ref`/`page`/`number` 로 **따로** 실어 보내고, 병합이 그것을 진짜 행 id 와
- *    사람이 읽는 이름('3번')으로 바꾼다.
- */
-function pushWarning(warnings: DraftWarning[], warning: DraftWarning): void {
-  if (warnings.length < OCR_MAX_WARNINGS) warnings.push(warning);
 }
 
 /**
@@ -169,6 +158,15 @@ function parseItem(
     });
   }
 
+  // ⚠️ 길이를 **자르기 전에** 잰다. 예전에는 6,000자에서 말없이 잘라내어, 쪽을 넘어가는
+  //    긴 지문의 뒷부분이 사라지고도 아무 표시가 없었다 — 선생님은 AI 가 안 읽은 줄 알았다
+  if (isOverLength(raw.html, OCR_HTML_MAX) || isOverLength(raw.stem_html, OCR_HTML_MAX)) {
+    pushWarning(warnings, {
+      ...at,
+      message: '본문이 너무 길어 뒷부분이 잘렸어요. 원본과 대조해 이어 붙여 주세요.',
+    });
+  }
+
   return {
     kind,
     ref,
@@ -176,18 +174,20 @@ function parseItem(
     box: parseBox(raw.box),
     passage_ref: nullableStr(raw.passage_ref, 16),
     number,
-    label: nullableStr(raw.label, 40),
+    // 머리글은 **여기서** 다듬는다 — 중복 판정 키(merge-keys)와 같은 글자를 써야
+    // 겹쳐 읽은 같은 지문이 표기 차이로 둘로 갈라지지 않는다
+    label: normalizeLabel(nullableStr(raw.label, 40)) || null,
     // ⚠️ 작품명은 **여기서** 다듬는다. 저장 경로(save.ts)는 모델 값을 그대로 넣으므로
     //    여기서 안 하면 「동백꽃」·동백꽃·"동백꽃" 이 서로 다른 작품으로 쌓인다
     title: normalizeWork(nullableStr(raw.title, 120)),
     author: normalizeWork(nullableStr(raw.author, 60)),
     // ⚠️ 다듬기가 **정화보다 먼저**다. 정화기는 허용 목록 밖 data-box 를 되돌릴 수 없게
     //    지우므로, 순서가 바뀌면 모델이 낸 '(가)' 상자 표시가 조용히 사라진다
-    html: sanitizeProblemHTML(normalizeOcrPassageHtml(str(raw.html, 6000))),
+    html: sanitizeProblemHTML(normalizeOcrPassageHtml(str(raw.html, OCR_HTML_MAX))),
     continued: raw.continued === true,
     continues: raw.continues === true,
     question_type,
-    stem_html: sanitizeProblemHTML(normalizeOcrStemHtml(str(raw.stem_html, 6000))),
+    stem_html: sanitizeProblemHTML(normalizeOcrStemHtml(str(raw.stem_html, OCR_HTML_MAX))),
     choices,
     answer,
     has_figure: raw.has_figure === true,
@@ -271,54 +271,4 @@ export function parseOcrDraft(raw: string, ctx: ParseContext): OcrDraft | null {
   }
 
   return { items, warnings: warnings.slice(0, OCR_MAX_WARNINGS) };
-}
-
-/**
- * 정답표 응답 원문을 검증한다.
- * @param raw - 검증 전 JSON 문자열
- * @param opts - 문항 번호 상한 (원본 시험지의 마지막 번호). 넘으면 버린다
- * @returns 정답 목록. 전체 모양이 깨졌으면 null
- */
-export function parseAnswerKeyDraft(
-  raw: string,
-  opts: { maxNumber?: number } = {},
-): AnswerKeyDraft | null {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return null;
-  }
-  if (!isRecord(parsed) || !Array.isArray(parsed.answers)) return null;
-
-  const warnings: DraftWarning[] = Array.isArray(parsed.warnings)
-    ? parsed.warnings
-      .map((w) => str(w, 300)).filter(Boolean)
-      .slice(0, OCR_MAX_WARNINGS)
-      .map((message) => ({ message }))
-    : [];
-
-  const seen = new Set<number>();
-  const answers: AnswerKeyRow[] = [];
-
-  for (const raw of parsed.answers) {
-    if (!isRecord(raw)) continue;
-    const no = int(raw.no);
-    if (no === null || no < 1) continue;
-    if (opts.maxNumber !== undefined && no > opts.maxNumber) {
-      pushWarning(warnings, { message: `정답표의 ${no}번은 이 시험지의 문항 범위를 벗어나 버렸어요.` });
-      continue;
-    }
-    // 같은 번호가 두 번 오면 먼저 온 것을 남긴다(정답표는 보통 한 번만 인쇄된다)
-    if (seen.has(no)) {
-      pushWarning(warnings, { message: `정답표에 ${no}번이 두 번 나와 먼저 읽은 값을 남겼어요.` });
-      continue;
-    }
-    const answer = normalizeChoice(str(raw.answer, 200));
-    if (!answer) continue;
-    seen.add(no);
-    answers.push({ no, answer });
-  }
-
-  return { answers, warnings: warnings.slice(0, OCR_MAX_WARNINGS) };
 }

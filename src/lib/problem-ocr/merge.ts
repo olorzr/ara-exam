@@ -7,7 +7,7 @@ import {
 } from './warnings';
 import { passageKeyIn, problemKeyIn, textOf } from './merge-keys';
 import {
-  fillGaps, fillPassageGaps, toPassage, toProblem,
+  alreadyContains, fillGaps, fillPassageGaps, toPassage, toProblem,
   type FragmentRef, type PassageWork,
 } from './merge-fill';
 
@@ -107,15 +107,26 @@ export interface MergeOptions {
 }
 
 /**
- * 앞 묶음에서 아직 열려 있는(다음 쪽으로 이어지는) 지문을 찾는다.
- * 바로 앞 쪽에서 끊긴 것만 후보다 — 멀리 있는 지문에 잘못 붙이면 두 글이 뒤섞인다.
+ * 앞 쪽에서 이어지는 조각을 붙일 지문을 찾는다.
+ *
+ * **바로 앞 쪽에서 끝난 것만** 후보다 — 멀리 있는 지문에 잘못 붙이면 두 글이 뒤섞인다.
+ *
+ * 두 단계로 찾는다:
+ *  ① 아직 열려 있는(`continues`) 지문 — 모델이 양쪽 표시를 다 낸 정상 경우.
+ *  ② 없으면 **닫혀 있어도** 바로 앞 쪽에서 끝난 마지막 지문. 모델이 쪽 끝에서
+ *     `continues` 를 빠뜨리는 일이 잦은데, ①만 보면 그때마다 뒷부분이 **주인 없는
+ *     지문 하나로 떨어져 나가** 문항이 어느 쪽에도 온전히 붙지 않는다.
+ *     붙이기 전에 `alreadyContains` 로 중복을 거른다.
  */
 function findOpenPassage(works: PassageWork[], page: number): PassageWork | undefined {
+  let fallback: PassageWork | undefined;
   for (let i = works.length - 1; i >= 0; i -= 1) {
     const w = works[i];
-    if (w.draft.open && w.draft.lastPage === page - 1) return w;
+    if (w.draft.lastPage !== page - 1) continue;
+    if (w.draft.open) return w;
+    if (!fallback) fallback = w;
   }
-  return undefined;
+  return fallback;
 }
 
 /**
@@ -182,6 +193,13 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
       if (item.continued) {
         const open = findOpenPassage(works, item.page);
         if (open) {
+          // 앞 묶음이 이 지문을 통째로 읽어 뒷부분까지 이미 담았을 수 있다.
+          // 그때 또 붙이면 같은 글이 두 번 인쇄된다 — 참조만 잇고 넘어간다
+          if (alreadyContains(open, item.html)) {
+            fillPassageGaps(open.draft, item);
+            refToId.set(item.ref, open.draft.id);
+            continue;
+          }
           open.fragments.push(item.html);
           open.draft.open = item.continues;
           open.draft.pageSpan += 1;

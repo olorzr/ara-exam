@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { passageKeyIn, problemKeyIn, textOf } from './merge-keys';
+import { normalizeLabel, passageKeyIn, problemKeyIn, textOf } from './merge-keys';
 import type { OcrItem } from './schema';
 
 function item(over: Partial<OcrItem> = {}): OcrItem {
@@ -63,5 +63,35 @@ describe('problemKeyIn', () => {
     const first = problemKeyIn(item({ kind: 'problem', page: 2, number: 1 }), seen);
     const second = problemKeyIn(item({ kind: 'problem', page: 2, number: 1 }), seen);
     expect(first).not.toBe(second);
+  });
+});
+
+describe('normalizeLabel', () => {
+  it('물결표 변종을 하나로 맞춘다 — 두 묶음이 달리 읽어도 같은 지문이다', () => {
+    for (const raw of ['[1~3]', '[1∼3]', '[1〜3]', '[1～3]', '[1 - 3]', '[ 1 ~ 3 ]']) {
+      expect(normalizeLabel(raw)).toBe('1~3');
+    }
+  });
+
+  it('전각 숫자와 감싼 괄호를 벗긴다', () => {
+    expect(normalizeLabel('［４~６］')).toBe('4~6');
+    expect(normalizeLabel('(7~9)')).toBe('7~9');
+  });
+
+  it('빈 값은 빈 문자열', () => {
+    expect(normalizeLabel(null)).toBe('');
+    expect(normalizeLabel('   ')).toBe('');
+  });
+
+  it('범위가 아닌 머리글도 그대로 다듬는다', () => {
+    expect(normalizeLabel('[가]')).toBe('가');
+  });
+});
+
+describe('passageKeyIn — 머리글 표기', () => {
+  it('표기만 다른 같은 머리글은 같은 키다 — 안 그러면 잘린 지문 둘이 남는다', () => {
+    const a = passageKeyIn(item({ label: '[1~3]' }), new Map());
+    const b = passageKeyIn(item({ label: '[1 ∼ 3]' }), new Map());
+    expect(a).toBe(b);
   });
 });

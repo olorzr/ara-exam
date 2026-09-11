@@ -173,6 +173,7 @@ export async function runProblemOcr(
       effort: pref.effort,
       pages: [...input.problemPages, ...input.answerPages].sort((a, b) => a - b),
       batches: batches.length,
+      retries: ocrRun.retries + answerRun.retries,
       durationMs: Date.now() - startedAt,
       imagesSent: ocrRun.imagesSent + answerRun.imagesSent,
       warnings: merged.warnings,
@@ -223,8 +224,8 @@ async function readAllAnswerKeys(
     signal?: AbortSignal;
     onProgress?: (p: OcrRunProgress) => void;
   },
-): Promise<{ imagesSent: number; rawLength: number }> {
-  const empty = { imagesSent: 0, rawLength: 0 };
+): Promise<{ imagesSent: number; rawLength: number; retries: number }> {
+  const empty = { imagesSent: 0, rawLength: 0, retries: 0 };
   if (env.signal?.aborted) return empty;
 
   const sources: AnswerKeySource[] = [];

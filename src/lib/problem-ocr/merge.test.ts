@@ -396,3 +396,62 @@ describe('mergeOcrDrafts — 경고', () => {
     expect(res.warnings.length).toBeGreaterThan(20);
   });
 });
+
+describe('mergeOcrDrafts — 모델이 이어짐 표시를 빠뜨릴 때', () => {
+  it("앞 지문이 continues 를 안 냈어도 바로 앞 쪽에서 끝났으면 이어 붙인다", () => {
+    // 모델은 쪽 끝에서 '다음 쪽으로 이어진다' 를 자주 빠뜨린다. 그때마다 뒷부분이
+    // 주인 없는 지문으로 떨어져 나가면 문항이 어느 쪽에도 온전히 붙지 않는다
+    const res = mergeOcrDrafts([
+      batch([passage({ ref: 'P1', page: 3, html: '<p>앞부분</p>', continues: false })], [3]),
+      batch([passage({ ref: 'P1', page: 4, label: null, html: '<p>뒷부분</p>', continued: true })], [4]),
+    ], { newId });
+
+    expect(res.passages).toHaveLength(1);
+    expect(res.passages[0].html).toContain('앞부분');
+    expect(res.passages[0].html).toContain('뒷부분');
+    expect(res.passages[0].pageSpan).toBe(2);
+  });
+
+  it('앞 묶음이 이미 뒷부분까지 읽어 뒀으면 두 번 붙이지 않는다', () => {
+    // 겹쳐 읽은 묶음이 같은 뒷부분을 '이어지는 조각' 으로 다시 내놓는 흔한 경우다.
+    // 그대로 이어 붙이면 같은 글이 두 번 인쇄된다
+    const res = mergeOcrDrafts([
+      batch([passage({ ref: 'P1', page: 3, html: '<p>앞부분</p><p>뒷부분이 여기 다 있다</p>' })], [3, 4]),
+      batch([passage({ ref: 'P1', page: 4, label: null, html: '<p>뒷부분이 여기 다 있다</p>', continued: true })], [4, 5]),
+    ], { newId });
+
+    expect(res.passages).toHaveLength(1);
+    expect(res.passages[0].html.match(/뒷부분이 여기 다 있다/g)).toHaveLength(1);
+  });
+
+  it('중복이라 안 붙여도 그 조각을 가리킨 문항은 이 지문에 붙는다', () => {
+    const res = mergeOcrDrafts([
+      batch([passage({ ref: 'P1', page: 3, html: '<p>앞</p><p>뒤가 여기 다 있다</p>' })], [3, 4]),
+      batch([
+        passage({ ref: 'P9', page: 4, label: null, html: '<p>뒤가 여기 다 있다</p>', continued: true }),
+        problem({ ref: 'Q9', page: 4, number: 9, passage_ref: 'P9' }),
+      ], [4, 5]),
+    ], { newId });
+
+    expect(res.passages).toHaveLength(1);
+    expect(res.problems[0].passage_id).toBe(res.passages[0].id);
+  });
+
+  it('머리글 표기가 달라도 같은 지문이다 — 물결표 하나로 지문이 둘이 되면 안 된다', () => {
+    const res = mergeOcrDrafts([
+      batch([passage({ ref: 'P1', page: 2, label: '[1~3]', html: '<p>온전한 지문 본문</p>' })], [1, 2]),
+      batch([passage({ ref: 'P1', page: 2, label: '[1 ∼ 3]', html: '<p>지문</p>' })], [2, 3]),
+    ], { newId });
+
+    expect(res.passages).toHaveLength(1);
+    expect(res.passages[0].html).toContain('온전한 지문 본문');
+  });
+
+  it('멀리 떨어진 쪽에는 여전히 안 붙는다 — 닫힌 지문이라도 마찬가지다', () => {
+    const res = mergeOcrDrafts([
+      batch([passage({ ref: 'P1', page: 1, html: '<p>가</p>', continues: false })], [1]),
+      batch([passage({ ref: 'P2', page: 4, label: null, html: '<p>나</p>', continued: true })], [4]),
+    ], { newId });
+    expect(res.passages).toHaveLength(2);
+  });
+});

@@ -1,5 +1,5 @@
 import type { QuestionType } from '@/types/problem-bank';
-import { OCR_MAX_ITEMS_PER_BATCH, OCR_MAX_WARNINGS } from './constants';
+import { OCR_HTML_MAX, OCR_MAX_ITEMS_PER_BATCH, OCR_MAX_WARNINGS } from './constants';
 import type { DraftWarning } from './warnings';
 
 /**
@@ -142,11 +142,11 @@ export const PROBLEM_OCR_SCHEMA = {
           label: { ...nullableString, maxLength: 40 },
           title: { ...nullableString, maxLength: 120 },
           author: { ...nullableString, maxLength: 60 },
-          html: { type: 'string', maxLength: 6000 },
+          html: { type: 'string', maxLength: OCR_HTML_MAX },
           continued: { type: 'boolean' },
           continues: { type: 'boolean' },
           question_type: { type: 'string', enum: ['객관식', '주관식', '서술형'] },
-          stem_html: { type: 'string', maxLength: 6000 },
+          stem_html: { type: 'string', maxLength: OCR_HTML_MAX },
           choices: {
             type: 'array',
             maxItems: 5,

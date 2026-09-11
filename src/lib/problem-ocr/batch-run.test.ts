@@ -163,12 +163,16 @@ describe('runOcrBatches', () => {
 });
 
 describe('representativeFailure', () => {
-  const base = { drafts: [], warnings: [], imagesSent: 0, rawLength: 0 };
+  const base = { drafts: [], warnings: [], imagesSent: 0, rawLength: 0, retries: 0 };
+  const at = (batch: number) => ({ pages: [batch], retried: false });
 
   it('중단시킨 코드를 최우선으로 고른다', () => {
     const failure = representativeFailure({
       ...base,
-      failures: [{ kind: 'render', batch: 1, message: '' }, { kind: 'ai', batch: 2, code: 'unauthorized' }],
+      failures: [
+        { kind: 'render', batch: 1, message: '', ...at(1) },
+        { kind: 'ai', batch: 2, code: 'unauthorized', ...at(2) },
+      ],
       fatal: 'unauthorized',
     });
     expect(failure).toMatchObject({ kind: 'ai', code: 'unauthorized' });
@@ -177,7 +181,10 @@ describe('representativeFailure', () => {
   it('AI 실패가 렌더 실패보다 구체적이다', () => {
     const failure = representativeFailure({
       ...base,
-      failures: [{ kind: 'render', batch: 1, message: 'x' }, { kind: 'ai', batch: 2, code: 'timeout' }],
+      failures: [
+        { kind: 'render', batch: 1, message: 'x', ...at(1) },
+        { kind: 'ai', batch: 2, code: 'timeout', ...at(2) },
+      ],
       fatal: null,
     });
     expect(failure).toMatchObject({ kind: 'ai', code: 'timeout' });
@@ -185,5 +192,94 @@ describe('representativeFailure', () => {
 
   it('실패가 없으면 null', () => {
     expect(representativeFailure({ ...base, failures: [], fatal: null })).toBeNull();
+  });
+});
+
+describe('runOcrBatches — 실패한 묶음 다시 읽기', () => {
+  it('실패한 묶음을 쪽 하나씩 쪼개 다시 읽는다 — 겹침이 1쪽뿐이라 가운데 쪽은 이 묶음만 본다', async () => {
+    const runBatch = vi.fn(async ({ pages }: { pages: number[] }) => {
+      // 3쪽을 한꺼번에 보내면 출력이 길어 워치독에 걸린다(실제로 흔한 실패다)
+      if (pages.length > 1) throw new AiError('timeout');
+      return { draft: `p${pages[0]}`, rawLength: 1 };
+    });
+
+    const res = await runOcrBatches({
+      batches: [[1, 2, 3]],
+      renderBatch: ok(),
+      runBatch,
+    });
+
+    expect(res.drafts.map((d) => d.draft)).toEqual(['p1', 'p2', 'p3']);
+    expect(res.drafts.map((d) => d.pages)).toEqual([[1], [2], [3]]);
+    expect(res.retries).toBe(3);
+    // 다 살렸으면 실패가 아니다 — 없는 경고로 겁주지 않는다
+    expect(res.failures).toHaveLength(0);
+    expect(said(res)).not.toContain('읽지 못했어요');
+  });
+
+  it('일부만 살아나면 **끝내 못 읽은 쪽만** 경고에 싣는다', async () => {
+    const runBatch = vi.fn(async ({ pages }: { pages: number[] }) => {
+      if (pages.length > 1 || pages[0] === 2) throw new AiError('timeout');
+      return { draft: `p${pages[0]}`, rawLength: 1 };
+    });
+
+    const res = await runOcrBatches({
+      batches: [[1, 2, 3]],
+      renderBatch: ok(),
+      runBatch,
+    });
+
+    expect(res.drafts.map((d) => d.draft)).toEqual(['p1', 'p3']);
+    expect(res.failures[0].pages).toEqual([2]);
+    expect(said(res)).toContain('다시 시도했지만');
+    expect(said(res)).toContain('2쪽');
+    expect(said(res)).not.toContain('1쪽');
+  });
+
+  it('한 쪽짜리 묶음은 그대로 한 번 더 — 일시적인 실패가 대부분이다', async () => {
+    const runBatch = vi.fn()
+      .mockRejectedValueOnce(new AiError('invalid_output'))
+      .mockResolvedValueOnce({ draft: 'a', rawLength: 1 });
+
+    const res = await runOcrBatches({ batches: [[5]], renderBatch: ok(), runBatch });
+
+    expect(runBatch).toHaveBeenCalledTimes(2);
+    expect(res.drafts.map((d) => d.draft)).toEqual(['a']);
+    expect(res.retries).toBe(1);
+  });
+
+  it('한도 초과는 다시 시도하지 않는다 — 같은 결과가 나오고 한도만 더 태운다', async () => {
+    const runBatch = vi.fn().mockRejectedValue(new AiError('usage_limit_exceeded'));
+    const res = await runOcrBatches({ batches: [[1, 2, 3]], renderBatch: ok(), runBatch });
+
+    expect(runBatch).toHaveBeenCalledTimes(1);
+    expect(res.retries).toBe(0);
+    expect(res.fatal).toBe('usage_limit_exceeded');
+    expect(res.failures[0].pages).toEqual([1, 2, 3]);
+  });
+
+  it('렌더가 통째로 죽어도 쪽을 쪼개면 성한 쪽은 건진다', async () => {
+    const renderBatch = vi.fn(async (pages: number[]) => {
+      // 2쪽이 pdf.js 를 죽인다 — 예전에는 1·3쪽까지 함께 잃었다
+      if (pages.includes(2) && pages.length > 1) throw new Error('PDF 손상');
+      if (pages[0] === 2) throw new Error('PDF 손상');
+      return { images: ['x'], rendered: pages, skipped: [] };
+    });
+    const res = await runOcrBatches({
+      batches: [[1, 2, 3]],
+      renderBatch,
+      runBatch: vi.fn(async ({ pages }: { pages: number[] }) => ({ draft: `p${pages[0]}`, rawLength: 1 })),
+    });
+
+    expect(res.drafts.map((d) => d.draft)).toEqual(['p1', 'p3']);
+    expect(res.failures[0]).toMatchObject({ kind: 'render', pages: [2] });
+  });
+
+  it('이미지를 하나도 못 만든 묶음은 다시 시도하지 않는다 — 쪽마다 이미 예산을 쟀다', async () => {
+    const renderBatch = vi.fn().mockResolvedValue({ images: [], rendered: [], skipped: [1, 2] });
+    const res = await runOcrBatches({ batches: [[1, 2]], renderBatch, runBatch: vi.fn() });
+
+    expect(renderBatch).toHaveBeenCalledTimes(1);
+    expect(res.retries).toBe(0);
   });
 });
