@@ -1,6 +1,6 @@
 import { normalizeGrammarPaths } from '@/lib/problem-bank/grammar-tree';
 import {
-  figureNumbersIn, MAX_FIGURES, reconcileFigurePlaceholders, shiftFigurePlaceholders,
+  MAX_FIGURES, reconcileFigurePlaceholders, shiftFigurePlaceholders,
 } from '@/lib/problem-bank/figure-placeholders';
 import { textOf } from './merge-keys';
 import type { OcrBox, OcrFigure, OcrItem } from './schema';
@@ -33,6 +33,14 @@ export interface PassageWork {
 export interface FragmentRef {
   work: PassageWork;
   index: number;
+  /**
+   * **가리키기만 하는 자리**인가.
+   *
+   * 이어지는 조각이 앞 조각 안에 이미 들어 있어 따로 담지 않았을 때 쓴다. 그 키가
+   * 가리키는 것은 그 조각이 아니라 **통째로 담은 큰 조각**이라, 나중에 더 긴 이어짐이
+   * 와도 **갈아 끼우면 안 된다** — 지문 앞부분과 그림이 통째로 날아간다(코덱스 리뷰).
+   */
+  alias?: boolean;
 }
 
 /**
@@ -270,15 +278,16 @@ export function fillGaps(target: ProblemDraft, item: OcrItem): void {
   }
   if (!target.box && item.box) target.box = item.box;
   if (item.has_figure) target.has_figure = true;
-  // ⚠️ 그림만 따로 채우는 것은 **발문이 비어 있지 않을 때**뿐이고, 그때도 지금 발문에
-  //    자리표시자가 없으면 채워 봐야 그릴 자리가 없다 — 그래서 자리표시자가 있을 때만
-  //    받는다. 좌표와 쪽은 짝이라 같은 쪽에서 읽은 것만 받는다
+  // ⚠️ 그림을 뒤늦게 알아본 경우를 되살린다. 첫 판이 좌표를 못 내면 파서가 **자리표시자도
+  //    지우므로**(fitFigures), '자리표시자가 있을 때만 채운다' 로 두면 영영 못 받는다.
+  //    발문과 그림은 짝이라 **함께** 받고, 글을 잃지 않게 짧아지지 않을 때만 받는다
   if (
     target.figures.length === 0
     && item.figures.length > 0
-    && item.page === target.page_no
-    && figureNumbersIn(target.stem_html).length > 0
+    && item.stem_html
+    && textOf(item.stem_html).length >= textOf(target.stem_html).length
   ) {
+    target.stem_html = item.stem_html;
     target.figures = item.figures.map(toRegion);
   }
 }

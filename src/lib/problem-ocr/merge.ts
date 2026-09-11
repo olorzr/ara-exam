@@ -184,6 +184,14 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
       const key = passageKeyIn(item, seenPassages);
       const existing = fragmentByKey.get(key);
       if (existing) {
+        // ⚠️ **가리키기만 하는 자리**는 갈아 끼우지 않는다. 그 키가 가리키는 것은
+        //    이 조각이 아니라 통째로 담은 큰 조각이라, 더 긴 이어짐으로 바꾸면
+        //    지문 앞부분과 그림이 통째로 날아간다
+        if (existing.alias) {
+          fillPassageGaps(existing.work.draft, item);
+          refToId.set(item.ref, existing.work.draft.id);
+          continue;
+        }
         // 겹쳐 읽은 **같은 조각** — 더 완전한(긴) 쪽을 남긴다.
         // 비교 대상이 합본이 아니라 조각이라 앞부분을 잃지 않는다
         const current = existing.work.fragments[existing.index] ?? '';
@@ -236,8 +244,11 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
             //    또 냈을 때 표에서 못 찾고, 그 사이 lastPage 가 그 쪽까지 와 있어
             //    `findOpenPassage` 도 이 지문을 거른다 — 주인 없는 지문이 하나 더 생기고
             //    처음 보는 문항이 거기에 붙는다. 마지막 조각을 가리켜 두면 다음번엔
-            //    중복 판정 길로 들어온다(글이 짧아 갈아 끼우지도 않는다)
-            fragmentByKey.set(key, { work: open, index: open.fragments.length - 1 });
+            //    중복 판정 길로 들어온다. **가리키기만 하는 자리**로 표시해 두어야
+            //    나중에 더 긴 이어짐이 와도 큰 조각을 갈아 끼우지 않는다
+            fragmentByKey.set(key, {
+              work: open, index: open.fragments.length - 1, alias: true,
+            });
             refToId.set(item.ref, open.draft.id);
             continue;
           }

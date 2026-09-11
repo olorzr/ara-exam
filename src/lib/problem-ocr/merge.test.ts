@@ -510,6 +510,26 @@ describe('mergeOcrDrafts — 모델이 이어짐 표시를 빠뜨릴 때', () =>
     expect(res.problems[0].passage_id).toBe(res.passages[0].id);
   });
 
+  it('가리키기만 하는 자리는 갈아 끼우지 않는다 — 지문 앞부분이 통째로 날아간다', () => {
+    const res = mergeOcrDrafts([
+      batch([passage({
+        ref: 'P1', page: 3, html: '<p>지문 앞부분</p><p>뒷부분 글</p>',
+      })], [3, 4]),
+      // 통째로 담긴 조각 안에 들어 있어 안 붙인다(키만 등록된다)
+      batch([passage({
+        ref: 'P1', page: 4, label: null, continued: true, html: '<p>뒷부분 글</p>',
+      })], [4, 5]),
+      // 더 긴 이어짐이 왔다 — 여기서 갈아 끼우면 '지문 앞부분' 이 사라진다
+      batch([passage({
+        ref: 'P1', page: 4, label: null, continued: true,
+        html: '<p>뒷부분 글이 훨씬 더 길게 읽힌 판이다 여기에는 앞부분이 없다</p>',
+      })], [4, 5, 6]),
+    ], { newId });
+
+    expect(res.passages).toHaveLength(1);
+    expect(res.passages[0].html).toContain('지문 앞부분');
+  });
+
   it('중복이라 안 붙여도 그 조각을 가리킨 문항은 이 지문에 붙는다', () => {
     const res = mergeOcrDrafts([
       batch([passage({ ref: 'P1', page: 3, html: '<p>앞</p><p>뒤가 여기 다 있다</p>' })], [3, 4]),
@@ -573,11 +593,31 @@ describe('mergeOcrDrafts — 문항의 그림', () => {
     expect(res.problems[0].figures).toEqual([region(1, 0.3)]);
   });
 
-  it('자리표시자가 없으면 그림을 받지 않는다 — 받아 봐야 그릴 자리가 없다', () => {
+  it('뒤늦게 알아본 그림을 되살린다 — 첫 판이 좌표를 못 내면 자리표시자도 지워져 있다', () => {
+    // 파서가 좌표 없는 자리표시자를 지우므로(fitFigures), '자리표시자가 있을 때만' 으로
+    // 두면 영영 못 받는다. 발문과 그림은 짝이라 함께 받는다
     const res = mergeOcrDrafts([
       batch([problem({ ref: 'Q1', number: 5, stem_html: '<p>물음</p>', figures: [] })], [1]),
-      batch([problem({ ref: 'Q1', number: 5, stem_html: '<p>물음</p>', figures: [box(0.3, 1)] })], [1, 2]),
+      batch([problem({
+        ref: 'Q1', number: 5, stem_html: `<p>물음</p>${fig(1)}`, figures: [box(0.3, 1)],
+      })], [1, 2]),
     ], { newId });
+
+    expect(res.problems[0].figures).toEqual([region(1, 0.3)]);
+    expect(res.problems[0].stem_html).toContain('data-figure="1"');
+  });
+
+  it('글이 짧아지는 판으로는 바꾸지 않는다 — 그림을 얻자고 발문을 잃으면 안 된다', () => {
+    const res = mergeOcrDrafts([
+      batch([problem({
+        ref: 'Q1', number: 5, stem_html: '<p>온전하게 읽힌 긴 발문이 여기 있다</p>', figures: [],
+      })], [1]),
+      batch([problem({
+        ref: 'Q1', number: 5, stem_html: `<p>짧다</p>${fig(1)}`, figures: [box(0.3, 1)],
+      })], [1, 2]),
+    ], { newId });
+
+    expect(res.problems[0].stem_html).toContain('온전하게 읽힌');
     expect(res.problems[0].figures).toEqual([]);
   });
 });
