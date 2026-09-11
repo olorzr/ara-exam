@@ -115,9 +115,40 @@
 - 관련 파일: src/lib/problem-bank/area-tree.ts, src/lib/problem-bank/area-master.ts
 
 ## 이미지로 출제 (render_mode: 'image')
-- 정의: 표·그림이 많아 글로 옮기지 못한 문항·지문을 **잘라 둔 원본 이미지**로 인쇄하는 방식
+- 정의: 글로 옮기지 못한 문항·지문을 **통째로 잘라 둔 원본 이미지**로 인쇄하는 방식
+- ⚠️ **마지막 수단이다.** 그림만 잘라 본문 제자리에 끼울 수 있으면(그림 자리표시자)
+  글로 둔다 — 글이라야 고칠 수 있고 검색되고 문제지에서 다시 조판된다
 - 코드에서의 사용: `render_mode`, `image_path`
 - 관련 파일: src/lib/problem-ocr/crop.ts, src/components/problem-paper/PaperPrintBlocks.tsx
+
+## 그림 자리표시자 (figure placeholder)
+- 정의: 본문 HTML 안의 빈 `<figure data-figure="n"></figure>`. 그림이 **원래 있던 자리**를
+  `<img>` 없이 남기는 표시다. 숫자는 `figure_paths` 배열의 **1-based 순번**이고,
+  화면·인쇄가 그 자리에서 본문을 갈라 서명 URL 이미지를 끼운다
+- 왜 URL 을 안 넣나: 그림은 비공개 버킷에 있어 **만료되는 서명 URL** 로만 열린다.
+  만료된 URL 을 본문에 굳히면 인쇄물에서 빈칸이 된다
+- 코드에서의 사용: `splitByFigurePlaceholders`, `reconcileFigurePlaceholders`,
+  `shiftFigurePlaceholders`, `FigurePlaceholderNode`
+- ⚠️ 편집기에 TipTap 노드가 없으면 글자 하나만 고쳐도 자리표시자가 사라진다
+- 관련 파일: src/lib/problem-bank/figure-placeholders.ts,
+  src/components/problem-editor/FigurePlaceholderNode.ts
+
+## 참고 텍스트 (page text)
+- 정의: PDF 에 **박혀 있는 글자**를 쪽마다 뽑아, 이미지와 **함께** 모델에게 주는 것.
+  글자 하나하나는 이쪽이 정확하고, 구조(밑줄·상자·그림·문항 경계)는 이미지에서 본다
+- ⚠️ 기출은 대부분 스캔본이라 **보통 비어 있다.** 있으면 공짜로 좋아지는 보너스다
+- ⚠️ 복합기가 붙인 자동 OCR 레이어는 걸러낸다 — 우리가 쓰려는 것보다 못한 인식 결과라
+  "정확한 글자" 라고 주면 오히려 더 틀린다
+- 코드에서의 사용: `PageText`, `collectPageTexts`, `OcrMeta.textSource`
+- 관련 파일: src/lib/pdf/pdfText.ts, src/lib/problem-ocr/page-text.ts
+
+## 단 가르기 (column split)
+- 정의: 2단 조판 쪽을 **단별 이미지 두 장**으로 나눠 보내는 것. 읽을 순서가 하나뿐이 되어
+  두 단이 섞이지 않고, 같은 바이트가 절반의 넓이에 쓰여 글자가 커진다
+- ⚠️ 홈(단 사이 여백)을 못 찾으면 **가르지 않는다** — 1단을 반으로 자르면 모든 줄이
+  두 동강 난다
+- 코드에서의 사용: `OCR_SPLIT_COLUMNS`, `detectGutter`, `RenderedImage.part`
+- 관련 파일: src/lib/pdf/columnDetect.ts, src/lib/pdf/pdfColumns.ts
 
 ## 코덱스 브릿지 (Codex bridge)
 - 정의: 선생님 PC 에서 도는 작은 중계 프로그램. 브라우저가 자기 ChatGPT 로 OCR 을 돌리게 해 준다. 학원 서버는 AI 를 호출하지 않는다

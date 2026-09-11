@@ -48,10 +48,24 @@
   앱은 `p_clear_units` 를 **늘 true** 로 보낸다 — 미리 센 개수로 정하면 그 사이 다른 탭이
   붙인 태그가 새 교과서 아래 남는다(태그가 없으면 그 UPDATE 는 0행으로 지나간다)
 
+## RPC exam.merge_passages
+- 설명: 갈라져 저장된 지문 둘을 하나로. 본문 이어 붙이기 + 딸린 문항 이관 + 빈 칸 채우기
+  + 뒤 지문 삭제를 **한 트랜잭션**으로 한다
+- 인자: `p_target uuid`(남는 앞 지문), `p_source uuid`(사라지는 뒤 지문)
+- Response: 앞 지문의 새 `updated_at`
+- 에러: 못 찾으면 `no_data_found`, 같은 지문끼리·다른 출처면 `invalid_parameter_value`
+- 비고: 두 행을 `FOR UPDATE` 로 **잠그고** 읽는다(그 사이 남이 고친 본문을 덮어쓰지 않게).
+  합친 뒤 `render_mode` 는 **글로 되돌린다** — 잘라 둔 이미지는 한쪽 쪽만 담고 있어
+  이미지 출제로 두면 이어 붙인 부분이 인쇄물에서 사라진다.
+  나눠 보내면 '본문은 합쳐졌는데 문항은 옛 지문에 남은' 상태가 되어 인쇄에서 같은
+  지문이 두 번 나온다
+
 ## RPC exam.create_problem_paper
 - 설명: 문제지 생성. `problem_papers` 의 **유일한 쓰기 경로**다(직접 INSERT 는 RLS 로 막혀 있다)
 - 인자: `p_title text`, `p_problem_ids uuid[]`, `p_settings jsonb`
 - Response: 만들어진 문제지 `uuid`
 - 검증: 도메인 · 제목 비지 않음 · 1~200개 · 중복 없음 · 전부 실재 ·
   **같은 지문의 문항이 붙어 있을 것**(흩어지면 인쇄에서 지문이 여러 번 나온다)
-- 비고: 본문을 `problem_paper_items.snapshot` 에 굳힌다. 설정은 화이트리스트로 재조립한다
+- 비고: 본문을 `problem_paper_items.snapshot` 에 굳힌다. 설정은 화이트리스트로 재조립한다.
+  지문 스냅샷에 `figure_paths` 가 있다(sql/23) — 안 실으면 아카이브 화면은 멀쩡한데
+  **인쇄물에서만** 그림이 사라진다. sql/23 이전 문제지에는 이 키가 없으므로 앱이 `?? []` 로 받는다

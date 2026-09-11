@@ -130,11 +130,15 @@ src/
           → pdf.js 렌더(scale 2) → 쪽 역할 지정(문제/정답표/제외, '마지막 N쪽' 단축)
           → Storage(exam-problem-bank) → problem_sources(추출중)
 [OCR]     3쪽씩(겹침 1) 묶어 선생님 PC 의 코덱스 turn → parse → merge
-          → passages/problems INSERT → bbox 로 영역 크롭 → 이미지 업로드
+          · 2단 쪽은 **단별 이미지 두 장**(columnDetect) + PDF 글자 레이어가 있으면 함께
+          · 실패한 묶음은 **쪽을 쪼개 한 번 더**
+          → verify-structure / verify-text 로 확인거리 자동 표시
+          → passages/problems INSERT → bbox 로 영역 크롭 + **그림만 따로 크롭**
           → 정답표는 따로 읽어 번호로 붙임(원본 안 쪽 + 별도 답지를 각각 5장 묶음)
           → problem_sources(검수중)
 [검수]    원본 페이지 이미지 + 영역 오버레이 ↔ TipTap 편집·정답·영역·교과서 단원
-          + 따로 올린 답지 보기
+          + 따로 올린 답지 보기 + 그림 추가(끌어 잡기)·빼기
+          + 다음 쪽 이어 읽기 / 앞 지문에 붙이기
 [아카이브] 왼쪽 패널 탭 4개(교과서·단원 | 학교 기출 | 작품 | 문법)
           카드 클릭 → 상세 창(지문+발문+선지+정답). 작품 조건이면 지문별로 묶어 표시
           + 필터(출처·학교·년도·학년·학기·시험·교과서·단원·영역·검색)
@@ -154,16 +158,35 @@ src/
   전부 ara-system 호스팅이고 이 앱은 링크·명령 문자열만 만든다
 
 ## lib/pdf
-- 역할: PDF → 캔버스 → JPEG data URL. 썸네일
+- 역할: PDF → 캔버스 → JPEG data URL. 썸네일. 글자 레이어 읽기
 - 의존: pdfjs-dist (⚠️ `wasmUrl: '/pdfjs-wasm/'` 필수 — 없으면 스캔본이 백지로 렌더된다)
-- 주요 파일: pdfRenderer.ts, pdfPages.ts, imageToJpeg.ts(사진 답지 → JPEG, EXIF 회전 반영)
+- 주요 파일: pdfRenderer.ts, pdfPages.ts, pdfColumns.ts, columnDetect.ts, pdfText.ts,
+  imageToJpeg.ts(사진 답지 → JPEG, EXIF 회전 반영)
+- **2단 쪽은 단별로 갈라 보낸다**(`OCR_SPLIT_COLUMNS`). 읽는 순서가 하나뿐이 되고 글자가
+  커진다. 홈을 못 찾으면 **가르지 않는다** — 1단을 반으로 자르면 모든 줄이 두 동강 난다.
+  **가로만** 자르므로 모델이 주는 `top`·`bottom` 은 쪽 기준 그대로다
+- `RenderedPages.rendered` 는 `{page, part}[]` 다(쪽 번호 배열이 아니다) — 한 쪽이 두 장이
+  되므로 "이미지 순서 = 이 쪽" 약속을 쪽 번호만으로는 지킬 수 없다
+- 글자 레이어(`pdfText`)는 **있으면 보너스**다. 기출은 대부분 스캔본이라 보통 비어 있고,
+  복합기 자동 OCR 레이어는 `hasUsableText` 가 걸러낸다(없느니만 못하다)
 
 ## lib/problem-ocr
 - 역할: 프롬프트 조립 → 구조화 출력 파싱 → 묶음 실행 → 병합 → 영역 크롭
 - 의존: lib/ai, lib/pdf, lib/sanitize-problem
-- 주요 파일: schema.ts, prompt.ts, parse.ts, normalize-html.ts, batch-plan.ts, batch-run.ts,
-  merge.ts, merge-keys.ts, crop.ts, run.ts, run-images.ts,
+- 주요 파일: schema.ts, prompt.ts, prompt-answer-key.ts, parse.ts, parse-answer-key.ts,
+  normalize-html.ts, batch-plan.ts, batch-attempt.ts, batch-run.ts,
+  merge.ts, merge-keys.ts, merge-fill.ts, crop.ts, run.ts, run-images.ts,
+  page-text.ts, verify-structure.ts, verify-text.ts, continue-passage.ts,
   answer-key.ts, answer-key-input.ts, answer-key-upload.ts, run-answer-key.ts
+- **실패한 묶음은 쪽을 쪼개 한 번 더** 읽는다(batch-attempt/batch-run). 겹침이 1쪽뿐이라
+  묶음 가운데 쪽은 그 묶음만 보는데, 죽으면 그 쪽이 통째로 사라졌다. 살려 낸 쪽은
+  실패로 세지 않고 **끝내 못 읽은 쪽만** 경고에 싣는다
+- **읽고 난 뒤 기계적으로 대조한다**(verify-structure: 빠진 번호·선지 수·머리글 범위,
+  verify-text: PDF 글자와의 대조). **확실할 때만 말한다** — 번호가 겹치는 자료(문제집)는
+  빠짐 검사를 아예 건너뛴다. 틀린 경고가 섞이면 경고 전체를 못 믿게 된다
+- **그림은 부분만 잘라 본문 제자리에 끼운다.** `figures`(OcrBox 배열)와 본문의
+  `<figure data-figure="n">` 이 순번으로 짝이다. 조각을 이어 붙일 때 번호를 민다 —
+  쪽 넘김 그림 지문이 이것으로 온전해졌다
 - 정답표는 **두 곳**에서 온다: 원본 PDF 안의 '정답표' 쪽과 따로 올린 답지 파일.
   둘은 다른 문서라 묶음을 섞지 않는다(`run-answer-key.ts` 가 공급원 목록으로 다룬다)
 - 서식 규약: 밑줄 `<u>`, 시행 줄바꿈 `<br>`, 원문의 빈 줄 `<p></p>`, 구분선 `<hr>`,
@@ -178,7 +201,8 @@ src/
 ## lib/problem-bank
 - 역할: 아카이브 조회·쓰기, Storage 경로·서명, 영역·단원 마스터 읽기, 필터·패싯
 - 의존: lib/supabase, lib/supabase-public(읽기 전용), lib/category-master(단원 마스터)
-- 주요 파일: queries.ts, facets.ts, mutations.ts, storage.ts, storage-paths.ts, bbox.ts,
+- 주요 파일: queries.ts, facets.ts, mutations.ts, mutations-source.ts, review-data.ts,
+  storage.ts, storage-paths.ts, bbox.ts, figure-placeholders.ts, figure-capture.ts,
   area-tree.ts, area-master.ts, unit-tree.ts, unit-master.ts, grammar-tree.ts,
   scope-resolve.ts, scope-pick.ts, source-form.ts, filters.ts, selection.ts, school-exam-tree.ts
 - 분류의 세 축: **영역**(ara-system 마스터, 최대 4단), **교과서 단원**(이 앱의 카테고리 관리,
