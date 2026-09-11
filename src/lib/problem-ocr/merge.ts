@@ -228,6 +228,10 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
           const verdict = alreadyContains(open, item);
           if (verdict === 'duplicate') {
             fillPassageGaps(open.draft, item);
+            // ⚠️ 글을 안 붙여도 **이 지문이 그 쪽까지 걸쳐 있다는 사실은 같다.**
+            //    안 옮기면 pageSpan 이 1로 남아 `save.ts` 가 이미지 출제를 고르고,
+            //    시작 쪽 이미지 하나만 인쇄돼 뒷부분이 사라진다
+            open.draft.open = item.continues;
             refToId.set(item.ref, open.draft.id);
             continue;
           }

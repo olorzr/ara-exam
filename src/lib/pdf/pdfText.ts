@@ -61,8 +61,13 @@ export function groupTextItems(pieces: readonly TextPiece[], pageWidth: number):
     && left.length >= used.length * MIN_COLUMN_SHARE
     && right.length >= used.length * MIN_COLUMN_SHARE
 
-  // 1단이면 통째로, 2단이면 왼쪽 단을 다 읽고 오른쪽 단으로 넘어간다
-  const groups = twoColumn ? [left, right] : [used]
+  // 1단이면 통째로, 2단이면 왼쪽 단을 다 읽고 오른쪽 단으로 넘어간다.
+  // ⚠️ 가운데를 **가로지르는** 조각(머리글·전면 표)도 반드시 담는다. 두 단 어디에도 안
+  //    들어가는데 빼 버리면 그 글이 참고 텍스트에서 통째로 사라진다 — 모델에게 덜 주는
+  //    것은 물론이고, 대조(verify-text)가 멀쩡한 문항을 '다르다' 고 짚는다.
+  //    자리는 맨 앞이다(머리글이 대부분이고, 참고 텍스트는 글자만 쓰지 순서는 안 쓴다)
+  const crossing = used.filter((p) => !left.includes(p) && !right.includes(p))
+  const groups = twoColumn ? [crossing, left, right] : [used]
   return groups.map(linesOf).filter(Boolean).join('\n')
 }
 

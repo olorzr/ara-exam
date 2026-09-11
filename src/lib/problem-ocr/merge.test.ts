@@ -462,6 +462,24 @@ describe('mergeOcrDrafts — 모델이 이어짐 표시를 빠뜨릴 때', () =>
     expect(res.passages[0].figures[1]).toEqual({ page: 4, box: box(0.7) });
   });
 
+  it('글이 이미 있어 안 붙여도 **몇 쪽에 걸쳤는지는 센다** — 1로 남으면 이미지로 인쇄된다', () => {
+    const res = mergeOcrDrafts([
+      batch([passage({
+        ref: 'P1', page: 3, has_figure: true,
+        html: '<p>앞</p><p>뒷부분 글이 여기 다 들어 있다</p>',
+      })], [3, 4]),
+      batch([passage({
+        ref: 'P1', page: 4, label: null, continued: true,
+        html: '<p>뒷부분 글이 여기 다 들어 있다</p>',
+      })], [4, 5]),
+    ], { newId });
+
+    expect(res.passages).toHaveLength(1);
+    // save.ts 가 이 값으로 '이미지로 출제' 를 정한다 — 1이면 시작 쪽만 인쇄된다
+    expect(res.passages[0].pageSpan).toBe(2);
+    expect(res.passages[0].lastPage).toBe(4);
+  });
+
   it('중복이라 안 붙여도 그 조각을 가리킨 문항은 이 지문에 붙는다', () => {
     const res = mergeOcrDrafts([
       batch([passage({ ref: 'P1', page: 3, html: '<p>앞</p><p>뒤가 여기 다 있다</p>' })], [3, 4]),

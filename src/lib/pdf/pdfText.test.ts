@@ -35,6 +35,19 @@ describe('groupTextItems', () => {
     expect(text.startsWith('줄0')).toBe(true)
   })
 
+  it('가운데를 가로지르는 머리글도 담는다 — 빼면 참고 텍스트에서 통째로 사라진다', () => {
+    const text = groupTextItems([
+      at('시험지 머리글', 50, 800, 500),
+      at('왼쪽 위', 50, 700, 100), at('오른쪽 위', 350, 700, 100),
+      at('왼쪽 아래', 50, 600, 100), at('오른쪽 아래', 350, 600, 100),
+      at('왼쪽 더', 50, 500, 100), at('오른쪽 더', 350, 500, 100),
+      at('왼쪽 또', 50, 400, 100), at('오른쪽 또', 350, 400, 100),
+    ], 600)
+    expect(text).toContain('시험지 머리글')
+    // 단 순서는 그대로다
+    expect(text.indexOf('왼쪽 아래')).toBeLessThan(text.indexOf('오른쪽 위'))
+  })
+
   it('한쪽에만 글이 있으면 1단이다', () => {
     const text = groupTextItems([at('가', 50, 700, 20), at('나', 60, 680, 20)], 600)
     expect(text).toBe('가\n나')

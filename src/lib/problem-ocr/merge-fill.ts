@@ -191,7 +191,6 @@ export function appendFragment(work: PassageWork, item: OcrItem): void {
   work.fragments.push(item.html);
   work.figures.push(item.figures.map((box) => ({ page: item.page, box })));
   work.draft.open = item.continues;
-  work.draft.pageSpan += 1;
 }
 
 /**
@@ -219,6 +218,11 @@ export function replaceFragment(work: PassageWork, index: number, item: OcrItem)
  */
 export function fillPassageGaps(draft: PassageDraft, item: OcrItem): void {
   draft.lastPage = Math.max(draft.lastPage, item.page);
+  // ⚠️ 몇 쪽에 걸쳐 있는지는 **세지 말고 계산한다.** 겹쳐 읽은 묶음이 같은 이어짐을 두 번
+  //    내면 세기는 부풀고, 글이 이미 있어 안 붙인 경우(중복)에는 아예 안 는다.
+  //    그 값으로 `save.ts` 가 '이미지로 출제' 를 정하므로, 1로 남으면 여러 쪽 지문이
+  //    **시작 쪽 이미지 하나로** 인쇄돼 뒷부분이 통째로 사라진다
+  draft.pageSpan = Math.max(1, draft.lastPage - draft.page_no + 1);
   if (!draft.label && item.label) draft.label = item.label;
   if (!draft.title && item.title) draft.title = item.title;
   if (!draft.author && item.author) draft.author = item.author;
