@@ -97,14 +97,18 @@ export default function PassageEditorCard({
     save: async (next) => {
       // ⚠️ 밀린 '글로 출제' 도 함께 싣는다. 이 저장만으로 카드가 깨끗해지므로,
       //    빠뜨리면 검수를 마쳐도 인쇄는 시작 쪽 이미지만 쓴다
+      // ⚠️ 보낼 때의 값을 붙잡아 두고, **그 값을 실제로 보냈을 때만** 내린다.
+      //    저장이 도는 동안 이어 읽기가 끝나 표시가 새로 켜질 수 있는데, 그때 내리면
+      //    그 요청에는 안 실린 출제 방식 변경이 영영 사라진다(코덱스 리뷰)
+      const sending = backToTextRef.current;
       const ok = await onSave({
         html: next.html,
         figure_paths: next.paths,
-        ...(backToTextRef.current ? { render_mode: 'text' as const } : {}),
+        ...(sending ? { render_mode: 'text' as const } : {}),
       });
       if (ok) {
         setFigurePaths(next.paths);
-        setBackToText(false);
+        if (sending) setBackToText(false);
       }
       return ok;
     },
@@ -129,14 +133,16 @@ export default function PassageEditorCard({
     setSaving(true);
     // ⚠️ `figure_paths` 도 함께 보낸다 — 그림을 붙이는 저장이 실패했을 때 사람이 다시
     //    눌러 고칠 길이 이것뿐이다(자리표시자만 남고 경로가 안 들어간 상태를 푼다)
+    // 보낼 때의 값을 붙잡아 둔다 — 저장이 도는 동안 이어 읽기가 표시를 새로 켤 수 있다
+    const sending = backToText;
     const ok = await onSave({
       html, title, author, area_path: area, unit_path: unit, figure_paths: figurePaths,
       // 이어 읽어 붙였으면 글로 되돌린다 — 잘라 둔 이미지는 시작 쪽만 담고 있다
-      ...(backToText ? { render_mode: 'text' as const } : {}),
+      ...(sending ? { render_mode: 'text' as const } : {}),
     });
-    // ⚠️ **성공했을 때만** 내린다. 실패했는데 내리면 다시 눌러도 이미지 출제인 채로 남아
-    //    되찾은 글이 영영 인쇄물에 안 나간다
-    if (ok) setBackToText(false);
+    // ⚠️ **성공했고 실제로 보냈을 때만** 내린다. 실패했는데 내리면 다시 눌러도 이미지
+    //    출제인 채로 남아 되찾은 글이 영영 인쇄물에 안 나간다
+    if (ok && sending) setBackToText(false);
     setSaving(false);
   };
 

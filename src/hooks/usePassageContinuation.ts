@@ -91,17 +91,20 @@ export function usePassageContinuation(source: ProblemSource | null) {
         pref: getCodexModelPref(),
         signal: controller.signal,
       });
-      if (!result.html) {
-        // 못 찾은 것도 결과다 — 모델이 남긴 까닭까지 그대로 보여 준다
-        toast.info(result.warnings[0] ?? `${page}쪽 머리에 이어지는 글이 안 보여요.`);
-        return result;
-      }
-      toast.success(`${page}쪽에서 이어지는 글을 읽었어요. 확인하고 저장해 주세요.`);
       // ⚠️ 이 길은 그림을 잘라 내지 못한다 — 있으면 사람이 직접 넣어야 한다.
-      //    말 안 하면 인쇄물에서 그림만 빠진 지문이 나간다
+      //    **글이 없어도** 알린다: 이어지는 부분이 도표 하나뿐인 지문이 실제로 있는데,
+      //    그때 "이어지는 글이 안 보여요" 로만 끝내면 그림이 있는 줄도 모른다
       if (result.hasFigure) {
         toast.warning(`${page}쪽 이어지는 부분에 그림이 있어요. '그림 추가' 로 직접 잘라 넣어 주세요.`);
       }
+      if (!result.html) {
+        // 못 찾은 것도 결과다 — 모델이 남긴 까닭까지 그대로 보여 준다
+        if (!result.hasFigure) {
+          toast.info(result.warnings[0] ?? `${page}쪽 머리에 이어지는 글이 안 보여요.`);
+        }
+        return result;
+      }
+      toast.success(`${page}쪽에서 이어지는 글을 읽었어요. 확인하고 저장해 주세요.`);
       return result;
     } catch (e) {
       if (isAiError(e)) {
