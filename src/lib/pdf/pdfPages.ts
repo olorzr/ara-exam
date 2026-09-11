@@ -21,37 +21,17 @@
 // 원본: ara-system `app/lib/ai/pdfPages.ts`.
 
 import { getPdfDocument, renderPdfPage } from '@/lib/pdf/pdfRenderer'
-import { encodePageImages, COLUMN_SCALE } from '@/lib/pdf/pdfColumns'
+import { encodePageImages } from '@/lib/pdf/pdfColumns'
+import {
+  COLUMN_SCALE, encodeAt, encodeWithinBudget,
+  MAX_BATCH_BYTES, MAX_PAGE_BYTES, PAGE_SCALE,
+} from '@/lib/pdf/pdfBudget'
+
+// 예산·인코딩은 `pdfBudget` 이 단일 출처다. ⚠️ 여기서 다시 선언하면 `pdfColumns` 와
+// **순환 import** 가 되어 단 이미지 예산이 NaN 이 되고, 2단 쪽이 전부 건너뛰어진다
+export { encodeWithinBudget, MAX_PAGE_BYTES }
 
 type PdfDocumentProxy = Awaited<ReturnType<typeof getPdfDocument>>['pdf']
-
-
-/**
- * 장당 data URL 예산 = 묶음 예산 ÷ 묶음당 쪽수.
- * 인코딩이 **모든 쪽을 이 아래로 보장**하므로 묶음 총량은 구성상 항상 예산 안이다.
- * 덕분에 묶음 수를 렌더 전에 알 수 있고(= 진행률·사전 안내가 정확해진다), 바이트 그리디가 필요 없다.
- */
-export const MAX_PAGE_BYTES = 1_200_000
-/** 묶음 총량 2차 안전판. 통과가 확인된 3.2MB의 약 2배 */
-const MAX_BATCH_BYTES = 6_000_000
-
-/** 쪽 전체를 그릴 배율 */
-const PAGE_SCALE = 2
-
-/**
- * 인코딩 사다리 — 위에서부터 시도해 **처음으로 예산에 맞는 것**을 쓴다.
- *
- * 1단은 기존 값 그대로다(화질 우선). 정답표 숫자를 잘못 읽으면 그 문항이 응시자 전원 오답으로
- * 처리되므로, 화질은 예산을 못 맞출 때만 양보한다.
- * A4(595×842pt)를 scale 2로 그리면 1190×1684라 1단에서는 축소가 걸리지 않는다 —
- * 실제 축소는 2단부터, 그리고 A3·큰 스캔 박스 PDF에서만 일어난다.
- */
-const ENCODE_STEPS: { maxSide: number; quality: number }[] = [
-  { maxSide: 1800, quality: 0.85 },
-  { maxSide: 1600, quality: 0.75 },
-  { maxSide: 1400, quality: 0.68 },
-  { maxSide: 1200, quality: 0.60 },
-]
 
 /** 썸네일은 페이지 고르기용이라 작고 거칠어도 된다 */
 const THUMB_SCALE = 0.35
@@ -69,40 +49,6 @@ export type PdfSource =
 
 /** 열어 둔 PDF — 묶음마다 다시 열지 않으려고 호출부가 들고 다닌다 */
 export type OpenPdf = { pdf: PdfDocumentProxy; numPages: number }
-
-/** 긴 변이 maxSide 를 넘으면 비율 유지 축소 후 JPEG data URL */
-function encodeAt(canvas: HTMLCanvasElement, maxSide: number, quality: number): string {
-  const scale = Math.min(1, maxSide / Math.max(canvas.width, canvas.height))
-  if (scale >= 1) return canvas.toDataURL('image/jpeg', quality)
-  const out = document.createElement('canvas')
-  out.width = Math.max(1, Math.round(canvas.width * scale))
-  out.height = Math.max(1, Math.round(canvas.height * scale))
-  const ctx = out.getContext('2d')
-  if (!ctx) throw new Error('이미지를 변환할 수 없습니다.')
-  ctx.drawImage(canvas, 0, 0, out.width, out.height)
-  return out.toDataURL('image/jpeg', quality)
-}
-
-/**
- * 예산에 맞을 때까지 화질을 낮춰가며 재인코딩. 끝까지 못 맞추면 **null**(호출부가 그 쪽을 건너뛴다).
- *
- * ⚠️ throw 하지 않는 게 핵심이다. 예전엔 한 장이 크면 실행 전체가 죽으면서
- *    "페이지 이미지가 너무 커요. 페이지 수를 줄여주세요."라는, 원인과 무관한 안내를 띄웠다
- *    (문제는 장수가 아니라 그 한 장이었다).
- * ⚠️ 재인코딩은 **같은 캔버스를 재사용**한다. pdf.js 재렌더는 비용이 10배다.
- */
-export function encodeWithinBudget(
-  canvas: HTMLCanvasElement,
-  budget: number,
-  steps: { maxSide: number; quality: number }[] = ENCODE_STEPS,
-): string | null {
-  for (const step of steps) {
-    const url = encodeAt(canvas, step.maxSide, step.quality)
-    // 바이트 비교 단위는 base64 문자 수다(실제 JPEG의 약 1.37배). ws로 나가는 것도 이 문자열이다.
-    if (url.length <= budget) return url
-  }
-  return null
-}
 
 /**
  * PDF 열기. 이미 업로드된 공개 URL 도 그대로 받는다(pdf.js 가 url 로딩을 지원).

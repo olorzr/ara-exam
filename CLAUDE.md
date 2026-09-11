@@ -159,6 +159,11 @@
 - [2026-09-04] 표 재분할은 한 패스에 **표 하나**만 쪼갠다(상한 32). 표가 많은 개념지는 그만큼 재측정이 돈다 — 렌더가 몇 프레임 늦을 뿐 내용에는 영향이 없다. 페이지 끝에 걸린 조각이 측정 오차로 다시 밀리면 **1행짜리 조각(+반복된 제목 행)** 이 남을 수 있다(내용 유실 없음, 외관 문제)
 
 ## Architecture Decisions
+- [2026-09-11] **순환 import 는 상수를 조용히 `undefined` 로 만든다 — 그래프를 테스트로 고정한다**([src/lib/__checks/import-cycles.test.ts](src/lib/__checks/import-cycles.test.ts)). 프로덕션이 이것 때문에 멈췄다: 이미지 예산이 `pdfPages` 에 있고 `pdfColumns` 가 그것을 import 하는데 `pdfPages` 도 `pdfColumns` 를 import 해 순환이 됐다. 번들러가 CommonJS 로 풀면 나중에 초기화되는 쪽이 `undefined` 를 읽어 단 이미지 예산이 **NaN** 이 되고, `url.length <= NaN` 이 늘 거짓이라 **모든 2단 쪽이 조용히 건너뛰어져** 기출 읽기가 통째로 실패했다
+  - ⚠️ **테스트(Vite/ESM)는 이것을 못 잡는다.** 평가 순서가 번들러와 달라 그냥 통과한다 — 그래서 값이 아니라 **import 그래프 자체**를 본다. `tsc`·`eslint`·`next build` 도 전부 통과했다
+  - **예산·인코딩의 단일 출처는 [pdfBudget.ts](src/lib/pdf/pdfBudget.ts)** 다. `pdfPages` 와 `pdfColumns` 는 **거기서만** 가져오고 서로에게서 값을 가져오지 않는다(타입은 `import type` 으로만)
+  - `encodeWithinBudget` 은 예산이 숫자가 아니면 **터뜨린다.** 조용히 모든 쪽을 건너뛰는 것보다 낫다 — 이 사고의 증상이 정확히 그 침묵이었다
+
 - [2026-09-11] **기출 OCR 2차 — 검수량 줄이기·그림 제자리·쪽 넘김 복구**([sql/22](sql/22_problem_bank_merge_passages.sql), [sql/23](sql/23_problem_bank_figures.sql)). 되돌리지 말 것:
   - **2단 쪽은 단별 이미지 두 장으로 보낸다**([columnDetect.ts](src/lib/pdf/columnDetect.ts), [pdfColumns.ts](src/lib/pdf/pdfColumns.ts), `OCR_SPLIT_COLUMNS`). 까닭이 둘이다 — ① 쪽 전체를 한 장으로 보내면 시각 모델이 **왼쪽 단 첫 줄 다음에 오른쪽 단 첫 줄**을 읽어 두 글을 한 문단으로 섞는다. 갈라 보내면 읽을 순서가 하나뿐이라 그 실수가 **구조적으로** 사라진다. ② 인코딩 사다리의 `maxSide` 는 **긴 변(세로)** 에 걸리는데 단 이미지는 세로가 쪽과 같고 가로만 절반이라, 배율을 3으로 올려도 사다리가 세로만 되돌리고 **가로 화소는 남는다**(A4 단 하나 595px → 892px)
     - ⚠️ **홈을 못 찾으면 가르지 않는다.** 1단 조판을 반으로 자르면 모든 줄이 두 동강 난다 — 못 갈라 손해 보는 쪽이 훨씬 낫다. 양쪽에 실제로 글자가 있어야 2단으로 본다

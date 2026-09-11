@@ -6,40 +6,11 @@
 // 판단이 한 자리에 모였다. 왜 가르는지는 `columnDetect.ts` 머리말에 적었다.
 
 import { detectGutter } from '@/lib/pdf/columnDetect'
-import { MAX_PAGE_BYTES, type RenderedPart } from '@/lib/pdf/pdfPages'
-
-/**
- * 단 하나짜리 이미지의 예산.
- *
- * 쪽 예산의 **절반**이다 — 2단 쪽을 갈라 보내도 그 쪽이 쓰는 총 바이트가 예전과 같아야
- * 묶음 총량과 진행률 계산이 흔들리지 않는다. 넓이도 절반이라 글자당 화질은 그대로다.
- */
-const MAX_COLUMN_BYTES = MAX_PAGE_BYTES / 2
-
-/**
- * 단을 갈라 보낼 때의 배율.
- *
- * 더 크게 그리는 이유: 인코딩 사다리의 `maxSide` 가 **긴 변(세로)** 에 걸리는데,
- * 단 이미지는 세로가 쪽 전체와 같고 가로만 절반이다. 배율을 올리면 세로는 사다리가
- * 되돌리고 **가로 화소만 남는다** — A4 기준 단 하나가 595px 에서 892px 로 넓어진다.
- */
-export const COLUMN_SCALE = 3
-
-/** 단을 자를 때 안쪽으로 더 잡는 여유 (폭 대비). 경계에 걸친 글자가 잘리지 않게 한다 */
-const COLUMN_OVERLAP = 0.01
-
-/**
- * 단 이미지 전용 인코딩 사다리.
- *
- * 1단의 `maxSide` 가 쪽 사다리(1800)보다 큰 이유는 위 `COLUMN_SCALE` 주석과 같다 —
- * 1800 을 그대로 쓰면 애써 키운 가로 화소를 세로에 걸린 상한이 도로 깎는다.
- */
-const COLUMN_ENCODE_STEPS: { maxSide: number; quality: number }[] = [
-  { maxSide: 2600, quality: 0.82 },
-  { maxSide: 2200, quality: 0.76 },
-  { maxSide: 1800, quality: 0.70 },
-  { maxSide: 1500, quality: 0.60 },
-]
+import {
+  COLUMN_ENCODE_STEPS, COLUMN_OVERLAP, MAX_COLUMN_BYTES, MAX_PAGE_BYTES,
+} from '@/lib/pdf/pdfBudget'
+// ⚠️ 타입만 가져온다 — 값으로 가져오면 `pdfPages` 와 순환 import 가 된다
+import type { RenderedPart } from '@/lib/pdf/pdfPages'
 
 /** 예산에 맞춰 캔버스를 data URL 로 만드는 함수 (pdfPages 의 사다리를 주입받는다) */
 type Encode = (
