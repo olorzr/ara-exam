@@ -634,6 +634,31 @@
 }
 .pb-editor .ProseMirror th { background: #f3f4f6; font-weight: 600; }
 
+/*
+ * 그림 자리표시자.
+ *
+ * 실제 그림은 만료되는 서명 URL 이라 편집기 안에서 그릴 수 없다. 대신 '그림 n' 칩으로
+ * 보여 준다 — 자리가 어딘지 보여야 끌어 옮겨 고칠 수 있다.
+ */
+.pb-editor .ProseMirror figure[data-figure] {
+  display: block;
+  margin: 8px 0;
+  padding: 6px 10px;
+  border: 1px dashed #9ca3af;
+  border-radius: 4px;
+  background: #f9fafb;
+  color: #6b7280;
+  font-size: 12px;
+  cursor: grab;
+}
+.pb-editor .ProseMirror figure[data-figure]::before {
+  content: '🖼 그림 ' attr(data-figure) ' (여기에 들어갑니다 — 끌어서 옮길 수 있어요)';
+}
+.pb-editor .ProseMirror figure[data-figure].ProseMirror-selectednode {
+  border-color: var(--primary, #81d8d0);
+  background: #f0fdfa;
+}
+
 /* 구역 상자 3종 — 인쇄(problem-paper.css)와 같은 규칙, 색만 연하다 */
 .pb-editor .ProseMirror blockquote[data-box] {
   --pb-box-open: '〈';

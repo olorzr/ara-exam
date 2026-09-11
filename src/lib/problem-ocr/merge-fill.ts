@@ -1,4 +1,5 @@
 import { normalizeGrammarPaths } from '@/lib/problem-bank/grammar-tree';
+import { MAX_FIGURES, shiftFigurePlaceholders } from '@/lib/problem-bank/figure-placeholders';
 import { textOf } from './merge-keys';
 import type { OcrItem } from './schema';
 import type { PassageDraft, ProblemDraft } from './merge';
@@ -55,6 +56,7 @@ export function toPassage(item: OcrItem, id: string): PassageWork {
       area_path: item.area_path,
       unit_path: item.unit_path,
       has_figure: item.has_figure,
+      figures: item.figures.map((box) => ({ page: item.page, box })),
       lastPage: item.page,
       open: item.continues,
       pageSpan: 1,
@@ -81,7 +83,26 @@ export function toProblem(item: OcrItem, id: string, passageId: string | null): 
     page_no: item.page,
     box: item.box,
     has_figure: item.has_figure,
+    figures: item.figures.map((box) => ({ page: item.page, box })),
   };
+}
+
+/**
+ * 이어지는 조각을 지문에 붙인다 — **그림 번호를 함께 민다.**
+ *
+ * ⚠️ 번호를 안 밀면 뒤 조각의 '1번 그림' 이 앞 조각의 그림을 가리킨다. 쪽을 넘어가는
+ *    그림 지문이 여기서 풀린다 — 그림은 **자기 쪽에서** 잘리고, 자리표시자만 이어진다.
+ * @param work - 붙일 대상 지문
+ * @param item - 이어지는 조각
+ */
+export function appendFragment(work: PassageWork, item: OcrItem): void {
+  work.fragments.push(shiftFigurePlaceholders(item.html, work.draft.figures.length));
+  for (const box of item.figures) {
+    if (work.draft.figures.length >= MAX_FIGURES) break;
+    work.draft.figures.push({ page: item.page, box });
+  }
+  work.draft.open = item.continues;
+  work.draft.pageSpan += 1;
 }
 
 /**
@@ -101,6 +122,11 @@ export function fillPassageGaps(draft: PassageDraft, item: OcrItem): void {
   if (draft.area_path.length === 0 && item.area_path.length > 0) draft.area_path = item.area_path;
   if (draft.unit_path.length === 0 && item.unit_path.length > 0) draft.unit_path = item.unit_path;
   if (item.has_figure) draft.has_figure = true;
+  // ⚠️ 그림은 **같은 쪽에서 읽은 것만** 받는다(좌표와 쪽은 짝이다 — box 와 같은 규칙).
+  //    겹쳐 읽은 묶음이 그림을 더 잘 봤을 때만 채운다
+  if (draft.figures.length === 0 && item.figures.length > 0 && item.page === draft.page_no) {
+    draft.figures = item.figures.map((box) => ({ page: item.page, box }));
+  }
 }
 
 /** 이미 담은 문항의 빈 칸만 채운다 */
@@ -125,4 +151,7 @@ export function fillGaps(target: ProblemDraft, item: OcrItem): void {
   }
   if (!target.box && item.box) target.box = item.box;
   if (item.has_figure) target.has_figure = true;
+  if (target.figures.length === 0 && item.figures.length > 0 && item.page === target.page_no) {
+    target.figures = item.figures.map((box) => ({ page: item.page, box }));
+  }
 }

@@ -16,17 +16,23 @@ import { withProfile, type SanitizeProfile } from './sanitize-profile';
  * ⚠️ `img` 는 **허용하지 않는다.** 그림·표 이미지는 Storage 경로를 DB 컬럼에 두고
  *    React 가 서명 URL 로 그린다. 본문 HTML 에 URL 이 들어오면 정화 규칙이 URL 스킴까지
  *    책임져야 하고, 서명 URL 은 만료돼 저장해 둘 수도 없다.
+ *
+ * 대신 **URL 없는 자리표시자** `<figure data-figure="1">` 만 허용한다. 그림이 본문의
+ * 어느 자리에 있었는지를 `<img>` 없이 남기는 방법이다(figure-placeholders.ts).
+ * 값은 한 자리 숫자뿐이라 여기서 새는 것이 없다.
  */
 const ALLOWED_TAGS = [
   'h3', 'h4',
   'p', 'br', 'hr',
   'strong', 'em', 'u', 's', 'code',
   'ul', 'ol', 'li', 'blockquote',
+  // 내용 없는 자리표시자로만 쓴다 — figcaption 은 허용하지 않는다
+  'figure',
   'table', 'thead', 'tbody', 'tr', 'th', 'td',
   'span',
 ];
 
-const ALLOWED_ATTR = ['colspan', 'rowspan', 'data-box', 'style'];
+const ALLOWED_ATTR = ['colspan', 'rowspan', 'data-box', 'data-figure', 'style'];
 
 /** inline style 은 개념지와 같은 좁은 집합만 — 표 셀 정렬·색이 전부다 */
 const ALLOWED_CSS_PROPS = new Set([
@@ -43,7 +49,11 @@ const PROBLEM_PROFILE: SanitizeProfile = {
   // 허용 말머리는 box-labels.ts 가 단일 출처다(인쇄 CSS 선택자와 짝이다).
   // ⚠️ 여기서 걸린 값은 **되돌릴 수 없이** 사라진다 — 시험지 표기('(가)')를 살리려면
   //    파서가 정화 **전에** normalizeBoxAttributes 로 다듬어야 한다
-  allowedDataAttrs: new Map([['data-box', isBoxLabel]]),
+  allowedDataAttrs: new Map<string, (value: string) => boolean>([
+    ['data-box', isBoxLabel],
+    // 그림 자리표시자의 순번. `figure_paths` 의 1-based 자리이고 한 자리뿐이다
+    ['data-figure', (value) => /^[1-9]$/.test(value)],
+  ]),
 };
 
 const PROBLEM_SANITIZE_CONFIG = {

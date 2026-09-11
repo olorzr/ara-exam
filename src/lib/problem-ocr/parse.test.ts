@@ -14,7 +14,7 @@ function item(over: Record<string, unknown> = {}) {
     kind: 'problem', ref: 'Q1', page: 1, box: null, passage_ref: null, number: 1,
     label: null, title: null, author: null, html: '', continued: false, continues: false,
     question_type: '객관식', stem_html: '<p>물음</p>', choices: ['가', '나', '다', '라', '마'],
-    answer: '1', has_figure: false, work_title: null, area_path: [], unit_path: [],
+    answer: '1', has_figure: false, figures: [], work_title: null, area_path: [], unit_path: [],
     grammar_paths: [],
     ...over,
   };
@@ -350,5 +350,64 @@ describe('parseOcrDraft — 길이', () => {
   it('상한 안이면 아무 말도 하지 않는다', () => {
     const draft = parseOcrDraft(json([item({ kind: 'passage', ref: 'P1', number: null, html: long(100) })]), ctx)!;
     expect(said(draft.warnings)).not.toContain('잘렸어요');
+  });
+});
+
+describe('parseOcrDraft — 본문 속 그림', () => {
+  const fig = (n: number) => `<figure data-figure="${n}"></figure>`;
+  const box = (top: number) => ({ column: 1, top, bottom: top + 0.1 });
+
+  it('그림 좌표와 자리표시자를 함께 담는다', () => {
+    const draft = parseOcrDraft(json([item({
+      stem_html: `<p>다음 그래프는?</p>${fig(1)}`,
+      figures: [box(0.2)],
+    })]), ctx)!;
+    expect(draft.items[0].figures).toEqual([{ column: 1, top: 0.2, bottom: 0.30000000000000004 }]);
+    expect(draft.items[0].stem_html).toContain('data-figure="1"');
+  });
+
+  it('좌표만 내고 자리표시자를 빠뜨리면 본문 끝에 붙인다 — 자리를 모르는 것보다 낫다', () => {
+    const draft = parseOcrDraft(json([item({
+      stem_html: '<p>물음</p>', figures: [box(0.2)],
+    })]), ctx)!;
+    expect(draft.items[0].stem_html).toContain('data-figure="1"');
+  });
+
+  it('자리표시자만 내고 좌표가 없으면 지운다 — 빈칸이 남으면 안 된다', () => {
+    const draft = parseOcrDraft(json([item({
+      stem_html: `<p>물음</p>${fig(1)}`, figures: [],
+    })]), ctx)!;
+    expect(draft.items[0].stem_html).not.toContain('figure');
+  });
+
+  it('지문 자리표시자는 html 에서 맞춘다 — 발문이 아니다', () => {
+    const draft = parseOcrDraft(json([item({
+      kind: 'passage', ref: 'P1', number: null,
+      html: `<p>지문</p>${fig(1)}`, stem_html: '', figures: [box(0.3)],
+    })]), ctx)!;
+    expect(draft.items[0].html).toContain('data-figure="1"');
+  });
+
+  it('뒤집힌 좌표는 버리고 자리표시자도 함께 지운다', () => {
+    const draft = parseOcrDraft(json([item({
+      stem_html: `<p>물음</p>${fig(1)}`,
+      figures: [{ column: 1, top: 0.8, bottom: 0.2 }],
+    })]), ctx)!;
+    expect(draft.items[0].figures).toEqual([]);
+    expect(draft.items[0].stem_html).not.toContain('figure');
+  });
+
+  it('그림이 있으면 has_figure 를 켠다 — 모델이 빠뜨려도 우리가 안다', () => {
+    const draft = parseOcrDraft(json([item({
+      has_figure: false, stem_html: '<p>물음</p>', figures: [box(0.2)],
+    })]), ctx)!;
+    expect(draft.items[0].has_figure).toBe(true);
+  });
+
+  it('상한을 넘는 그림은 잘라 낸다 — 크롭이 폭주하면 업로드가 그만큼 나간다', () => {
+    const draft = parseOcrDraft(json([item({
+      stem_html: '<p>물음</p>', figures: [box(0.1), box(0.2), box(0.3), box(0.4), box(0.5)],
+    })]), ctx)!;
+    expect(draft.items[0].figures).toHaveLength(3);
   });
 });

@@ -181,3 +181,53 @@ describe('longestPassageChars', () => {
     expect(longestPassageChars([snap()])).toBe(0);
   });
 });
+
+describe('buildPaperBlocks — 지문 안 그림', () => {
+  const fig = (n: number) => `<figure data-figure="${n}"></figure>`;
+
+  it('자리표시자 자리에 그림 블록을 끼운다 — 그림이 밀려 나오면 지문이 안 읽힌다', () => {
+    const p = {
+      ...passage('p1', `<p>앞 문단</p>${fig(1)}<p>뒤 문단</p>`),
+      figure_paths: ['graph.jpg'],
+    };
+    const kinds = build([snap({ passage: p })]).map((b) => b.kind);
+    expect(kinds).toEqual([
+      'passage-header', 'passage-part', 'passage-figure', 'passage-part', 'problem',
+    ]);
+  });
+
+  it('빈 <figure> 를 문단 조각으로 남기지 않는다 — 인쇄물에서 빈 줄이 된다', () => {
+    const p = { ...passage('p1', `<p>글</p>${fig(1)}`), figure_paths: ['g.jpg'] };
+    const parts = build([snap({ passage: p })])
+      .filter((b) => b.kind === 'passage-part') as { html: string }[];
+    expect(parts.every((b) => !b.html.includes('figure'))).toBe(true);
+  });
+
+  it('상자 테두리는 **글 조각**의 처음·끝에만 붙인다 — 그림에 붙으면 상자가 갈라 보인다', () => {
+    const p = {
+      ...passage('p1', `<p>앞</p>${fig(1)}<p>뒤</p>`),
+      figure_paths: ['g.jpg'],
+    };
+    const parts = build([snap({ passage: p })])
+      .filter((b) => b.kind === 'passage-part') as { first: boolean; last: boolean }[];
+    expect(parts[0].first).toBe(true);
+    expect(parts[0].last).toBe(false);
+    expect(parts[parts.length - 1].last).toBe(true);
+  });
+
+  it('경로가 없는 자리표시자는 건너뛴다 — 못 잘라 낸 그림이다', () => {
+    const p = { ...passage('p1', `<p>글</p>${fig(1)}`), figure_paths: [''] };
+    expect(build([snap({ passage: p })]).some((b) => b.kind === 'passage-figure')).toBe(false);
+  });
+
+  it('그림이 없는 지문은 예전과 똑같이 쪼갠다', () => {
+    const p = passage('p1', '<p>한 문단</p><p>두 문단</p>');
+    const kinds = build([snap({ passage: p })]).map((b) => b.kind);
+    expect(kinds).toEqual(['passage-header', 'passage-part', 'passage-part', 'problem']);
+  });
+
+  it('지문 그림도 서명할 경로에 담는다 — 빠지면 인쇄물에서만 빈칸이 된다', () => {
+    const p = { ...passage('p1'), figure_paths: ['pg.jpg'] };
+    expect(imagePathsOf([snap({ passage: p })])).toContain('pg.jpg');
+  });
+});

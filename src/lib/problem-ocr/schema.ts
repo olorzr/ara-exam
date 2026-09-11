@@ -1,5 +1,7 @@
 import type { QuestionType } from '@/types/problem-bank';
-import { OCR_HTML_MAX, OCR_MAX_ITEMS_PER_BATCH, OCR_MAX_WARNINGS } from './constants';
+import {
+  OCR_HTML_MAX, OCR_MAX_FIGURES_PER_ITEM, OCR_MAX_ITEMS_PER_BATCH, OCR_MAX_WARNINGS,
+} from './constants';
 import type { DraftWarning } from './warnings';
 
 /**
@@ -62,6 +64,14 @@ export interface OcrItem {
   answer: string | null;
   /** 표·그림이 있어 글로 다 옮기지 못했다 → 이미지 출제 후보 */
   has_figure: boolean;
+  /**
+   * 글로 못 옮기는 **그림·표 부분만**의 위치들.
+   *
+   * 항목 전체(`box`)와 다르다 — 그림만 잘라 본문의 **제자리**에 끼우려는 것이다.
+   * 본문 HTML 의 `<figure data-figure="n">` 자리표시자와 순서로 짝을 이룬다
+   * (figures[0] 이 1번).
+   */
+  figures: OcrBox[];
   work_title: string | null;
   /** 영역 세트 트리의 이름 경로. 해당 없으면 빈 배열 */
   area_path: string[];
@@ -121,7 +131,8 @@ export const PROBLEM_OCR_SCHEMA = {
         required: [
           'kind', 'ref', 'page', 'box', 'passage_ref', 'number', 'label', 'title', 'author',
           'html', 'continued', 'continues', 'question_type', 'stem_html', 'choices',
-          'answer', 'has_figure', 'work_title', 'area_path', 'unit_path', 'grammar_paths',
+          'answer', 'has_figure', 'figures', 'work_title', 'area_path', 'unit_path',
+          'grammar_paths',
         ],
         properties: {
           kind: { type: 'string', enum: ['passage', 'problem'] },
@@ -154,6 +165,21 @@ export const PROBLEM_OCR_SCHEMA = {
           },
           answer: { ...nullableString, maxLength: 200 },
           has_figure: { type: 'boolean' },
+          // 항목 전체가 아니라 **그림 부분만**의 자리. box 와 같은 모양이다
+          figures: {
+            type: 'array',
+            maxItems: OCR_MAX_FIGURES_PER_ITEM,
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['column', 'top', 'bottom'],
+              properties: {
+                column: { type: 'integer', enum: [0, 1, 2] },
+                top: { type: 'number', minimum: 0, maximum: 1 },
+                bottom: { type: 'number', minimum: 0, maximum: 1 },
+              },
+            },
+          },
           work_title: { ...nullableString, maxLength: 120 },
           // 빈 배열이 "해당 없음"이다 — nullable 배열은 엄격 모드에서 다루기 번거롭다
           area_path: {

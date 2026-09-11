@@ -9,7 +9,7 @@ function draft(over: Partial<ProblemDraft> = {}): ProblemDraft {
     stem_html: '<p>물음</p>', choices: ['가', '나', '다', '라', '마'],
     answer: null, score: null, work_title: '', area_path: [], unit_path: [], grammar_paths: [],
     page_no: 1,
-    box: null, has_figure: false, ...over,
+    box: null, has_figure: false, figures: [], ...over,
   };
 }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { choiceGlyph } from '@/lib/problem-bank/choices';
+import { splitByFigurePlaceholders } from '@/lib/problem-bank/figure-placeholders';
 import { stripTrailingEmptyParagraphs } from '@/lib/problem-paper/html-trim';
 import { sanitizeInlineHTML, sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import type { Problem } from '@/types/problem-bank';
@@ -46,25 +47,18 @@ export default function ProblemBodyView({ problem, imageUrls }: ProblemBodyViewP
             <span className="q-num q-num--mint">{String(problem.number).padStart(2, '0')}</span>
           )}
           {!asImage && (
-            <div
-              className="pb-q__stem"
-              dangerouslySetInnerHTML={{
-                __html: stripTrailingEmptyParagraphs(sanitizeProblemHTML(problem.stem_html)),
-              }}
-            />
+            <div className="pb-q__stem">
+              <BodyWithFigures
+                html={stripTrailingEmptyParagraphs(sanitizeProblemHTML(problem.stem_html))}
+                paths={problem.figure_paths}
+                urls={imageUrls}
+              />
+            </div>
           )}
         </div>
 
         {asImage && (
           <FigureImage path={problem.image_path} urls={imageUrls} alt="문항" />
-        )}
-
-        {!asImage && problem.figure_paths.length > 0 && (
-          <div className="pb-figure">
-            {problem.figure_paths.map((path) => (
-              <FigureImage key={path} path={path} urls={imageUrls} alt="자료" />
-            ))}
-          </div>
         )}
 
         {objective && (
@@ -105,6 +99,46 @@ export default function ProblemBodyView({ problem, imageUrls }: ProblemBodyViewP
         </details>
       )}
     </div>
+  );
+}
+
+/**
+ * 본문을 그리되 **그림 자리표시자 자리에 그림을 끼운다.**
+ *
+ * ⚠️ 자리표시자가 없는데 그림이 있으면(옛 행이나 검수에서 갓 붙인 것) **본문 끝에** 붙인다.
+ *    안 그리면 그림이 어디에도 안 나와 있는 줄도 모른다.
+ */
+export function BodyWithFigures({
+  html, paths, urls,
+}: { html: string; paths: readonly string[]; urls: Map<string, string> }) {
+  const chunks = splitByFigurePlaceholders(html);
+  const placed = new Set(
+    chunks.filter((c) => c.kind === 'figure').map((c) => (c as { index: number }).index),
+  );
+  const trailing = paths
+    .map((path, i) => ({ path, index: i + 1 }))
+    .filter(({ path, index }) => Boolean(path) && !placed.has(index));
+
+  return (
+    <>
+      {chunks.map((chunk, i) => (chunk.kind === 'html' ? (
+        <div key={i} dangerouslySetInnerHTML={{ __html: chunk.html }} />
+      ) : (
+        <FigureImage
+          key={i}
+          path={paths[chunk.index - 1] ?? ''}
+          urls={urls}
+          alt={`자료 ${chunk.index}`}
+        />
+      )))}
+      {trailing.length > 0 && (
+        <div className="pb-figure">
+          {trailing.map(({ path, index }) => (
+            <FigureImage key={path} path={path} urls={urls} alt={`자료 ${index}`} />
+          ))}
+        </div>
+      )}
+    </>
   );
 }
 

@@ -7,7 +7,7 @@ import {
 } from './warnings';
 import { passageKeyIn, problemKeyIn, textOf } from './merge-keys';
 import {
-  alreadyContains, fillGaps, fillPassageGaps, toPassage, toProblem,
+  alreadyContains, appendFragment, fillGaps, fillPassageGaps, toPassage, toProblem,
   type FragmentRef, type PassageWork,
 } from './merge-fill';
 
@@ -26,6 +26,12 @@ import {
  * ⚠️ 정답(answer)과 유형(question_type)은 **한 덩어리로** 옮긴다.
  *    유형이 바뀌면 정답의 의미가 달라지기 때문이다('1' 은 객관식에서만 선지 번호다).
  */
+
+/** 잘라 낼 그림 하나 — 어느 쪽의 어느 자리인가 */
+export interface FigureRegion {
+  page: number;
+  box: OcrBox;
+}
 
 /** 저장 직전의 지문 */
 export interface PassageDraft {
@@ -49,6 +55,11 @@ export interface PassageDraft {
   /** 교과서 단원 이름 경로 [대단원, 소단원] */
   unit_path: string[];
   has_figure: boolean;
+  /**
+   * 글로 못 옮긴 그림들 — **자기 쪽 번호와 함께** 든다.
+   * 쪽을 넘어가는 지문의 그림은 시작 쪽이 아니라 그 그림이 실린 쪽에서 잘라야 한다.
+   */
+  figures: FigureRegion[];
   /** 이어 붙인 마지막 쪽 (크롭 범위 안내용) */
   lastPage: number;
   /** 아직 다음 쪽으로 이어지는 중인가 */
@@ -81,6 +92,7 @@ export interface ProblemDraft {
   page_no: number;
   box: OcrBox | null;
   has_figure: boolean;
+  figures: FigureRegion[];
 }
 
 export interface MergeResult {
@@ -200,9 +212,7 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
             refToId.set(item.ref, open.draft.id);
             continue;
           }
-          open.fragments.push(item.html);
-          open.draft.open = item.continues;
-          open.draft.pageSpan += 1;
+          appendFragment(open, item);
           // 이어지는 조각에서만 작품명·영역·단원을 알아볼 때가 있다(앞 쪽은 머리글이 없다)
           fillPassageGaps(open.draft, item);
           fragmentByKey.set(key, { work: open, index: open.fragments.length - 1 });

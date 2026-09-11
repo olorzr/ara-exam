@@ -1,4 +1,5 @@
 import { splitHtmlBlocks } from '@/lib/print/split-html-blocks';
+import { splitByFigurePlaceholders } from '@/lib/problem-bank/figure-placeholders';
 import { sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import { trimEdgeEmptyParagraphs } from './html-trim';
 import type { PaperItemSnapshot } from '@/types/problem-bank';
@@ -22,6 +23,8 @@ export type PaperBlock =
   | { kind: 'passage-header'; key: string; text: string }
   | { kind: 'passage-part'; key: string; html: string; first: boolean; last: boolean }
   | { kind: 'passage-image'; key: string; path: string; label: string }
+  /** 지문 본문 제자리에 끼울 그림 한 장 — 문단 조각들 사이에 낀다 */
+  | { kind: 'passage-figure'; key: string; path: string; label: string }
   | { kind: 'problem'; key: string; number: number; snapshot: PaperItemSnapshot }
   | {
     kind: 'problem-image';
@@ -73,17 +76,41 @@ export function buildPaperBlocks(items: readonly PaperItemSnapshot[]): PaperBloc
       } else {
         // 가장자리 빈 문단을 먼저 걷어낸다 — 상자 테두리 안이 위아래로 뜨는 것을 막고,
         // first/last 표시도 진짜 첫·마지막 조각에 붙는다
-        const parts = trimEdgeEmptyParagraphs(splitHtmlBlocks(sanitizeProblemHTML(passage.html)));
-        parts.forEach((html, i) => {
-          blocks.push({
-            kind: 'passage-part',
-            key: `pp-${group.start}-${i}`,
-            html,
-            // 상자 윤곽이 단·쪽을 넘어도 이어져 보이도록 위·아래 테두리를 조각에 표시한다
-            first: i === 0,
-            last: i === parts.length - 1,
-          });
+        const figures = passage.figure_paths ?? [];
+        // ⚠️ **그림 자리표시자마다 먼저 가른다.** 자리표시자를 그대로 `splitHtmlBlocks` 에
+        //    넘기면 빈 <figure> 가 문단 조각 하나로 남아, 인쇄물에서 그림이 아니라
+        //    빈 줄이 나온다
+        const chunks = splitByFigurePlaceholders(sanitizeProblemHTML(passage.html));
+        const parts: PaperBlock[] = [];
+        chunks.forEach((chunk, ci) => {
+          if (chunk.kind === 'figure') {
+            const path = figures[chunk.index - 1];
+            if (path) {
+              parts.push({
+                kind: 'passage-figure',
+                key: `pf-${group.start}-${ci}`,
+                path,
+                label: passage.title || passage.label,
+              });
+            }
+            return;
+          }
+          for (const [i, html] of trimEdgeEmptyParagraphs(splitHtmlBlocks(chunk.html)).entries()) {
+            parts.push({
+              kind: 'passage-part', key: `pp-${group.start}-${ci}-${i}`, html,
+              first: false, last: false,
+            });
+          }
         });
+
+        // 상자 윤곽이 단·쪽을 넘어도 이어져 보이도록 위·아래 테두리를 **글 조각의**
+        // 처음·끝에만 표시한다. 그림 블록을 세면 테두리가 그림 위아래에 붙는다
+        const textParts = parts.filter((b) => b.kind === 'passage-part');
+        const firstText = textParts[0];
+        const lastText = textParts[textParts.length - 1];
+        if (firstText?.kind === 'passage-part') firstText.first = true;
+        if (lastText?.kind === 'passage-part') lastText.last = true;
+        blocks.push(...parts);
       }
     }
 
@@ -121,6 +148,7 @@ export function imagePathsOf(items: readonly PaperItemSnapshot[]): string[] {
     for (const figure of item.figure_paths) if (figure) paths.add(figure);
     const passage = item.passage;
     if (passage?.render_mode === 'image' && passage.image_path) paths.add(passage.image_path);
+    for (const figure of passage?.figure_paths ?? []) if (figure) paths.add(figure);
   }
   return [...paths];
 }

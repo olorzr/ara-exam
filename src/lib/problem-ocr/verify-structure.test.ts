@@ -11,14 +11,15 @@ function problem(over: Partial<ProblemDraft> = {}): ProblemDraft {
     id: id(), passage_id: null, number: 1, question_type: '객관식',
     stem_html: '<p>물음</p>', choices: ['가', '나', '다', '라', '마'], answer: '1', score: null,
     work_title: '', area_path: [], unit_path: [], grammar_paths: [],
-    page_no: 1, box: null, has_figure: false, ...over,
+    page_no: 1, box: null, has_figure: false, figures: [], ...over,
   };
 }
 
 function passage(over: Partial<PassageDraft> = {}): PassageDraft {
   return {
     id: id(), label: '', title: '', author: '', html: '<p>지문</p>', page_no: 1, box: null,
-    area_path: [], unit_path: [], has_figure: false, lastPage: 1, open: false, pageSpan: 1,
+    area_path: [], unit_path: [], has_figure: false, figures: [], lastPage: 1, open: false,
+    pageSpan: 1,
     ...over,
   };
 }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useReviewMountKeys } from './useReviewMountKeys';
+import { useSignedImageUrls } from './useSignedImageUrls';
 import { toast } from 'sonner';
 import { fetchProblemsOfSource } from '@/lib/problem-bank/queries';
 import { loadReviewData } from '@/lib/problem-bank/review-data';
@@ -287,6 +288,16 @@ export function useProblemReview(sourceId: string) {
     [problems],
   );
 
+  /**
+   * 본문에 끼운 그림들의 서명 URL.
+   * 쪽 이미지와 **따로** 받는다 — 그림은 검수 중에 늘고 줄지만 쪽 이미지는 고정이다.
+   */
+  const figurePaths = useMemo(() => [
+    ...passages.flatMap((p) => p.figure_paths ?? []),
+    ...problems.flatMap((p) => p.figure_paths ?? []),
+  ].filter(Boolean), [passages, problems]);
+  const figureImages = useSignedImageUrls(figurePaths);
+
   const pageUrlFor = useCallback(
     (page: number) => pageUrls.get(sourcePagePath(sourceId, page)) ?? null,
     [pageUrls, sourceId],
@@ -294,6 +305,7 @@ export function useProblemReview(sourceId: string) {
 
   return {
     source, passages, problems, loading, busy, error, verifiedCount, reloadSeq, mountKey,
+    figureUrls: figureImages.urls,
     reload: load, saveProblem, savePassage, toggleVerified, changeTextbook,
     removeProblem, removePassage, mergePassageInto, pageUrlFor,
   };

@@ -1,15 +1,23 @@
 'use client';
 
 import { sanitizeProblemHTML } from '@/lib/sanitize-problem';
+import { BodyWithFigures } from './ProblemBodyView';
 import type { Passage } from '@/types/problem-bank';
 
 /** 그리는 데 필요한 만큼만 — 목록 조회가 컬럼을 좁혀 오는 자리도 있다 */
-export type PassageBody = Pick<Passage, 'html' | 'render_mode' | 'image_path' | 'title' | 'label'>;
+export type PassageBody = Pick<
+  Passage, 'html' | 'render_mode' | 'image_path' | 'title' | 'label'
+> & {
+  /** 본문 제자리에 끼울 그림들. 옛 스냅샷·좁힌 조회에는 없을 수 있다 */
+  figure_paths?: string[];
+};
 
 interface PassageBodyViewProps {
   passage: PassageBody;
   /** `image_path` 의 서명 URL. 이미지 지문인데 없으면 자리표시자를 그린다 */
   imageUrl?: string | null;
+  /** 본문에 끼울 그림들의 서명 URL (Storage 경로 → URL) */
+  figureUrls?: Map<string, string>;
 }
 
 /**
@@ -22,7 +30,9 @@ interface PassageBodyViewProps {
  * ⚠️ 저장 시점에 이미 정화했더라도 여기서 **한 번 더** 정화한다 — 진입이
  *    `dangerouslySetInnerHTML` 이고, DB 를 직접 건드린 값이 섞일 수 있다(개념지와 같은 다층 방어).
  */
-export default function PassageBodyView({ passage, imageUrl }: PassageBodyViewProps) {
+export default function PassageBodyView({
+  passage, imageUrl, figureUrls,
+}: PassageBodyViewProps) {
   if (passage.render_mode === 'image' && passage.image_path) {
     if (!imageUrl) {
       // 조용히 비우면 "지문이 원래 없는 문항" 처럼 보인다
@@ -45,10 +55,13 @@ export default function PassageBodyView({ passage, imageUrl }: PassageBodyViewPr
 
   return (
     <div className="pb-sheet pb-sheet--screen">
-      <div
-        className="pb-passage-part pb-passage-part--first pb-passage-part--last"
-        dangerouslySetInnerHTML={{ __html: sanitizeProblemHTML(passage.html) }}
-      />
+      <div className="pb-passage-part pb-passage-part--first pb-passage-part--last">
+        <BodyWithFigures
+          html={sanitizeProblemHTML(passage.html)}
+          paths={passage.figure_paths ?? []}
+          urls={figureUrls ?? new Map()}
+        />
+      </div>
     </div>
   );
 }

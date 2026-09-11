@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   PROBLEM_BANK_BUCKET,
+  passageFigurePath,
   passageRegionPath,
+  problemFigurePath,
   problemRegionPath,
   sourceAnswerKeyPath,
   sourceFolder,
@@ -55,5 +57,22 @@ describe('storage-paths', () => {
   it('답지 번호가 1 미만이거나 정수가 아니면 막는다', () => {
     expect(() => sourceAnswerKeyPath(ID, 0, 'jpg')).toThrow();
     expect(() => sourceAnswerKeyPath(ID, 2.5, 'jpg')).toThrow();
+  });
+});
+
+describe('figure paths', () => {
+  it('문항·지문 그림은 서로 다른 가족을 쓴다', () => {
+    expect(problemFigurePath(ID, 1)).toBe(`problems/${ID}/figure-1.jpg`);
+    expect(passageFigurePath(ID, 2)).toBe(`passages/${ID}/figure-2.jpg`);
+  });
+
+  it('문항 영역 이미지와 겹치지 않는다 — 하나는 통째 출제용, 하나는 본문 안 그림이다', () => {
+    expect(problemFigurePath(ID, 1)).not.toBe(problemRegionPath(ID));
+  });
+
+  it('순번이 범위를 벗어나면 막는다 — 경로에 그대로 들어가는 값이다', () => {
+    expect(() => problemFigurePath(ID, 0)).toThrow();
+    expect(() => problemFigurePath(ID, 10)).toThrow();
+    expect(() => problemFigurePath(ID, 1.5)).toThrow();
   });
 });

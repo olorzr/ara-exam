@@ -12,7 +12,7 @@ function passage(over: Partial<OcrItem> = {}): OcrItem {
     kind: 'passage', ref: 'P1', page: 1, box: null, passage_ref: null, number: null,
     label: '[1~3]', title: '소나기', author: '황순원', html: '<p>지문</p>',
     continued: false, continues: false, question_type: '객관식', stem_html: '',
-    choices: [], answer: null, has_figure: false, work_title: null,
+    choices: [], answer: null, has_figure: false, figures: [], work_title: null,
     area_path: [], unit_path: [], grammar_paths: [], ...over,
   };
 }
@@ -22,7 +22,7 @@ function problem(over: Partial<OcrItem> = {}): OcrItem {
     kind: 'problem', ref: 'Q1', page: 1, box: null, passage_ref: null, number: 1,
     label: null, title: null, author: null, html: '', continued: false, continues: false,
     question_type: '객관식', stem_html: '<p>물음</p>', choices: ['가', '나'],
-    answer: null, has_figure: false, work_title: null, area_path: [], unit_path: [],
+    answer: null, has_figure: false, figures: [], work_title: null, area_path: [], unit_path: [],
     grammar_paths: [], ...over,
   };
 }
@@ -453,5 +453,64 @@ describe('mergeOcrDrafts — 모델이 이어짐 표시를 빠뜨릴 때', () =>
       batch([passage({ ref: 'P2', page: 4, label: null, html: '<p>나</p>', continued: true })], [4]),
     ], { newId });
     expect(res.passages).toHaveLength(2);
+  });
+});
+
+describe('mergeOcrDrafts — 쪽을 넘어가는 지문의 그림', () => {
+  const fig = (n: number) => `<figure data-figure="${n}"></figure>`;
+  const box = (top: number) => ({ column: 1 as const, top, bottom: top + 0.1 });
+
+  it('조각마다 그림을 자기 쪽 번호와 함께 든다 — 시작 쪽에서 찾으면 엉뚱한 데를 자른다', () => {
+    const res = mergeOcrDrafts([
+      batch([passage({
+        ref: 'P1', page: 3, html: `<p>앞</p>${fig(1)}`, figures: [box(0.2)], continues: true,
+      })], [3]),
+      batch([passage({
+        ref: 'P1', page: 4, label: null, html: `<p>뒤</p>${fig(1)}`,
+        figures: [box(0.5)], continued: true,
+      })], [4]),
+    ], { newId });
+
+    expect(res.passages).toHaveLength(1);
+    expect(res.passages[0].figures).toEqual([
+      { page: 3, box: box(0.2) },
+      { page: 4, box: box(0.5) },
+    ]);
+  });
+
+  it('이어 붙일 때 자리표시자 번호를 민다 — 안 밀면 뒤 조각이 앞 그림을 가리킨다', () => {
+    const res = mergeOcrDrafts([
+      batch([passage({
+        ref: 'P1', page: 3, html: `<p>앞</p>${fig(1)}`, figures: [box(0.2)], continues: true,
+      })], [3]),
+      batch([passage({
+        ref: 'P1', page: 4, label: null, html: `<p>뒤</p>${fig(1)}`,
+        figures: [box(0.5)], continued: true,
+      })], [4]),
+    ], { newId });
+
+    expect(res.passages[0].html).toContain('data-figure="1"');
+    expect(res.passages[0].html).toContain('data-figure="2"');
+  });
+
+  it('그림 없는 조각은 번호를 건드리지 않는다', () => {
+    const res = mergeOcrDrafts([
+      batch([passage({ ref: 'P1', page: 3, html: '<p>앞</p>', continues: true })], [3]),
+      batch([passage({
+        ref: 'P1', page: 4, label: null, html: `<p>뒤</p>${fig(1)}`,
+        figures: [box(0.5)], continued: true,
+      })], [4]),
+    ], { newId });
+    expect(res.passages[0].html).toContain('data-figure="1"');
+    expect(res.passages[0].figures).toEqual([{ page: 4, box: box(0.5) }]);
+  });
+
+  it('겹쳐 읽은 그림은 같은 쪽에서 읽은 것만 받는다 — 좌표와 쪽은 짝이다', () => {
+    const res = mergeOcrDrafts([
+      batch([passage({ ref: 'P1', page: 2, html: '<p>지문</p>', figures: [] })], [1, 2]),
+      // 3쪽에서 본 좌표를 2쪽 지문에 붙이면 엉뚱한 자리를 자른다
+      batch([passage({ ref: 'P1', page: 3, label: null, html: '<p>딴글</p>', figures: [box(0.5)] })], [3]),
+    ], { newId });
+    expect(res.passages[0].figures).toEqual([]);
   });
 });

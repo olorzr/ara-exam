@@ -109,3 +109,30 @@ describe('프로필 격리', () => {
     expect(sanitizeProblemHTML('<p><span data-concept>ㄴ</span></p>')).not.toContain('data-concept');
   });
 });
+
+describe('그림 자리표시자', () => {
+  it('빈 <figure data-figure> 는 통과한다 — 그림이 본문 어디 있었는지를 남긴다', () => {
+    const html = sanitizeProblemHTML('<p>앞</p><figure data-figure="1"></figure><p>뒤</p>');
+    expect(html).toContain('data-figure="1"');
+    expect(html).toContain('<figure');
+  });
+
+  it('한 자리 숫자가 아니면 속성을 지운다', () => {
+    expect(sanitizeProblemHTML('<figure data-figure="12"></figure>')).not.toContain('data-figure');
+    expect(sanitizeProblemHTML('<figure data-figure="x"></figure>')).not.toContain('data-figure');
+    expect(sanitizeProblemHTML('<figure data-figure="0"></figure>')).not.toContain('data-figure');
+  });
+
+  it('<img> 는 여전히 막는다 — 서명 URL 은 만료돼 본문에 굳힐 수 없다', () => {
+    expect(sanitizeProblemHTML('<figure><img src="https://x/y.jpg"></figure>')).not.toContain('img');
+  });
+
+  it('figcaption 은 허용 목록 밖이다', () => {
+    const html = sanitizeProblemHTML('<figure data-figure="1"><figcaption>설명</figcaption></figure>');
+    expect(html).not.toContain('figcaption');
+  });
+
+  it('선지에는 자리표시자를 넣지 않는다 — 한 칸 안에 들어가야 한다', () => {
+    expect(sanitizeInlineHTML('<figure data-figure="1"></figure>가')).not.toContain('figure');
+  });
+});

@@ -3,7 +3,7 @@
 import type { OpenPdf } from '@/lib/pdf/pdfPages';
 import { uploadProblemFile } from '@/lib/problem-bank/storage';
 import {
-  passageRegionPath, problemRegionPath, sourcePagePath,
+  passageFigurePath, passageRegionPath, problemFigurePath, problemRegionPath, sourcePagePath,
 } from '@/lib/problem-bank/storage-paths';
 import { boxToBbox } from './crop';
 import { PageCropper } from './crop-dom';
@@ -67,6 +67,57 @@ export async function uploadPageImages(
   }
 }
 
+/**
+ * 본문 안에 끼울 **그림만** 잘라 올린다.
+ *
+ * 항목 영역 크롭(`cropRegions`)과 다르다 — 저건 '문항을 통째로 이미지로 출제' 할 때 쓰는
+ * 한 장이고, 이건 발문·지문의 **제자리**에 들어가는 그림 여럿이다.
+ *
+ * ⚠️ 그림은 **자기 쪽에서** 자른다. 쪽을 넘어가는 지문의 그림을 시작 쪽에서 찾으면
+ *    엉뚱한 자리를 잘라 낸다(FigureRegion 이 쪽 번호를 함께 드는 이유).
+ * ⚠️ 실패한 자리는 **빈 문자열**로 남긴다. 배열을 압축하면 뒤 그림의 번호가 당겨져
+ *    본문 자리표시자가 엉뚱한 그림을 가리킨다.
+ */
+async function cropFigures(
+  cropper: PageCropper,
+  items: readonly { id: string; figures: readonly { page: number; box: NonNullable<PassageBox> }[] }[],
+  pathOf: (id: string, index: number) => string,
+  signal: AbortSignal | undefined,
+): Promise<{ paths: Map<string, string[]>; failed: string[] }> {
+  const paths = new Map<string, string[]>();
+  const failed: string[] = [];
+
+  for (const item of items) {
+    if (item.figures.length === 0) continue;
+    if (signal?.aborted) {
+      failed.push(item.id);
+      continue;
+    }
+    const out: string[] = [];
+    let missed = false;
+    for (let i = 0; i < item.figures.length; i += 1) {
+      const figure = item.figures[i];
+      const blob = await cropper.crop(figure.page, boxToBbox(figure.box));
+      const path = pathOf(item.id, i + 1);
+      let ok = false;
+      if (blob) {
+        try {
+          await uploadProblemFile(path, blob, 'image/jpeg');
+          ok = true;
+        } catch {
+          // 그림 하나가 안 올라가도 나머지는 올린다
+        }
+      }
+      out.push(ok ? path : '');
+      if (!ok) missed = true;
+    }
+    paths.set(item.id, out);
+    if (missed) failed.push(item.id);
+  }
+
+  return { paths, failed };
+}
+
 /** 문항·지문 영역을 잘라 올린다. 실패한 것은 경로 없이 두고 넘어간다 */
 export async function cropRegions(
   doc: OpenPdf,
@@ -76,11 +127,15 @@ export async function cropRegions(
 ): Promise<{
   passageImages: Map<string, string>;
   problemImages: Map<string, string>;
+  passageFigures: Map<string, string[]>;
+  problemFigures: Map<string, string[]>;
   warnings: OcrWarning[];
 }> {
   const cropper = new PageCropper(doc);
   const passageImages = new Map<string, string>();
   const problemImages = new Map<string, string>();
+  const passageFigures = new Map<string, string[]>();
+  const problemFigures = new Map<string, string[]>();
   const warnings: OcrWarning[] = [];
 
   interface CropTarget {
@@ -154,6 +209,40 @@ export async function cropRegions(
       done += 1;
       onProgress?.({ phase: 'crop', done, total: targets.length });
     }
+    // 본문 제자리에 끼울 그림 — 항목 영역과 같은 캔버스 캐시를 쓴다(재렌더가 비싸다)
+    const figuresOfPassages = await cropFigures(
+      cropper,
+      merged.passages.map((p) => ({ id: p.id, figures: p.figures })),
+      passageFigurePath,
+      signal,
+    );
+    const figuresOfProblems = await cropFigures(
+      cropper,
+      merged.problems.map((p) => ({ id: p.id, figures: p.figures })),
+      problemFigurePath,
+      signal,
+    );
+    for (const [id, list] of figuresOfPassages.paths) passageFigures.set(id, list);
+    for (const [id, list] of figuresOfProblems.paths) problemFigures.set(id, list);
+
+    // 그림을 못 만든 항목은 반드시 알린다 — 본문에 자리표시자만 남아 빈칸이 된다
+    const figureTargets: OcrWarningTarget[] = [
+      ...merged.passages.filter((p) => figuresOfPassages.failed.includes(p.id)).map((p) => targetOf({
+        id: p.id, page: p.page_no, kind: 'passage',
+        label: itemTargetLabel({ kind: 'passage', page: p.page_no }),
+      })),
+      ...merged.problems.filter((p) => figuresOfProblems.failed.includes(p.id)).map((p) => targetOf({
+        id: p.id, page: p.page_no, kind: 'problem',
+        label: itemTargetLabel({ kind: 'problem', page: p.page_no, number: p.number }),
+      })),
+    ];
+    if (figureTargets.length > 0) {
+      warnings.push({
+        message: `본문에 끼울 그림을 만들지 못했어요(${listSomeLabels(figureTargets.map((t) => t.label))}). `
+          + '검수에서 원본을 끌어 다시 잘라 주세요.',
+        targets: figureTargets,
+      });
+    }
   } finally {
     cropper.dispose();
   }
@@ -168,5 +257,5 @@ export async function cropRegions(
     });
   }
 
-  return { passageImages, problemImages, warnings };
+  return { passageImages, problemImages, passageFigures, problemFigures, warnings };
 }

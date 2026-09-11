@@ -31,11 +31,12 @@ export default function ArchiveList({
   rows, loading, thumbnails, selectMode, isSelected, onToggleSelect, onOpen, groupByPassage,
 }: ArchiveListProps) {
   const grouped = usePassageGroups(rows, Boolean(groupByPassage) && !loading);
-  // 이미지 지문의 본문은 서명 URL 이 있어야 보인다
+  // 이미지 지문의 본문과, 본문 제자리에 끼운 그림들은 서명 URL 이 있어야 보인다
   const passageImages = useSignedImageUrls(
-    grouped.groups
-      .map((g) => (g.passage?.render_mode === 'image' ? g.passage.image_path : ''))
-      .filter(Boolean),
+    grouped.groups.flatMap((g) => [
+      g.passage?.render_mode === 'image' ? g.passage.image_path : '',
+      ...(g.passage?.figure_paths ?? []),
+    ]).filter(Boolean),
   );
 
   if (loading) {
@@ -83,6 +84,7 @@ export default function ArchiveList({
                 ? passageImages.urls.get(group.passage.image_path)
                 : null
             }
+            figureUrls={passageImages.urls}
           >
             {group.rows.map(card)}
           </PassageGroupCard>

@@ -8,6 +8,7 @@ import { Table, TableRow } from '@tiptap/extension-table';
 import { Extension } from '@tiptap/core';
 import { CustomTableCell, CustomTableHeader } from '@/components/exam-builder/CustomTableCell';
 import { sanitizeProblemHTML } from '@/lib/sanitize-problem';
+import { FigurePlaceholderNode } from './FigurePlaceholderNode';
 import ProblemEditorToolbar from './ProblemEditorToolbar';
 
 /**
@@ -78,6 +79,8 @@ export default function ProblemHtmlEditor({
       // @tiptap/extension-underline 을 따로 등록하면 확장이 두 벌이 된다
       StarterKit.configure({ heading: { levels: [3, 4] } }),
       BoxAttribute,
+      // 없으면 편집기가 그림 자리표시자를 모르는 태그로 보고 버린다
+      FigurePlaceholderNode,
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Table.configure({ resizable: true }),
       TableRow,

@@ -8,6 +8,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import ProblemHtmlEditor from '@/components/problem-editor/ProblemHtmlEditor';
 import PassageContinueButton from './PassageContinueButton';
+import FigureStrip from './FigureStrip';
+import { useFigureEditor } from '@/hooks/useFigureEditor';
+import type { Bbox } from '@/types/problem-bank';
 import AreaPathPicker from './AreaPathPicker';
 import type { AreaTreeNode } from '@/lib/problem-bank/area-tree';
 import { UNIT_DEPTH_LABELS } from '@/lib/problem-bank/unit-tree';
@@ -43,6 +46,12 @@ interface PassageEditorCardProps {
    * 쪽을 넘어가는 지문이 둘로 갈라져 저장됐을 때 손으로 합치는 길이다.
    */
   onMergeIntoPrevious?: () => void;
+  /** 본문에 끼운 그림들의 서명 URL */
+  figureUrls?: Map<string, string>;
+  /** 원본에서 끌어 잡기를 시작한다 — 페이지가 끝난 영역을 넘겨준다 */
+  onStartCapture?: (handler: (bbox: Bbox, pageUrl: string) => void) => void;
+  /** 지금 이 카드가 영역을 기다리는 중인가 */
+  capturing?: boolean;
 }
 
 /**
@@ -53,13 +62,29 @@ interface PassageEditorCardProps {
 export default function PassageEditorCard({
   passage, problemCount, areaTree, unitTree, selected, onSelect, onSave, onDelete, onDirtyChange,
   issues, onContinue, continuing, sourcePageCount, onMergeIntoPrevious,
+  figureUrls, onStartCapture, capturing,
 }: PassageEditorCardProps) {
   const [html, setHtml] = useState(passage.html);
   const [title, setTitle] = useState(passage.title);
   const [author, setAuthor] = useState(passage.author);
   const [area, setArea] = useState<string[]>(passage.area_path);
   const [unit, setUnit] = useState<string[]>(passage.unit_path);
+  const [figurePaths, setFigurePaths] = useState<string[]>(passage.figure_paths ?? []);
   const [saving, setSaving] = useState(false);
+
+  /**
+   * 그림을 붙이거나 뺄 때는 **본문과 경로를 한 번에** 저장한다 —
+   * 따로 저장될 틈을 주면 자리표시자와 그림 수가 어긋난다.
+   */
+  const figures = useFigureEditor({
+    kind: 'passage',
+    id: passage.id,
+    save: async (next) => {
+      const ok = await onSave({ html: next.html, figure_paths: next.paths });
+      if (ok) setFigurePaths(next.paths);
+      return ok;
+    },
+  });
 
   /** 저장하지 않은 수정이 있는가 — 문항 카드와 같은 이유로 화면에 알린다 */
   const dirty = html !== passage.html
@@ -76,6 +101,16 @@ export default function PassageEditorCard({
     setSaving(true);
     await onSave({ html, title, author, area_path: area, unit_path: unit });
     setSaving(false);
+  };
+
+  const handleCapture = async (bbox: Bbox, pageUrl: string) => {
+    const next = await figures.capture(bbox, pageUrl, html, figurePaths);
+    if (next !== null) setHtml(next);
+  };
+
+  const handleRemoveFigure = async (index: number) => {
+    const next = await figures.remove(index, html, figurePaths);
+    if (next !== null) setHtml(next);
   };
 
   /**
@@ -175,6 +210,15 @@ export default function PassageEditorCard({
           <Label className="text-xs text-gray-500">본문</Label>
           <ProblemHtmlEditor value={html} onChange={setHtml} minHeight={200} ariaLabel="지문 본문" />
         </div>
+
+        <FigureStrip
+          paths={figurePaths}
+          urls={figureUrls ?? new Map()}
+          onRemove={handleRemoveFigure}
+          onStartCapture={onStartCapture ? () => onStartCapture(handleCapture) : undefined}
+          capturing={capturing}
+          busy={figures.busy}
+        />
 
         {onContinue && (
           <PassageContinueButton

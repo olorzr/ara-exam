@@ -6,12 +6,15 @@ import {
 import { UNIT_DEPTH_MAX } from '@/lib/problem-bank/unit-tree';
 import { normalizeOcrPassageHtml, normalizeOcrStemHtml } from './normalize-html';
 import type { QuestionType } from '@/types/problem-bank';
-import { OCR_HTML_MAX, OCR_MAX_ITEMS_PER_BATCH, OCR_MAX_WARNINGS } from './constants';
+import {
+  OCR_HTML_MAX, OCR_MAX_FIGURES_PER_ITEM, OCR_MAX_ITEMS_PER_BATCH, OCR_MAX_WARNINGS,
+} from './constants';
 import {
   int, isRecord, isOverLength, LEADING_MARKER, normalizeChoice, normalizeWork, nullableStr,
   parseBox, QUESTION_TYPES, str,
 } from './parse-values';
 import type { OcrDraft, OcrItem } from './schema';
+import { reconcileFigurePlaceholders } from '@/lib/problem-bank/figure-placeholders';
 import { normalizeLabel } from './merge-keys';
 import { pushDraftWarning as pushWarning, type DraftWarning } from './warnings';
 
@@ -167,6 +170,12 @@ function parseItem(
     });
   }
 
+  // 그림 좌표. 못 알아본 것은 버린다 — 자리표시자도 함께 맞춰 준다
+  const figures = (Array.isArray(raw.figures) ? raw.figures : [])
+    .map(parseBox)
+    .filter((box): box is NonNullable<typeof box> => box !== null)
+    .slice(0, OCR_MAX_FIGURES_PER_ITEM);
+
   return {
     kind,
     ref,
@@ -183,14 +192,23 @@ function parseItem(
     author: normalizeWork(nullableStr(raw.author, 60)),
     // ⚠️ 다듬기가 **정화보다 먼저**다. 정화기는 허용 목록 밖 data-box 를 되돌릴 수 없게
     //    지우므로, 순서가 바뀌면 모델이 낸 '(가)' 상자 표시가 조용히 사라진다
-    html: sanitizeProblemHTML(normalizeOcrPassageHtml(str(raw.html, OCR_HTML_MAX))),
+    // ⚠️ 자리표시자를 **실제 그림 수에 맞춘다.** 모델이 한쪽만 내는 일이 흔한데,
+    //    어긋난 채 저장하면 없는 그림을 찾다 빈칸이 되거나 잘라 둔 그림이 안 나온다
+    html: reconcileFigurePlaceholders(
+      sanitizeProblemHTML(normalizeOcrPassageHtml(str(raw.html, OCR_HTML_MAX))),
+      kind === 'passage' ? figures.length : 0,
+    ),
     continued: raw.continued === true,
     continues: raw.continues === true,
     question_type,
-    stem_html: sanitizeProblemHTML(normalizeOcrStemHtml(str(raw.stem_html, OCR_HTML_MAX))),
+    stem_html: reconcileFigurePlaceholders(
+      sanitizeProblemHTML(normalizeOcrStemHtml(str(raw.stem_html, OCR_HTML_MAX))),
+      kind === 'problem' ? figures.length : 0,
+    ),
     choices,
     answer,
-    has_figure: raw.has_figure === true,
+    has_figure: raw.has_figure === true || figures.length > 0,
+    figures,
     work_title: normalizeWork(nullableStr(raw.work_title, 120)),
     area_path,
     unit_path,

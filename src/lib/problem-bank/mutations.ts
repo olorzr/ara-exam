@@ -38,6 +38,8 @@ export interface ProblemPatch {
   render_mode?: RenderMode;
   bbox?: Bbox | null;
   image_path?: string;
+  /** 본문에 끼운 그림들. ⚠️ `stem_html` 의 자리표시자와 **함께** 보내야 번호가 안 어긋난다 */
+  figure_paths?: string[];
   passage_id?: string | null;
   number?: number | null;
 }
@@ -90,6 +92,8 @@ export interface PassagePatch {
   render_mode?: RenderMode;
   bbox?: Bbox | null;
   image_path?: string;
+  /** 본문에 끼운 그림들. ⚠️ `html` 의 자리표시자와 **함께** 보내야 번호가 안 어긋난다 */
+  figure_paths?: string[];
 }
 
 /**

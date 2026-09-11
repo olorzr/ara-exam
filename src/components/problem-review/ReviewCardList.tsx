@@ -6,7 +6,7 @@ import PassageEditorCard from '@/components/problem-review/PassageEditorCard';
 import ProblemEditorCard from '@/components/problem-review/ProblemEditorCard';
 import type { AreaTreeNode } from '@/lib/problem-bank/area-tree';
 import type { PassagePatch, ProblemPatch } from '@/lib/problem-bank/mutations';
-import type { Passage, Problem } from '@/types/problem-bank';
+import type { Bbox, Passage, Problem } from '@/types/problem-bank';
 
 /** 지문 다음에 그 지문의 문항이 오도록 늘어놓은 한 줄 */
 export type ReviewRow = { kind: 'passage' | 'problem'; id: string };
@@ -37,6 +37,12 @@ interface ReviewCardListProps {
   sourcePageCount?: number;
   /** 지문 둘을 하나로 — 뒤 지문을 앞 지문에 붙인다 */
   mergePassage?: (targetId: string, sourceId: string) => void;
+  /** 본문에 끼운 그림들의 서명 URL */
+  figureUrls?: Map<string, string>;
+  /** 어느 카드가 원본에서 영역을 기다리는 중인가 */
+  capturingId?: string | null;
+  /** 카드가 '그림 추가' 를 눌렀을 때 — 끝난 영역을 그 카드에 돌려준다 */
+  onStartCapture?: (id: string, handler: (bbox: Bbox, pageUrl: string) => void) => void;
 }
 
 /**
@@ -49,6 +55,7 @@ export default function ReviewCardList({
   rows, passages, problems, mountKey, areaTree, unitTree, selectedId, issues,
   onSelect, onDirtyChange, savePassage, saveProblem, toggleVerified, deletePassage, deleteProblem,
   continuePassage, continuingId, sourcePageCount, mergePassage,
+  figureUrls, capturingId, onStartCapture,
 }: ReviewCardListProps) {
   if (rows.length === 0) {
     return (
@@ -102,6 +109,11 @@ export default function ReviewCardList({
               onMergeIntoPrevious={mergePassage && previous
                 ? () => mergePassage(previous.id, passage.id)
                 : undefined}
+              figureUrls={figureUrls}
+              capturing={capturingId === passage.id}
+              onStartCapture={onStartCapture
+                ? (handler) => onStartCapture(passage.id, handler)
+                : undefined}
             />
           );
         }
@@ -125,6 +137,11 @@ export default function ReviewCardList({
             // 검수가 옛 버전으로 걸려 아무도 안 고쳤는데 충돌한다
             onToggleVerified={(v, knownUpdatedAt) => toggleVerified(problem.id, v, knownUpdatedAt)}
             onDelete={() => deleteProblem(problem.id)}
+            figureUrls={figureUrls}
+            capturing={capturingId === problem.id}
+            onStartCapture={onStartCapture
+              ? (handler) => onStartCapture(problem.id, handler)
+              : undefined}
           />
         );
       })}

@@ -104,6 +104,12 @@ export interface Passage {
   page_no: number;
   bbox: Bbox | null;
   image_path: string;
+  /**
+   * 본문 제자리에 끼울 그림들 (Storage 경로, 1-based).
+   * `html` 의 `<figure data-figure="n">` 과 **순번으로 짝을 이룬다**.
+   * 못 만든 자리는 빈 문자열 — 압축하면 번호가 어긋나 엉뚱한 그림이 그려진다.
+   */
+  figure_paths: string[];
   render_mode: RenderMode;
   /** ara-system 영역 분류 마스터의 **이름 경로 스냅샷**(id 아님) */
   area_path: string[];
@@ -154,6 +160,10 @@ export interface Problem {
   page_no: number;
   bbox: Bbox | null;
   image_path: string;
+  /**
+   * 본문 제자리에 끼울 그림들 (Storage 경로, 1-based).
+   * `stem_html` 의 `<figure data-figure="n">` 과 **순번으로 짝을 이룬다**.
+   */
   figure_paths: string[];
   render_mode: RenderMode;
   status: ProblemStatus;
@@ -201,6 +211,11 @@ export interface PaperPassageSnapshot {
   html: string;
   render_mode: RenderMode;
   image_path: string;
+  /**
+   * 지문 본문에 끼운 그림들.
+   * ⚠️ **선택값이다** — sql/23 이전에 만든 문제지의 스냅샷에는 이 키가 없다.
+   */
+  figure_paths?: string[];
 }
 
 /** 문제지 항목의 출처 스냅샷 (머리말 표시용) */

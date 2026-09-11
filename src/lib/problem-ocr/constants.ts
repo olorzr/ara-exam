@@ -103,3 +103,14 @@ export const OCR_HTML_MAX = 20000;
  * 모든 줄이 두 동강 난다.
  */
 export const OCR_SPLIT_COLUMNS = true;
+
+/**
+ * 한 항목에서 받아들일 그림 수.
+ *
+ * 국어 시험지의 한 문항·지문에 그림이 셋을 넘는 일은 드물다. 상한을 두는 이유는
+ * 모델이 글자 덩어리를 그림으로 잘못 보고 좌표를 잔뜩 낼 때 크롭이 폭주하는 것을
+ * 막기 위해서다(그림 하나가 Storage 업로드 한 번이다).
+ *
+ * 사람이 검수에서 더 붙일 수는 있다 — 그쪽 상한은 `MAX_FIGURES`(figure-placeholders.ts).
+ */
+export const OCR_MAX_FIGURES_PER_ITEM = 3;

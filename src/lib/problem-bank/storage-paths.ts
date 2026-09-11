@@ -10,6 +10,8 @@
  *    그래서 경로는 전부 **UUID + 고정 영문 이름**으로만 만든다.
  */
 
+import { MAX_FIGURES } from './figure-placeholders';
+
 /** 기출 문제 은행 전용 버킷 (비공개) */
 export const PROBLEM_BANK_BUCKET = 'exam-problem-bank';
 
@@ -82,6 +84,37 @@ export function problemRegionPath(problemId: string): string {
  */
 export function passageRegionPath(passageId: string): string {
   return `passages/${assertSafe(passageId, '지문 id')}/region.jpg`;
+}
+
+/**
+ * 문항 본문에 끼울 그림 경로.
+ *
+ * 문항 영역(`region.jpg`)과 **다른 가족**이다 — 저건 '문항 전체를 이미지로 출제' 할 때
+ * 쓰는 한 장이고, 이건 발문 안 제자리에 들어가는 그림 여럿이다.
+ * @param problemId - 문항 id (UUID)
+ * @param index - 1-based 순번 (`figure_paths` 의 자리와 같다)
+ * @returns 버킷 기준 경로
+ */
+export function problemFigurePath(problemId: string, index: number): string {
+  return `problems/${assertSafe(problemId, '문항 id')}/figure-${figureIndex(index)}.jpg`;
+}
+
+/**
+ * 지문 본문에 끼울 그림 경로.
+ * @param passageId - 지문 id (UUID)
+ * @param index - 1-based 순번
+ * @returns 버킷 기준 경로
+ */
+export function passageFigurePath(passageId: string, index: number): string {
+  return `passages/${assertSafe(passageId, '지문 id')}/figure-${figureIndex(index)}.jpg`;
+}
+
+/** 그림 순번 검사 — 경로에 들어가는 값이라 여기서 막는다 */
+function figureIndex(index: number): number {
+  if (!Number.isInteger(index) || index < 1 || index > MAX_FIGURES) {
+    throw new Error(`그림 번호가 잘못됐어요: ${index}`);
+  }
+  return index;
 }
 
 /**

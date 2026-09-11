@@ -150,10 +150,13 @@ export async function runProblemOcr(
     const cropped = await cropRegions(doc, merged, signal, onProgress);
     merged.warnings.push(...cropped.warnings);
 
-    // ⚠️ 여러 쪽에 걸친 그림 지문은 **어느 쪽으로도 온전하지 않다** —
-    //    글만 쓰면 그림이 빠지고, 이미지로 쓰면 잘라 둔 시작 쪽만 나가 뒷부분이 사라진다.
-    //    자동으로 고를 수 없으니 검수에서 사람이 보게 드러낸다(코덱스 리뷰 20R).
-    const splitFigures = merged.passages.filter((p) => p.has_figure && p.pageSpan > 1);
+    // ⚠️ 여러 쪽에 걸친 그림 지문은 **어느 쪽으로도 온전하지 않았다** —
+    //    글만 쓰면 그림이 빠지고, 이미지로 쓰면 잘라 둔 시작 쪽만 나가 뒷부분이 사라졌다
+    //    (코덱스 리뷰 20R). 이제 그림을 **자기 쪽에서 잘라 본문 제자리에** 끼우므로
+    //    그림을 하나라도 건진 지문은 글로 온전하다. 하나도 못 건진 것만 남겨 알린다.
+    const splitFigures = merged.passages.filter(
+      (p) => p.has_figure && p.pageSpan > 1 && (cropped.passageFigures.get(p.id) ?? []).every((v) => !v),
+    );
     if (splitFigures.length > 0) {
       merged.warnings.push({
         message: `그림·표가 있으면서 여러 쪽에 걸친 지문이 ${splitFigures.length}개 있어요`
@@ -172,8 +175,12 @@ export async function runProblemOcr(
     // 묶음 하나라도 들어가면 곧바로 표시한다 — 중간에 실패해도 앞 묶음은 남아 있어서,
     // "하나도 안 들어갔다" 고 안내하면 거짓말이 된다(트랜잭션이 아니다)
     const markSaved = () => { savedAnything = true; };
-    await insertPassages(input.sourceId, merged.passages, cropped.passageImages, markSaved);
-    await insertProblems(input.sourceId, merged.problems, cropped.problemImages, markSaved);
+    await insertPassages(
+      input.sourceId, merged.passages, cropped.passageImages, markSaved, cropped.passageFigures,
+    );
+    await insertProblems(
+      input.sourceId, merged.problems, cropped.problemImages, markSaved, cropped.problemFigures,
+    );
 
     // ⚠️ 병합 뒤에 붙은 경고들(정답표·크롭·그림 지문)은 각자 상한을 안 거쳤다 —
     //    저장 직전에 한 번 정리한다. 안 그러면 ocr_meta 가 끝없이 커진다

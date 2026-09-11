@@ -20,6 +20,7 @@ import SourceTextbookPicker from '@/components/problem-review/SourceTextbookPick
 import AnswerKeyFiles from '@/components/problem-review/AnswerKeyFiles';
 import OcrProgress from '@/components/problem-ocr/OcrProgress';
 import { toBbox } from '@/lib/problem-bank/bbox';
+import type { Bbox } from '@/types/problem-bank';
 import { issuesByTargetId } from '@/lib/problem-ocr/warnings';
 
 /**
@@ -46,6 +47,11 @@ function ProblemSourceReviewContent() {
    *    알고 그대로 인쇄하게 된다(코덱스 리뷰 14R).
    */
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
+  // 원본에서 영역을 기다리는 카드와, 잡은 영역을 돌려줄 함수. 한 번에 한 카드만
+  // 잡으므로 함수를 그냥 들고 있으면 된다 — 저장은 본문을 아는 카드가 한다
+  const [capture, setCapture] = useState<
+    { id: string; onBbox: (bbox: Bbox, pageUrl: string) => void } | null
+  >(null);
 
   // 화면에 보이는 쪽 목록.
   //
@@ -217,11 +223,33 @@ function ProblemSourceReviewContent() {
             ))}
           </div>
           <AnswerKeyFiles paths={source.answer_key_paths ?? []} />
+          {capture && (
+            <p className="rounded border border-primary bg-primary/5 px-2 py-1 text-xs text-primary">
+              원본에서 그림을 <strong>끌어서</strong> 잡아 주세요. 잡으면 그 카드의 본문 끝에 붙습니다.
+              <button
+                type="button"
+                onClick={() => setCapture(null)}
+                className="ml-2 underline underline-offset-2"
+              >
+                그만두기
+              </button>
+            </p>
+          )}
           <PageImageWithBoxes
             src={review.pageUrlFor(page)}
             boxes={boxes}
             selectedId={focus.selectedId}
             onSelect={(id) => focus.focusItem(id)}
+            capturing={Boolean(capture)}
+            onCapture={(bbox) => {
+              const url = review.pageUrlFor(page);
+              if (!url) {
+                toast.error('이 쪽의 원본 이미지가 없어 그림을 잘라낼 수 없어요.');
+                return;
+              }
+              capture?.onBbox(bbox, url);
+              setCapture(null);
+            }}
           />
         </div>
 
@@ -248,6 +276,11 @@ function ProblemSourceReviewContent() {
             continuingId={continuation.busyId}
             sourcePageCount={source.page_count}
             mergePassage={guards.mergePassage}
+            figureUrls={review.figureUrls}
+            capturingId={capture?.id ?? null}
+            onStartCapture={(id, onBbox) => setCapture(
+              (prev) => (prev?.id === id ? null : { id, onBbox }),
+            )}
           />
         </div>
       </div>

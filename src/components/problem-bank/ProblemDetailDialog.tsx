@@ -65,6 +65,7 @@ function DetailBody({ problemId }: { problemId: string }) {
   const shown = detail?.siblings.find((p) => p.id === shownId) ?? detail?.problem ?? null;
   const paths = [
     detail?.passage?.image_path,
+    ...(detail?.passage?.figure_paths ?? []),
     shown?.image_path,
     ...(shown?.figure_paths ?? []),
   ].filter((p): p is string => Boolean(p));
@@ -122,6 +123,7 @@ function DetailBody({ problemId }: { problemId: string }) {
           <PassageBodyView
             passage={passage}
             imageUrl={passage.image_path ? images.urls.get(passage.image_path) : null}
+            figureUrls={images.urls}
           />
         </section>
       )}

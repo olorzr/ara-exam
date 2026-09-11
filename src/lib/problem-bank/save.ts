@@ -68,6 +68,12 @@ export async function updateSource(
 export type ImagePathMap = Map<string, string>;
 
 /**
+ * 본문 제자리에 끼울 그림 경로들 (항목 id → 1번부터 차례로).
+ * ⚠️ 못 만든 자리는 **빈 문자열**이다 — 압축하면 본문 자리표시자가 엉뚱한 그림을 가리킨다.
+ */
+export type FigurePathMap = Map<string, string[]>;
+
+/**
  * 지문을 저장한다.
  * @param sourceId - 출처 id
  * @param passages - 병합이 만든 지문 초안
@@ -80,6 +86,7 @@ export async function insertPassages(
   passages: PassageDraft[],
   imagePaths: ImagePathMap = new Map(),
   onChunk?: (count: number) => void,
+  figurePaths: FigurePathMap = new Map(),
 ): Promise<void> {
   const rows = passages.map((p) => ({
     id: p.id,
@@ -91,13 +98,16 @@ export async function insertPassages(
     page_no: p.page_no,
     bbox: p.box ? { column: p.box.column, top: p.box.top, bottom: p.box.bottom } : null,
     image_path: imagePaths.get(p.id) ?? '',
-    // 표·그림이 많아 글로 다 못 옮긴 지문은 이미지 출제를 **기본값으로 제안**한다.
+    figure_paths: figurePaths.get(p.id) ?? [],
     // 검수에서 사람이 바꿀 수 있다.
     //
     // ⚠️ 단, **여러 쪽에 걸친 지문은 제안하지 않는다.** 잘라 둔 이미지는 시작 쪽 하나뿐이라
     //    이미지 출제로 두면 이어지는 뒷부분이 인쇄물에서 통째로 사라진다(코덱스 리뷰 2R).
     //    이런 지문은 글로 인쇄하고, 필요하면 검수에서 사람이 직접 바꾼다.
-    render_mode: p.has_figure && p.pageSpan === 1 && imagePaths.has(p.id) ? 'image' : 'text',
+    //
+    // ⚠️ **그림을 제자리에 끼웠으면 글로 둔다.** 그림이 본문 안에 있으면 이미지로 통째
+    //    출제할 까닭이 없다 — 글로 두어야 편집·검색되고 문제지에서 다시 조판된다
+    render_mode: renderModeFor(p.has_figure && p.pageSpan === 1, imagePaths, figurePaths, p.id),
     area_path: p.area_path,
     unit_path: p.unit_path,
   }));
@@ -117,6 +127,7 @@ export async function insertProblems(
   problems: ProblemDraft[],
   imagePaths: ImagePathMap = new Map(),
   onChunk?: (count: number) => void,
+  figurePaths: FigurePathMap = new Map(),
 ): Promise<void> {
   const rows = problems.map((p) => ({
     id: p.id,
@@ -134,9 +145,36 @@ export async function insertProblems(
     page_no: p.page_no,
     bbox: p.box ? { column: p.box.column, top: p.box.top, bottom: p.box.bottom } : null,
     image_path: imagePaths.get(p.id) ?? '',
-    render_mode: p.has_figure && imagePaths.has(p.id) ? 'image' : 'text',
+    figure_paths: figurePaths.get(p.id) ?? [],
+    render_mode: renderModeFor(p.has_figure, imagePaths, figurePaths, p.id),
   }));
   await insertChunked('problems', rows, onChunk);
+}
+
+/**
+ * 처음 제안할 인쇄 방식.
+ *
+ * 순서가 중요하다:
+ *  ① 그림을 **본문 제자리에 하나라도 끼웠으면** 글로 둔다 — 그게 가장 쓸모 있는 모양이다
+ *    (편집·검색되고 문제지에서 다시 조판된다).
+ *  ② 못 끼웠는데 그림이 있다고 표시됐고 항목 이미지가 있으면 통째로 이미지 출제.
+ *    프롬프트가 "옮길 수 있는 글자만 적으라" 고 시켰으므로 글만으로는 온전하지 않다.
+ *  ③ 나머지는 글.
+ * 검수에서 사람이 바꿀 수 있다.
+ * @param needsImage - 그림이 있어 글만으로는 온전하지 않은가
+ * @param imagePaths - 항목 전체 이미지
+ * @param figurePaths - 본문에 끼운 그림들
+ * @param id - 항목 id
+ * @returns 'text' 또는 'image'
+ */
+function renderModeFor(
+  needsImage: boolean,
+  imagePaths: ImagePathMap,
+  figurePaths: FigurePathMap,
+  id: string,
+): 'text' | 'image' {
+  if ((figurePaths.get(id) ?? []).some(Boolean)) return 'text';
+  return needsImage && imagePaths.has(id) ? 'image' : 'text';
 }
 
 /**

@@ -198,3 +198,32 @@ describe('buildProblemOcrPrompt — 단을 갈라 보낼 때', () => {
     expect(p).toContain('보낸 이미지는 4·5쪽');
   });
 });
+
+describe('buildProblemOcrPrompt — 그림', () => {
+  const p = () => buildProblemOcrPrompt({
+    source, pages: [1], batch: { index: 0, total: 1 },
+    areaTree: tree, unitTree: units, scopeUnits: [],
+  });
+
+  it('항목 전체가 아니라 그림 **부분만** 잡으라고 한다', () => {
+    expect(p()).toContain('부분만');
+    expect(p()).toContain('항목 전체(box)가 아니다');
+  });
+
+  it('자리표시자와 figures 를 짝지으라고 못박는다 — 한쪽만 내면 어긋난다', () => {
+    expect(p()).toContain('<figure data-figure="1">');
+    expect(p()).toContain('짝지어');
+  });
+
+  it('글로 옮길 수 있는 표는 넣지 말라고 한다 — 글이라야 검색·재조판된다', () => {
+    expect(p()).toContain('글자만 있는 표는 넣지 않는다');
+  });
+
+  it('<img> 는 여전히 금지다', () => {
+    expect(p()).toContain('<img> 는 쓰지 않는다');
+  });
+
+  it('테두리를 넉넉히 잡으라고 한다 — 축 이름이 잘리면 못 푼다', () => {
+    expect(p()).toContain('넉넉히 감싸도록');
+  });
+});

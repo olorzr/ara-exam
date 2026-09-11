@@ -29,6 +29,8 @@ interface PassageGroupCardProps {
   problemCount: number;
   /** 이미지 지문의 서명 URL */
   imageUrl?: string | null;
+  /** 본문에 끼운 그림들의 서명 URL */
+  figureUrls?: Map<string, string>;
   children: React.ReactNode;
 }
 
@@ -40,7 +42,7 @@ interface PassageGroupCardProps {
  * 고를 수 있다. 본문은 기본으로 접어 둔다 — 펼쳐 두면 목록이 아니라 책이 된다.
  */
 export default function PassageGroupCard({
-  passageId, passage, source, problemCount, imageUrl, children,
+  passageId, passage, source, problemCount, imageUrl, figureUrls, children,
 }: PassageGroupCardProps) {
   const [open, setOpen] = useState(false);
 
@@ -89,7 +91,7 @@ export default function PassageGroupCard({
 
       {open && (
         <div className="rounded border border-gray-200 bg-white p-3">
-          <PassageBodyView passage={passage} imageUrl={imageUrl} />
+          <PassageBodyView passage={passage} imageUrl={imageUrl} figureUrls={figureUrls} />
         </div>
       )}
 

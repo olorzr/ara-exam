@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { sanitizeInlineHTML, sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import { choiceGlyph } from '@/lib/problem-bank/choices';
+import { splitByFigurePlaceholders } from '@/lib/problem-bank/figure-placeholders';
 import type { PaperBlock } from '@/lib/problem-paper/blocks';
 import { stripTrailingEmptyParagraphs } from '@/lib/problem-paper/html-trim';
 import type { PaperItemSnapshot, PaperSettings } from '@/types/problem-bank';
@@ -41,6 +42,13 @@ export function renderPaperBlocks({ blocks, settings, imageUrls }: RenderArgs): 
             }`}
             dangerouslySetInnerHTML={{ __html: block.html }}
           />
+        );
+
+      case 'passage-figure':
+        return (
+          <div key={block.key} className="pb-passage-part pb-figure">
+            <PrintImage path={block.path} urls={imageUrls} alt={`${block.label || '지문'} 자료`} />
+          </div>
         );
 
       case 'passage-image':
@@ -112,6 +120,45 @@ interface ProblemBlockProps {
   imageUrls: Map<string, string>;
 }
 
+/**
+ * 발문을 그리되 **그림 자리표시자 자리에 그림을 끼운다.**
+ *
+ * ⚠️ 자리표시자가 없는데 그림이 있으면(옛 행) **발문 끝에** 붙인다. 안 그리면 인쇄물에서
+ *    자료가 통째로 빠진 문항이 나가는데, 그건 화면을 봐서는 알 수 없는 결함이다.
+ */
+function StemWithFigures({
+  html, paths, imageUrls, number,
+}: { html: string; paths: readonly string[]; imageUrls: Map<string, string>; number: number }) {
+  const chunks = splitByFigurePlaceholders(html);
+  const placed = new Set(
+    chunks.filter((c) => c.kind === 'figure').map((c) => (c as { index: number }).index),
+  );
+  const trailing = paths.filter((path, i) => Boolean(path) && !placed.has(i + 1));
+
+  return (
+    <>
+      {chunks.map((chunk, i) => (chunk.kind === 'html' ? (
+        <div key={i} dangerouslySetInnerHTML={{ __html: chunk.html }} />
+      ) : (
+        <div key={i} className="pb-figure">
+          <PrintImage
+            path={paths[chunk.index - 1] ?? ''}
+            urls={imageUrls}
+            alt={`${number}번 자료`}
+          />
+        </div>
+      )))}
+      {trailing.length > 0 && (
+        <div className="pb-figure">
+          {trailing.map((path) => (
+            <PrintImage key={path} path={path} urls={imageUrls} alt={`${number}번 자료`} />
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
 /** 문항 하나 — 발문·선지·삽화가 한 블록이다(갈리면 읽을 수 없다) */
 function ProblemBlock({ number, snapshot, settings, imageUrls }: ProblemBlockProps) {
   const objective = snapshot.question_type === '객관식' && snapshot.choices.length > 0;
@@ -120,22 +167,16 @@ function ProblemBlock({ number, snapshot, settings, imageUrls }: ProblemBlockPro
     <div className="pb-q">
       <div className="pb-q__head">
         <span className="q-num q-num--mint">{String(number).padStart(2, '0')}</span>
-        <div
-          className="pb-q__stem"
-          // 끝에 붙은 빈 문단을 걷어낸다 — 그대로 두면 선지 앞에 빈 줄이 생긴다
-          dangerouslySetInnerHTML={{
-            __html: stripTrailingEmptyParagraphs(sanitizeProblemHTML(snapshot.stem_html)),
-          }}
-        />
-      </div>
-
-      {snapshot.figure_paths.length > 0 && (
-        <div className="pb-figure">
-          {snapshot.figure_paths.map((path) => (
-            <PrintImage key={path} path={path} urls={imageUrls} alt={`${number}번 자료`} />
-          ))}
+        <div className="pb-q__stem">
+          {/* 끝에 붙은 빈 문단을 걷어낸다 — 그대로 두면 선지 앞에 빈 줄이 생긴다 */}
+          <StemWithFigures
+            html={stripTrailingEmptyParagraphs(sanitizeProblemHTML(snapshot.stem_html))}
+            paths={snapshot.figure_paths}
+            imageUrls={imageUrls}
+            number={number}
+          />
         </div>
-      )}
+      </div>
 
       {objective ? (
         <div className="pb-q__choices">

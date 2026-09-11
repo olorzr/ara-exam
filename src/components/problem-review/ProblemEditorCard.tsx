@@ -11,6 +11,9 @@ import ProblemHtmlEditor from '@/components/problem-editor/ProblemHtmlEditor';
 import { blankChoicePositions, trimTrailingChoices } from '@/lib/problem-bank/choices';
 import { sanitizeInlineHTML } from '@/lib/sanitize-problem';
 import AreaPathPicker from './AreaPathPicker';
+import FigureStrip from './FigureStrip';
+import { useFigureEditor } from '@/hooks/useFigureEditor';
+import type { Bbox } from '@/types/problem-bank';
 import GrammarTagPicker from './GrammarTagPicker';
 import type { AreaTreeNode } from '@/lib/problem-bank/area-tree';
 import { isGrammarArea } from '@/lib/problem-bank/grammar-tree';
@@ -53,6 +56,12 @@ interface ProblemEditorCardProps {
   onDirtyChange?: (dirty: boolean) => void;
   /** OCR 이 이 문항에 남긴 확인거리 — 위 배너의 경고를 카드에도 붙인다 */
   issues?: string[];
+  /** 본문에 끼운 그림들의 서명 URL */
+  figureUrls?: Map<string, string>;
+  /** 원본에서 끌어 잡기를 시작한다 — 페이지가 끝난 영역을 넘겨준다 */
+  onStartCapture?: (handler: (bbox: Bbox, pageUrl: string) => void) => void;
+  /** 지금 이 카드가 영역을 기다리는 중인가 */
+  capturing?: boolean;
 }
 
 /**
@@ -67,7 +76,7 @@ interface ProblemEditorCardProps {
  */
 export default function ProblemEditorCard({
   problem, areaTree, unitTree, selected, onSelect, onSave, onToggleVerified, onDelete, onDirtyChange,
-  issues,
+  issues, figureUrls, onStartCapture, capturing,
 }: ProblemEditorCardProps) {
   const [stem, setStem] = useState(problem.stem_html);
   const [choices, setChoices] = useState<string[]>(problem.choices);
@@ -77,7 +86,32 @@ export default function ProblemEditorCard({
   const [unit, setUnit] = useState<string[]>(problem.unit_path);
   const [grammar, setGrammar] = useState<string[]>(problem.grammar_paths);
   const [workTitle, setWorkTitle] = useState(problem.work_title);
+  const [figurePaths, setFigurePaths] = useState<string[]>(problem.figure_paths);
   const [saving, setSaving] = useState(false);
+
+  /**
+   * 그림을 붙이거나 뺄 때는 **발문과 경로를 한 번에** 저장한다 —
+   * 따로 저장될 틈을 주면 자리표시자와 그림 수가 어긋난다.
+   */
+  const figures = useFigureEditor({
+    kind: 'problem',
+    id: problem.id,
+    save: async (next) => {
+      const updatedAt = await onSave({ stem_html: next.html, figure_paths: next.paths });
+      if (updatedAt) setFigurePaths(next.paths);
+      return Boolean(updatedAt);
+    },
+  });
+
+  const handleCapture = async (bbox: Bbox, pageUrl: string) => {
+    const next = await figures.capture(bbox, pageUrl, stem, figurePaths);
+    if (next !== null) setStem(next);
+  };
+
+  const handleRemoveFigure = async (index: number) => {
+    const next = await figures.remove(index, stem, figurePaths);
+    if (next !== null) setStem(next);
+  };
 
   const verified = problem.status === '검수완료';
   const missingAnswer = !answer.trim();
@@ -212,6 +246,15 @@ export default function ProblemEditorCard({
           <Label className="text-xs text-gray-500">발문</Label>
           <ProblemHtmlEditor value={stem} onChange={setStem} ariaLabel="발문" />
         </div>
+
+        <FigureStrip
+          paths={figurePaths}
+          urls={figureUrls ?? new Map()}
+          onRemove={handleRemoveFigure}
+          onStartCapture={onStartCapture ? () => onStartCapture(handleCapture) : undefined}
+          capturing={capturing}
+          busy={figures.busy}
+        />
 
         {type === '객관식' && (
           <div className="space-y-1">
