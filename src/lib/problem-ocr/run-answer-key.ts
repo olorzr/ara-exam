@@ -4,7 +4,8 @@ import { generateDraft } from '@/lib/ai/codex/generateDraft';
 import { AiError } from '@/lib/ai/types';
 import { imageFileToJpegDataUrl } from '@/lib/pdf/imageToJpeg';
 import {
-  openPdfSource, renderPagesToImages, type OpenPdf, type RenderedPages,
+  openPdfSource, renderPagesToImages,
+  type OpenPdf, type RenderedImage, type RenderedPages,
 } from '@/lib/pdf/pdfPages';
 import { applyAnswerKey } from './answer-key';
 import { type AnswerKeyInput } from './answer-key-input';
@@ -13,7 +14,8 @@ import { runOcrBatches } from './batch-run';
 import { ANSWER_KEY_PAGES_PER_BATCH, answerKeyTurnBudgetMs } from './constants';
 import type { MergeResult } from './merge';
 import { parseAnswerKeyDraft } from './parse-answer-key';
-import { buildAnswerKeyPrompt, type OcrSourceMeta } from './prompt';
+import { buildAnswerKeyPrompt } from './prompt-answer-key';
+import type { OcrSourceMeta } from './prompt';
 import { ANSWER_KEY_SCHEMA } from './schema';
 
 /**
@@ -105,14 +107,16 @@ export async function separateAnswerKey(
       pages: files.map((_, i) => i + 1),
       render: async (wanted) => {
         const images: string[] = [];
-        const rendered: number[] = [];
+        const rendered: RenderedImage[] = [];
         const skipped: number[] = [];
         for (const index of wanted) {
           if (signal?.aborted) break;
           const url = await imageFileToJpegDataUrl(files[index - 1]);
           if (!url) { skipped.push(index); continue; }
           images.push(url);
-          rendered.push(index);
+          // 답지 사진은 가르지 않는다 — 정답표는 대개 한 단이고, 순서가 곧 번호라
+          // 한 장이 두 장이 되면 그 약속이 깨진다
+          rendered.push({ page: index, part: 'full' });
         }
         return { images, rendered, skipped };
       },

@@ -3,9 +3,12 @@ import { representativeFailure, runOcrBatches } from './batch-run';
 import { AiError } from '@/lib/ai/types';
 import { toWarningObject, warningText } from './warnings';
 
+/** 쪽 번호를 '쪽 전체 한 장' 짜리 렌더 결과로 */
+const asFull = (pages: number[]) => pages.map((page) => ({ page, part: 'full' as const }));
+
 /** 요청한 쪽을 전부 그려 낸 렌더 함수 */
 const ok = (images: string[] = ['data:image/jpeg;base64,x']) =>
-  vi.fn(async (pages: number[]) => ({ images, rendered: pages, skipped: [] }));
+  vi.fn(async (pages: number[]) => ({ images, rendered: asFull(pages), skipped: [] }));
 
 /** 경고를 한 줄로 이어 본다 */
 const said = (res: { warnings: Parameters<typeof warningText>[0][] }) =>
@@ -36,7 +39,7 @@ describe('runOcrBatches', () => {
     const res = await runOcrBatches({
       batches: [[1, 2, 3]],
       // 1쪽이 너무 커서 건너뛰었다 — 이미지는 2·3쪽 두 장뿐이다
-      renderBatch: vi.fn().mockResolvedValue({ images: ['b', 'c'], rendered: [2, 3], skipped: [1] }),
+      renderBatch: vi.fn().mockResolvedValue({ images: ['b', 'c'], rendered: asFull([2, 3]), skipped: [1] }),
       runBatch,
     });
 
@@ -95,7 +98,7 @@ describe('runOcrBatches', () => {
       batches: [[1], [2]],
       renderBatch: vi.fn()
         .mockRejectedValueOnce(new Error('PDF 손상'))
-        .mockResolvedValueOnce({ images: ['x'], rendered: [2], skipped: [] }),
+        .mockResolvedValueOnce({ images: ['x'], rendered: asFull([2]), skipped: [] }),
       runBatch,
     });
     expect(runBatch).toHaveBeenCalledTimes(1);
@@ -140,7 +143,7 @@ describe('runOcrBatches', () => {
       batches: [[1]],
       renderBatch: vi.fn(async () => {
         controller.abort();
-        return { images: ['x'], rendered: [1], skipped: [] };
+        return { images: ['x'], rendered: asFull([1]), skipped: [] };
       }),
       runBatch,
       signal: controller.signal,
@@ -263,7 +266,7 @@ describe('runOcrBatches — 실패한 묶음 다시 읽기', () => {
       // 2쪽이 pdf.js 를 죽인다 — 예전에는 1·3쪽까지 함께 잃었다
       if (pages.includes(2) && pages.length > 1) throw new Error('PDF 손상');
       if (pages[0] === 2) throw new Error('PDF 손상');
-      return { images: ['x'], rendered: pages, skipped: [] };
+      return { images: ['x'], rendered: asFull(pages), skipped: [] };
     });
     const res = await runOcrBatches({
       batches: [[1, 2, 3]],

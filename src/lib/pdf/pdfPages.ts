@@ -21,6 +21,7 @@
 // 원본: ara-system `app/lib/ai/pdfPages.ts`.
 
 import { getPdfDocument, renderPdfPage } from '@/lib/pdf/pdfRenderer'
+import { detectGutter } from '@/lib/pdf/columnDetect'
 
 type PdfDocumentProxy = Awaited<ReturnType<typeof getPdfDocument>>['pdf']
 
@@ -33,6 +34,42 @@ type PdfDocumentProxy = Awaited<ReturnType<typeof getPdfDocument>>['pdf']
 export const MAX_PAGE_BYTES = 1_200_000
 /** 묶음 총량 2차 안전판. 통과가 확인된 3.2MB의 약 2배 */
 const MAX_BATCH_BYTES = 6_000_000
+
+/**
+ * 단 하나짜리 이미지의 예산.
+ *
+ * 쪽 예산의 **절반**이다 — 2단 쪽을 갈라 보내도 그 쪽이 쓰는 총 바이트가 예전과 같아야
+ * 묶음 총량과 진행률 계산이 흔들리지 않는다. 넓이도 절반이라 글자당 화질은 그대로다.
+ */
+const MAX_COLUMN_BYTES = MAX_PAGE_BYTES / 2
+
+/** 쪽 전체를 그릴 배율 */
+const PAGE_SCALE = 2
+
+/**
+ * 단을 갈라 보낼 때의 배율.
+ *
+ * 더 크게 그리는 이유: 인코딩 사다리의 `maxSide` 가 **긴 변(세로)** 에 걸리는데,
+ * 단 이미지는 세로가 쪽 전체와 같고 가로만 절반이다. 배율을 올리면 세로는 사다리가
+ * 되돌리고 **가로 화소만 남는다** — A4 기준 단 하나가 595px 에서 892px 로 넓어진다.
+ */
+const COLUMN_SCALE = 3
+
+/** 단을 자를 때 안쪽으로 더 잡는 여유 (폭 대비). 경계에 걸친 글자가 잘리지 않게 한다 */
+const COLUMN_OVERLAP = 0.01
+
+/**
+ * 단 이미지 전용 인코딩 사다리.
+ *
+ * 1단의 `maxSide` 가 쪽 사다리(1800)보다 큰 이유는 위 `COLUMN_SCALE` 주석과 같다 —
+ * 1800 을 그대로 쓰면 애써 키운 가로 화소를 세로에 걸린 상한이 도로 깎는다.
+ */
+const COLUMN_ENCODE_STEPS: { maxSide: number; quality: number }[] = [
+  { maxSide: 2600, quality: 0.82 },
+  { maxSide: 2200, quality: 0.76 },
+  { maxSide: 1800, quality: 0.70 },
+  { maxSide: 1500, quality: 0.60 },
+]
 
 /**
  * 인코딩 사다리 — 위에서부터 시도해 **처음으로 예산에 맞는 것**을 쓴다.
@@ -87,8 +124,12 @@ function encodeAt(canvas: HTMLCanvasElement, maxSide: number, quality: number): 
  *    (문제는 장수가 아니라 그 한 장이었다).
  * ⚠️ 재인코딩은 **같은 캔버스를 재사용**한다. pdf.js 재렌더는 비용이 10배다.
  */
-export function encodeWithinBudget(canvas: HTMLCanvasElement, budget: number): string | null {
-  for (const step of ENCODE_STEPS) {
+export function encodeWithinBudget(
+  canvas: HTMLCanvasElement,
+  budget: number,
+  steps: { maxSide: number; quality: number }[] = ENCODE_STEPS,
+): string | null {
+  for (const step of steps) {
     const url = encodeAt(canvas, step.maxSide, step.quality)
     // 바이트 비교 단위는 base64 문자 수다(실제 JPEG의 약 1.37배). ws로 나가는 것도 이 문자열이다.
     if (url.length <= budget) return url
@@ -125,19 +166,40 @@ export async function pdfPageCount(src: PdfSource): Promise<number> {
   return numPages
 }
 
+/** 이미지 한 장이 쪽의 어느 부분인가 */
+export type RenderedPart = 'full' | 'left' | 'right'
+
+/** 보낸 이미지 한 장의 정체 */
+export type RenderedImage = {
+  page: number
+  part: RenderedPart
+}
+
 export type RenderedPages = {
   images: string[]
   /**
-   * 실제로 그려 낸 쪽 번호. **images 와 순서·길이가 정확히 같다.**
+   * 실제로 그려 낸 이미지의 정체. **images 와 순서·길이가 정확히 같다.**
    *
    * ⚠️ 호출부는 요청한 pages 가 아니라 **이 값**을 프롬프트에 실어야 한다.
-   *    한 쪽이라도 건너뛰면 "이미지 순서 = 이 쪽 번호" 라는 약속이 깨져
+   *    한 쪽이라도 건너뛰면 "이미지 순서 = 이 쪽" 이라는 약속이 깨져
    *    2쪽 내용이 1쪽으로 기록되고, 그 잘못된 쪽 번호가 중복 판정·지문 병합·
    *    이미지 크롭까지 줄줄이 어긋나게 만든다.
+   *
+   * 2단 쪽을 갈라 보내면 **한 쪽이 두 장**이 된다 — 그래서 쪽 번호 배열이 아니라
+   * 이 모양이다. 쪽 번호만 필요하면 `pagesOf` 를 쓸 것.
    */
-  rendered: number[]
+  rendered: RenderedImage[]
   /** 예산 안에 못 넣어 건너뛴 쪽 번호 — 호출부가 경고로 알린다(조용히 빠뜨리지 않기) */
   skipped: number[]
+}
+
+/**
+ * 보낸 이미지들이 덮는 쪽 번호 (중복 없이, 순서 유지).
+ * @param rendered - 보낸 이미지 목록
+ * @returns 쪽 번호 배열
+ */
+export function pagesOf(rendered: readonly RenderedImage[]): number[] {
+  return [...new Set(rendered.map((r) => r.page))]
 }
 
 /**
@@ -149,30 +211,90 @@ export type RenderedPages = {
 export async function renderPagesToImages(
   doc: OpenPdf,
   pages: number[],
-  opts?: { signal?: AbortSignal },
+  opts?: { signal?: AbortSignal; splitColumns?: boolean },
 ): Promise<RenderedPages> {
   const wanted = [...new Set(pages)]
     .filter(p => Number.isInteger(p) && p >= 1 && p <= doc.numPages)
     .sort((a, b) => a - b)
 
+  const split = opts?.splitColumns ?? false
   const images: string[] = []
-  const rendered: number[] = []
+  const rendered: RenderedImage[] = []
   const skipped: number[] = []
   let bytes = 0
 
   for (const page of wanted) {
     if (opts?.signal?.aborted) break
-    const url = encodeWithinBudget(await renderPdfPage(doc.pdf, page, 2), MAX_PAGE_BYTES)
-    if (!url) { skipped.push(page); continue }
-    // 2차 안전판 — 장당 예산이 보장되므로 실제로는 거의 안 걸린다
-    if (bytes + url.length > MAX_BATCH_BYTES) { skipped.push(page); continue }
-    bytes += url.length
-    images.push(url)
-    rendered.push(page)
+
+    const canvas = await renderPdfPage(doc.pdf, page, split ? COLUMN_SCALE : PAGE_SCALE)
+    const parts = encodePage(canvas, split)
+
+    // ⚠️ 한 조각이라도 예산을 못 맞추면 **그 쪽을 통째로** 건너뛴다. 반쪽만 보내면
+    //    그 쪽 내용의 절반이 조용히 사라지는데, 경고에는 아무것도 안 남는다
+    if (parts.length === 0) { skipped.push(page); continue }
+
+    const size = parts.reduce((n, p) => n + p.url.length, 0)
+    // 2차 안전판 — 쪽당 예산이 보장되므로 실제로는 거의 안 걸린다
+    if (bytes + size > MAX_BATCH_BYTES) { skipped.push(page); continue }
+
+    bytes += size
+    for (const { url, part } of parts) {
+      images.push(url)
+      rendered.push({ page, part })
+    }
     await new Promise(resolve => setTimeout(resolve, 0))
   }
 
   return { images, rendered, skipped }
+}
+
+/**
+ * 쪽 하나를 보낼 이미지들로. 2단이면 단별로 가른다.
+ * @param canvas - 그려 둔 쪽
+ * @param split - 2단이면 가를지
+ * @returns 보낼 조각들. 하나라도 예산을 못 맞추면 **빈 배열**(호출부가 그 쪽을 건너뛴다)
+ */
+function encodePage(
+  canvas: HTMLCanvasElement,
+  split: boolean,
+): { url: string; part: RenderedPart }[] {
+  const gutter = split ? detectGutter(canvas) : null
+
+  if (gutter === null) {
+    // 1단이거나 못 알아봤다 — 통째로 보낸다. 반으로 자르면 모든 줄이 두 동강 난다
+    const url = encodeWithinBudget(canvas, MAX_PAGE_BYTES)
+    return url ? [{ url, part: 'full' }] : []
+  }
+
+  const overlap = Math.round(canvas.width * COLUMN_OVERLAP)
+  const center = Math.round(canvas.width * gutter)
+  const left = cropColumn(canvas, 0, Math.min(canvas.width, center + overlap))
+  const right = cropColumn(canvas, Math.max(0, center - overlap), canvas.width)
+  if (!left || !right) return []
+
+  return [{ url: left, part: 'left' }, { url: right, part: 'right' }]
+}
+
+/**
+ * 쪽에서 가로 구간만 잘라 JPEG data URL 로. **세로는 자르지 않는다** —
+ * 그래야 모델이 알려 주는 `top`·`bottom` 이 쪽 전체 기준으로 남아 크롭이 그대로 맞는다.
+ * @param canvas - 그려 둔 쪽
+ * @param from - 왼쪽 경계(px)
+ * @param to - 오른쪽 경계(px)
+ * @returns data URL. 예산을 못 맞추면 null
+ */
+function cropColumn(canvas: HTMLCanvasElement, from: number, to: number): string | null {
+  const width = Math.max(1, to - from)
+  const out = document.createElement('canvas')
+  out.width = width
+  out.height = canvas.height
+  const ctx = out.getContext('2d')
+  if (!ctx) return null
+  // JPEG 는 투명을 모른다 — 안 칠하면 검게 나온다
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, width, canvas.height)
+  ctx.drawImage(canvas, from, 0, width, canvas.height, 0, 0, width, canvas.height)
+  return encodeWithinBudget(out, MAX_COLUMN_BYTES, COLUMN_ENCODE_STEPS)
 }
 
 /**

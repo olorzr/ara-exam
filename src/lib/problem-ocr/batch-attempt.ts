@@ -1,4 +1,5 @@
 import { AiError, type AiErrorCode } from '@/lib/ai/types';
+import { pagesOf, type RenderedImage, type RenderedPages } from '@/lib/pdf/pdfPages';
 import type { PageBatch } from './batch-plan';
 
 /**
@@ -23,15 +24,15 @@ export interface AttemptDeps<TDraft> {
    * 그 묶음의 쪽을 이미지로. 실패하면 throw 해도 되고 빈 배열을 돌려줘도 된다.
    * `rendered` 는 **실제로 그린 쪽 번호**이고 images 와 순서·길이가 같아야 한다.
    */
-  renderBatch: (
-    pages: PageBatch,
-    index: number,
-  ) => Promise<{ images: string[]; rendered: number[]; skipped: number[] }>;
+  renderBatch: (pages: PageBatch, index: number) => Promise<RenderedPages>;
   /** 취소 신호. **렌더와 호출 사이에서** 본다 — 렌더는 수 초 걸린다 */
   signal?: AbortSignal;
   /** 이미지를 실제로 AI 에 보내 초안 하나를 받는다 */
   runBatch: (args: {
+    /** 이 묶음이 실제로 덮는 쪽 (중복 없음) */
     pages: PageBatch;
+    /** 이미지 한 장 한 장의 정체 — 프롬프트가 "몇 쪽의 어느 단인지" 를 알려야 한다 */
+    rendered: RenderedImage[];
     images: string[];
     index: number;
     total: number;
@@ -53,10 +54,10 @@ export async function attemptBatch<TDraft>(
   deps: AttemptDeps<TDraft>,
 ): Promise<AttemptResult<TDraft>> {
   let images: string[] = [];
-  // ⚠️ 프롬프트에 실을 쪽 번호는 요청한 쪽이 아니라 **실제로 그린 쪽**이다.
-  //    한 쪽이라도 건너뛰면 "이미지 순서 = 이 쪽 번호" 약속이 깨져 내용이 엉뚱한 쪽으로
+  // ⚠️ 프롬프트에 실을 것은 요청한 쪽이 아니라 **실제로 그린 이미지**다.
+  //    한 쪽이라도 건너뛰면 "이미지 순서 = 이 쪽" 약속이 깨져 내용이 엉뚱한 쪽으로
   //    기록되고, 중복 판정·지문 병합·크롭까지 줄줄이 어긋난다(코덱스 리뷰 6R)
-  let rendered: number[] = pages;
+  let rendered: RenderedImage[] = pages.map((page) => ({ page, part: 'full' as const }));
   let skipped: number[] = [];
 
   try {
@@ -80,10 +81,11 @@ export async function attemptBatch<TDraft>(
   if (deps.signal?.aborted) return { ok: false, kind: 'ai', code: 'cancelled', skipped };
 
   try {
+    const covered = pagesOf(rendered);
     const { draft, rawLength } = await deps.runBatch({
-      pages: rendered, images, index, total,
+      pages: covered, rendered, images, index, total,
     });
-    return { ok: true, draft, pages: rendered, imagesSent: images.length, rawLength, skipped };
+    return { ok: true, draft, pages: covered, imagesSent: images.length, rawLength, skipped };
   } catch (e) {
     return {
       ok: false,

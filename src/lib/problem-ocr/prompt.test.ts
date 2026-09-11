@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildAnswerKeyPrompt, buildProblemOcrPrompt, type OcrSourceMeta } from './prompt';
+import { buildProblemOcrPrompt, type OcrSourceMeta } from './prompt';
 import { DATA_BEGIN, DATA_END } from '@/lib/ai/untrusted-data';
 import type { AreaTreeNode } from '@/lib/problem-bank/area-tree';
 
@@ -145,26 +145,56 @@ describe('buildProblemOcrPrompt', () => {
   });
 });
 
-describe('buildAnswerKeyPrompt', () => {
-  it('정답표만 읽고 풀지 말라고 한다', () => {
-    const p = buildAnswerKeyPrompt({ source, pages: [12], maxNumber: 20 });
-    expect(p).toContain('문제를 풀어서 정답을 만들어내는 것은 금지');
-    expect(p).toContain('1~20');
+describe('buildProblemOcrPrompt — 단을 갈라 보낼 때', () => {
+  const base = {
+    source, batch: { index: 0, total: 1 }, areaTree: tree, unitTree: units, scopeUnits: [],
+  };
+
+  it('이미지마다 몇 쪽의 어느 단인지 밝힌다 — 어긋나면 내용이 엉뚱한 쪽에 기록된다', () => {
+    const p = buildProblemOcrPrompt({
+      ...base,
+      pages: [4, 5],
+      rendered: [
+        { page: 4, part: 'left' }, { page: 4, part: 'right' }, { page: 5, part: 'full' },
+      ],
+    });
+    expect(p).toContain('1번=4쪽 왼쪽 단');
+    expect(p).toContain('2번=4쪽 오른쪽 단');
+    expect(p).toContain('3번=5쪽 전체');
   });
 
-  it('배점은 읽지 않는다', () => {
-    const p = buildAnswerKeyPrompt({ source, pages: [12] });
-    expect(p).toContain('배점은 읽지 않는다');
+  it('단과 단 사이는 쪽 경계가 아님을 알린다 — 한 지문이 둘로 쪼개지면 안 된다', () => {
+    const p = buildProblemOcrPrompt({
+      ...base,
+      pages: [4],
+      rendered: [{ page: 4, part: 'left' }, { page: 4, part: 'right' }],
+    });
+    expect(p).toContain('쪽과 쪽 사이');
+    expect(p).toContain('한 지문');
   });
 
-  it('문항 수를 모르면 범위를 강요하지 않는다', () => {
-    const p = buildAnswerKeyPrompt({ source, pages: [12] });
-    expect(p).toContain('문항 수를 모른다');
+  it('column 은 쪽 기준으로 적으라고 못박는다 — 크롭이 그 값으로 자른다', () => {
+    const p = buildProblemOcrPrompt({
+      ...base,
+      pages: [4],
+      rendered: [{ page: 4, part: 'left' }, { page: 4, part: 'right' }],
+    });
+    expect(p).toContain('쪽 기준');
   });
 
-  it('별도 답지는 쪽 번호 대신 장수를 알린다 — 원본과 쪽 번호가 무관하다', () => {
-    const p = buildAnswerKeyPrompt({ source, pages: [1, 2], imageLabel: '답지 사진' });
-    expect(p).toContain('답지 사진 2장');
-    expect(p).not.toContain('1·2쪽');
+  it('가르지 않은 묶음은 예전 문구 그대로다', () => {
+    const p = buildProblemOcrPrompt({
+      ...base,
+      pages: [4, 5],
+      rendered: [{ page: 4, part: 'full' }, { page: 5, part: 'full' }],
+    });
+    expect(p).toContain('보낸 이미지는 4·5쪽이고, 이미지 순서가 곧 이 쪽 순서다');
+    // 기본 규칙에도 '왼쪽 단' 이 나오므로(box.column 설명), 갈라 보낼 때만 쓰는 문구로 본다
+    expect(p).not.toContain('단을 따로 찍은 것이라');
+  });
+
+  it('rendered 를 안 주면 한 쪽 = 한 장으로 본다 (옛 호출부)', () => {
+    const p = buildProblemOcrPrompt({ ...base, pages: [4, 5] });
+    expect(p).toContain('보낸 이미지는 4·5쪽');
   });
 });

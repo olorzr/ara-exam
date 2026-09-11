@@ -12,7 +12,7 @@ import { maxProblemNumber } from './answer-key';
 import { answerKeyImageCount, type AnswerKeyInput } from './answer-key-input';
 import { planPageBatches } from './batch-plan';
 import { representativeFailure, runOcrBatches } from './batch-run';
-import { ocrTurnBudgetMs } from './constants';
+import { OCR_SPLIT_COLUMNS, ocrTurnBudgetMs } from './constants';
 import { mergeOcrDrafts } from './merge';
 import type { MergeResult } from './merge';
 import { OCR_MAX_MERGED_WARNINGS } from './constants';
@@ -90,13 +90,18 @@ export async function runProblemOcr(
 
     const ocrRun = await runOcrBatches({
       batches,
-      renderBatch: (pages) => renderPagesToImages(doc, pages, { signal }),
-      runBatch: async ({ pages, images, index, total }) => {
+      // 2단 쪽은 단별로 갈라 보낸다 — 읽을 순서가 하나뿐이라 두 단이 뒤섞이지 않고,
+      // 같은 바이트가 절반의 넓이에 쓰여 글자가 커진다(columnDetect.ts)
+      renderBatch: (pages) => renderPagesToImages(doc, pages, {
+        signal, splitColumns: OCR_SPLIT_COLUMNS,
+      }),
+      runBatch: async ({ pages, rendered, images, index, total }) => {
         const raw = await generateDraft({
           port,
           prompt: buildProblemOcrPrompt({
             source: input.meta,
             pages,
+            rendered,
             batch: { index, total },
             areaTree: input.areaTree,
             unitTree: input.unitTree,
