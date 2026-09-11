@@ -1,7 +1,7 @@
 'use client';
 
 import { choiceGlyph } from '@/lib/problem-bank/choices';
-import { splitByFigurePlaceholders } from '@/lib/problem-bank/figure-placeholders';
+import { renderFiguresInHtml, unplacedFigures } from '@/lib/problem-bank/figure-render';
 import { stripTrailingEmptyParagraphs } from '@/lib/problem-paper/html-trim';
 import { sanitizeInlineHTML, sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import type { Problem } from '@/types/problem-bank';
@@ -105,32 +105,20 @@ export default function ProblemBodyView({ problem, imageUrls }: ProblemBodyViewP
 /**
  * 본문을 그리되 **그림 자리표시자 자리에 그림을 끼운다.**
  *
- * ⚠️ 자리표시자가 없는데 그림이 있으면(옛 행이나 검수에서 갓 붙인 것) **본문 끝에** 붙인다.
+ * ⚠️ HTML 을 자리표시자에서 **잘라 나누지 않는다.** 그림은 〈보기〉 상자나 표 칸 안에
+ *    있을 때가 많은데, 거기서 자르면 상자가 먼저 닫혀 그림과 뒷글이 밖으로 튀어나온다.
+ * ⚠️ 자리표시자가 없는데 그림이 있으면(옛 행이나 검수에서 칩만 지운 것) **본문 끝에** 붙인다.
  *    안 그리면 그림이 어디에도 안 나와 있는 줄도 모른다.
  */
 export function BodyWithFigures({
   html, paths, urls,
 }: { html: string; paths: readonly string[]; urls: Map<string, string> }) {
-  const chunks = splitByFigurePlaceholders(html);
-  const placed = new Set(
-    chunks.filter((c) => c.kind === 'figure').map((c) => (c as { index: number }).index),
-  );
-  const trailing = paths
-    .map((path, i) => ({ path, index: i + 1 }))
-    .filter(({ path, index }) => Boolean(path) && !placed.has(index));
+  const trailing = unplacedFigures(html, paths);
 
   return (
     <>
-      {chunks.map((chunk, i) => (chunk.kind === 'html' ? (
-        <div key={i} dangerouslySetInnerHTML={{ __html: chunk.html }} />
-      ) : (
-        <FigureImage
-          key={i}
-          path={paths[chunk.index - 1] ?? ''}
-          urls={urls}
-          alt={`자료 ${chunk.index}`}
-        />
-      )))}
+      {/* 정화는 호출부가 이미 했다 — 여기서 다시 하면 넣은 <img> 가 통째로 사라진다 */}
+      <div dangerouslySetInnerHTML={{ __html: renderFiguresInHtml(html, paths, urls) }} />
       {trailing.length > 0 && (
         <div className="pb-figure">
           {trailing.map(({ path, index }) => (

@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import { sanitizeInlineHTML, sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import { choiceGlyph } from '@/lib/problem-bank/choices';
-import { splitByFigurePlaceholders } from '@/lib/problem-bank/figure-placeholders';
+import { renderFiguresInHtml, unplacedFigures } from '@/lib/problem-bank/figure-render';
 import type { PaperBlock } from '@/lib/problem-paper/blocks';
 import { stripTrailingEmptyParagraphs } from '@/lib/problem-paper/html-trim';
 import type { PaperItemSnapshot, PaperSettings } from '@/types/problem-bank';
@@ -40,7 +40,10 @@ export function renderPaperBlocks({ blocks, settings, imageUrls }: RenderArgs): 
             className={`pb-passage-part${block.first ? ' pb-passage-part--first' : ''}${
               block.last ? ' pb-passage-part--last' : ''
             }`}
-            dangerouslySetInnerHTML={{ __html: block.html }}
+            // 〈보기〉 상자·표 안에 남은 그림 자리표시자를 여기서 끼운다 — 구조를 자르지 않는다
+            dangerouslySetInnerHTML={{
+              __html: renderFiguresInHtml(block.html, block.figures ?? [], imageUrls),
+            }}
           />
         );
 
@@ -123,34 +126,23 @@ interface ProblemBlockProps {
 /**
  * 발문을 그리되 **그림 자리표시자 자리에 그림을 끼운다.**
  *
- * ⚠️ 자리표시자가 없는데 그림이 있으면(옛 행) **발문 끝에** 붙인다. 안 그리면 인쇄물에서
+ * ⚠️ HTML 을 자리표시자에서 **잘라 나누지 않는다** — 〈보기〉 상자 안의 그림에서
+ *    상자가 먼저 닫혀 그림과 뒷글이 밖으로 튀어나온다(화면 쪽과 같은 규약).
+ * ⚠️ 자리표시자가 없는데 그림이 있으면 **발문 끝에** 붙인다. 안 그리면 인쇄물에서
  *    자료가 통째로 빠진 문항이 나가는데, 그건 화면을 봐서는 알 수 없는 결함이다.
  */
 function StemWithFigures({
   html, paths, imageUrls, number,
 }: { html: string; paths: readonly string[]; imageUrls: Map<string, string>; number: number }) {
-  const chunks = splitByFigurePlaceholders(html);
-  const placed = new Set(
-    chunks.filter((c) => c.kind === 'figure').map((c) => (c as { index: number }).index),
-  );
-  const trailing = paths.filter((path, i) => Boolean(path) && !placed.has(i + 1));
+  const trailing = unplacedFigures(html, paths);
 
   return (
     <>
-      {chunks.map((chunk, i) => (chunk.kind === 'html' ? (
-        <div key={i} dangerouslySetInnerHTML={{ __html: chunk.html }} />
-      ) : (
-        <div key={i} className="pb-figure">
-          <PrintImage
-            path={paths[chunk.index - 1] ?? ''}
-            urls={imageUrls}
-            alt={`${number}번 자료`}
-          />
-        </div>
-      )))}
+      {/* 정화는 호출부가 이미 했다 — 여기서 다시 하면 넣은 <img> 가 통째로 사라진다 */}
+      <div dangerouslySetInnerHTML={{ __html: renderFiguresInHtml(html, paths, imageUrls) }} />
       {trailing.length > 0 && (
         <div className="pb-figure">
-          {trailing.map((path) => (
+          {trailing.map(({ path }) => (
             <PrintImage key={path} path={path} urls={imageUrls} alt={`${number}번 자료`} />
           ))}
         </div>

@@ -1,5 +1,5 @@
 import { splitHtmlBlocks } from '@/lib/print/split-html-blocks';
-import { splitByFigurePlaceholders } from '@/lib/problem-bank/figure-placeholders';
+import { soleFigureIndex, unplacedFigures } from '@/lib/problem-bank/figure-render';
 import { sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import { trimEdgeEmptyParagraphs } from './html-trim';
 import type { PaperItemSnapshot } from '@/types/problem-bank';
@@ -21,7 +21,15 @@ import { groupRangeLabel, groupsOf, type PaperItem } from './compose';
 /** 인쇄 블록 한 개 */
 export type PaperBlock =
   | { kind: 'passage-header'; key: string; text: string }
-  | { kind: 'passage-part'; key: string; html: string; first: boolean; last: boolean }
+  | {
+    kind: 'passage-part';
+    key: string;
+    html: string;
+    /** 이 지문의 그림 경로들 — 상자 안에 남은 자리표시자를 그리는 쪽이 끼운다 */
+    figures?: string[];
+    first: boolean;
+    last: boolean;
+  }
   | { kind: 'passage-image'; key: string; path: string; label: string }
   /** 지문 본문 제자리에 끼울 그림 한 장 — 문단 조각들 사이에 낀다 */
   | { kind: 'passage-figure'; key: string; path: string; label: string }
@@ -77,47 +85,44 @@ export function buildPaperBlocks(items: readonly PaperItemSnapshot[]): PaperBloc
         // 가장자리 빈 문단을 먼저 걷어낸다 — 상자 테두리 안이 위아래로 뜨는 것을 막고,
         // first/last 표시도 진짜 첫·마지막 조각에 붙는다
         const figures = passage.figure_paths ?? [];
-        // ⚠️ **그림 자리표시자마다 먼저 가른다.** 자리표시자를 그대로 `splitHtmlBlocks` 에
-        //    넘기면 빈 <figure> 가 문단 조각 하나로 남아, 인쇄물에서 그림이 아니라
-        //    빈 줄이 나온다
-        const chunks = splitByFigurePlaceholders(sanitizeProblemHTML(passage.html));
-        const parts: PaperBlock[] = [];
-        chunks.forEach((chunk, ci) => {
-          if (chunk.kind === 'figure') {
-            const path = figures[chunk.index - 1];
-            if (path) {
-              parts.push({
-                kind: 'passage-figure',
-                key: `pf-${group.start}-${ci}`,
-                path,
-                label: passage.title || passage.label,
-              });
-            }
-            return;
+        // ⚠️ **최상위 블록으로 먼저 쪼갠다.** 자리표시자에서 문자열을 자르면 〈보기〉 상자나
+        //    표 안에 있는 그림에서 여는 태그와 닫는 태그가 갈려 상자가 깨진다.
+        //    쪼갠 **뒤에** 그림만인 조각을 가려내고, 상자 안에 남은 것은 그리는 쪽이 끼운다
+        const raw = trimEdgeEmptyParagraphs(splitHtmlBlocks(sanitizeProblemHTML(passage.html)));
+        const parts: PaperBlock[] = raw.map((html, i): PaperBlock => {
+          const only = soleFigureIndex(html);
+          const path = only === null ? '' : figures[only - 1];
+          if (only !== null && path) {
+            return {
+              kind: 'passage-figure',
+              key: `pf-${group.start}-${i}`,
+              path,
+              label: passage.title || passage.label,
+            };
           }
-          for (const [i, html] of trimEdgeEmptyParagraphs(splitHtmlBlocks(chunk.html)).entries()) {
-            parts.push({
-              kind: 'passage-part', key: `pp-${group.start}-${ci}-${i}`, html,
-              first: false, last: false,
-            });
-          }
-        });
+          return {
+            kind: 'passage-part',
+            key: `pp-${group.start}-${i}`,
+            html,
+            // 상자 안에 남은 자리표시자는 그리는 쪽이 서명 URL 로 끼운다
+            figures,
+            first: false,
+            last: false,
+          };
+        // 그림만이었는데 경로가 없는 조각은 버린다 — 빈 줄만 남는다
+        }).filter((b) => b.kind !== 'passage-part' || soleFigureIndex(b.html) === null);
 
         // ⚠️ 자리표시자가 없는 그림은 **본문 끝에** 붙인다. 화면(`BodyWithFigures`)이
         //    그렇게 그리는데 인쇄만 빠뜨리면, 선생님이 화면에서 본 그림이 인쇄물에서만
         //    사라진다 — 가장 알아채기 어려운 결함이다(검수에서 칩만 지운 지문이 그렇다)
-        const placed = new Set(
-          chunks.filter((c) => c.kind === 'figure').map((c) => c.index),
-        );
-        figures.forEach((path, i) => {
-          if (!path || placed.has(i + 1)) return;
+        for (const { index, path } of unplacedFigures(passage.html, figures)) {
           parts.push({
             kind: 'passage-figure',
-            key: `pf-${group.start}-x${i}`,
+            key: `pf-${group.start}-x${index}`,
             path,
             label: passage.title || passage.label,
           });
-        });
+        }
 
         // 상자 윤곽이 단·쪽을 넘어도 이어져 보이도록 위·아래 테두리를 **글 조각의**
         // 처음·끝에만 표시한다. 그림 블록을 세면 테두리가 그림 위아래에 붙는다

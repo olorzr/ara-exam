@@ -3,7 +3,7 @@ import {
   figureNumbersIn, MAX_FIGURES, reconcileFigurePlaceholders, shiftFigurePlaceholders,
 } from '@/lib/problem-bank/figure-placeholders';
 import { textOf } from './merge-keys';
-import type { OcrItem } from './schema';
+import type { OcrBox, OcrItem } from './schema';
 import type { FigureRegion, PassageDraft, ProblemDraft } from './merge';
 
 /**
@@ -50,6 +50,16 @@ const HEAD_PROBE = 20;
  */
 const TAIL_PROBE = 40;
 
+/** 같은 자리를 가리키는 좌표인가 — 모델이 낸 값이라 딱 떨어지지 않는다 */
+function sameBox(a: OcrBox, b: OcrBox): boolean {
+  return a.column === b.column
+    && Math.abs(a.top - b.top) < BOX_TOLERANCE
+    && Math.abs(a.bottom - b.bottom) < BOX_TOLERANCE;
+}
+
+/** 같은 그림으로 볼 좌표 차이 (쪽 높이 비율). 모델이 낼 때마다 조금씩 달라진다 */
+const BOX_TOLERANCE = 0.03;
+
 /** 이어지는 조각이 이미 담겨 있는가에 대한 판정 */
 export type ContainmentVerdict =
   /** 통째로 이미 있다 — 또 붙이면 같은 글이 두 번 인쇄된다 */
@@ -83,9 +93,15 @@ export function alreadyContains(work: PassageWork, item: OcrItem): ContainmentVe
 
   const soFar = textOf(work.fragments.join(' '));
   if (!soFar.includes(text.slice(0, HEAD_PROBE))) return 'new';
-  // 끝부분까지 있어야 통째로 있는 것이다. 그림이 늘었어도 아직 담을 것이 남았다
-  const tail = text.slice(-TAIL_PROBE);
-  const whole = soFar.includes(tail) && item.figures.length <= (work.figures.flat().length);
+  // 끝부분까지 있어야 통째로 있는 것이다. 그림이 늘었어도 아직 담을 것이 남았다.
+  // ⚠️ 그림은 **개수가 아니라 자리로** 견준다. 앞 묶음이 시작 쪽 그림 하나를 잡아 뒀는데
+  //    이번 조각이 **다음 쪽의 다른 그림** 하나를 알아본 경우, 개수만 보면 '이미 있다' 가
+  //    되어 그 새 그림이 잘리지도 저장되지도 않는다(코덱스 리뷰)
+  const mine = work.figures.flat();
+  const newFigure = item.figures.some(
+    (box) => !mine.some((had) => had.page === item.page && sameBox(had.box, box)),
+  );
+  const whole = soFar.includes(text.slice(-TAIL_PROBE)) && !newFigure;
   return whole ? 'duplicate' : 'partial';
 }
 

@@ -203,6 +203,27 @@
 
 .pb-figure { margin-top: 4px; }
 
+/*
+ * 본문 제자리에 끼운 그림. 〈보기〉 상자·표 안에도 들어가므로 칸을 넘지 않게 가둔다.
+ * URL 을 못 받았을 때의 자리는 **눈에 보여야** 한다 — 조용히 비우면 그림이 원래
+ * 없었는지 못 불러왔는지 알 수 없다.
+ */
+.pb-figure-img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 4px auto;
+}
+.pb-figure-missing {
+  display: block;
+  border: 1px dashed #b45309;
+  color: #b45309;
+  font-size: 9pt;
+  padding: 12px 8px;
+  text-align: center;
+  margin: 4px 0;
+}
+
 /* ── 표 ───────────────────────────────────────────── */
 /* 개념지 시트와 같은 규칙 — 셀이 min-content 로 버티면 2단 칸에서 표가 삐져나간다 */
 .pb-sheet table {

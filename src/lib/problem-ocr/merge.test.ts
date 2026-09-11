@@ -398,6 +398,9 @@ describe('mergeOcrDrafts — 경고', () => {
 });
 
 describe('mergeOcrDrafts — 모델이 이어짐 표시를 빠뜨릴 때', () => {
+  const fig = (n: number) => `<figure data-figure="${n}"></figure>`;
+  const box = (top: number) => ({ column: 1 as const, top, bottom: top + 0.1 });
+
   it("앞 지문이 continues 를 안 냈어도 바로 앞 쪽에서 끝났으면 이어 붙인다", () => {
     // 모델은 쪽 끝에서 '다음 쪽으로 이어진다' 를 자주 빠뜨린다. 그때마다 뒷부분이
     // 주인 없는 지문으로 떨어져 나가면 문항이 어느 쪽에도 온전히 붙지 않는다
@@ -440,6 +443,23 @@ describe('mergeOcrDrafts — 모델이 이어짐 표시를 빠뜨릴 때', () =>
     expect(res.passages).toHaveLength(1);
     expect(res.passages[0].html).toContain('이어지는 뒷문단');
     expect(said(res)).toContain('앞부분이 겹쳐 보일 수 있어요');
+  });
+
+  it('글은 같아도 **다른 자리의** 그림을 알아봤으면 버리지 않는다 — 개수만 보면 놓친다', () => {
+    const res = mergeOcrDrafts([
+      batch([passage({
+        ref: 'P1', page: 3, html: `<p>같은 뒷부분 글이 여기 다 들어 있다</p>${fig(1)}`,
+        figures: [box(0.2)],
+      })], [3, 4]),
+      // 다음 쪽의 **다른** 도표를 이번에 알아봤다(개수는 똑같이 1개다)
+      batch([passage({
+        ref: 'P1', page: 4, label: null, continued: true,
+        html: `<p>같은 뒷부분 글이 여기 다 들어 있다</p>${fig(1)}`, figures: [box(0.7)],
+      })], [4, 5]),
+    ], { newId });
+
+    expect(res.passages[0].figures).toHaveLength(2);
+    expect(res.passages[0].figures[1]).toEqual({ page: 4, box: box(0.7) });
   });
 
   it('중복이라 안 붙여도 그 조각을 가리킨 문항은 이 지문에 붙는다', () => {
