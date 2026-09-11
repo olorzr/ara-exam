@@ -105,6 +105,9 @@ export function usePassageContinuation(source: ProblemSource | null) {
         return result;
       }
       toast.success(`${page}쪽에서 이어지는 글을 읽었어요. 확인하고 저장해 주세요.`);
+      // ⚠️ 글을 읽었어도 **남긴 말은 반드시 보여 준다.** 잘렸다거나 흐려서 못 읽었다는
+      //    말이 여기 담기는데, 성공 문구만 띄우면 그대로 저장하고 넘어간다
+      for (const warning of result.warnings) toast.warning(warning);
       return result;
     } catch (e) {
       if (isAiError(e)) {

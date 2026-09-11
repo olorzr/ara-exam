@@ -333,7 +333,24 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
 
   // 조각을 이제 합친다 — 조각별 비교가 다 끝난 뒤여야 한다.
   // 그림 번호 밀기도 여기서 **한 번만** 한다(joinFragments)
-  const passages = works.map((w) => ({ ...w.draft, ...joinFragments(w) }));
+  const passages = works.map((w) => {
+    const { droppedFigures, ...joined } = joinFragments(w);
+    // ⚠️ 상한에 걸려 버린 그림은 **반드시 알린다.** 크롭은 남은 것만 보므로 여기서
+    //    말하지 않으면 그 그림이 어디에도 안 나오고 아무 표시도 없다
+    if (droppedFigures > 0) {
+      warn({
+        message: `그림이 너무 많아 ${droppedFigures}개를 담지 못했어요. `
+          + '검수에서 필요한 그림을 직접 잘라 넣어 주세요.',
+        targets: [{
+          kind: 'passage',
+          id: w.draft.id,
+          page: w.draft.page_no,
+          label: itemTargetLabel({ kind: 'passage', page: w.draft.page_no }),
+        }],
+      });
+    }
+    return { ...w.draft, ...joined };
+  });
 
   // 지문이 끝내 안 닫혔으면 뒷부분이 빠졌을 수 있다 — 조용히 넘기지 않는다.
   // 개수만 세지 말고 **어느 지문인지** 짚는다(개수만으로는 찾을 방법이 없다)

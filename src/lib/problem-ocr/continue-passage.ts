@@ -140,15 +140,19 @@ export function parseContinuation(raw: string): ContinuationResult | null {
   // ⚠️ **그림 자리표시자는 지운다.** 이 길은 좌표를 받지 않아 그림을 잘라 낼 수 없는데,
   //    번호만 붙여 두면 그 지문에 **이미 있던 다른 그림**이 그 자리에 그려진다
   //    (자리표시자 번호는 `figure_paths` 의 순번이다). 사람이 직접 잘라 넣게 알린다
+  const body = value.html.trim();
   const html = reconcileFigurePlaceholders(
-    sanitizeProblemHTML(
-      normalizeOcrPassageHtml(value.html.trim().slice(0, CONTINUATION_MAX)),
-    ),
+    sanitizeProblemHTML(normalizeOcrPassageHtml(body.slice(0, CONTINUATION_MAX))),
     0,
   );
   const warnings = Array.isArray(value.warnings)
     ? value.warnings.filter((w): w is string => typeof w === 'string').slice(0, 5)
     : [];
+  // ⚠️ 자르면 **반드시 알린다.** 되찾으러 온 자리에서 또 말없이 잃으면 고칠 방법이
+  //    영영 없다 — 이 기능이 고치려던 바로 그 문제다
+  if (body.length > CONTINUATION_MAX) {
+    warnings.unshift('이어지는 글이 너무 길어 뒷부분이 잘렸어요. 원본과 대조해 채워 주세요.');
+  }
 
   return {
     html,

@@ -782,6 +782,19 @@ describe('mergeOcrDrafts — 쪽을 넘어가는 지문의 그림', () => {
     expect(said(res)).toContain('그림을 덜 알아봤어요');
   });
 
+  it('그림이 상한을 넘으면 **버린 개수를 알린다** — 크롭은 남은 것만 보므로 말 안 하면 조용히 사라진다', () => {
+    const many = (page: number) => [box(0.1, page), box(0.3, page), box(0.5, page)];
+    const drafts = [3, 4, 5, 6].map((page, i) => batch([passage({
+      ref: 'P1', page, label: i === 0 ? '[1~3]' : null, continued: i > 0,
+      continues: i < 3, html: `<p>조각 ${page}</p>${fig(1)}${fig(2)}${fig(3)}`,
+      figures: many(page),
+    })], [page]));
+
+    const res = mergeOcrDrafts(drafts, { newId });
+    expect(res.passages[0].figures).toHaveLength(9);
+    expect(said(res)).toContain('담지 못했어요');
+  });
+
   it('겹쳐 읽은 그림은 같은 쪽에서 읽은 것만 받는다 — 좌표와 쪽은 짝이다', () => {
     const res = mergeOcrDrafts([
       batch([passage({ ref: 'P1', page: 2, html: '<p>지문</p>', figures: [] })], [1, 2]),

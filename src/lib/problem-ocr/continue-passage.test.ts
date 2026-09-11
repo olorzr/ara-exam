@@ -104,6 +104,20 @@ describe('parseContinuation', () => {
     expect(res.continues).toBe(true);
   });
 
+  it('너무 길면 자르되 **반드시 알린다** — 되찾으러 온 자리에서 또 잃으면 안 된다', () => {
+    const res = parseContinuation(JSON.stringify({
+      html: `<p>${'가'.repeat(13000)}</p>`, continues: false, has_figure: false, warnings: [],
+    }))!;
+    expect(res.warnings[0]).toContain('뒷부분이 잘렸어요');
+  });
+
+  it('상한 안이면 아무 말도 안 한다', () => {
+    const res = parseContinuation(JSON.stringify({
+      html: '<p>글</p>', continues: false, has_figure: false, warnings: [],
+    }))!;
+    expect(res.warnings).toEqual([]);
+  });
+
   it('모양이 깨지면 null', () => {
     expect(parseContinuation('설명 문장')).toBeNull();
     expect(parseContinuation('{"continues":true}')).toBeNull();

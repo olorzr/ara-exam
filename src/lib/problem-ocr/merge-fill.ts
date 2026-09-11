@@ -145,19 +145,26 @@ export function toPassage(item: OcrItem, id: string): PassageWork {
 /**
  * 조각들을 합치며 그림 번호를 민다 — **여기서 한 번만** 민다.
  * @param work - 합칠 지문
- * @returns 이어 붙인 본문과 조각 순서대로의 그림
+ * @returns 이어 붙인 본문, 조각 순서대로의 그림, 상한에 걸려 버린 그림 수
  */
-export function joinFragments(work: PassageWork): { html: string; figures: FigureRegion[] } {
+export function joinFragments(work: PassageWork): {
+  html: string;
+  figures: FigureRegion[];
+  droppedFigures: number;
+} {
   const figures: FigureRegion[] = [];
   const parts: string[] = [];
+  let droppedFigures = 0;
 
   for (const [i, fragment] of work.fragments.entries()) {
     const mine = work.figures[i] ?? [];
-    // 상한을 넘는 그림은 붙이지 않는다 — 자리표시자도 아래 reconcile 이 지운다
+    // 상한을 넘는 그림은 붙이지 않는다 — 자리표시자도 아래 reconcile 이 지운다.
+    // ⚠️ **몇 개를 버렸는지 세어 돌려준다.** 크롭은 남은 것만 보므로 여기서 안 세면
+    //    그 그림이 어디에도 안 나오고 경고도 없다 — 조용한 유실이다
     const room = Math.max(MAX_FIGURES - figures.length, 0);
-    const kept = mine.slice(0, room);
+    droppedFigures += Math.max(mine.length - room, 0);
     const shifted = shiftFigurePlaceholders(fragment, figures.length);
-    figures.push(...kept);
+    figures.push(...mine.slice(0, room));
     const trimmed = shifted.trim();
     if (trimmed) parts.push(trimmed);
   }
@@ -166,6 +173,7 @@ export function joinFragments(work: PassageWork): { html: string; figures: Figur
     // 조각을 갈아 끼우는 사이 남거나 모자란 번호가 생길 수 있다 — 마지막에 한 번 맞춘다
     html: reconcileFigurePlaceholders(parts.join('\n'), figures.length),
     figures,
+    droppedFigures,
   };
 }
 
