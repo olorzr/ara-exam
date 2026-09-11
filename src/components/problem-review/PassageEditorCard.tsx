@@ -37,7 +37,10 @@ interface PassageEditorCardProps {
    * 다음 쪽에서 이어지는 본문을 읽어 온다. AI 가 꺼져 있거나 원본이 없으면 없다.
    * 읽어 온 글은 **본문 끝에 붙여 보여 주기만** 하고 저장은 사람이 누른다.
    */
-  onContinue?: (page: number, soFarHtml: string) => Promise<{ html: string } | null>;
+  onContinue?: (
+    page: number,
+    soFarHtml: string,
+  ) => Promise<{ html: string; hasFigure: boolean } | null>;
   /** 이 지문의 이어 읽기가 도는 중인가 */
   continuing?: boolean;
   /** 원본 문서의 쪽 수 — 없는 쪽을 읽으러 가지 않게 가둔다 */
@@ -156,12 +159,19 @@ export default function PassageEditorCard({
    */
   const handleContinue = async (page: number) => {
     const result = await onContinue?.(page, bodyRef.current);
-    if (!result?.html) return;
+    if (!result) return;
+
+    // ⚠️ 이미지 출제인 채로 두면 되찾은 것이 인쇄물에 안 나간다. **글이든 그림이든**
+    //    이어지는 것이 있으면 그렇다 — 다음 쪽이 도표 하나뿐인 지문이 실제로 있는데,
+    //    그때 글만 보고 넘기면 사람이 그림을 넣어도 시작 쪽 이미지만 인쇄된다
+    if ((result.html || result.hasFigure) && passage.render_mode === 'image') {
+      setBackToText(true);
+    }
+    if (!result.html) return;
+
     // ⚠️ 읽는 동안(수십 초) 친 글을 잃지 않게 **끝난 뒤의** 본문 뒤에 붙인다
     const now = bodyRef.current;
     setHtml(now ? `${now}\n${result.html}` : result.html);
-    // 이미지 출제인 채로 두면 되찾은 글이 인쇄물에 안 나간다
-    if (passage.render_mode === 'image') setBackToText(true);
   };
 
   const toggleRenderMode = () => {

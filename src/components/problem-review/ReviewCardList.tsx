@@ -30,7 +30,11 @@ interface ReviewCardListProps {
   deletePassage: (id: string) => void;
   deleteProblem: (id: string) => void;
   /** 다음 쪽에서 이어지는 본문 읽어 오기. AI 가 꺼져 있으면 없다 */
-  continuePassage?: (id: string, page: number, soFarHtml: string) => Promise<{ html: string } | null>;
+  continuePassage?: (
+    id: string,
+    page: number,
+    soFarHtml: string,
+  ) => Promise<{ html: string; hasFigure: boolean } | null>;
   /** 이어 읽기가 도는 지문 id */
   continuingId?: string | null;
   /** 원본 문서의 쪽 수 */
