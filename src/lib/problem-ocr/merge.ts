@@ -1,5 +1,8 @@
 import type { QuestionType } from '@/types/problem-bank';
 import { OCR_MAX_MERGED_WARNINGS } from './constants';
+import {
+  reconcileFigurePlaceholders, shiftFigurePlaceholders,
+} from '@/lib/problem-bank/figure-placeholders';
 import type { OcrBox, OcrDraft } from './schema';
 import {
   capWarnings, itemTargetLabel, resolveDraftWarning, warningKey,
@@ -187,7 +190,11 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
         // 비교 대상이 합본이 아니라 조각이라 앞부분을 잃지 않는다
         const current = existing.work.fragments[existing.index] ?? '';
         if (textOf(item.html).length > textOf(current).length) {
-          existing.work.fragments[existing.index] = item.html;
+          // ⚠️ 모델이 낸 원문은 늘 그림 1번부터 센다 — 이 조각에 적용했던 밀기를
+          //    **다시 걸어야** 뒤 조각의 그림이 앞 조각 것을 가리키지 않는다
+          existing.work.fragments[existing.index] = shiftFigurePlaceholders(
+            item.html, existing.work.offsets[existing.index] ?? 0,
+          );
           // 이 조각이 마지막이었다면 '아직 이어지는가'도 새 값으로 바꾼다
           if (existing.index === existing.work.fragments.length - 1) {
             existing.work.draft.open = item.continues;
@@ -207,7 +214,7 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
         if (open) {
           // 앞 묶음이 이 지문을 통째로 읽어 뒷부분까지 이미 담았을 수 있다.
           // 그때 또 붙이면 같은 글이 두 번 인쇄된다 — 참조만 잇고 넘어간다
-          if (alreadyContains(open, item.html)) {
+          if (alreadyContains(open, item)) {
             fillPassageGaps(open.draft, item);
             refToId.set(item.ref, open.draft.id);
             continue;
@@ -261,10 +268,15 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
     for (const warning of draft.warnings) warn(resolveDraftWarning(warning, refToId));
   }
 
-  // 조각을 이제 합친다 — 조각별 비교가 다 끝난 뒤여야 한다
+  // 조각을 이제 합친다 — 조각별 비교가 다 끝난 뒤여야 한다.
+  // 합친 뒤 자리표시자를 실제 그림 수에 **다시 맞춘다** — 조각을 갈아 끼우는 사이
+  // 남거나 모자란 번호가 생길 수 있고, 어긋난 채 저장하면 빈칸이 되거나 그림이 사라진다
   const passages = works.map((w) => ({
     ...w.draft,
-    html: w.fragments.map((f) => f.trim()).filter(Boolean).join('\n'),
+    html: reconcileFigurePlaceholders(
+      w.fragments.map((f) => f.trim()).filter(Boolean).join('\n'),
+      w.draft.figures.length,
+    ),
   }));
 
   // 지문이 끝내 안 닫혔으면 뒷부분이 빠졌을 수 있다 — 조용히 넘기지 않는다.

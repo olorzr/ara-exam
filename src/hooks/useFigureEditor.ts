@@ -69,10 +69,10 @@ export function useFigureEditor({ kind, id, save }: FigureEditorInput) {
     html: string,
     paths: readonly string[],
   ): Promise<string | null> => {
-    if (!window.confirm(`${index}번 그림을 뺄까요? 되돌릴 수 없어요.`)) return null;
+    if (!window.confirm(`${index}번 그림을 본문에서 뺄까요?`)) return null;
     setBusy(true);
     try {
-      const next = await dropFigure({ index, paths, html });
+      const next = dropFigure({ index, paths, html });
       if (!(await save(next))) return null;
       return next.html;
     } catch (e) {

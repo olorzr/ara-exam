@@ -1,22 +1,14 @@
 -- ============================================================
--- 22. 기출 문제 은행 — 갈라진 지문 이어 붙이기
+-- 24. 지문 합치기가 그림을 잃지 않게 (sql/22 보정)
 -- ============================================================
--- 쪽을 넘어가는 지문이 **두 개로 갈라져** 저장되는 일이 있다. 모델이 '이어진다' 표시를
--- 빠뜨리거나, 겹쳐 읽은 묶음이 뒷부분만 따로 내놓았을 때다. 앱(merge.ts)이 대부분을
--- 자동으로 잇지만, 이미 아카이브에 들어간 것은 손으로 합칠 길이 있어야 한다.
+-- sql/22 의 `exam.merge_passages` 는 본문만 이어 붙이고 **그림을 옮기지 않았다.**
+-- 뒤 지문에 그림이 있으면 합친 뒤 그 그림이 통째로 사라지거나(경로를 안 옮겼으니)
+-- 자리표시자 번호가 겹쳐 **앞 지문의 그림이 엉뚱한 자리에 그려졌다**
+-- (본문의 `<figure data-figure="n">` 은 `figure_paths` 의 1-based 순번과 짝이다).
 --
--- ⚠️ **한 트랜잭션이어야 한다.** 앱에서 UPDATE 를 나눠 보내면 중간에 하나가 실패했을 때
---    '본문은 합쳐졌는데 문항은 옛 지문에 남은' 상태가 된다 — 그러면 인쇄에서 같은 지문이
---    두 번 나오고 머리글 범위가 거짓말을 한다(set_source_textbook 과 같은 까닭).
---
--- ⚠️ **이 파일의 함수는 그림을 옮기지 않는다.** sql/23 이 지문에 `figure_paths` 를 더하고
---    sql/24 가 이 함수를 **그림까지 옮기는 판으로 바꾼다.** 세 파일을 번호 순서대로 적용할 것.
---
--- 스키마는 모든 문장에 `exam.` 을 명시한다 (SQL Editor 가 문마다 다른 백엔드로 보낼 수 있다).
+-- sql/23 이 `passages.figure_paths` 를 만들므로 **그 뒤에** 적용해야 한다.
+-- 코덱스 리뷰에서 잡힌 결함이다.
 
--- ---------------------------------------------
--- 1. RPC — 뒤 지문을 앞 지문에 붙이고 지운다
--- ---------------------------------------------
 CREATE OR REPLACE FUNCTION exam.merge_passages(
   p_target UUID,
   p_source UUID
@@ -27,7 +19,12 @@ AS $$
 DECLARE
   v_target exam.passages%ROWTYPE;
   v_source exam.passages%ROWTYPE;
+  v_offset INT;
+  v_room   INT;
+  v_html   TEXT;
   v_updated TIMESTAMPTZ;
+  -- 한 항목에 달 수 있는 그림 수. 앱의 MAX_FIGURES(figure-placeholders.ts)와 같아야 한다
+  c_max_figures CONSTANT INT := 9;
 BEGIN
   IF p_target = p_source THEN
     RAISE EXCEPTION '같은 지문끼리는 합칠 수 없습니다' USING ERRCODE = 'invalid_parameter_value';
@@ -49,13 +46,37 @@ BEGIN
     RAISE EXCEPTION '다른 출처의 지문끼리는 합칠 수 없습니다' USING ERRCODE = 'invalid_parameter_value';
   END IF;
 
-  -- 본문은 **뒤에 붙인다**. 순서를 바꾸면 글이 거꾸로 읽힌다
+  -- 뒤 지문의 그림은 앞 지문 것 **뒤로** 밀린다. 상한을 넘는 것은 붙이지 않는다
+  v_offset := cardinality(v_target.figure_paths);
+  v_room   := GREATEST(c_max_figures - v_offset, 0);
+
+  -- 뒤 지문 본문의 자리표시자 번호를 그만큼 민다. 밀지 않으면 뒤 지문의 '1번' 이
+  -- 앞 지문의 1번 그림을 가리킨다. 자리가 없어 못 붙인 그림의 표시는 지운다.
+  -- 큰 번호부터 바꿔야 1→2, 2→3 이 연쇄로 겹치지 않는다
+  v_html := COALESCE(v_source.html, '');
+  IF v_offset > 0 THEN
+    FOR i IN REVERSE c_max_figures..1 LOOP
+      IF i <= cardinality(v_source.figure_paths) AND i <= v_room THEN
+        v_html := replace(
+          v_html,
+          '<figure data-figure="' || i || '"></figure>',
+          '<figure data-figure="' || (i + v_offset) || '"></figure>'
+        );
+      ELSE
+        v_html := replace(v_html, '<figure data-figure="' || i || '"></figure>', '');
+      END IF;
+    END LOOP;
+  END IF;
+
   UPDATE exam.passages SET
+    -- 본문은 **뒤에 붙인다**. 순서를 바꾸면 글이 거꾸로 읽힌다
     html = CASE
-      WHEN COALESCE(v_source.html, '') = '' THEN v_target.html
-      WHEN COALESCE(v_target.html, '') = '' THEN v_source.html
-      ELSE v_target.html || E'\n' || v_source.html
+      WHEN v_html = '' THEN v_target.html
+      WHEN COALESCE(v_target.html, '') = '' THEN v_html
+      ELSE v_target.html || E'\n' || v_html
     END,
+    -- 그림 경로도 같은 순서로 이어 붙인다 — 본문 자리표시자와 순번으로 짝을 이룬다
+    figure_paths = v_target.figure_paths || v_source.figure_paths[1:v_room],
     -- 빈 칸만 채운다 — 앞 지문에 이미 있는 값은 건드리지 않는다(앱의 병합 규칙과 같다).
     -- 뒤 조각에서만 작품명·지은이를 알아본 경우가 흔하다(앞 쪽에는 머리글이 없다)
     title      = CASE WHEN COALESCE(v_target.title, '')  = '' THEN v_source.title  ELSE v_target.title  END,
@@ -72,6 +93,8 @@ BEGIN
   -- '지문 없는 문항' 으로 남는다
   UPDATE exam.problems SET passage_id = p_target WHERE passage_id = p_source;
 
+  -- ⚠️ Storage 파일은 지우지 않는다 — 뒤 지문의 그림 경로를 앞 지문이 물려받았고,
+  --    이미 만든 문제지도 스냅샷으로 들고 있다
   DELETE FROM exam.passages WHERE id = p_source;
 
   SELECT updated_at INTO v_updated FROM exam.passages WHERE id = p_target;
@@ -83,17 +106,14 @@ REVOKE ALL ON FUNCTION exam.merge_passages(UUID, UUID) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION exam.merge_passages(UUID, UUID) TO authenticated, service_role;
 
 COMMENT ON FUNCTION exam.merge_passages(UUID, UUID) IS
-  '갈라진 지문 둘을 하나로 (본문 이어 붙이기 + 문항 이관 + 빈 칸 채우기 + 뒤 지문 삭제). 한 트랜잭션이라야 문항만 남는 상태가 안 생긴다';
+  '갈라진 지문 둘을 하나로 (본문·그림 이어 붙이기 + 자리표시자 번호 밀기 + 문항 이관 + 빈 칸 채우기 + 뒤 지문 삭제). 한 트랜잭션이라야 문항만 남는 상태가 안 생긴다';
 
--- PostgREST 스키마 캐시 갱신 — 없으면 배포 직후 새 RPC 가 PGRST202 로 거부된다
 NOTIFY pgrst, 'reload schema';
 
 -- ---------------------------------------------
 -- 확인 쿼리 (적용 뒤 직접 돌려 볼 것)
 -- ---------------------------------------------
--- 함수가 생겼는지:
---   SELECT proname FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
---    WHERE n.nspname = 'exam' AND proname = 'merge_passages';
---
--- 실제 합치기 (되돌릴 수 없다 — 시험용 출처에서만):
---   SELECT exam.merge_passages('<앞 지문 id>', '<뒤 지문 id>');
+-- 앞 지문에 그림 1개, 뒤 지문에 그림 1개인 상태에서 합친 뒤:
+--   SELECT cardinality(figure_paths), html LIKE '%data-figure="2"%'
+--     FROM exam.passages WHERE id = '<앞 지문 id>';
+--   → 2, true 여야 한다

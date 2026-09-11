@@ -5,8 +5,8 @@ import { bboxToPixelRect } from '@/lib/problem-ocr/crop';
 import {
   figurePlaceholder, MAX_FIGURES, removeFigureAt,
 } from './figure-placeholders';
-import { passageFigurePath, problemFigurePath } from './storage-paths';
-import { removeProblemFiles, replaceProblemFile } from './storage';
+import { capturedFigurePath, newFigureToken } from './storage-paths';
+import { uploadProblemFile } from './storage';
 
 /**
  * 검수 화면에서 **사람이 끌어 잡은 영역**을 그림으로 잘라 본문에 붙인다 (브라우저 전용).
@@ -95,15 +95,11 @@ export async function captureFigure(
   const blob = await cropImageUrl(input.pageUrl, input.bbox);
   if (!blob) return null;
 
-  // ⚠️ 파일 이름을 **배열 길이로 정하면 안 된다.** 가운데 그림을 지우면 배열은 줄지만
-  //    남은 파일 이름(figure-3.jpg)은 그대로라, 다음에 붙이는 그림이 같은 이름을 골라
-  //    **쓰고 있는 파일을 덮어쓴다.** 비어 있는 이름을 찾아 쓴다
-  const pathOf = input.kind === 'passage' ? passageFigurePath : problemFigurePath;
-  const path = freeFigurePath(input.id, input.paths, pathOf);
-
-  // ⚠️ 같은 자리에 다시 올릴 수 있다(잘못 잡아 지웠다가 다시 잡는 경우).
-  //    버킷에 UPDATE 정책이 없으므로 지우고 새로 올린다
-  await replaceProblemFile(path, blob, 'image/jpeg');
+  // ⚠️ 이름은 **한 번만 쓴다.** 순번으로 지으면 가운데 그림을 뺀 뒤 다음에 붙이는 그림이
+  //    같은 이름을 골라, 이미 만든 문제지가 스냅샷으로 들고 있는 파일을 덮어쓴다 —
+  //    그러면 인쇄물에서만 그 그림이 딴 것으로 바뀐다. 늘 새 이름이라 upsert 도 필요 없다
+  const path = capturedFigurePath(input.kind, input.id, newFigureToken());
+  await uploadProblemFile(path, blob, 'image/jpeg');
 
   return {
     paths: [...input.paths, path],
@@ -111,48 +107,21 @@ export async function captureFigure(
   };
 }
 
-/**
- * 아직 안 쓰는 그림 파일 이름을 고른다.
- * @param id - 항목 id
- * @param paths - 지금 쓰고 있는 경로들
- * @param pathOf - 경로 만드는 함수
- * @returns 빈 자리의 경로
- * @throws 자리가 없을 때
- */
-function freeFigurePath(
-  id: string,
-  paths: readonly string[],
-  pathOf: (id: string, index: number) => string,
-): string {
-  const used = new Set(paths.filter(Boolean));
-  for (let n = 1; n <= MAX_FIGURES; n += 1) {
-    const candidate = pathOf(id, n);
-    if (!used.has(candidate)) return candidate;
-  }
-  throw new Error(`그림은 ${MAX_FIGURES}개까지 붙일 수 있어요.`);
-}
 
 /**
- * 그림 하나를 뺀다 — 자리표시자·경로를 함께 고치고 **그 파일만** 지운다.
+ * 그림 하나를 뺀다 — 자리표시자와 경로를 **함께** 고친다.
  *
- * ⚠️ 지우는 것은 **빠지는 그 파일 하나**다. 남은 경로에 아직 있으면 지우지 않는다 —
- *    자리표시자 번호는 당겨지지만 파일 이름은 그대로라, 이름만 보고 지우면
- *    **쓰고 있는 그림이 사라진다.**
- * ⚠️ 문항·출처 삭제는 파일을 **남긴다**(이미 만든 문제지의 스냅샷이 그 경로를 들고
- *    있어서다 — mutations.ts 참조). 여기만 예외인 이유는 방금 붙였다 무르는 자리라
- *    문제지에 실릴 틈이 없기 때문이다.
+ * ⚠️ **Storage 파일은 지우지 않는다.** 이미 만든 문제지가 그 경로를 스냅샷에 들고 있어서,
+ *    지우면 **인쇄물에서 그 자리가 빈칸**이 된다(선택 삭제·출처 삭제와 같은 규약 —
+ *    mutations.ts 참조). 고아 파일은 감수한 값이다.
+ *    파일 이름은 한 번만 쓰므로(`capturedFigurePath`) 남겨 둬도 다음 그림과 부딪히지 않는다.
  * @param input - 뺄 그림과 지금 상태
  * @returns 새 경로 목록과 본문
  */
-export async function dropFigure(input: {
+export function dropFigure(input: {
   index: number;
   paths: readonly string[];
   html: string;
-}): Promise<{ paths: string[]; html: string }> {
-  const next = removeFigureAt(input.html, input.paths, input.index);
-
-  const gone = input.paths[input.index - 1];
-  if (gone && !next.paths.includes(gone)) await removeProblemFiles([gone]);
-
-  return next;
+}): { paths: string[]; html: string } {
+  return removeFigureAt(input.html, input.paths, input.index);
 }

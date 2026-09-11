@@ -178,11 +178,17 @@ export async function runOcrBatches<TDraft>(
     //    다만 재시도가 한도·권한 같은 치명 코드를 물어 왔다면 그게 더 할 말이 많다
     let cause: AttemptResult<TDraft> = first;
 
-    for (const part of parts) {
+    for (const [p, part] of parts.entries()) {
+      // ⚠️ 치명 코드(한도·권한·취소)를 만나면 **그 자리에서 멈춘다.** 기록만 하고 다음 쪽을
+      //    계속 보내면 같은 이유로 실패하면서 한도만 더 태운다. 안 보낸 쪽은 잃은 쪽이다
+      if (fatal) {
+        lost.push(...parts.slice(p).flat());
+        break;
+      }
       if (signal?.aborted) {
-        lost.push(...part);
+        lost.push(...parts.slice(p).flat());
         fatal = 'cancelled';
-        continue;
+        break;
       }
       retries += 1;
       const again = await attemptBatch(part, i, total, deps);

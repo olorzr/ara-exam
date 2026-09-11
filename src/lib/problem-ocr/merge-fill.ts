@@ -16,6 +16,14 @@ import type { PassageDraft, ProblemDraft } from './merge';
 export interface PassageWork {
   draft: PassageDraft;
   fragments: string[];
+  /**
+   * 조각마다 그림 번호를 얼마나 밀었는가 — `fragments` 와 자리·길이가 같다.
+   *
+   * ⚠️ 이 값이 없으면 **겹쳐 읽은 더 온전한 판으로 조각을 갈아 끼울 때 밀기가 풀린다.**
+   *    모델이 낸 원문은 늘 1번부터 세므로, 그대로 넣으면 뒤 조각의 '1번 그림' 이
+   *    앞 조각의 그림을 가리킨다.
+   */
+  offsets: number[];
 }
 
 /** 중복 판정 키가 가리키는 자리 — 어느 지문의 몇 번째 조각인가 */
@@ -33,13 +41,17 @@ const CONTINUATION_PROBE = 40;
  * ⚠️ 이 검사가 없으면 같은 뒷부분이 두 번 붙는다. 앞 묶음이 쪽 경계를 넘는 지문을
  *    통째로 한 항목으로 읽어 두면(흔하다), 겹쳐 읽은 다음 묶음이 그 뒷부분만 다시
  *    '이어지는 조각' 으로 내놓는데 그것을 그대로 이어 붙이면 본문이 겹쳐 인쇄된다.
+ *
+ * ⚠️ 글이 없는 조각(**그림만 있는 이어짐**)은 견줄 것이 없어 무조건 '이미 있다' 로
+ *    떨어졌다. 그러면 그 그림이 잘리지도 저장되지도 않는다 — 쪽 머리에 도표만 이어지는
+ *    지문이 실제로 그렇다. 그림이 있으면 새 조각으로 본다.
  * @param work - 붙일 대상 지문
- * @param html - 붙이려는 조각
+ * @param item - 붙이려는 조각
  * @returns 이미 담겨 있으면 true
  */
-export function alreadyContains(work: PassageWork, html: string): boolean {
-  const probe = textOf(html).slice(0, CONTINUATION_PROBE);
-  if (!probe) return true;
+export function alreadyContains(work: PassageWork, item: OcrItem): boolean {
+  const probe = textOf(item.html).slice(0, CONTINUATION_PROBE);
+  if (!probe) return item.figures.length === 0;
   return textOf(work.fragments.join(' ')).includes(probe);
 }
 
@@ -62,6 +74,7 @@ export function toPassage(item: OcrItem, id: string): PassageWork {
       pageSpan: 1,
     },
     fragments: [item.html],
+    offsets: [0],
   };
 }
 
@@ -96,7 +109,9 @@ export function toProblem(item: OcrItem, id: string, passageId: string | null): 
  * @param item - 이어지는 조각
  */
 export function appendFragment(work: PassageWork, item: OcrItem): void {
-  work.fragments.push(shiftFigurePlaceholders(item.html, work.draft.figures.length));
+  const offset = work.draft.figures.length;
+  work.fragments.push(shiftFigurePlaceholders(item.html, offset));
+  work.offsets.push(offset);
   for (const box of item.figures) {
     if (work.draft.figures.length >= MAX_FIGURES) break;
     work.draft.figures.push({ page: item.page, box });

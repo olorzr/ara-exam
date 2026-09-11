@@ -118,6 +118,38 @@ function figureIndex(index: number): number {
 }
 
 /**
+ * 검수에서 **사람이 끌어 잡은** 그림의 경로.
+ *
+ * ⚠️ 순번이 아니라 **한 번만 쓰는 이름**을 붙인다. 순번으로 지으면 가운데 그림을 뺀 뒤
+ *    다음에 붙이는 그림이 같은 이름을 골라, 이미 만든 문제지가 스냅샷으로 들고 있는
+ *    파일을 덮어쓴다 — 그러면 **인쇄물에서만** 그 그림이 딴 것으로 바뀐다.
+ * @param kind - 문항인가 지문인가
+ * @param id - 항목 id (UUID)
+ * @param token - 한 번만 쓰는 이름 (`newFigureToken`)
+ * @returns 버킷 기준 경로
+ */
+export function capturedFigurePath(
+  kind: 'passage' | 'problem',
+  id: string,
+  token: string,
+): string {
+  const folder = kind === 'passage' ? 'passages' : 'problems';
+  const what = kind === 'passage' ? '지문 id' : '문항 id';
+  if (!/^[0-9a-z]{6,16}$/.test(token)) {
+    throw new Error(`그림 이름이 잘못됐어요: ${token}`);
+  }
+  return `${folder}/${assertSafe(id, what)}/figure-${token}.jpg`;
+}
+
+/**
+ * 한 번만 쓰는 그림 이름을 만든다.
+ * @returns 소문자·숫자 12글자
+ */
+export function newFigureToken(): string {
+  return crypto.randomUUID().replace(/-/g, '').slice(0, 12);
+}
+
+/**
  * 출처 하나가 쓰는 모든 경로의 접두사. 출처를 지울 때 통째로 정리하는 데 쓴다.
  * @param sourceId - 출처 id (UUID)
  * @returns 버킷 기준 폴더 경로

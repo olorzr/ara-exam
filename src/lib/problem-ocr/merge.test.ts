@@ -505,6 +505,44 @@ describe('mergeOcrDrafts — 쪽을 넘어가는 지문의 그림', () => {
     expect(res.passages[0].figures).toEqual([{ page: 4, box: box(0.5) }]);
   });
 
+  it('겹쳐 읽어 더 온전한 판으로 갈아 끼워도 그림 번호 밀기가 풀리지 않는다', () => {
+    // 모델이 낸 원문은 늘 1번부터 센다 — 밀기를 다시 안 걸면 뒤 조각이 앞 그림을 가리킨다
+    const res = mergeOcrDrafts([
+      batch([passage({
+        ref: 'P1', page: 3, html: `<p>앞</p>${fig(1)}`, figures: [box(0.2)], continues: true,
+      })], [3]),
+      batch([passage({
+        ref: 'P1', page: 4, label: null, html: `<p>뒤</p>${fig(1)}`,
+        figures: [box(0.5)], continued: true,
+      })], [4]),
+      // 같은 4쪽 조각을 더 온전히 읽은 묶음
+      batch([passage({
+        ref: 'P1', page: 4, label: null, html: `<p>뒤가 더 온전하게 읽힌 판이다</p>${fig(1)}`,
+        figures: [box(0.5)], continued: true,
+      })], [4, 5]),
+    ], { newId });
+
+    expect(res.passages[0].html).toContain('더 온전하게');
+    expect(res.passages[0].html).toContain('data-figure="1"');
+    expect(res.passages[0].html).toContain('data-figure="2"');
+  });
+
+  it('그림만 이어지는 조각도 새 조각으로 본다 — 글이 없다고 버리면 그 그림이 사라진다', () => {
+    const res = mergeOcrDrafts([
+      batch([passage({
+        ref: 'P1', page: 3, html: '<p>앞 글</p>', continues: true,
+      })], [3]),
+      // 쪽 머리에 도표만 이어지는 지문이 실제로 있다
+      batch([passage({
+        ref: 'P1', page: 4, label: null, html: fig(1), figures: [box(0.1)], continued: true,
+      })], [4]),
+    ], { newId });
+
+    expect(res.passages).toHaveLength(1);
+    expect(res.passages[0].figures).toEqual([{ page: 4, box: box(0.1) }]);
+    expect(res.passages[0].html).toContain('data-figure="1"');
+  });
+
   it('겹쳐 읽은 그림은 같은 쪽에서 읽은 것만 받는다 — 좌표와 쪽은 짝이다', () => {
     const res = mergeOcrDrafts([
       batch([passage({ ref: 'P1', page: 2, html: '<p>지문</p>', figures: [] })], [1, 2]),

@@ -278,6 +278,22 @@ describe('runOcrBatches — 실패한 묶음 다시 읽기', () => {
     expect(res.failures[0]).toMatchObject({ kind: 'render', pages: [2] });
   });
 
+  it('재시도 중 한도에 걸리면 그 자리에서 멈춘다 — 계속 보내면 한도만 더 태운다', async () => {
+    const runBatch = vi.fn(async ({ pages }: { pages: number[] }) => {
+      if (pages.length > 1) throw new AiError('timeout');
+      if (pages[0] === 1) return { draft: 'p1', rawLength: 1 };
+      throw new AiError('usage_limit_exceeded');
+    });
+
+    const res = await runOcrBatches({ batches: [[1, 2, 3]], renderBatch: ok(), runBatch });
+
+    // 첫 시도 + 1쪽 + 2쪽(한도) = 3번. 3쪽은 보내지 않는다
+    expect(runBatch).toHaveBeenCalledTimes(3);
+    expect(res.fatal).toBe('usage_limit_exceeded');
+    // 안 보낸 쪽도 **잃은 쪽**이다 — 조용히 빠뜨리면 안 된다
+    expect(res.failures[0].pages).toEqual([2, 3]);
+  });
+
   it('이미지를 하나도 못 만든 묶음은 다시 시도하지 않는다 — 쪽마다 이미 예산을 쟀다', async () => {
     const renderBatch = vi.fn().mockResolvedValue({ images: [], rendered: [], skipped: [1, 2] });
     const res = await runOcrBatches({ batches: [[1, 2]], renderBatch, runBatch: vi.fn() });
