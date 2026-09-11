@@ -17,6 +17,7 @@ import { mergeOcrDrafts } from './merge';
 import type { MergeResult } from './merge';
 import { OCR_MAX_MERGED_WARNINGS } from './constants';
 import { capWarnings, dedupeWarnings, itemTargetLabel } from './warnings';
+import { verifyStructure } from './verify-structure';
 import { parseOcrDraft } from './parse';
 import { buildProblemOcrPrompt, type OcrSourceMeta } from './prompt';
 import {
@@ -133,6 +134,11 @@ export async function runProblemOcr(
     }
 
     const merged = mergeOcrDrafts(ocrRun.drafts, { leadingWarnings: ocrRun.warnings });
+
+    // 모델은 자기가 빠뜨린 것을 모른다 — 셈으로 드러나는 것(빠진 번호·선지 수·머리글과
+    // 문항의 어긋남)은 우리가 찾아 카드에 붙인다. 이게 없으면 30문항을 처음부터 끝까지
+    // 원본과 대조하는 수밖에 없다
+    merged.warnings.push(...verifyStructure(merged));
 
     // 정답표는 따로 읽는다 — 본문과 같은 프롬프트로 읽으면 모델이 문제를 풀려 든다.
     // 원본 안의 정답표 쪽과 따로 올린 답지를 한 번에 훑는다.
