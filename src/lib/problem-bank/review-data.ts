@@ -1,4 +1,5 @@
 import { fetchPassages, fetchProblemsOfSource, fetchSource } from './queries';
+import { sortByReadingOrder } from './reading-order';
 import { signProblemFiles } from './storage';
 import { sourcePagePath } from './storage-paths';
 import type { Passage, Problem, ProblemSource } from '@/types/problem-bank';
@@ -28,11 +29,16 @@ export interface ReviewData {
  * @throws 조회 실패 시
  */
 export async function loadReviewData(sourceId: string): Promise<ReviewData> {
-  const [source, passages, problems] = await Promise.all([
+  const [source, fetched, problems] = await Promise.all([
     fetchSource(sourceId),
     fetchPassages(sourceId),
     fetchProblemsOfSource(sourceId),
   ]);
+
+  // ⚠️ 조회는 `page_no` 다음에 **무작위 UUID** 로 정렬한다. 한 쪽에 지문이 둘이면
+  //    화면 차례가 원본과 무관해지고, 그 차례로 '앞 지문에 붙이기' 대상을 고르면
+  //    엉뚱한 글에 이어 붙는다 — 되돌릴 수 없는 동작이다
+  const passages = sortByReadingOrder(fetched);
 
   const itemPages = [...passages.map((p) => p.page_no), ...problems.map((q) => q.page_no)];
   const ocrPages = (source?.ocr_meta?.pages ?? []).filter((n) => Number.isInteger(n) && n >= 1);
