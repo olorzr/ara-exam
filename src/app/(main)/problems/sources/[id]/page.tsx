@@ -218,8 +218,7 @@ function ProblemSourceReviewContent() {
         <div className="flex items-end gap-3">
           {/* 교과서가 있어야 단원 칸이 뜬다 — 여기서 고칠 수 있어야 옛 출처도 분류된다 */}
           <SourceTextbookPicker
-            value={source.textbook}
-            grade={source.grade}
+            source={source}
             // 묻는 순간의 미저장 개수를 센다 — 부를 때 값을 굳히면 그 사이 친 내용이 안 잡힌다
             onChange={(textbook) => review.changeTextbook(textbook, () => dirtyIds.size)}
           />

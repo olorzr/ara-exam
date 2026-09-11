@@ -180,7 +180,7 @@ src/
 - 의존: lib/supabase, lib/supabase-public(읽기 전용), lib/category-master(단원 마스터)
 - 주요 파일: queries.ts, facets.ts, mutations.ts, storage.ts, storage-paths.ts, bbox.ts,
   area-tree.ts, area-master.ts, unit-tree.ts, unit-master.ts, grammar-tree.ts,
-  scope-resolve.ts, source-form.ts, filters.ts, selection.ts, school-exam-tree.ts
+  scope-resolve.ts, scope-pick.ts, source-form.ts, filters.ts, selection.ts, school-exam-tree.ts
 - 분류의 세 축: **영역**(ara-system 마스터, 최대 4단), **교과서 단원**(이 앱의 카테고리 관리,
   2단), **문법**(코드 상수 마스터, 최대 3단). 셋 다 노드 id 가 아니라 **이름 경로 스냅샷**이다
 - 문법 축만 **문항에 여러 개** 붙는다(`grammar_paths`, 원소 하나가 경로 하나). 그래서 저장 모양과
@@ -204,7 +204,12 @@ src/
 - 작품 축의 값은 `problems.work_title` 이고 지문(`passages.title`)과의 동기화는 **DB 트리거**가 한다
   (sql/20). 표기 정규화는 `work-title.ts` ↔ `exam.normalize_work_title` 1:1
 - 학교는 관리자시스템 `public.schools` 가 원본이다(`school_id` + 이름 스냅샷). 교과서는
-  내신 관리에 등록된 시험범위(`scope-resolve.ts`)에서 자동으로 찾아 준다
+  내신 관리에 등록된 시험범위에서 자동으로 찾아 준다 — **학교만 고르면** 그 학교의 슬롯을
+  전부 읽어(`fetchSchoolScopeRows`) 폼 조건에 **가장 가까운** 슬롯의 교과서를 쓴다
+  (줄 세우기 `scope-pick.ts`, 조립 `scope-resolve.ts`, 조회 훅 `src/hooks/useScopeHint.ts`).
+  학년 → 학년도 거리 → 학기 → 시험 → 최근 해 → 중간 우선이고, **다른 학년에서 빌리는 것은
+  중등만**(고등은 학년마다 책이 다르다). **범위(단원)는 정확한 슬롯의 것만** 쓴다 —
+  다른 해의 단원을 이번 시험 범위라고 보여 주면 거짓말이 된다
 
 ## components/ui
 - 역할: 화면 조각(shadcn/base-ui 래퍼)
