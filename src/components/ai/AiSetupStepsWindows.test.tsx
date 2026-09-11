@@ -49,15 +49,23 @@ describe('윈도우 설치 안내', () => {
     expect(html).toContain('바탕화면');
   });
 
-  it('기본 포트면 --port 를 붙이지 않는다', () => {
-    expect(render(DEFAULT_CODEX_PORT)).not.toContain('--port');
-  });
-
   it('바꾼 포트가 재설치 명령에 들어간다', () => {
     // 메모장으로 start-codex.cmd 를 고치던 단계가 사라졌다.
     const html = render(8900);
     expect(html).toContain('--port 8900');
     expect(html).not.toContain('메모장');
+  });
+
+  it('⚠️ 기본 포트로 되돌려도 명령이 남아 있다', () => {
+    // 8900 으로 깔고 카드에서 8899 로 되돌리면 브릿지는 아직 8900 에 있다.
+    // 여기서 명령을 숨기면 되돌릴 방법이 없어진다(코덱스 리뷰 1R).
+    expect(render(DEFAULT_CODEX_PORT)).toContain(`--port ${DEFAULT_CODEX_PORT}`);
+  });
+
+  it('기본 포트에서는 포트 안내를 접어 둔다', () => {
+    // 대부분의 선생님에게는 필요 없는 이야기라 화면을 차지하면 안 된다.
+    expect(render(DEFAULT_CODEX_PORT)).not.toContain('<details class="mt-4" open=""');
+    expect(render(8900)).toContain('open=""');
   });
 
   it('끄는 방법을 함께 준다', () => {

@@ -73,18 +73,30 @@ export default function AiSetupStepsWindows({ port }: AiSetupStepsWindowsProps) 
             설치가 끝나면 바탕화면에 <strong>ARA AI</strong> 아이콘이 생깁니다. 문제가 생기면 그
             아이콘을 더블클릭하세요 &mdash; <strong>켤 때마다 스스로 최신으로 갱신됩니다.</strong>
           </p>
-          {port !== DEFAULT_CODEX_PORT && (
-            <>
-              <p className="mt-2 rounded-md border border-gray-200 bg-gray-50 p-2.5 text-xs text-gray-600">
-                <strong>연결 포트를 {port}로 바꾸셨습니다.</strong> 설치가 끝난 뒤{' '}
-                <strong>명령 프롬프트</strong>(시작 버튼 → <code>cmd</code>)에 아래를 붙여넣어 같은
-                번호로 다시 설치해 주세요. 두 곳이 같아야 연결됩니다.
-              </p>
-              <CopyCommand command={winPortCommand(port)} />
-            </>
-          )}
         </li>
       </ol>
+
+      {/* ⚠️ 기본 포트일 때도 **남겨 둔다.** 8900 으로 깐 뒤 카드에서 8899 로 되돌리면
+          브릿지는 아직 8900 에 있는데, 이 명령이 사라지면 되돌릴 방법이 없어진다
+          (카드는 "설치 명령을 다시 실행하라" 고 안내한다). 기본값이 아닐 때만 펼쳐 둔다. */}
+      <details className="mt-4" open={port !== DEFAULT_CODEX_PORT}>
+        <summary className="cursor-pointer text-xs text-gray-500">연결 포트를 바꾸셨다면</summary>
+        <p className="mt-2 text-xs text-gray-500">
+          {port === DEFAULT_CODEX_PORT ? (
+            <>
+              지금 설정은 기본값 <strong>{DEFAULT_CODEX_PORT}</strong> 입니다. 다른 번호로 깔았다가
+              되돌리셨다면 브릿지도 같은 번호로 되돌려야 합니다 —{' '}
+            </>
+          ) : (
+            <>
+              연결 포트가 <strong>{port}</strong> 입니다. 브릿지도 같은 번호여야 연결됩니다 —{' '}
+            </>
+          )}
+          <strong>명령 프롬프트</strong>(시작 버튼 → <code>cmd</code>)에 아래를 붙여넣어 다시
+          설치해 주세요. 여러 번 실행해도 안전합니다.
+        </p>
+        <CopyCommand command={winPortCommand(port)} />
+      </details>
 
       <details className="mt-4">
         <summary className="cursor-pointer text-xs text-gray-500">끄고 싶을 때</summary>
