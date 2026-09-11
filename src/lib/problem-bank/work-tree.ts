@@ -1,5 +1,5 @@
 import type { WorkFacet } from './facets';
-import type { ProblemFilters } from './filters';
+import { GRAMMAR_AXIS_CLEARED, type ProblemFilters } from './filters';
 import { SCHOOL_AXES_CLEARED, type FacetTreeNode } from './school-exam-tree';
 
 /**
@@ -84,6 +84,7 @@ export function buildWorkTree(facets: readonly WorkFacet[]): FacetTreeNode<WorkF
 export function workFilterPatch(facet: WorkFacet): Partial<ProblemFilters> {
   return {
     ...SCHOOL_AXES_CLEARED,
+    ...GRAMMAR_AXIS_CLEARED,
     textbook: '',
     unit_path: [],
     work_title: facet.title,

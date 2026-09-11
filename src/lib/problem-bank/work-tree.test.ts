@@ -59,13 +59,14 @@ describe('buildWorkTree', () => {
 });
 
 describe('workFilterPatch', () => {
-  it('작품을 걸고 학교·교과서·단원을 비운다 — 세 트리가 조용히 교집합이 되면 안 된다', () => {
+  it('작품을 걸고 학교·교과서·단원·문법을 비운다 — 네 트리가 조용히 교집합이 되면 안 된다', () => {
     const patch = workFilterPatch(work());
     expect(patch.work_title).toBe('동백꽃');
     expect(patch.school_name).toBe('');
     expect(patch.source_type).toBe('');
     expect(patch.textbook).toBe('');
     expect(patch.unit_path).toEqual([]);
+    expect(patch.grammar_path).toEqual([]);
     expect(patch.page).toBe(0);
   });
 

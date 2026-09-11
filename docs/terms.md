@@ -90,8 +90,9 @@
   붙지만, 문법은 한 문항이 개념 두셋을 걸쳐서 경로를 `' > '` 로 이어 붙인 문자열을 원소로 담는다.
   그래서 상위 검색이 `contains`(@>)가 아니라 **`overlaps`(&&)** 다 — 고른 가지의 잎을 전부 펴서 찾는다
 - 깊이는 가지마다 다르다(담화·어문 규정은 2단, 나머지는 3단). DB 제약은 경로 길이가 아니라 **개수**다
-- 코드에서의 사용: `Problem.grammar_paths`, `GRAMMAR_TREE`, `grammarPathsUnder`,
+- 코드에서의 사용: `Problem.grammar_paths`, `GRAMMAR_TREE`, `GRAMMAR_ALL_PATHS`, `grammarPathsUnder`,
   `expandGrammarAncestors`, `isGrammarArea`, RPC `add_grammar_paths`, 아카이브 필터 `gram`
+- 훑어보는 화면은 [문법 트리](#문법-트리-grammar-browse-tree), 개수는 [문법 개념 건수](#문법-개념-건수-grammarfacet) 참고
 - 관련 파일: src/lib/problem-bank/grammar-tree.ts, src/components/problem-review/GrammarTagPicker.tsx,
   sql/21_problem_bank_grammar.sql
 
@@ -137,6 +138,37 @@
 - 정의: 아카이브 왼쪽에서 **학교 › 학년도 › 학년 › 학기·시험** 으로 훑는 폴더. `source_type='내신기출'` 출처만 나오고, 마스터가 아니라 실제로 읽어 둔 출처(패싯)로 만든다
 - 코드에서의 사용: `SchoolExamFacet`, `buildSchoolExamTree`, `SourceFacets.schoolExams`
 - 관련 파일: src/lib/problem-bank/school-exam-tree.ts, src/components/problem-bank/SchoolExamTreePanel.tsx, src/components/problem-bank/ArchiveSidePanel.tsx
+
+## 문법 트리 (grammar browse tree)
+- 정의: 아카이브 왼쪽에서 **대분류 › 중분류 › 개념** 으로 훑는 폴더. 다른 세 트리와 달리
+  **마스터(`GRAMMAR_TREE`) 전체**를 그리고 개념마다 문항 수를 얹는다 — 아직 한 문항도 없는
+  개념도 흐리게(`dimmed`) 보이고, 고를 수는 있다
+- ⚠️ 마스터로 만드는 까닭: 문법 태그는 업로드가 아니라 **나중에 손으로** 붙는 것이라,
+  패싯(태깅된 잎)만 쓰면 '태그 0건 → 선택지 0건 → 붙일 길 없음' 이라는 닭-달걀이 된다
+- 가지도 고를 수 있어야 해서(= '품사 전체') 가지마다 **`(전체)` 잎**을 단다.
+  교과서 단원 트리가 이미 쓰는 방식이라 `FacetTree` 의 클릭 규약은 그대로 둔다
+- 코드에서의 사용: `buildGrammarBrowseTree`, `grammarFilterPatch`, `grammarNodeKey`,
+  `grammarSelectOptions`, `GRAMMAR_SELF_LEAF`, `GRAMMAR_ALL_PATHS`
+- 관련 파일: src/lib/problem-bank/grammar-browse-tree.ts, src/components/problem-bank/GrammarTreePanel.tsx, src/components/problem-bank/ArchiveSidePanel.tsx
+
+## 문법 개념 건수 (GrammarFacet)
+- 정의: 문법 경로마다 붙는 **문항 수**. 트리 라벨의 `(5)` 가 이것이다
+- ⚠️ **조상은 잎의 합이 아니다.** 한 문항이 같은 조상 아래 태그를 둘 달 수 있어(피동+사동)
+  그냥 더하면 한 문항을 두 번 센다. 문항마다 걸리는 경로를 집합으로 모아 **경로당 한 번만** 센다 —
+  그래야 상위 검색(잎들의 `overlaps`)의 결과 수와 맞는다
+- 다른 필터를 반영하지 않는 **전역값**이다(작품 패싯과 같은 규약). `FACET_MAX_ROWS` 를 넘으면 근사치가 된다
+- 코드에서의 사용: `GrammarFacet`, `fetchGrammarFacets`, `tallyGrammarCounts`, `useProblemArchive().grammarCounts`
+- 관련 파일: src/lib/problem-bank/grammar-counts.ts, src/lib/problem-bank/facets.ts
+
+## 선택지 (SelectOption)
+- 정의: 고르는 칸의 **값과 보여 줄 이름 한 쌍**(`{ value: '__all__', label: '유형 전체' }`)
+- ⚠️ base-ui 의 `Select.Value` 는 `Select.Root` 에 `items`(값→이름 지도)가 없으면 고른 **값을
+  그대로** 그린다. `SelectItem` 의 children 은 팝업 안에서만 쓰이고, `SelectItem` 의 `label` 은
+  타이프어헤드용이라 대신해 주지 않는다. 그래서 아카이브 필터가 `__all__` 로 보였다
+- `OptionSelect` 는 `items` 와 `SelectItem` 을 **같은 배열**에서 만들어 어긋날 수 없게 하고,
+  원시 `Select` 는 `items` 를 **타입으로 강제**한다
+- 코드에서의 사용: `SelectOption`, `OptionSelect`, `toSelectOptions`
+- 관련 파일: src/components/ui/option-select.tsx, src/components/ui/select.tsx, src/lib/problem-bank/filter-axes.ts
 
 ## 미지정만 (UNSPECIFIED_AXIS)
 - 정의: 아카이브 필터에서 **저장값이 비어 있는 행만** 고르는 값(`'__none__'`). 필터의 빈 문자열은 '전체'(조건 없음)라서, '미지정인 것만'은 따로 표시해야 한다

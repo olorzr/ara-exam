@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { OptionSelect } from '@/components/ui/option-select';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { MIDDLE_SCHOOL_GRADES, HIGH_SCHOOL_GRADES, SEMESTER_OPTIONS } from '@/lib/constants';
@@ -129,35 +129,36 @@ export default function CurriculumCategoryTab() {
       <div className="flex gap-4">
         <div className="space-y-2">
           <Label>구분</Label>
-          <Select value={level} onValueChange={(v) => { if (v) setLevel(v as '중등' | '고등'); }}>
-            <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="중등">중등</SelectItem>
-              <SelectItem value="고등">고등</SelectItem>
-            </SelectContent>
-          </Select>
+          <OptionSelect
+            value={level}
+            options={['중등', '고등']}
+            className="w-32"
+            ariaLabel="구분"
+            onChange={(v) => setLevel(v as '중등' | '고등')}
+          />
         </div>
         <div className="space-y-2">
           <Label>학년</Label>
-          <Select value={grade} onValueChange={(v) => { if (v) { setGrade(v); setSemester(''); } }}>
-            <SelectTrigger className="w-32"><SelectValue placeholder="학년 선택" /></SelectTrigger>
-            <SelectContent>
-              {gradeOptions.map((g) => (
-                <SelectItem key={g} value={g}>{g}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <OptionSelect
+            value={grade}
+            options={gradeOptions}
+            placeholder="학년 선택"
+            className="w-32"
+            ariaLabel="학년"
+            onChange={(v) => { setGrade(v); setSemester(''); }}
+          />
         </div>
         <div className="space-y-2">
           <Label>학기</Label>
-          <Select value={semester} onValueChange={(v) => { if (v) setSemester(v); }} disabled={!grade}>
-            <SelectTrigger className="w-32"><SelectValue placeholder="학기 선택" /></SelectTrigger>
-            <SelectContent>
-              {SEMESTER_OPTIONS.map((s) => (
-                <SelectItem key={s} value={s}>{s}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <OptionSelect
+            value={semester}
+            options={SEMESTER_OPTIONS}
+            placeholder="학기 선택"
+            disabled={!grade}
+            className="w-32"
+            ariaLabel="학기"
+            onChange={setSemester}
+          />
         </div>
       </div>
 

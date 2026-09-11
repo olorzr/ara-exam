@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { OptionSelect } from '@/components/ui/option-select';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { MasterListPanel } from '@/components/words';
@@ -104,25 +104,30 @@ export default function ExternalCategoryTab() {
       <div className="flex gap-4">
         <div className="space-y-2">
           <Label>년도</Label>
-          <Select value={year} onValueChange={(v) => { if (v) setYear(v); }} disabled={!selectedSchoolId}>
-            <SelectTrigger className="w-36"><SelectValue placeholder="년도 선택" /></SelectTrigger>
-            <SelectContent>
-              {yearOptions.map((y) => (
-                <SelectItem key={y} value={y}>{y === UNSPECIFIED_OPTION ? y : `${y}학년도`}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <OptionSelect
+            value={year}
+            options={yearOptions.map((y) => ({
+              value: y,
+              label: y === UNSPECIFIED_OPTION ? y : `${y}학년도`,
+            }))}
+            placeholder="년도 선택"
+            disabled={!selectedSchoolId}
+            className="w-36"
+            ariaLabel="년도"
+            onChange={setYear}
+          />
         </div>
         <div className="space-y-2">
           <Label>학년</Label>
-          <Select value={grade} onValueChange={(v) => { if (v) setGrade(v); }} disabled={!selectedSchoolId}>
-            <SelectTrigger className="w-32"><SelectValue placeholder="학년 선택" /></SelectTrigger>
-            <SelectContent>
-              {EXTERNAL_GRADE_OPTIONS.map((g) => (
-                <SelectItem key={g} value={g}>{g}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <OptionSelect
+            value={grade}
+            options={EXTERNAL_GRADE_OPTIONS}
+            placeholder="학년 선택"
+            disabled={!selectedSchoolId}
+            className="w-32"
+            ariaLabel="학년"
+            onChange={setGrade}
+          />
         </div>
       </div>
 

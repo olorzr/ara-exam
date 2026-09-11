@@ -1,7 +1,7 @@
 import { SEMESTER_OPTIONS } from '@/lib/constants';
 import { naturalCompare } from '@/lib/category-tree';
 import { EXAM_TYPE_OPTIONS } from './source-form';
-import { UNSPECIFIED_AXIS, type ProblemFilters } from './filters';
+import { GRAMMAR_AXIS_CLEARED, UNSPECIFIED_AXIS, type ProblemFilters } from './filters';
 
 /**
  * 학교 기출 트리 (순수 함수).
@@ -32,8 +32,10 @@ export interface FacetTreeNode<T> {
   id: string;
   label: string;
   children: FacetTreeNode<T>[];
-  /** 잎에만 있다 */
+  /** 잎에만 있다 — 다만 문법 트리는 가지에도 '(전체)' 잎을 달아 가지를 고르게 한다 */
   value?: T;
+  /** 문항 0건 — 흐리게 그린다(고를 수는 있다). 문법 트리만 쓴다 */
+  dimmed?: boolean;
 }
 
 /** 이 트리가 다루는 출처 유형 — 학교 기출만 학교·학기·시험이 다 채워진다 */
@@ -176,14 +178,15 @@ export function schoolExamFilterPatch(facet: SchoolExamFacet): Partial<ProblemFi
     exam_type: axisValue(facet.exam_type),
     textbook: '',
     unit_path: [],
-    // 작품 트리도 같은 이유로 비운다 — 세 트리는 서로의 축을 남기지 않는다
+    // 작품·문법 트리도 같은 이유로 비운다 — 네 트리는 서로의 축을 남기지 않는다
     work_title: '',
+    ...GRAMMAR_AXIS_CLEARED,
     page: 0,
   };
 }
 
 /** 아카이브 왼쪽 패널의 탭 */
-export type ArchiveSideTab = 'units' | 'schools' | 'works';
+export type ArchiveSideTab = 'units' | 'schools' | 'works' | 'grammar';
 
 /**
  * 주소로 들어왔을 때 왼쪽 패널의 첫 탭.
@@ -194,8 +197,11 @@ export type ArchiveSideTab = 'units' | 'schools' | 'works';
  * @returns 켤 탭
  */
 export function initialSideTab(
-  filters: Pick<ProblemFilters, 'school_name' | 'unit_path' | 'work_title'>,
+  filters: Pick<ProblemFilters, 'school_name' | 'unit_path' | 'work_title' | 'grammar_path'>,
 ): ArchiveSideTab {
+  // 문법을 가장 먼저 본다 — 다른 세 축은 위쪽 필터 줄에도 드러나지만, 문법 개념은
+  // 트리에서 봐야 어느 가지인지 알 수 있다
+  if (filters.grammar_path.length > 0 && filters.unit_path.length === 0) return 'grammar';
   if (filters.work_title && filters.unit_path.length === 0) return 'works';
   return filters.school_name && filters.unit_path.length === 0 ? 'schools' : 'units';
 }

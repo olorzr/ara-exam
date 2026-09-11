@@ -5,7 +5,7 @@ import CategoryTree from '@/components/words/CategoryTree';
 import { buildCategoryTree } from '@/lib/category-tree';
 import { getAllSelectableCategories } from '@/lib/category-master';
 import { EXTERNAL_LEVEL } from '@/lib/constants';
-import type { ProblemFilters } from '@/lib/problem-bank/filters';
+import { GRAMMAR_AXIS_CLEARED, type ProblemFilters } from '@/lib/problem-bank/filters';
 import { SCHOOL_AXES_CLEARED } from '@/lib/problem-bank/school-exam-tree';
 import { WORK_AXIS_CLEARED } from '@/lib/problem-bank/work-tree';
 import type { Category } from '@/types';
@@ -74,6 +74,7 @@ export default function UnitTreePanel({ filters, onChange }: UnitTreePanelProps)
       // 남겨 두면 '상현중 기출 ∩ 이 단원' 이 조용히 0건이 되고 화면에 이유가 안 보인다
       ...SCHOOL_AXES_CLEARED,
       ...WORK_AXIS_CLEARED,
+      ...GRAMMAR_AXIS_CLEARED,
       grade: category.grade,
       textbook: category.publisher,
       // 소단원이 없는 '(전체)' 잎은 대단원만 — 그 아래 문항이 모두 걸린다

@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { expandGrammarAncestors } from './grammar-tree';
+import { tallyGrammarCounts } from './grammar-counts';
 import {
   SCHOOL_EXAM_SOURCE_TYPE, schoolExamKey, type SchoolExamFacet,
 } from './school-exam-tree';
@@ -216,18 +217,33 @@ export const fetchAreaFacets = (): Promise<string[][]> => collectPathFacets('are
  */
 export const fetchUnitFacets = (): Promise<string[][]> => collectPathFacets('unit_path');
 
+/** 문법 개념 하나 — 경로와 그 아래(자기 자신 포함) 문항 수 */
+export interface GrammarFacet {
+  /** 저장 표기 그대로의 경로 ('단어 > 품사 > 명사') */
+  path: string;
+  /** 이 경로에 걸리는 문항 수 */
+  count: number;
+}
+
 /**
- * 아카이브에 쓰인 문법 분류 목록.
+ * 아카이브에 태깅된 문법 분류와 그 문항 수.
  *
  * ⚠️ `collectPathFacets` 를 재사용할 수 없다 — 그쪽은 컬럼 하나가 **경로 하나**라는
  *    전제인데, 이 컬럼은 원소 하나가 경로 하나이고 한 행에 여러 개가 들어 있다.
  *
- * 모은 것은 문항이 실제로 들고 있는 **잎**뿐이라, 그대로 선택지로 두면 '품사 전체' 를
- * 고를 수가 없다 — `expandGrammarAncestors` 로 조상까지 펴서 돌려준다.
- * @returns 중복 없는 경로 문자열 목록 (교재 목차 순서)
+ * 세는 규칙(조상 중복 제거)은 `tallyGrammarCounts` 에 있다. 개수를 함께 세는 이유는
+ * 작품 패싯과 같다 — 트리에 '명사 (5)' 로 보여야 어디에 기출이 쌓였는지, 어디가
+ * 아직 비었는지 한눈에 보인다.
+ *
+ * ⚠️ 선택지는 이것으로 만들지 **않는다.** 태깅된 잎만 모으므로 아무도 안 붙인 개념은
+ *    영영 안 나온다 — 선택지·트리는 마스터(`GRAMMAR_ALL_PATHS`)에서 만들고 여기 건수를
+ *    얹는다. 이 함수는 '얼마나 쌓였나' 만 답한다.
+ *
+ * ⚠️ `FACET_MAX_ROWS` 를 넘는 아카이브에서는 건수가 근사치가 된다(작품 패싯과 같은 한계).
+ * @returns 경로와 문항 수 (교재 목차 순서, 마스터에 없는 옛 경로는 뒤로)
  */
-export async function fetchGrammarFacets(): Promise<string[]> {
-  const seen = new Set<string>();
+export async function fetchGrammarFacets(): Promise<GrammarFacet[]> {
+  const rows: string[][] = [];
 
   for (let from = 0; from < FACET_MAX_ROWS; from += FACET_CHUNK) {
     const { data, error } = await supabase
@@ -236,17 +252,15 @@ export async function fetchGrammarFacets(): Promise<string[]> {
       .not('grammar_paths', 'eq', '{}')
       .order('id')
       .range(from, from + FACET_CHUNK - 1);
-    // 선택지를 못 만들어도 목록은 봐야 한다 — 여기까지 모은 것만 돌려준다
+    // 건수를 못 세도 목록은 봐야 한다 — 여기까지 모은 것만 돌려준다
     if (error) break;
 
-    const rows = (data ?? []) as unknown as { grammar_paths: string[] | null }[];
-    for (const row of rows) {
-      for (const path of row.grammar_paths ?? []) {
-        if (path) seen.add(path);
-      }
-    }
-    if (rows.length < FACET_CHUNK) break;
+    const page = (data ?? []) as unknown as { grammar_paths: string[] | null }[];
+    for (const row of page) rows.push(row.grammar_paths ?? []);
+    if (page.length < FACET_CHUNK) break;
   }
 
-  return expandGrammarAncestors([...seen]);
+  const counts = tallyGrammarCounts(rows);
+  return expandGrammarAncestors([...counts.keys()])
+    .map((path) => ({ path, count: counts.get(path) ?? 0 }));
 }

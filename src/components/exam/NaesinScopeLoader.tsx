@@ -5,7 +5,7 @@ import type { Category } from '@/types';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { OptionSelect } from '@/components/ui/option-select';
 import { School } from 'lucide-react';
 import { toast } from 'sonner';
 import { MIDDLE_SCHOOL_GRADES, HIGH_SCHOOL_GRADES } from '@/lib/constants';
@@ -127,61 +127,56 @@ export default function NaesinScopeLoader({ categories, onApply }: NaesinScopeLo
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           <div className="space-y-2">
             <Label>구분</Label>
-            <Select value={level} onValueChange={(v) => { if (v) setLevel(v as '중등' | '고등'); }}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="중등">중등</SelectItem>
-                <SelectItem value="고등">고등</SelectItem>
-              </SelectContent>
-            </Select>
+            <OptionSelect
+              value={level}
+              options={['중등', '고등']}
+              className="w-full"
+              ariaLabel="구분"
+              onChange={(v) => setLevel(v as '중등' | '고등')}
+            />
           </div>
           <div className="space-y-2">
             <Label>학교</Label>
-            <Select
+            <OptionSelect
               value={schoolId}
-              items={schools.map((s) => ({ value: s.id, label: s.name }))}
-              onValueChange={(v) => { if (v) setSchoolId(v); }}
-            >
-              <SelectTrigger><SelectValue placeholder="학교 선택" /></SelectTrigger>
-              <SelectContent>
-                {schools.map((s) => (
-                  <SelectItem key={s.id} value={s.id} label={s.name}>{s.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              options={schools.map((s) => ({ value: s.id, label: s.name }))}
+              placeholder="학교 선택"
+              className="w-full"
+              ariaLabel="학교"
+              onChange={setSchoolId}
+            />
           </div>
           <div className="space-y-2">
             <Label>학년</Label>
-            <Select value={grade} onValueChange={(v) => { if (v) setGrade(v); }}>
-              <SelectTrigger><SelectValue placeholder="학년" /></SelectTrigger>
-              <SelectContent>
-                {grades.map((g) => (
-                  <SelectItem key={g} value={g}>{g}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <OptionSelect
+              value={grade}
+              options={grades}
+              placeholder="학년"
+              className="w-full"
+              ariaLabel="학년"
+              onChange={setGrade}
+            />
           </div>
           <div className="space-y-2">
             <Label>학년도</Label>
-            <Select value={String(year)} onValueChange={(v) => { if (v) setYear(Number(v)); }}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {yearOptions.map((y) => (
-                  <SelectItem key={y} value={String(y)}>{y}학년도</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <OptionSelect
+              value={String(year)}
+              options={yearOptions.map((y) => ({ value: String(y), label: `${y}학년도` }))}
+              className="w-full"
+              ariaLabel="학년도"
+              onChange={(v) => setYear(Number(v))}
+            />
           </div>
           <div className="space-y-2">
             <Label>시험</Label>
-            <Select value={slotKey} onValueChange={(v) => { if (v) setSlotKey(v); }}>
-              <SelectTrigger><SelectValue placeholder="시험 선택" /></SelectTrigger>
-              <SelectContent>
-                {slotOptions.map((o) => (
-                  <SelectItem key={o.key} value={o.key}>{o.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <OptionSelect
+              value={slotKey}
+              options={slotOptions.map((o) => ({ value: o.key, label: o.label }))}
+              placeholder="시험 선택"
+              className="w-full"
+              ariaLabel="시험"
+              onChange={setSlotKey}
+            />
           </div>
         </div>
 

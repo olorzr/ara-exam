@@ -1,13 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
   EMPTY_FILTERS, toProblemQuery, type ProblemFilters,
 } from '@/lib/problem-bank/filters';
 import {
   EMPTY_SOURCE_FACETS, fetchAreaFacets, fetchGrammarFacets, fetchSourceFacets, fetchUnitFacets,
-  fetchWorkFacets, type SourceFacets, type WorkFacet,
+  fetchWorkFacets, type GrammarFacet, type SourceFacets, type WorkFacet,
 } from '@/lib/problem-bank/facets';
 import { fetchProblemPage, PROBLEM_PAGE_SIZE } from '@/lib/problem-bank/queries';
 import type { Problem, ProblemSource } from '@/types/problem-bank';
@@ -33,17 +33,26 @@ export function useProblemArchive(initial: ProblemFilters = EMPTY_FILTERS) {
   const [facets, setFacets] = useState<SourceFacets>(EMPTY_SOURCE_FACETS);
   const [areaFacets, setAreaFacets] = useState<string[][]>([]);
   const [unitFacets, setUnitFacets] = useState<string[][]>([]);
-  /** 문법 분류는 원소가 경로 문자열이라 다른 패싯과 모양이 다르다 */
-  const [grammarFacets, setGrammarFacets] = useState<string[]>([]);
+  /** 문법 분류는 원소가 경로 문자열이고 문항 수를 함께 들고 있어 다른 패싯과 모양이 다르다 */
+  const [grammarFacets, setGrammarFacets] = useState<GrammarFacet[]>([]);
   const [workFacets, setWorkFacets] = useState<WorkFacet[]>([]);
 
   useEffect(() => {
     fetchSourceFacets().then(setFacets).catch(() => { /* 선택지가 없어도 목록은 본다 */ });
     fetchAreaFacets().then(setAreaFacets).catch(() => { /* 영역 필터만 빠진다 */ });
     fetchUnitFacets().then(setUnitFacets).catch(() => { /* 단원 필터만 빠진다 */ });
-    fetchGrammarFacets().then(setGrammarFacets).catch(() => { /* 문법 필터만 빠진다 */ });
+    fetchGrammarFacets().then(setGrammarFacets).catch(() => { /* 문법 건수만 빠진다 */ });
     fetchWorkFacets().then(setWorkFacets).catch(() => { /* 작품 트리만 빠진다 */ });
   }, []);
+
+  /**
+   * 경로 → 문항 수. 트리·선택지가 마스터를 그리면서 여기서 건수만 얹는다.
+   * 조회가 실패해도 빈 Map 이라 트리는 전부 0건으로 멀쩡히 그려진다.
+   */
+  const grammarCounts = useMemo(
+    () => new Map(grammarFacets.map((f) => [f.path, f.count])),
+    [grammarFacets],
+  );
 
   const queryKey = JSON.stringify(toProblemQuery(filters));
   // 세대를 키에 접어 넣는다 — 조건이 그대로여도 reload() 하면 다시 읽는다
@@ -81,7 +90,7 @@ export function useProblemArchive(initial: ProblemFilters = EMPTY_FILTERS) {
   const pageCount = Math.max(1, Math.ceil(total / PROBLEM_PAGE_SIZE));
 
   return {
-    filters, rows, total, loading, facets, areaFacets, unitFacets, grammarFacets, workFacets,
+    filters, rows, total, loading, facets, areaFacets, unitFacets, grammarCounts, workFacets,
     pageCount, patch, reset, reload,
   };
 }

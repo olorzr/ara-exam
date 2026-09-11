@@ -3,11 +3,18 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { OptionSelect, type SelectOption } from '@/components/ui/option-select';
 import { CheckSquare, X, ArrowRightLeft, Trash2, BookOpen, ArrowUpDown } from 'lucide-react';
 import { formatCategoryLabel } from '@/lib/format';
 import type { Category } from '@/types';
 import type { WordSortOrder } from '@/hooks/useWordsManager';
+
+/** 정렬 선택지 — 값은 `WordSortOrder`, 이름은 선생님이 읽는 말 */
+const SORT_OPTIONS: SelectOption[] = [
+  { value: 'asc', label: '오름차순 (ㄱ~ㅎ)' },
+  { value: 'desc', label: '내림차순 (ㅎ~ㄱ)' },
+  { value: 'order', label: '등록순' },
+];
 
 interface WordListHeaderProps {
   category: Category;
@@ -50,17 +57,14 @@ export default function WordListHeader({
             {formatCategoryLabel(category)}
           </h2>
           <Badge variant="outline">{wordCount}개</Badge>
-          <Select value={sortOrder} onValueChange={(v) => { if (v) onSortChange(v as WordSortOrder); }}>
-            <SelectTrigger className="w-[130px] h-8 text-xs">
-              <ArrowUpDown className="h-3 w-3 mr-1" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="asc">오름차순 (ㄱ~ㅎ)</SelectItem>
-              <SelectItem value="desc">내림차순 (ㅎ~ㄱ)</SelectItem>
-              <SelectItem value="order">등록순</SelectItem>
-            </SelectContent>
-          </Select>
+          <OptionSelect
+            value={sortOrder}
+            options={SORT_OPTIONS}
+            className="w-[130px] h-8 text-xs"
+            ariaLabel="정렬"
+            triggerIcon={<ArrowUpDown className="h-3 w-3 mr-1" />}
+            onChange={(v) => onSortChange(v as WordSortOrder)}
+          />
         </div>
         {!selectMode ? (
           <div className="flex items-center gap-2">

@@ -97,8 +97,17 @@ describe('schoolExamFilterPatch', () => {
     const patch = schoolExamFilterPatch(facet());
     expect(patch).toEqual({
       source_type: '내신기출', school_name: '상현중', year: '2026', grade: '중2',
-      semester: '1학기', exam_type: '중간', textbook: '', unit_path: [], work_title: '', page: 0,
+      semester: '1학기', exam_type: '중간', textbook: '', unit_path: [], work_title: '',
+      grammar_path: [], page: 0,
     });
+  });
+
+  /**
+   * 네 트리는 서로의 축을 비운다. 문법만 빠져 있으면 계약이 반쪽이 되어,
+   * 문법을 고른 뒤 학교를 고르면 두 조건이 조용히 겹친다.
+   */
+  it('문법 축도 비운다', () => {
+    expect(schoolExamFilterPatch(facet()).grammar_path).toEqual([]);
   });
 });
 
@@ -142,6 +151,21 @@ describe('initialSideTab', () => {
 
   it('단원 조건이 함께 있으면 교과서 탭', () => {
     expect(initialSideTab({ ...EMPTY_FILTERS, work_title: '동백꽃', unit_path: ['1. 문학'] }))
+      .toBe('units');
+  });
+
+  it('문법 조건만 있으면 문법 탭 — 개념은 트리에서 봐야 어느 가지인지 안다', () => {
+    expect(initialSideTab({ ...EMPTY_FILTERS, grammar_path: ['단어', '품사'] })).toBe('grammar');
+  });
+
+  it('문법이 다른 축보다 먼저다', () => {
+    expect(initialSideTab({
+      ...EMPTY_FILTERS, grammar_path: ['음운'], school_name: '상현중', work_title: '동백꽃',
+    })).toBe('grammar');
+  });
+
+  it('단원 조건이 함께 있으면 교과서 탭 (문법이어도)', () => {
+    expect(initialSideTab({ ...EMPTY_FILTERS, grammar_path: ['음운'], unit_path: ['1. 문학'] }))
       .toBe('units');
   });
 });

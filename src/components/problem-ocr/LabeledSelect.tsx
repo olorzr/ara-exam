@@ -1,13 +1,9 @@
 'use client';
 
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { OptionSelect, type SelectOption } from '@/components/ui/option-select';
 
-/** 값과 보여 줄 글이 다른 선택지(예: 학교 id ↔ 학교 이름) */
-export interface SelectOption {
-  value: string;
-  label: string;
-}
+export type { SelectOption };
 
 interface LabeledSelectProps {
   label: string;
@@ -22,38 +18,28 @@ interface LabeledSelectProps {
   onChange: (value: string) => void;
 }
 
-/** 문자열 목록도 그대로 받도록 맞춰 준다 */
-function toOptions(options: readonly SelectOption[] | readonly string[]): SelectOption[] {
-  return options.map((o) => (typeof o === 'string' ? { value: o, label: o } : o));
-}
-
 /**
  * 라벨 + Select 한 칸.
  *
  * 출처 정보 폼에 같은 모양의 칸이 열 개 가까이 들어가서 한 곳으로 모았다.
- * `onValueChange` 가 `string | null` 을 주는 것(CLAUDE.md Known Issues)도 여기서 흡수한다.
+ * 고르는 칸 자체는 [OptionSelect](../ui/option-select.tsx) 가 그린다 — 값과 이름을
+ * 한 배열에서 꺼내야 트리거에 이름이 나오기 때문이다(그 파일의 ⚠️ 주석 참고).
  */
 export default function LabeledSelect({
   label, value, options, placeholder, error, hint, disabled, onChange,
 }: LabeledSelectProps) {
-  const items = toOptions(options);
-
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
-      <Select
+      <OptionSelect
         value={value}
-        items={items}
+        options={options}
+        placeholder={placeholder}
         disabled={disabled}
-        onValueChange={(v) => { if (v) onChange(v); }}
-      >
-        <SelectTrigger className="w-full"><SelectValue placeholder={placeholder} /></SelectTrigger>
-        <SelectContent>
-          {items.map((o) => (
-            <SelectItem key={o.value} value={o.value} label={o.label}>{o.label}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+        className="w-full"
+        ariaLabel={label}
+        onChange={onChange}
+      />
       {error && <p className="text-xs text-red-600">{error}</p>}
       {hint}
     </div>

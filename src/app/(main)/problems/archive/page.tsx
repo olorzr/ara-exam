@@ -233,6 +233,7 @@ function ArchiveContent() {
             filters={archive.filters}
             schoolExams={archive.facets.schoolExams}
             works={archive.workFacets}
+            grammarCounts={archive.grammarCounts}
             onChange={patch}
           />
         </div>
@@ -243,7 +244,6 @@ function ArchiveContent() {
             facets={archive.facets}
             areaFacets={archive.areaFacets}
             unitFacets={archive.unitFacets}
-            grammarFacets={archive.grammarFacets}
             workFacets={archive.workFacets}
             total={archive.total}
             onChange={patch}

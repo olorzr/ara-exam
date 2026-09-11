@@ -89,7 +89,6 @@ export default function PaperComposePage() {
             facets={archive.facets}
             areaFacets={archive.areaFacets}
             unitFacets={archive.unitFacets}
-            grammarFacets={archive.grammarFacets}
             workFacets={archive.workFacets}
             total={archive.total}
             onChange={archive.patch}

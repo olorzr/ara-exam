@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { OptionSelect } from '@/components/ui/option-select';
 import ProblemHtmlEditor from '@/components/problem-editor/ProblemHtmlEditor';
 import { blankChoicePositions, trimTrailingChoices } from '@/lib/problem-bank/choices';
 import { sanitizeInlineHTML } from '@/lib/sanitize-problem';
@@ -243,12 +243,13 @@ export default function ProblemEditorCard({
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <div className="space-y-1">
             <Label className="text-xs text-gray-500">유형</Label>
-            <Select value={type} onValueChange={(v) => { if (v) setType(v as QuestionType); }}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {QUESTION_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <OptionSelect
+              value={type}
+              options={QUESTION_TYPES}
+              className="h-8 text-xs w-full"
+              ariaLabel="유형"
+              onChange={(v) => setType(v as QuestionType)}
+            />
           </div>
           <div className="space-y-1">
             <Label className="text-xs text-gray-500">정답</Label>

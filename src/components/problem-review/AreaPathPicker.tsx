@@ -2,11 +2,14 @@
 
 import { useMemo } from 'react';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { OptionSelect, type SelectOption } from '@/components/ui/option-select';
 import { AREA_DEPTH_LABELS, optionsAt, type AreaTreeNode } from '@/lib/problem-bank/area-tree';
 
 /** '고르지 않음' 센티널 — base-ui Select 는 빈 문자열 value 를 싫어한다 */
 const NONE = '__none__';
+
+/** 마디 이름은 값과 이름이 같다 */
+const toOption = (name: string): SelectOption => ({ value: name, label: name });
 
 interface AreaPathPickerProps {
   tree: AreaTreeNode[];
@@ -55,18 +58,13 @@ export default function AreaPathPicker({
       {levels.map((level, depth) => (
         <div key={depth} className="space-y-1">
           <Label className="text-xs text-gray-500">{labels[depth]}</Label>
-          <Select
+          <OptionSelect
             value={level.selected || NONE}
-            onValueChange={(v) => { if (v) handle(depth, v); }}
-          >
-            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NONE}>—</SelectItem>
-              {level.options.map((name) => (
-                <SelectItem key={name} value={name}>{name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            options={[{ value: NONE, label: '—' }, ...level.options.map(toOption)]}
+            className="h-8 text-xs w-full"
+            ariaLabel={labels[depth]}
+            onChange={(v) => handle(depth, v)}
+          />
         </div>
       ))}
     </div>

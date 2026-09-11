@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { OptionSelect } from '@/components/ui/option-select';
 import { listLocalModels } from '@/lib/ai/codex/localClient';
 import type { CodexModel } from '@/lib/ai/codex/protocol';
 import { getCodexModelPref, setCodexModelPref } from '@/lib/ai/localModelPref';
@@ -99,40 +99,32 @@ export default function AiModelSelect({ port }: AiModelSelectProps) {
     <div className="grid gap-4 sm:grid-cols-2">
       <div className="space-y-2">
         <Label htmlFor="ai-model">모델</Label>
-        <Select value={model ?? DEFAULT_VALUE} onValueChange={(v) => { if (v) handleModel(v); }}>
-          <SelectTrigger id="ai-model">
-            <SelectValue placeholder="계정 기본값" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={DEFAULT_VALUE}>계정 기본값</SelectItem>
-            {models.map((m) => (
-              <SelectItem key={m.id} value={m.id}>
-                {m.displayName || m.id}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <OptionSelect
+          id="ai-model"
+          value={model ?? DEFAULT_VALUE}
+          options={[
+            { value: DEFAULT_VALUE, label: '계정 기본값' },
+            ...models.map((m) => ({ value: m.id, label: m.displayName || m.id })),
+          ]}
+          onChange={handleModel}
+        />
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="ai-effort">추론 노력</Label>
-        <Select
+        <OptionSelect
+          id="ai-effort"
           value={effort ?? DEFAULT_VALUE}
-          onValueChange={(v) => { if (v) handleEffort(v); }}
           disabled={!selected || efforts.length === 0}
-        >
-          <SelectTrigger id="ai-effort">
-            <SelectValue placeholder="모델 기본값" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={DEFAULT_VALUE}>모델 기본값</SelectItem>
-            {efforts.map((e) => (
-              <SelectItem key={e.reasoningEffort} value={e.reasoningEffort}>
-                {EFFORT_LABELS[e.reasoningEffort] ?? e.reasoningEffort}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          options={[
+            { value: DEFAULT_VALUE, label: '모델 기본값' },
+            ...efforts.map((e) => ({
+              value: e.reasoningEffort,
+              label: EFFORT_LABELS[e.reasoningEffort] ?? e.reasoningEffort,
+            })),
+          ]}
+          onChange={handleEffort}
+        />
         {!selected && (
           <p className="text-xs text-gray-500">모델을 고르면 노력도 선택할 수 있어요.</p>
         )}

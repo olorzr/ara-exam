@@ -200,6 +200,15 @@ const GRAMMAR_ORDER: Map<string, number> = (() => {
 })();
 
 /**
+ * 마스터의 모든 경로(중간 마디 포함)를 목차 순서로.
+ *
+ * 아카이브 필터·트리의 선택지가 여기서 나온다. **패싯(태깅된 잎)이 아니라 마스터**인
+ * 이유는 grammar-browse-tree.ts 에 적어 두었다 — 한 줄로는, 태그가 0건이면 패싯도 0건이라
+ * 고를 칸 자체가 안 생겨 태깅을 시작할 길이 없었다.
+ */
+export const GRAMMAR_ALL_PATHS: readonly string[] = [...GRAMMAR_ORDER.keys()];
+
+/**
  * 이 가지 아래의 **잎 경로 전부** — 상위 검색이 쓴다.
  *
  * 저장값이 경로 문자열이라 `@>`(contains) 로는 정확 일치만 걸린다. '품사' 를 고르면

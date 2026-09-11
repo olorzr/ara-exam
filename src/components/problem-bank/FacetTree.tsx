@@ -13,6 +13,11 @@ interface FacetTreeProps<T> {
   selectedId?: string;
   onSelect: (value: T) => void;
   emptyText?: string;
+  /**
+   * 이 깊이 미만까지 펼쳐 둔다. 기본 2.
+   * 마스터 전체를 그리는 문법 트리는 1 을 준다 — 2 면 첫 화면에 100줄이 넘게 쏟아진다.
+   */
+  defaultExpandedDepth?: number;
 }
 
 /**
@@ -23,7 +28,7 @@ interface FacetTreeProps<T> {
  * 네 화면이 함께 쓰므로, 제네릭으로 고치는 대신 이 작은 형제를 둔다.
  */
 export default function FacetTree<T>({
-  nodes, selectedId, onSelect, emptyText,
+  nodes, selectedId, onSelect, emptyText, defaultExpandedDepth = DEFAULT_EXPANDED_DEPTH,
 }: FacetTreeProps<T>) {
   if (nodes.length === 0) {
     return <p className="py-4 text-center text-sm text-gray-400">{emptyText ?? '항목이 없습니다.'}</p>;
@@ -38,6 +43,7 @@ export default function FacetTree<T>({
           selectedId={selectedId}
           onSelect={onSelect}
           depth={0}
+          expandedDepth={defaultExpandedDepth}
         />
       ))}
     </div>
@@ -49,10 +55,13 @@ interface FacetTreeItemProps<T> {
   selectedId?: string;
   onSelect: (value: T) => void;
   depth: number;
+  expandedDepth: number;
 }
 
-function FacetTreeItem<T>({ node, selectedId, onSelect, depth }: FacetTreeItemProps<T>) {
-  const [collapsed, setCollapsed] = useState(depth >= DEFAULT_EXPANDED_DEPTH);
+function FacetTreeItem<T>({
+  node, selectedId, onSelect, depth, expandedDepth,
+}: FacetTreeItemProps<T>) {
+  const [collapsed, setCollapsed] = useState(depth >= expandedDepth);
   const expanded = !collapsed;
   const isLeaf = node.children.length === 0 && node.value !== undefined;
   const isSelected = isLeaf && selectedId === node.id;
@@ -91,7 +100,10 @@ function FacetTreeItem<T>({ node, selectedId, onSelect, depth }: FacetTreeItemPr
           ? <FileText className="h-3.5 w-3.5 shrink-0 text-gray-400" />
           : <FolderOpen className="h-3.5 w-3.5 shrink-0 text-amber-400" />}
 
-        <span className="truncate">{node.label}</span>
+        {/* 0건은 흐리게. 건수는 라벨에 숫자로도 적혀 있다 — 색만으로 알리지 않는다 */}
+        <span className={`truncate ${node.dimmed && !isSelected ? 'text-gray-400' : ''}`}>
+          {node.label}
+        </span>
       </div>
 
       {expanded && node.children.length > 0 && (
@@ -103,6 +115,7 @@ function FacetTreeItem<T>({ node, selectedId, onSelect, depth }: FacetTreeItemPr
               selectedId={selectedId}
               onSelect={onSelect}
               depth={depth + 1}
+              expandedDepth={expandedDepth}
             />
           ))}
         </div>

@@ -6,16 +6,12 @@ import { EXTERNAL_LEVEL, SEMESTER_OPTIONS } from '@/lib/constants';
 import { UNSPECIFIED_OPTION } from '@/lib/external-category';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { OptionSelect, type SelectOption } from '@/components/ui/option-select';
 import { Settings } from 'lucide-react';
 import { useCategoryFormState, type CategoryFormProps } from '@/hooks/useCategoryFormState';
 
-/**
- * 마스터 목록(id/name)을 base-ui Select 의 items(value→label) 구조로 변환한다.
- * items 를 넘기지 않으면 SelectValue 가 팝업을 한 번도 열기 전까지 선택된 value(UUID)를
- * 그대로 표시하므로, 한글 이름이 보이도록 매핑을 제공한다.
- */
-const toSelectItems = (list: { id: string; name: string }[]) =>
+/** 마스터 목록(id/name)을 선택지 모양으로 — 값은 UUID, 이름은 한글 */
+const toSelectItems = (list: { id: string; name: string }[]): SelectOption[] =>
   list.map((item) => ({ value: item.id, label: item.name }));
 
 /**
@@ -43,119 +39,128 @@ export default function CategoryForm(props: CategoryFormProps) {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div className="space-y-2">
             <Label>구분</Label>
-            <Select value={level} onValueChange={(v) => { if (v) s.handleLevelChange(v as CategoryLevel); }}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="중등">중등</SelectItem>
-                <SelectItem value="고등">고등</SelectItem>
-                <SelectItem value={EXTERNAL_LEVEL}>외부지문 및 프린트</SelectItem>
-              </SelectContent>
-            </Select>
+            <OptionSelect
+              value={level}
+              options={['중등', '고등', EXTERNAL_LEVEL]}
+              className="w-full"
+              ariaLabel="구분"
+              onChange={(v) => s.handleLevelChange(v as CategoryLevel)}
+            />
           </div>
 
           {level !== EXTERNAL_LEVEL ? (
             <>
               <div className="space-y-2">
                 <Label>학년</Label>
-                <Select value={grade} onValueChange={(v) => { if (v) s.handleGradeChange(v); }}>
-                  <SelectTrigger><SelectValue placeholder="학년 선택" /></SelectTrigger>
-                  <SelectContent>
-                    {s.gradeOptions.map((g) => (
-                      <SelectItem key={g} value={g}>{g}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <OptionSelect
+                  value={grade}
+                  options={s.gradeOptions}
+                  placeholder="학년 선택"
+                  className="w-full"
+                  ariaLabel="학년"
+                  onChange={s.handleGradeChange}
+                />
               </div>
               <div className="space-y-2">
                 <Label>출판사</Label>
-                <Select value={s.publisherId} items={toSelectItems(s.publishers)} onValueChange={(v) => { if (v) s.handlePublisherSelect(v); }} disabled={!grade}>
-                  <SelectTrigger><SelectValue placeholder="출판사 선택" /></SelectTrigger>
-                  <SelectContent>
-                    {s.publishers.map((p) => (
-                      <SelectItem key={p.id} value={p.id} label={p.name}>{p.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <OptionSelect
+                  value={s.publisherId}
+                  options={toSelectItems(s.publishers)}
+                  placeholder="출판사 선택"
+                  disabled={!grade}
+                  className="w-full"
+                  ariaLabel="출판사"
+                  onChange={s.handlePublisherSelect}
+                />
               </div>
               <div className="space-y-2">
                 <Label>학기</Label>
-                <Select value={semester} onValueChange={(v) => { if (v) s.handleSemesterChange(v); }} disabled={!s.publisherId}>
-                  <SelectTrigger><SelectValue placeholder="학기 선택" /></SelectTrigger>
-                  <SelectContent>
-                    {SEMESTER_OPTIONS.map((sem) => (
-                      <SelectItem key={sem} value={sem}>{sem}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <OptionSelect
+                  value={semester}
+                  options={SEMESTER_OPTIONS}
+                  placeholder="학기 선택"
+                  disabled={!s.publisherId}
+                  className="w-full"
+                  ariaLabel="학기"
+                  onChange={s.handleSemesterChange}
+                />
               </div>
               <div className="space-y-2">
                 <Label>대단원</Label>
-                <Select value={s.chapterId} items={toSelectItems(s.chapters)} onValueChange={(v) => { if (v) s.handleChapterSelect(v); }} disabled={!semester}>
-                  <SelectTrigger><SelectValue placeholder="대단원 선택" /></SelectTrigger>
-                  <SelectContent>
-                    {s.chapters.map((c) => (
-                      <SelectItem key={c.id} value={c.id} label={c.name}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <OptionSelect
+                  value={s.chapterId}
+                  options={toSelectItems(s.chapters)}
+                  placeholder="대단원 선택"
+                  disabled={!semester}
+                  className="w-full"
+                  ariaLabel="대단원"
+                  onChange={s.handleChapterSelect}
+                />
               </div>
               <div className="space-y-2">
                 <Label>소단원 (선택)</Label>
-                <Select value={s.subChapterId} items={toSelectItems(s.subChaptersList)} onValueChange={(v) => { if (v) s.handleSubChapterSelect(v); }} disabled={!s.chapterId}>
-                  <SelectTrigger><SelectValue placeholder="소단원 선택" /></SelectTrigger>
-                  <SelectContent>
-                    {s.subChaptersList.map((sub) => (
-                      <SelectItem key={sub.id} value={sub.id} label={sub.name}>{sub.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <OptionSelect
+                  value={s.subChapterId}
+                  options={toSelectItems(s.subChaptersList)}
+                  placeholder="소단원 선택"
+                  disabled={!s.chapterId}
+                  className="w-full"
+                  ariaLabel="소단원"
+                  onChange={s.handleSubChapterSelect}
+                />
               </div>
             </>
           ) : (
             <>
               <div className="space-y-2">
                 <Label>학교명</Label>
-                <Select value={s.schoolId} items={toSelectItems(s.schools)} onValueChange={(v) => { if (v) s.handleSchoolSelect(v); }}>
-                  <SelectTrigger><SelectValue placeholder="학교 선택" /></SelectTrigger>
-                  <SelectContent>
-                    {s.schools.map((sch) => (
-                      <SelectItem key={sch.id} value={sch.id} label={sch.name}>{sch.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <OptionSelect
+                  value={s.schoolId}
+                  options={toSelectItems(s.schools)}
+                  placeholder="학교 선택"
+                  className="w-full"
+                  ariaLabel="학교명"
+                  onChange={s.handleSchoolSelect}
+                />
               </div>
               <div className="space-y-2">
                 <Label>년도</Label>
-                <Select value={year} onValueChange={(v) => { if (v) s.handleYearChange(v); }} disabled={!s.schoolId}>
-                  <SelectTrigger><SelectValue placeholder="년도 선택" /></SelectTrigger>
-                  <SelectContent>
-                    {s.yearOptions.map((y) => (
-                      <SelectItem key={y} value={y}>{y === UNSPECIFIED_OPTION ? y : `${y}학년도`}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <OptionSelect
+                  value={year}
+                  options={s.yearOptions.map((y) => ({
+                    value: y,
+                    label: y === UNSPECIFIED_OPTION ? y : `${y}학년도`,
+                  }))}
+                  placeholder="년도 선택"
+                  disabled={!s.schoolId}
+                  className="w-full"
+                  ariaLabel="년도"
+                  onChange={s.handleYearChange}
+                />
               </div>
               <div className="space-y-2">
                 <Label>학년</Label>
-                <Select value={grade} onValueChange={(v) => { if (v) s.handleGradeChange(v); }} disabled={!year}>
-                  <SelectTrigger><SelectValue placeholder="학년 선택" /></SelectTrigger>
-                  <SelectContent>
-                    {s.gradeOptions.map((g) => (
-                      <SelectItem key={g} value={g}>{g}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <OptionSelect
+                  value={grade}
+                  options={s.gradeOptions}
+                  placeholder="학년 선택"
+                  disabled={!year}
+                  className="w-full"
+                  ariaLabel="학년"
+                  onChange={s.handleGradeChange}
+                />
               </div>
               <div className="space-y-2">
                 <Label>프린트/작품명</Label>
-                <Select value={s.materialId} items={toSelectItems(s.materials)} onValueChange={(v) => { if (v) s.handleMaterialSelect(v); }} disabled={!grade}>
-                  <SelectTrigger><SelectValue placeholder="프린트/작품명 선택" /></SelectTrigger>
-                  <SelectContent>
-                    {s.materials.map((m) => (
-                      <SelectItem key={m.id} value={m.id} label={m.name}>{m.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <OptionSelect
+                  value={s.materialId}
+                  options={toSelectItems(s.materials)}
+                  placeholder="프린트/작품명 선택"
+                  disabled={!grade}
+                  className="w-full"
+                  ariaLabel="프린트/작품명"
+                  onChange={s.handleMaterialSelect}
+                />
               </div>
             </>
           )}

@@ -6,7 +6,22 @@ import { Select as SelectPrimitive } from "@base-ui/react/select"
 import { cn } from "@/lib/utils"
 import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
 
-const Select = SelectPrimitive.Root
+type SelectRootProps = SelectPrimitive.Root.Props<string>
+
+/**
+ * ⚠️ `items` 를 **필수**로 못박은 래퍼다.
+ *
+ * base-ui 는 `items`(값→이름 지도)가 없으면 `Select.Value` 가 고른 **값을 그대로** 그린다 —
+ * `SelectItem` 의 children 은 팝업 안에서만 쓰이기 때문이다. 그래서 아카이브 필터 줄이
+ * 한동안 `__all__` 로, 단어 정렬이 `asc` 로 보였다. 빠뜨리면 화면에서만 드러나고 타입은
+ * 멀쩡했으므로, 여기서 **컴파일 에러**가 나게 한다.
+ *
+ * 보통은 이걸 직접 쓰지 말고 [OptionSelect](./option-select.tsx) 를 쓴다 —
+ * 거기서는 `items` 와 `SelectItem` 이 같은 배열에서 나와 어긋날 수가 없다.
+ */
+function Select(props: SelectRootProps & { items: NonNullable<SelectRootProps['items']> }) {
+  return <SelectPrimitive.Root {...props} />
+}
 
 function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
   return (

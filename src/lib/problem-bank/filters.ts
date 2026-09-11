@@ -57,6 +57,14 @@ const AREA_SEPARATOR = '>';
 export const UNSPECIFIED_AXIS = '__none__';
 
 /**
+ * 문법 축을 비우는 패치 — 다른 트리로 넘어갈 때 쓴다.
+ *
+ * ⚠️ 트리 모듈이 아니라 **여기** 있어야 한다. `school-exam-tree`·`work-tree` 가 이 파일을
+ *    import 하고 문법 트리 모듈은 **그 둘을** import 하므로, 트리 쪽에 두면 순환이 된다.
+ */
+export const GRAMMAR_AXIS_CLEARED: Partial<ProblemFilters> = { grammar_path: [] };
+
+/**
  * 값이 있는 조건만 남긴다.
  * @param key - 조회 조건 이름
  * @param value - 필터 값
