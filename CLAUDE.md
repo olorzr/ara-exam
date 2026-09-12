@@ -159,6 +159,23 @@
 - [2026-09-04] 표 재분할은 한 패스에 **표 하나**만 쪼갠다(상한 32). 표가 많은 개념지는 그만큼 재측정이 돈다 — 렌더가 몇 프레임 늦을 뿐 내용에는 영향이 없다. 페이지 끝에 걸린 조각이 측정 오차로 다시 밀리면 **1행짜리 조각(+반복된 제목 행)** 이 남을 수 있다(내용 유실 없음, 외관 문제)
 
 ## Architecture Decisions
+- [2026-09-12] **출처 삭제는 DB 행만 지운다 — Storage 는 건드리지 않는다**([useSourceDelete.ts](src/hooks/useSourceDelete.ts), [source-delete.ts](src/lib/problem-bank/source-delete.ts)). 되돌리지 말아야 할 판단들:
+  - **`deleteSource` 는 예전부터 있었지만 부르는 곳이 하나도 없었다.** DB 는 막는 게 없다(sql/17 의 `FOR ALL` 정책에 DELETE 가 포함되고, 지문·문항은 CASCADE, `problem_paper_items.problem_id` 는 SET NULL). "삭제가 아예 안 된다" 는 제보의 원인은 **버튼이 없던 것뿐**이었다
+  - **Storage 파일은 남긴다.** `deleteProblems` 와 같은 근거다 — 잘라 둔 `problems/`·`passages/` 이미지는 문제지 스냅샷이 들고 있어 지우면 인쇄물이 빈칸이 된다. `sources/{id}/` 아래(원본 PDF·쪽 이미지·답지)는 스냅샷이 참조하지 않아 지워도 안전하지만, **규칙을 하나로 두는 편이 낫다고 보고 전부 남긴다**. 그래서 `removeProblemFiles`·`sourceFolder` 는 계속 미사용이다 — 나중에 정리 기능을 만든다면 그 둘이 출발점이다
+  - ⚠️ **`supabase.delete()` 는 0행을 지워도 `error` 가 null 이다.** `deleteSource` 는 `.select('id')` 로 지운 행을 돌려받아 비어 있으면 던진다. 이걸 빼면 "성공 토스트가 뜨는데 목록에는 그대로" 가 되어 **이번 제보와 똑같은 모양의 버그**가 다시 생긴다
+  - **확인 문구는 `lib/` 의 순수 함수**(`sourceDeleteConfirmMessage`)다. 문장마다 조건이 달라(문제지 수 > 0, 상태가 '추출중') 화면에 흩어 두면 "문제지가 0개인데 문제지 얘기가 나오는" 거짓말이 조용히 생긴다. `selection.ts` 의 `bulkDeleteConfirmMessage` 와 같은 규약이고, 스냅샷 안내 문장은 **글자 그대로 같은 것**을 쓴다
+  - **미저장 수정(`dirtyIds`) 확인은 일부러 건너뛴다.** 어차피 출처를 통째로 버리는 참이고, 되돌릴 수 없는 확인창 위에 확인창을 하나 더 얹으면 읽지 않고 누르게 된다. 같은 이유로 훅을 `useReviewGuards` 에 넣지 않았다 — 그쪽은 `review`+`dirtyIds` 를 요구하는데 목록 화면에는 둘 다 없다
+  - ⚠️ **지울 수 있는 목록은 offset 페이징이 통째로 위험해진다**([source-list.ts](src/lib/problem-bank/source-list.ts), [sources/page.tsx](src/app/(main)/problems/sources/page.tsx)). 출처 목록은 '더 보기' 로 이어 붙이는데, 한 행이 사라지면 **뒤쪽 offset 이 전부 하나씩 당겨진다**. 세 함정을 모두 피해야 한다(코덱스 리뷰 P1·P2):
+    - ① 예전처럼 `sources.length` 로 다음 쪽을 역산하면 한 행이 빠진 순간 '더 보기' 가 **0쪽을 다시 불러 중복 행**을 만든다
+    - ② '불러온 쪽 수' 카운터만 두고 이어 받으면 **더 나쁘다** — 경계에 걸린 행 하나가 **영영 안 보인다**(선생님은 그게 지워진 줄 안다). 그래서 지운 뒤에는 `refetchSources(펼친 쪽 수)` 로 **0쪽부터 통째로** 다시 읽는다
+    - ③ 그 재조회가 **실패하면 목록은 어긋난 채로 남는다.** 토스트만 띄우고 넘어가면 다음 '더 보기' 가 ②를 그대로 일으킨다 — `needsResync` 로 '더 보기' 를 닫고 **다시 읽기만 내준다**
+    - 쪽 수는 **state 가 아니라 ref**(`loadedPagesRef`)다. 확인창을 띄운 사이 '더 보기' 가 끝나면 삭제가 붙들고 있던 옛 값으로 다시 읽어 뒤쪽 한 쪽이 통째로 사라진다
+    - 목록 요청에는 **세대 번호**(`reqSeq`)를 붙여 늦게 온 응답을 버린다. 재조회와 '더 보기' 가 겹치면 서로를 덮어써 목록과 쪽 수가 어긋나고, 그때부터 쪽이 통째로 건너뛰어진다. 같은 이유로 `useSourceDelete` 는 **`onDeleted` 를 await** 한 뒤에야 잠금을 푼다
+    - `selection.ts` 의 `pageAfterDelete` 는 여기 안 맞는다 — 그건 '현재 쪽' 이 있는 offset 페이징용이고 이 화면은 이어 붙이는 '더 보기' 다
+  - ⚠️ **여러 쪽을 한 번에 다시 읽을 때 PostgREST 기본 상한(1,000행)을 넘기지 말 것.** 34쪽(1,020행)을 한 번에 청하면 20행이 **말없이** 빠지고, 그 뒤 '더 보기' 는 1,020 부터 이어 받아 빠진 20행이 영영 안 보인다. `sourceRefetchChunks` 가 상한 아래로 나누고 `refetchSources` 가 순서대로 받아 잇는다
+  - **삭제 훅의 잠금은 state 가 아니라 `busyRef` 다** — 같은 실행 흐름에서 두 번 부르면 state 는 아직 안 바뀌어 있어 두 번째가 통과한다(화면의 `disabled` 는 렌더 뒤에나 걸린다). 그리고 `await deleteSource` **뒤에도** 생존을 확인한다 — 지우는 사이 다른 메뉴로 떠난 사람을 목록으로 끌고 가면 안 된다(성공 토스트는 사실이므로 그대로 띄운다)
+  - **순수 로직은 supabase 를 부르지 않는 파일에 둔다**([source-delete.ts](src/lib/problem-bank/source-delete.ts)). 이 저장소에는 supabase 를 목으로 감싸 테스트한 전례가 없어서, 확인 문구와 쪽 나누기처럼 값만 다루는 부분을 떼어 두어야 클라이언트 없이 검증된다
+  - **목록 행을 통째로 `<Link>` 로 감싸지 않는다.** 그 안에 버튼을 넣으면 잘못된 HTML 이고 키보드로도 못 쓴다 — [papers/page.tsx](src/app/(main)/problems/papers/page.tsx) 와 같은 모양(flex 래퍼 + `flex-1` 링크 + 형제 버튼)으로 나눈다
 - [2026-09-11] **순환 import 는 상수를 조용히 `undefined` 로 만든다 — 그래프를 테스트로 고정한다**([src/lib/__checks/import-cycles.test.ts](src/lib/__checks/import-cycles.test.ts)). 프로덕션이 이것 때문에 멈췄다: 이미지 예산이 `pdfPages` 에 있고 `pdfColumns` 가 그것을 import 하는데 `pdfPages` 도 `pdfColumns` 를 import 해 순환이 됐다. 번들러가 CommonJS 로 풀면 나중에 초기화되는 쪽이 `undefined` 를 읽어 단 이미지 예산이 **NaN** 이 되고, `url.length <= NaN` 이 늘 거짓이라 **모든 2단 쪽이 조용히 건너뛰어져** 기출 읽기가 통째로 실패했다
   - ⚠️ **테스트(Vite/ESM)는 이것을 못 잡는다.** 평가 순서가 번들러와 달라 그냥 통과한다 — 그래서 값이 아니라 **import 그래프 자체**를 본다. `tsc`·`eslint`·`next build` 도 전부 통과했다
   - **예산·인코딩의 단일 출처는 [pdfBudget.ts](src/lib/pdf/pdfBudget.ts)** 다. `pdfPages` 와 `pdfColumns` 는 **거기서만** 가져오고 서로에게서 값을 가져오지 않는다(타입은 `import type` 으로만)

@@ -1,5 +1,6 @@
 'use client';
 
+import { Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { sourceLabel } from '@/lib/problem-bank/source-label';
@@ -18,10 +19,13 @@ interface ReviewHeaderProps {
   verifiedCount: number;
   onTextbook: (textbook: string) => Promise<void>;
   onFinish: () => void;
+  /** 출처를 통째로 지운다 — 잘못 읽힌 기출을 검수 중에 걷어내는 길 */
+  onDelete: () => void;
+  deleting: boolean;
 }
 
 export default function ReviewHeader({
-  source, problemCount, verifiedCount, onTextbook, onFinish,
+  source, problemCount, verifiedCount, onTextbook, onFinish, onDelete, deleting,
 }: ReviewHeaderProps) {
   const textSource = source.ocr_meta?.textSource;
 
@@ -44,6 +48,17 @@ export default function ReviewHeader({
       <div className="flex items-end gap-3">
         {/* 교과서가 있어야 단원 칸이 뜬다 — 여기서 고칠 수 있어야 옛 출처도 분류된다 */}
         <SourceTextbookPicker source={source} onChange={onTextbook} />
+        {/* 읽기가 통째로 어긋난 기출은 고치는 것보다 지우고 다시 올리는 편이 빠르다 */}
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onDelete}
+          disabled={deleting}
+          className="text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600"
+        >
+          <Trash2 className="h-4 w-4" />
+          <span className="ml-1">{deleting ? '지우는 중…' : '삭제'}</span>
+        </Button>
         <Button type="button" onClick={onFinish} disabled={source.status === '완료'}>
           {source.status === '완료' ? '검수 완료됨' : '검수 마치기'}
         </Button>

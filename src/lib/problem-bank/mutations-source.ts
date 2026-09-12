@@ -14,12 +14,24 @@ import { normalizeGrammarPaths } from './grammar-tree';
  * 출처를 지운다. 지문·문항이 CASCADE 로 함께 사라진다.
  *
  * ⚠️ 이미 만든 문제지는 **스냅샷**이라 계속 인쇄된다(항목의 problem_id 만 null 이 된다).
+ *
+ * ⚠️ Storage 는 건드리지 않는다 — `deleteProblems` 와 같은 까닭이다(mutations.ts).
+ *
+ * ⚠️ **지운 행을 돌려받아 확인한다.** PostgREST 의 DELETE 는 한 행도 못 지워도
+ *    `error` 가 null 이라, 그냥 두면 "지웠다" 와 "아무것도 안 했다" 가 구분되지 않는다.
+ *    화면은 성공 토스트를 띄우는데 목록에는 그대로 남는 — 바로 이 기능이 없던 시절의
+ *    제보("삭제가 아예 안 된다")와 똑같은 모양이 된다.
  * @param id - 출처 id
- * @throws 삭제 실패 시
+ * @throws 삭제 실패 시, 또는 지운 행이 없을 때(이미 지워졌거나 정책이 막았을 때)
  */
 export async function deleteSource(id: string): Promise<void> {
-  const { error } = await supabase.from('problem_sources').delete().eq('id', id);
+  const { data, error } = await supabase
+    .from('problem_sources')
+    .delete()
+    .eq('id', id)
+    .select('id');
   if (error) throw error;
+  if (!data || data.length === 0) throw new Error('이미 지워졌거나 지울 수 없는 출처예요.');
 }
 
 /**

@@ -11,6 +11,7 @@ import { useSourceTrees } from '@/hooks/useSourceTrees';
 import { useAiEnabled } from '@/hooks/useAiEnabled';
 import { usePassageContinuation } from '@/hooks/usePassageContinuation';
 import { useReviewGuards } from '@/hooks/useReviewGuards';
+import { useSourceDelete } from '@/hooks/useSourceDelete';
 import { setSourceStatus } from '@/lib/problem-bank/mutations-source';
 import PageImageWithBoxes, { type BoxOverlay } from '@/components/problem-review/PageImageWithBoxes';
 import ReviewCardList, { type ReviewRow } from '@/components/problem-review/ReviewCardList';
@@ -127,6 +128,8 @@ function ProblemSourceReviewContent() {
 
   // 미저장 수정을 지키는 확인 절차는 한 곳에 모아 둔다 — 세 가지가 규칙이 서로 다르다
   const guards = useReviewGuards(review, dirtyIds);
+  // 지운 뒤에는 돌아갈 화면이 없다(이 주소가 곧 사라진 출처다) — 목록으로 보낸다
+  const del = useSourceDelete(() => router.push('/problems/sources'));
 
   const markDirty = useCallback((id: string, dirty: boolean) => {
     setDirtyIds((prev) => {
@@ -183,6 +186,8 @@ function ProblemSourceReviewContent() {
         verifiedCount={review.verifiedCount}
         onTextbook={(textbook) => review.changeTextbook(textbook, () => dirtyIds.size)}
         onFinish={finish}
+        onDelete={() => del.requestDelete(source)}
+        deleting={del.deletingId !== null}
       />
 
       <OcrProgress
