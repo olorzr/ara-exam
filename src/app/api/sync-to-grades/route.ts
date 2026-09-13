@@ -42,8 +42,12 @@ export async function POST(request: NextRequest) {
   const intakeUrl = process.env.ARA_SYSTEM_INTAKE_URL;
   const intakeSecret = process.env.ARA_SYSTEM_INTAKE_SECRET;
   if (!intakeUrl || !intakeSecret) {
-    // 연동 미설정 — 조용히 skip(성적 연동을 안 쓰는 배포에서도 시험 생성은 정상 동작)
-    return NextResponse.json({ ok: false, skipped: true, reason: 'not_configured' });
+    // 연동 미설정. 시험 생성 자체는 이미 끝났으므로 되돌리지 않지만, **성공처럼 보이면 안 된다** —
+    // 예전엔 여기서 HTTP 200 을 돌려줘 2026-07-19~09-13 두 달 동안 단어 시험 139건이 한 건도
+    // 등록되지 않았는데도 상태 코드·로그·화면 어디에도 신호가 없었다. 이 저장소에는 전용 logger 가
+    // 없어 console.error 로 남긴다(Vercel 함수 로그에서 보인다).
+    console.error('[sync-to-grades] ARA_SYSTEM_INTAKE_URL/ARA_SYSTEM_INTAKE_SECRET 미설정 — 성적 자동 등록 skip');
+    return NextResponse.json({ ok: false, skipped: true, reason: 'not_configured' }, { status: 503 });
   }
 
   // 호출자 인증 — service-role + 공유 시크릿으로 다운스트림 쓰기를 하는 특권 라우트이므로,
@@ -139,6 +143,8 @@ export async function POST(request: NextRequest) {
 
     if (!res.ok) {
       const detail = await res.text().catch(() => '');
+      // 시크릿·토큰은 절대 찍지 않는다. 401 이면 주소(리다이렉트로 Authorization 유실)나 시크릿 불일치다.
+      console.error(`[sync-to-grades] 인테이크 거절 ${res.status}: ${detail.slice(0, 300)}`);
       return NextResponse.json(
         { ok: false, reason: 'intake_failed', status: res.status, detail: detail.slice(0, 300) },
         { status: 502 },
@@ -149,6 +155,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, result });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'unknown';
+    console.error(`[sync-to-grades] 예외: ${message}`);
     return NextResponse.json({ ok: false, reason: 'exception', message }, { status: 500 });
   }
 }

@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { DEFAULT_PASS_PERCENTAGE, PERCENTAGE_BASE, MIN_EXAM_WORDS, EXTERNAL_LEVEL } from '@/lib/constants';
 import { buildCategoryTree } from '@/lib/category-tree';
 import { shuffle } from '@/lib/shuffle';
+import { fireGradeSync } from '@/lib/grade-sync-client';
 
 /**
  * 시험지 생성 페이지 (트리 구조 카테고리 선택, 합격선 설정, 셔플 옵션)
@@ -161,21 +162,8 @@ export default function ExamCreatePage() {
       }
 
       // 학원 성적 자동 등록: ara-system 성적에 시험 정의를 멱등 등록한다.
-      // keepalive 로 쏴서 페이지 이동에 요청이 취소되지 않게 하고, 실패해도 생성 UX 를 막지 않는다.
-      // RPC 가 만료 직전 세션을 내부 갱신했을 수 있으므로, 렌더 시점 세션이 아니라
-      // 지금 세션을 다시 읽어 최신 토큰으로 인증한다.
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (!session?.access_token) return;
-        fetch('/api/sync-to-grades', {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ examId }),
-          keepalive: true,
-        }).catch(() => {});
-      }).catch(() => {});
+      // 전송·실패 알림 규약은 grade-sync-client 한 곳에 있다(개념지 저장과 공유).
+      fireGradeSync('/api/sync-to-grades', { examId });
 
       toast.success('시험지가 생성되었습니다.');
       router.push(`/exam/view?id=${examId}`);

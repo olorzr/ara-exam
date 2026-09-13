@@ -39,6 +39,31 @@
 - 비고: **연결 상태·사용량은 여기서 다루지 않는다.** 그건 브라우저가 선생님 PC 의
   코덱스 브릿지에 직접 물어본다(서버는 AI 를 호출하지 않는다).
 
+## POST /api/sync-to-grades
+- 설명: 만들어진 단어 시험지를 ara-system(학원 관리 시스템) 성적에 **회차로 자동 등록**한다.
+  서버가 `exams` + `exam_words` 스냅샷을 읽어 ara-system `/api/integrations/vocab-exam` 으로 전달한다
+- 인증: `Authorization: Bearer <supabase access_token>` (도메인 검사 포함)
+- Body: `{ examId: string }` (UUID)
+- Response: `{ ok: true, result }` — result 에 `subtypeId`·`roundNumber`·`created`
+- 에러: 401 `unauthorized` · 400 `bad_body`/`bad_examId` · 404 `exam_not_found` ·
+  500 `words_read_failed`/`category_read_failed`/`exception` · 502 `intake_failed`(+`status`·`detail`) ·
+  **503 `not_configured`**(연동 env 미설정)
+- 비고: 호출은 시험 생성·재시험 직후 **fire-and-forget**(`keepalive`)이고 실패해도 생성 UX 를 막지
+  않지만, 클라이언트가 응답을 읽어 **경고 토스트**를 띄운다([grade-sync-client.ts](../src/lib/grade-sync-client.ts)).
+  ara-system 쪽이 멱등이라 재호출·재시험도 안전하다. 학교급은 시험 카테고리의 level/grade 로
+  도출하며(단일 학교급일 때만) 미상이면 필드를 빼 ara-system 기본값(중등부)에 맡긴다
+
+## POST /api/sync-concept-to-grades
+- 설명: 저장된 개념지를 ara-system 성적에 **개념지당 1회차**로 자동 등록한다.
+  개념 단어(`marks`)가 정답이자 문항 수다
+- 인증: `Authorization: Bearer <supabase access_token>`
+- Body: `{ conceptSheetId: string }` (UUID)
+- Response: `{ ok: true, result }` — result 에 `subtypeId`·`roundNumber`·`created`
+- 에러: 위와 같고, 추가로 200 `{ skipped: true, reason: 'no_marks' }`(마킹된 개념 단어 없음 — 정상)
+- 비고: 폴더는 ara-system 이 만든다(`개념 시험 > 교과서 그룹 > 학년+학기`). 외부지문은 출판사가
+  비어 있어 **publisher 슬롯에 학교명**을 보낸다 — 안 보내면 전부 '기타' 한 폴더에 뭉친다.
+  ⚠️ 채점이 끝난 회차는 ara-system 이 분모·정답을 동결하므로 이름·날짜만 갱신된다
+
 ## RPC exam.set_source_textbook
 - 설명: 기출 출처의 교과서를 바꾸고, 원하면 그 출처의 단원 태그를 **같은 트랜잭션에서** 지운다
 - 인자: `p_source_id uuid`, `p_textbook text`, `p_clear_units boolean` (기본 true)
