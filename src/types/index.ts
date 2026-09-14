@@ -89,11 +89,27 @@ export interface SubChapter {
   created_at: string;
 }
 
-/** 학교 마스터 (외부지문용, 모든 사용자 공유) */
+/**
+ * `exam.schools` 행 — 관리자시스템 `public.schools` 의 **거울**이고 id 가 같다.
+ * 프린트·외부지문이 실제로 등록된 학교만 들어 있다(sql/27).
+ */
 export interface School {
   id: string;
   name: string;
   created_at: string;
+}
+
+/**
+ * 학교 선택 칸에 올릴 한 줄 — 관리자 마스터 행과 이미 쓰인 학교를 함께 담는다.
+ * `School` 과 달리 `created_at` 이 없다(마스터 조회는 그 칸을 읽지 않는다).
+ */
+export interface SelectableSchool {
+  id: string;
+  name: string;
+  /** '중등' | '고등'. 마스터에 짝이 없는 옛 학교는 비어 있다 */
+  level?: string;
+  /** 마스터에 짝이 없어 보존만 하는 옛 행인가 (새로 고르라고 권할 자리가 아니다) */
+  legacy?: boolean;
 }
 
 /** 프린트/작품명 마스터 (학교 + 년도 + 학년별) */

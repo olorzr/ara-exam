@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import type { CategoryLevel, Publisher, MajorChapter, SubChapter, School, SchoolMaterial } from '@/types';
+import type { CategoryLevel, Publisher, MajorChapter, SubChapter, SchoolMaterial, SelectableSchool } from '@/types';
 import { EXTERNAL_LEVEL, MIDDLE_SCHOOL_GRADES, HIGH_SCHOOL_GRADES } from '@/lib/constants';
 import { EXTERNAL_GRADE_OPTIONS, buildYearOptions, toStoredValue } from '@/lib/external-category';
 import {
   getPublishers, getMajorChapters, getSubChapters,
-  getSchools, getSchoolMaterials,
+  getSelectableSchools, getSchoolMaterials,
 } from '@/lib/category-master';
 
 export interface CategoryFormProps {
@@ -44,7 +44,7 @@ export function useCategoryFormState(props: CategoryFormProps) {
   const [publishers, setPublishers] = useState<Publisher[]>([]);
   const [chapters, setChapters] = useState<MajorChapter[]>([]);
   const [subChaptersList, setSubChaptersList] = useState<SubChapter[]>([]);
-  const [schools, setSchools] = useState<School[]>([]);
+  const [schools, setSchools] = useState<SelectableSchool[]>([]);
   const [materials, setMaterials] = useState<SchoolMaterial[]>([]);
 
   const [publisherId, setPublisherId] = useState('');
@@ -73,7 +73,7 @@ export function useCategoryFormState(props: CategoryFormProps) {
   useEffect(() => {
     (async () => {
       if (level === EXTERNAL_LEVEL) {
-        setSchools(await getSchools());
+        setSchools(await getSelectableSchools());
       } else {
         setPublishers(await getPublishers(level));
       }
@@ -123,10 +123,14 @@ export function useCategoryFormState(props: CategoryFormProps) {
     })();
   }, [subChapter, subChaptersList, subChapterId]);
 
-  // 학교 이름 → ID 역추적
+  // 학교 이름 → ID 역추적 (임시저장 복원용)
+  // ⚠️ **이미 그 이름의 학교를 고른 상태면 손대지 않는다.** 학교 원본인 관리자시스템
+  //    `public.schools` 에는 이름 UNIQUE 가 없어, 같은 이름이 둘이면 방금 고른 쪽을
+  //    이름이 같은 **첫 번째** 학교로 되돌려 놓는다(코덱스 리뷰).
   useEffect(() => {
     (async () => {
       if (!schoolName || schools.length === 0) return;
+      if (schools.find((s) => s.id === schoolId)?.name === schoolName) return;
       const found = schools.find((s) => s.name === schoolName);
       if (found && found.id !== schoolId) setSchoolId(found.id);
     })();

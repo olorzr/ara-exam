@@ -36,7 +36,9 @@ export function validateBundles(
   for (const bundle of bundles) {
     const errors: { name?: string; school?: string; pages?: string } = {};
     if (!bundle.name.trim()) errors.name = '프린트 이름을 적어 주세요.';
-    if (!bundle.schoolName.trim()) errors.school = '학교를 골라 주세요.';
+    // 이름이 아니라 **id** 를 요구한다 — 학교 거울(`exam.schools`)과 프린트 마스터가 id 로 붙는다.
+    // 이름만 있고 id 가 비면 시험지는 만들어지는데 카테고리 트리에는 안 올라간다
+    if (!bundle.schoolId) errors.school = '학교를 골라 주세요.';
     if (pagesOfBundle(map, bundle.localId).length === 0) {
       errors.pages = '이 묶음에 넣을 쪽을 골라 주세요.';
     }

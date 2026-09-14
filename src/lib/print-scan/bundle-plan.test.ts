@@ -20,8 +20,15 @@ describe('validateBundles', () => {
   });
 
   it('프린트명·학교가 비면 막는다 — 읽고 나서 저장이 막히면 ChatGPT 를 이미 쓴 뒤다', () => {
-    const errors = validateBundles([draft({ name: '  ', schoolName: '' })], map);
+    const errors = validateBundles([draft({ name: '  ', schoolId: '', schoolName: '' })], map);
     expect(errors.byId.b1.name).toBeTruthy();
+    expect(errors.byId.b1.school).toBeTruthy();
+  });
+
+  it('학교 이름만 있고 id 가 없으면 막는다 — 그 상태로 저장하면 카테고리 트리에 안 올라간다', () => {
+    // 학교 거울(exam.schools)과 프린트 마스터가 id 로 붙는다. 이름만 남은 묶음은
+    // 시험지는 멀쩡히 만들어지는데 `ensureSchoolMaterial` 이 아무것도 못 한다.
+    const errors = validateBundles([draft({ schoolId: '', schoolName: '상현중학교' })], map);
     expect(errors.byId.b1.school).toBeTruthy();
   });
 

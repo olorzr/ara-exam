@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { CategoryLevel } from '@/types';
 import { EXTERNAL_LEVEL, SEMESTER_OPTIONS } from '@/lib/constants';
 import { UNSPECIFIED_OPTION } from '@/lib/external-category';
+import { schoolOptionLabel } from '@/lib/category-master';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { OptionSelect, type SelectOption } from '@/components/ui/option-select';
@@ -116,7 +117,7 @@ export default function CategoryForm(props: CategoryFormProps) {
                 <Label>학교명</Label>
                 <OptionSelect
                   value={s.schoolId}
-                  options={toSelectItems(s.schools)}
+                  options={s.schools.map((sc) => ({ value: sc.id, label: schoolOptionLabel(sc) }))}
                   placeholder="학교 선택"
                   className="w-full"
                   ariaLabel="학교명"

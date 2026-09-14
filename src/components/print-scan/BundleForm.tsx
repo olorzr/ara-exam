@@ -1,26 +1,21 @@
 'use client';
 
-import { useState } from 'react';
-import { toast } from 'sonner';
-import { Plus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { OptionSelect } from '@/components/ui/option-select';
-import { createSchool } from '@/lib/category-master';
+import { schoolOptionLabel } from '@/lib/category-master';
 import { buildYearOptions, EXTERNAL_GRADE_OPTIONS } from '@/lib/external-category';
 import type { BundleDraft } from '@/lib/print-scan/bundles';
-import type { School } from '@/types';
+import type { SelectableSchool } from '@/types';
 
 interface BundleFormProps {
   bundle: BundleDraft;
-  schools: School[];
+  schools: SelectableSchool[];
   errors?: { name?: string; school?: string; pages?: string };
   pageCount: number;
   disabled?: boolean;
   onChange: (patch: Partial<BundleDraft>) => void;
-  onSchoolAdded: (school: School) => void;
 }
 
 /**
@@ -29,35 +24,18 @@ interface BundleFormProps {
  * 값은 개념지와 **같은 규약**이다: 학교/년도/학년/프린트명이 그대로 외부지문 카테고리가 된다.
  * 그래서 '미지정' ↔ '' 변환도 같은 함수(`toStoredValue`)를 지나며, 그 변환은 저장 직전
  * (`toBundleInsert`)에 한 번만 한다 — 화면은 표시값을 그대로 들고 있는다.
+ *
+ * ⚠️ 학교는 **관리자시스템 학교 마스터**에서 온다. 여기서 새 학교를 만들지 않는다 —
+ *    손으로 적은 이름이 마스터와 갈라지는 바람에 예전엔 선택지가 두 곳뿐이었다.
+ * ⚠️ 선택지의 값은 이름이 아니라 **학교 id** 다. 마스터에는 이름 UNIQUE 가 없어,
+ *    이름으로 id 를 되찾으면 동명 학교가 생기는 순간 조용히 엉뚱한 학교에 붙는다.
  */
 export default function BundleForm({
-  bundle, schools, errors, pageCount, disabled, onChange, onSchoolAdded,
+  bundle, schools, errors, pageCount, disabled, onChange,
 }: BundleFormProps) {
-  const [newSchool, setNewSchool] = useState('');
-  const [adding, setAdding] = useState(false);
-
-  const schoolOptions = schools.map((s) => ({ value: s.name, label: s.name }));
+  const schoolOptions = schools.map((s) => ({ value: s.id, label: schoolOptionLabel(s) }));
   // 새로 올리는 프린트라 '데이터에 있는 년도' 가 없다 — 롤링 윈도만으로 충분하다
   const yearOptions = buildYearOptions([]);
-
-  const addSchool = async () => {
-    const name = newSchool.trim();
-    if (!name || adding) return;
-    setAdding(true);
-    try {
-      const { data, error } = await createSchool(name);
-      if (error || !data) throw error ?? new Error('학교를 추가하지 못했어요.');
-      const school = data as School;
-      onSchoolAdded(school);
-      onChange({ schoolId: school.id, schoolName: school.name });
-      setNewSchool('');
-      toast.success(`${school.name} 을(를) 추가했어요.`);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : '학교를 추가하지 못했어요.');
-    } finally {
-      setAdding(false);
-    }
-  };
 
   return (
     <div className="space-y-3">
@@ -65,35 +43,21 @@ export default function BundleForm({
         <Label htmlFor="bundle-school">학교</Label>
         <OptionSelect
           id="bundle-school"
-          value={bundle.schoolName}
+          value={bundle.schoolId}
           options={schoolOptions}
           placeholder="학교를 고르세요"
           disabled={disabled}
-          onChange={(name) => onChange({
-            schoolName: name,
-            schoolId: schools.find((s) => s.name === name)?.id ?? '',
+          onChange={(id) => onChange({
+            schoolId: id,
+            // 저장되는 이름은 꼬리표가 붙지 않은 원래 이름이다(라벨과 값을 헷갈리지 말 것)
+            schoolName: schools.find((s) => s.id === id)?.name ?? '',
           })}
           className="w-full"
         />
         {errors?.school && <p className="text-xs text-red-600">{errors.school}</p>}
-        <div className="flex items-center gap-1.5">
-          <Input
-            value={newSchool}
-            onChange={(e) => setNewSchool(e.target.value)}
-            placeholder="목록에 없으면 새 학교 이름"
-            disabled={disabled || adding}
-            className="h-8 text-sm"
-            aria-label="새 학교 이름"
-          />
-          <Button
-            type="button" variant="outline" size="sm"
-            onClick={addSchool}
-            disabled={disabled || adding || !newSchool.trim()}
-          >
-            <Plus className="h-3.5 w-3.5" />
-            추가
-          </Button>
-        </div>
+        <p className="text-xs text-gray-400">
+          목록에 없는 학교는 관리자시스템 › 학원 관리 › 학교 에서 먼저 등록해 주세요.
+        </p>
       </div>
 
       <div className="grid grid-cols-2 gap-2">

@@ -12,13 +12,13 @@ import OcrProgress from '@/components/problem-ocr/OcrProgress';
 import { useAiEnabled } from '@/hooks/useAiEnabled';
 import { usePrintScanOcr } from '@/hooks/usePrintScanOcr';
 import { usePrintScanPages } from '@/hooks/usePrintScanPages';
-import { getSchools } from '@/lib/category-master';
+import { getSelectableSchools } from '@/lib/category-master';
 import { assignedPages } from '@/lib/print-scan/bundles';
 import {
   printRunConfirmMessage, toBundleInsert, totalBatchCount, validateBundles,
 } from '@/lib/print-scan/bundle-plan';
 import { OCR_CONFIRM_BATCH_THRESHOLD } from '@/lib/problem-ocr/constants';
-import type { School } from '@/types';
+import type { SelectableSchool } from '@/types';
 
 /**
  * 학교 프린트 스캔 올리기 (`/print-sheets/upload`).
@@ -33,12 +33,12 @@ export default function PrintScanUploadPage() {
 
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
-  const [schools, setSchools] = useState<School[]>([]);
+  const [schools, setSchools] = useState<SelectableSchool[]>([]);
   const scan = usePrintScanPages(file);
 
   useEffect(() => {
     let alive = true;
-    getSchools()
+    getSelectableSchools()
       .then((rows) => { if (alive) setSchools(rows); })
       .catch(() => toast.error('학교 목록을 불러오지 못했어요.'));
     return () => { alive = false; };
@@ -175,7 +175,6 @@ export default function PrintScanUploadPage() {
                       pageCount={scan.pagesOf(active.localId).length}
                       disabled={busy}
                       onChange={(patch) => scan.updateBundle(active.localId, patch)}
-                      onSchoolAdded={(school) => setSchools((prev) => [...prev, school])}
                     />
                   </div>
                 )}

@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { fetchScansWithBundles } from '@/lib/print-scan/queries';
 import {
   createSheetForBundle, deleteBundle as deleteBundleRow, deleteScan as deleteScanRow,
+  ensureSchoolMaterial,
 } from '@/lib/print-scan/save';
 import { bundleDeleteConfirmMessage, scanDeleteConfirmMessage } from '@/lib/print-scan/scan-delete';
 import type { PrintBundleRow, PrintScanRow } from '@/types/print-scan';
@@ -101,6 +102,9 @@ export function usePrintSheetList() {
     }
     await withBusy(bundle.id, async () => {
       await createSheetForBundle(bundle, bundle.ocr_html);
+      // 읽기 경로(`runBundle`)와 **같이** 카테고리 트리에도 올린다 — 예전엔 이 길로 만든
+      // 시험지만 트리에서 빠져 있었다(편집기 카테고리 바에서 고른 자리가 비어 보인다)
+      await ensureSchoolMaterial(bundle, (warning) => toast.warning(warning));
       toast.success('시험지를 만들었어요.');
     });
   }, [withBusy]);

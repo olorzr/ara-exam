@@ -42,6 +42,43 @@ export async function fetchNaesinSchools(level: string): Promise<NaesinSchool[]>
   return (data as NaesinSchool[]) ?? [];
 }
 
+/** 프린트·외부지문이 다루는 학교급 — 학년 선택지가 중1~고3 뿐이라 초등은 뺀다 */
+const PRINT_SCHOOL_LEVELS = ['중등', '고등'] as const;
+
+/**
+ * 관리자시스템에 등록된 **중등·고등 학교 전부**를 가져온다.
+ *
+ * `fetchNaesinSchools` 의 형제다 — 그쪽은 내신 화면이 학교급 하나를 고른 뒤 부르고,
+ * 이쪽은 학교급을 미리 정하지 않는 자리(프린트·외부지문)가 한 번에 받아 간다.
+ *
+ * 학교급 순서는 여기서 정하지 않는다 — DB 정렬은 한글 자모순('고등' < '중등')이라
+ * 선택지에 쓰고 싶은 순서(중등 → 고등)와 어긋난다. 정렬은 `mergeSchoolOptions` 가 맡는다.
+ * @returns 이름순 목록
+ */
+export async function fetchMasterSchools(): Promise<NaesinSchool[]> {
+  const { data, error } = await publicDb()
+    .from('schools')
+    .select('id, name, level')
+    .in('level', PRINT_SCHOOL_LEVELS)
+    .order('name');
+  if (error) throw error;
+  return (data as NaesinSchool[]) ?? [];
+}
+
+/**
+ * 학교 하나의 **지금 이름**을 마스터에서 되읽는다.
+ *
+ * 화면이 들고 있는 이름은 폼을 연 시점의 스냅샷이다 — 그 사이 관리자시스템에서 이름을 바꿨다면
+ * 그 옛 이름을 되쓰는 순간 거울과 그 아래 스냅샷이 **전부 옛 이름으로 되돌아간다**.
+ * 그래서 거울을 만들 때는 화면 값이 아니라 이 함수가 돌려준 값을 쓴다.
+ * @param id - `public.schools.id`
+ * @returns 마스터의 이름. 마스터에 없는 학교(옛 항목)면 null
+ */
+export async function fetchMasterSchoolName(id: string): Promise<string | null> {
+  const { data } = await publicDb().from('schools').select('name').eq('id', id).maybeSingle();
+  return (data?.name as string | undefined) ?? null;
+}
+
 /**
  * (학교 × 학년 × 학년도 × 학기 × 중간/기말) 내신 시험범위 슬롯 단건을 가져온다.
  * 저장된 행이 없으면 null.

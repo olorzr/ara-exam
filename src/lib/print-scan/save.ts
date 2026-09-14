@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { createSchoolMaterial } from '@/lib/category-master';
+import { createSchoolMaterial, ensureSchoolMirror } from '@/lib/category-master';
 import { buildConceptSheetPayload, generateConceptTitle } from '@/lib/concept-sheet-form';
 import { removeProblemFiles } from '@/lib/problem-bank/storage';
 import type { PrintBundle, PrintBundleStatus, PrintOcrMeta } from '@/types/print-scan';
@@ -123,18 +123,36 @@ export async function fetchSheetIdForBundle(bundleId: string): Promise<string | 
 }
 
 /**
- * 프린트를 카테고리 마스터에도 등록해 둔다 (실패해도 무시).
+ * 프린트를 카테고리 마스터에도 등록해 둔다.
  *
  * 개념지는 카테고리를 **텍스트로 복사**해 저장하므로 마스터가 없어도 저장·인쇄는 된다.
  * 다만 마스터에 없으면 개념지 편집기의 카테고리 트리에 그 프린트가 안 보여서,
  * 선생님이 카테고리 바를 열었을 때 **고른 자리가 비어 보인다**.
+ *
+ * 학교 거울을 **먼저** 만든다 — `school_materials.school_id` 는 `exam.schools(id)` 를 가리키는
+ * 하드 FK 라, 관리자 마스터에서 고른 학교가 거울에 없으면 등록이 FK 위반으로 막힌다.
+ *
+ * ⚠️ **모든 오류를 삼키지 않는다.** 예전에는 `.catch(() => undefined)` 가 전부를 먹어서,
+ *    거울이 없어 프린트가 트리에 안 올라가도 화면에 아무 말이 없었다(이 결함을 조용하게 만든
+ *    장치가 바로 그것이다). 이미 있는 경우(UNIQUE 위반)만 정상으로 치고 나머지는 경고로 올린다.
  * @param bundle - 묶음 (학교 id 를 모르면 아무것도 하지 않는다)
+ * @param onWarning - 사람에게 보일 경고를 받는 곳 (없으면 조용히 지나간다)
  */
-export async function ensureSchoolMaterial(bundle: PrintBundle): Promise<void> {
+export async function ensureSchoolMaterial(
+  bundle: PrintBundle,
+  onWarning?: (message: string) => void,
+): Promise<void> {
   if (!bundle.school_id || !bundle.name) return;
+
+  const mirror = await ensureSchoolMirror({ id: bundle.school_id, name: bundle.school_name });
+  if (mirror.warning) onWarning?.(mirror.warning);
+  if (!mirror.id) return;
+
+  const { error } = await createSchoolMaterial(bundle.name, mirror.id, bundle.year, bundle.grade);
   // 이미 있으면 UNIQUE(name, school_id, year, grade) 로 막힌다 — 그게 정상이라 삼킨다
-  await createSchoolMaterial(bundle.name, bundle.school_id, bundle.year, bundle.grade)
-    .catch(() => undefined);
+  if (error && error.code !== UNIQUE_VIOLATION) {
+    onWarning?.(`프린트 '${bundle.name}' 을(를) 카테고리 마스터에 등록하지 못했어요: ${error.message}`);
+  }
 }
 
 /**

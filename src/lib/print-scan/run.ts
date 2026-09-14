@@ -152,8 +152,9 @@ export async function runBundle(
 
     env.onProgress?.({ phase: 'save', done: 0, total: 1 });
     const sheetId = await createSheetForBundle(bundle, html);
-    // 카테고리 트리에도 올려 둔다(실패해도 시험지는 멀쩡하다)
-    await ensureSchoolMaterial(bundle);
+    // 카테고리 트리에도 올려 둔다(실패해도 시험지는 멀쩡하다).
+    // 못 올렸으면 **말한다** — 시험지는 멀쩡한데 트리에서만 안 보이는 것이 가장 찾기 어렵다
+    await ensureSchoolMaterial(bundle, (warning) => env.onWarnings?.([warning]));
 
     await updateBundle(bundle.id, {
       status: '읽기완료',

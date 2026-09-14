@@ -10,7 +10,7 @@ import { kstYear } from '@/lib/kst-year';
 import {
   EXTERNAL_GRADE_OPTIONS, UNSPECIFIED_OPTION, buildYearOptions, toStoredValue,
 } from '@/lib/external-category';
-import type { School, SchoolMaterial } from '@/types';
+import type { SchoolMaterial, SelectableSchool } from '@/types';
 import * as cm from '@/lib/category-master';
 
 /**
@@ -21,14 +21,14 @@ import * as cm from '@/lib/category-master';
  * (학교당 수십 건 규모라 왕복을 늘릴 이유가 없고, 같은 목록에서 년도 옵션도 뽑는다).
  */
 export default function ExternalCategoryTab() {
-  const [schools, setSchools] = useState<School[]>([]);
+  const [schools, setSchools] = useState<SelectableSchool[]>([]);
   const [selectedSchoolId, setSelectedSchoolId] = useState('');
   const [materials, setMaterials] = useState<SchoolMaterial[]>([]);
   const [year, setYear] = useState(() => String(kstYear()));
   const [grade, setGrade] = useState('');
 
   const loadSchools = useCallback(async () => {
-    setSchools(await cm.getSchools());
+    setSchools(await cm.getSelectableSchools());
   }, []);
 
   useEffect(() => {
@@ -57,31 +57,19 @@ export default function ExternalCategoryTab() {
     [materials, scopeReady, storedYear, storedGrade],
   );
 
-  // --- School CRUD ---
-  const handleAddSchool = async (name: string) => {
-    const { error } = await cm.createSchool(name);
-    if (error) { toast.error('이미 존재하는 학교입니다.'); return; }
-    toast.success('학교가 추가되었습니다.');
-    loadSchools();
-  };
-  const handleEditSchool = async (id: string, name: string) => {
-    const { error } = await cm.updateSchool(id, name);
-    if (error) { toast.error(`학교 수정 실패: ${error.message}`); return; }
-    toast.success('학교명이 수정되었습니다.');
-    loadSchools();
-  };
-  const handleDeleteSchool = async (id: string) => {
-    const { error } = await cm.deleteSchool(id);
-    if (error) { toast.error(`학교 삭제 실패: ${error.message}`); return; }
-    toast.success('학교가 삭제되었습니다.');
-    if (selectedSchoolId === id) setSelectedSchoolId('');
-    loadSchools();
-  };
-
   // --- Material CRUD ---
+  // 학교는 여기서 만들지 않는다 — 원본이 관리자시스템 public.schools 다(sql/27).
   const reloadMats = () => cm.getSchoolMaterials(selectedSchoolId).then(setMaterials);
   const handleAddMat = async (name: string) => {
-    const { error } = await cm.createSchoolMaterial(name, selectedSchoolId, storedYear, storedGrade);
+    // 프린트를 붙일 자리를 먼저 만든다 — school_materials.school_id 는 exam.schools 로 가는
+    // 하드 FK 라, 마스터에서 고른 학교가 거울에 없으면 등록이 조용히 막힌다
+    const school = schools.find((s) => s.id === selectedSchoolId);
+    if (!school) { toast.error('학교를 먼저 고르세요.'); return; }
+    const mirror = await cm.ensureSchoolMirror(school);
+    if (mirror.warning) toast.warning(mirror.warning);
+    if (!mirror.id) return;
+
+    const { error } = await cm.createSchoolMaterial(name, mirror.id, storedYear, storedGrade);
     if (error) { toast.error('이미 존재하는 항목입니다.'); return; }
     toast.success('프린트/작품명이 추가되었습니다.');
     reloadMats();
@@ -136,13 +124,11 @@ export default function ExternalCategoryTab() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <MasterListPanel
               title="학교"
-              items={schools}
+              items={schools.map((s) => ({ id: s.id, name: cm.schoolOptionLabel(s) }))}
               selectedId={selectedSchoolId}
               onSelect={setSelectedSchoolId}
-              onAdd={handleAddSchool}
-              onEdit={handleEditSchool}
-              onDelete={handleDeleteSchool}
-              placeholder="예: OO중학교"
+              note="학교는 관리자시스템 › 학원 관리 › 학교 에서 등록합니다."
+              emptyMessage="학교 목록을 불러오지 못했습니다"
             />
             <MasterListPanel
               title="프린트/작품명"
