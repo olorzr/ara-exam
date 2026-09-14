@@ -28,6 +28,11 @@ describe('gradeSyncFailureMessage', () => {
     expect(gradeSyncFailureMessage({ ok: false, reason: 'intake_failed', status: 500 })).toContain('500');
   });
 
+  it('409 는 원본 미등록이라고 짚어 준다 (재시험은 원본 회차에 붙는다)', () => {
+    const msg = gradeSyncFailureMessage({ ok: false, reason: 'intake_failed', status: 409 });
+    expect(msg).toContain('원본 시험지');
+  });
+
   it('응답을 못 받으면 연결 실패로 알린다', () => {
     expect(gradeSyncFailureMessage(undefined)).toContain('연결');
   });

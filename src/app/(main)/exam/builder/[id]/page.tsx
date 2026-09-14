@@ -8,6 +8,7 @@ import {
   ExamEditor,
   ExamMarkingSidebar,
   ExamPreview,
+  PassPercentageField,
 } from '@/components/exam-builder';
 import { useConceptSheetEditor } from '@/hooks/useConceptSheetEditor';
 
@@ -36,6 +37,7 @@ export default function ConceptEditorPage() {
             editorHTML={e.editorHTML}
             category={e.category}
             markCount={e.marks.length}
+            passPercentage={e.passPercentage}
             activeTab={e.previewTab}
             onTabChange={e.setPreviewTab}
             onBack={() => e.router.push('/exam/builder')}
@@ -65,6 +67,13 @@ export default function ConceptEditorPage() {
             value={e.title}
             onChange={(ev) => e.handleTitleChange(ev.target.value)}
             className="flex-1 max-w-md border-transparent hover:border-gray-300 focus:border-primary bg-transparent text-base font-semibold"
+          />
+
+          {/* 합격 기준 — 단어 시험지 생성 화면과 같은 자리(제목과 저장 사이) */}
+          <PassPercentageField
+            value={e.passPercentage}
+            onChange={e.setPassPercentage}
+            markCount={e.marks.length}
           />
 
           <Button

@@ -7,6 +7,7 @@ import { A4Document, CompactPageHeader } from '@/components/print';
 import { SHEET_BODY_CLASS, useConceptSheetBlocks } from '@/hooks/useConceptSheetBlocks';
 import { decideSheetColumns, maxWrappedTableColumns } from '@/lib/print/sheet-columns';
 import { EXTERNAL_LEVEL } from '@/lib/constants';
+import { passCountOf } from '@/lib/pass-count';
 import { kstYear } from '@/lib/kst-year';
 import type { BuilderCategory } from './ExamCategoryBar';
 
@@ -34,6 +35,11 @@ interface ExamSheetRendererProps {
   config: SheetConfig;
   category: BuilderCategory;
   markCount: number;
+  /**
+   * 합격 기준(%). 주면 채점 시트(1~3단계)의 점수란 옆에 '합격 N개 이상 (P%)' 을 찍는다.
+   * 단어 시험지(ExamPrintHeader)와 같은 문구다 — 선생님이 두 인쇄물에서 같은 말을 봐야 한다.
+   */
+  passPercentage?: number;
   /** 개념지 탭에서 인터랙티브 모드 */
   interactive?: boolean;
   /** '전체 출력' 에서 다음 시트를 새 페이지에서 시작시킨다 */
@@ -49,6 +55,7 @@ export default function ExamSheetRenderer({
   config,
   category,
   markCount,
+  passPercentage,
   interactive,
   breakAfterLast,
 }: ExamSheetRendererProps) {
@@ -122,6 +129,12 @@ export default function ExamSheetRenderer({
               {config.showScore && (
                 <span className="ml-auto font-semibold text-[#C83C6E]">
                   <span className="inline-block border-b border-gray-400 w-10 text-center" /> / {markCount}개
+                </span>
+              )}
+              {/* 합격 기준 — 채점하는 시트(1~3단계)에만. 개념지·답안지는 시험이 아니라 안 찍는다 */}
+              {config.showScore && passPercentage !== undefined && markCount > 0 && (
+                <span className="font-normal text-gray-500">
+                  합격 <strong className="text-gray-800">{passCountOf(passPercentage, markCount)}개</strong> 이상 ({passPercentage}%)
                 </span>
               )}
             </div>

@@ -21,9 +21,23 @@
 - 관련 파일: `src/types/index.ts`, `sql/01_schema.sql`
 
 ## 합격선 (Pass Percentage)
-- 정의: 시험 통과에 필요한 최소 정답률 (기본값 80%)
-- 코드에서의 사용: `pass_percentage`, `pass_count`, `DEFAULT_PASS_PERCENTAGE`
-- 관련 파일: `src/lib/constants.ts`, `src/app/(main)/exam/create/page.tsx`
+- 정의: 시험 통과에 필요한 최소 정답률 (기본값 80%). **미만이면 재시험** — 학원의 모든 시험에 적용된다
+- 어디에 있나: 단어 시험지 `exams.pass_percentage`, **개념지 `concept_sheets.pass_percentage`**(sql/25)
+- 코드에서의 사용: `pass_percentage`, `pass_count`, `DEFAULT_PASS_PERCENTAGE`, `passCountOf`
+- 관련 파일: `src/lib/constants.ts`, `src/lib/pass-count.ts`, `src/app/(main)/exam/create/page.tsx`,
+  `src/components/exam-builder/PassPercentageField.tsx`
+- ⚠️ 합격 개수 계산식(CEIL)은 **네 곳이 1:1 미러**다: `create_exam_with_words` RPC ·
+  `pass-count.ts` · ara-system migration 477 · ara-system `scripts/backfill-araexam-grades.js`
+
+## 재시험 (Retake)
+- 정의: 합격선 미만인 학생이 한 번 더 보는 시험. 단어시험은 **같은 단어를 다시 섞은 시험지**를
+  새로 만들고(시험 기록 화면의 '재시험' 버튼), 개념시험은 **같은 개념지를 합격할 때까지** 다시 본다
+- 코드에서의 사용: `exams.parent_exam_id` + `retake_number`(이 앱의 시험지), `handleRetest`
+- 관련 파일: `src/hooks/useExamHistory.ts`, `src/components/exam/ExamHistoryCard.tsx`,
+  `sql/10_migration_lock_exam_words.sql`(차수·셔플·제목 접미사를 서버가 결정)
+- ⚠️ **학원 관리 시스템에서는 재시험이 회차가 아니다**(그쪽 mig477) — 재시험지는 원본 회차에 붙고
+  (`exam_retake_papers`), 학생별 차수는 `exam_results.attempt_no` 로 표현된다. 원본이 미등록이면
+  동기화가 409 로 거절한다
 
 ## 외부지문 및 프린트 (External Level)
 - 정의: 교과서 외 학교별 특이 지문/프린트물의 단어를 관리하는 별도 카테고리. 계층은 `학교 > 년도 > 학년 > 프린트/작품명`

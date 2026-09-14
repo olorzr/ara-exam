@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireSession } from '@/lib/require-session';
-import { EXTERNAL_LEVEL } from '@/lib/constants';
+import { DEFAULT_PASS_PERCENTAGE, EXTERNAL_LEVEL } from '@/lib/constants';
 import { levelGradeToDivision } from '@/lib/grade-division';
+import { passCountOf } from '@/lib/pass-count';
 
 /**
  * ara-system 성적 개념 시험 자동 등록 — 발신부.
@@ -20,6 +21,10 @@ import { levelGradeToDivision } from '@/lib/grade-division';
  * 별도 division 이 담당하므로 슬롯을 이렇게 재사용해도 안전하다. 년도는 시리즈에 넣지
  * 않는다 — ara-system 이 회차 라벨(YY-NN)을 연도별로 다시 세므로(mig343) 교과서
  * 시리즈도 년도 없이 해마다 재사용한다.
+ *
+ * 합격 기준(커트라인): 개념지에도 pass_percentage 가 있다(sql/25, 기본 80). 단어시험과 같은 규약으로
+ * passPercentage·passCount 를 함께 보내면 ara-system 이 실컬럼(exam_subtype.pass_count)에 저장하고
+ * 합격/불합격(exam_results.passed)을 판정한다. 개수 계산식(CEIL)은 passCountOf 한 곳이다.
  *
  * 실패해도 throw 하지 않는다(저장 UX 방해 금지). 공유 시크릿은 서버 env 에만 둔다.
  */
@@ -58,7 +63,7 @@ export async function POST(request: NextRequest) {
   try {
     const { data: sheet, error: sheetErr } = await supabaseAdmin
       .from('concept_sheets')
-      .select('id, title, level, grade, publisher, semester, unit, subunit, school_name, marks')
+      .select('id, title, level, grade, publisher, semester, unit, subunit, school_name, marks, pass_percentage')
       .eq('id', conceptSheetId)
       .maybeSingle();
     if (sheetErr || !sheet) {
@@ -88,6 +93,11 @@ export async function POST(request: NextRequest) {
       ? sheet.school_name ?? ''
       : sheet.publisher ?? '';
 
+    // 합격 기준 — 개념지 값(없던 시절 행은 DEFAULT 80 이 채워져 있다).
+    const passPercentage = typeof sheet.pass_percentage === 'number'
+      ? sheet.pass_percentage
+      : DEFAULT_PASS_PERCENTAGE;
+
     const payload = {
       sourceExamId: sheet.id,
       title: sheet.title || '개념',
@@ -97,6 +107,8 @@ export async function POST(request: NextRequest) {
       semester: sheet.semester ?? '',
       ...(unitTitle ? { unitTitle } : {}),
       answers,
+      passPercentage,
+      passCount: passCountOf(passPercentage, answers.length),
     };
 
     const res = await fetch(`${intakeUrl.replace(/\/$/, '')}/api/integrations/concept-exam`, {

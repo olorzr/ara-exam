@@ -1,5 +1,6 @@
 import type { BuilderCategory, MarkItem } from '@/components/exam-builder';
-import { EXTERNAL_LEVEL } from './constants';
+import { DEFAULT_PASS_PERCENTAGE, EXTERNAL_LEVEL } from './constants';
+import { clampPassPercentage } from './pass-count';
 import { normalizeCategoryName } from './category-name';
 import type { ConceptSheet } from '@/types';
 
@@ -8,6 +9,7 @@ export type ConceptSheetPayload = Pick<
   ConceptSheet,
   | 'title' | 'level' | 'year' | 'grade' | 'publisher'
   | 'semester' | 'unit' | 'subunit' | 'school_name' | 'editor_html' | 'marks'
+  | 'pass_percentage'
 >;
 
 /** 새 개념지의 빈 카테고리 */
@@ -67,6 +69,7 @@ export function isCategoryIncomplete(cat: BuilderCategory): boolean {
  * @param input.category - 빌더 카테고리
  * @param input.html - 이미 sanitize 된 편집기 HTML
  * @param input.marks - 추출된 개념 마킹 목록
+ * @param input.passPercentage - 합격 기준(%). 범위 밖·빈 값이면 기본 80
  * @returns Supabase insert/update 에 그대로 넘길 수 있는 payload
  */
 export function buildConceptSheetPayload(input: {
@@ -74,6 +77,7 @@ export function buildConceptSheetPayload(input: {
   category: BuilderCategory;
   html: string;
   marks: MarkItem[];
+  passPercentage?: number;
 }): ConceptSheetPayload {
   const { title, category, html, marks } = input;
   return {
@@ -88,5 +92,6 @@ export function buildConceptSheetPayload(input: {
     school_name: normalizeCategoryName(category.schoolName),
     editor_html: html,
     marks,
+    pass_percentage: clampPassPercentage(input.passPercentage, DEFAULT_PASS_PERCENTAGE),
   };
 }

@@ -20,6 +20,8 @@ interface ExamPreviewProps {
   editorHTML: string;
   category: BuilderCategory;
   markCount: number;
+  /** 합격 기준(%) — 채점 시트 머리에 '합격 N개 이상' 을 찍는다 */
+  passPercentage?: number;
   activeTab: string;
   onTabChange: (tab: string) => void;
   onBack: () => void;
@@ -37,6 +39,7 @@ export default function ExamPreview({
   editorHTML,
   category,
   markCount,
+  passPercentage,
   activeTab,
   onTabChange,
   onBack,
@@ -82,6 +85,7 @@ export default function ExamPreview({
             config={cfg}
             category={category}
             markCount={markCount}
+            passPercentage={passPercentage}
             // 마지막 시트를 뺀 나머지는 뒤에서 페이지를 넘겨 시트마다 새 장에서 시작하게 한다
             breakAfterLast={i < keys.length - 1}
           />
@@ -96,6 +100,7 @@ export default function ExamPreview({
         config={config}
         category={category}
         markCount={markCount}
+        passPercentage={passPercentage}
         interactive={activeTab === 'concept'}
       />
     );

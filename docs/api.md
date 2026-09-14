@@ -44,10 +44,15 @@
   서버가 `exams` + `exam_words` 스냅샷을 읽어 ara-system `/api/integrations/vocab-exam` 으로 전달한다
 - 인증: `Authorization: Bearer <supabase access_token>` (도메인 검사 포함)
 - Body: `{ examId: string }` (UUID)
-- Response: `{ ok: true, result }` — result 에 `subtypeId`·`roundNumber`·`created`
+- Response: `{ ok: true, result }` — 원본이면 result 에 `subtypeId`·`roundNumber`·`created`,
+  **재시험이면 `{ retake: true, subtypeId: <원본 회차>, paperId, retakeNumber }`**
 - 에러: 401 `unauthorized` · 400 `bad_body`/`bad_examId` · 404 `exam_not_found` ·
   500 `words_read_failed`/`category_read_failed`/`exception` · 502 `intake_failed`(+`status`·`detail`) ·
   **503 `not_configured`**(연동 env 미설정)
+- ⚠️ **재시험은 회차를 만들지 않는다**(ara-system mig477). 원본 회차에 딸린 재시험지
+  (`exam_retake_papers`)로 붙고, 학생별 차수는 채점할 때 오른다. 그래서 **원본이 아직 등록 전이면
+  수신부가 409 `parent_not_registered`** 를 돌려주고 여기서는 502 `intake_failed`(status 409)로 올라간다.
+  화면에는 '원본 시험지가 학원 성적에 아직 등록되지 않았어요' 토스트가 뜬다
 - 비고: 호출은 시험 생성·재시험 직후 **fire-and-forget**(`keepalive`)이고 실패해도 생성 UX 를 막지
   않지만, 클라이언트가 응답을 읽어 **경고 토스트**를 띄운다([grade-sync-client.ts](../src/lib/grade-sync-client.ts)).
   ara-system 쪽이 멱등이라 재호출·재시험도 안전하다. 학교급은 시험 카테고리의 level/grade 로
@@ -63,6 +68,9 @@
 - 비고: 폴더는 ara-system 이 만든다(`개념 시험 > 교과서 그룹 > 학년+학기`). 외부지문은 출판사가
   비어 있어 **publisher 슬롯에 학교명**을 보낸다 — 안 보내면 전부 '기타' 한 폴더에 뭉친다.
   ⚠️ 채점이 끝난 회차는 ara-system 이 분모·정답을 동결하므로 이름·날짜만 갱신된다
+  (**합격 기준만은 갱신된다** — 잘못 넣은 기준을 고치면 지난 합격 판정도 함께 고쳐져야 한다)
+- 합격 기준: 개념지의 `pass_percentage`(기본 80)와 그로 계산한 `passCount` 를 함께 보낸다.
+  계산식(CEIL)은 [pass-count.ts](../src/lib/pass-count.ts) 단일 출처 — RPC·마이그레이션·백필과 미러
 
 ## RPC exam.set_source_textbook
 - 설명: 기출 출처의 교과서를 바꾸고, 원하면 그 출처의 단원 태그를 **같은 트랜잭션에서** 지운다

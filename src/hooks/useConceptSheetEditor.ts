@@ -17,6 +17,7 @@ import {
   isCategoryIncomplete,
 } from '@/lib/concept-sheet-form';
 import { useConceptMarkActions } from './useConceptMarkActions';
+import { DEFAULT_PASS_PERCENTAGE } from '@/lib/constants';
 import type { ConceptSheet } from '@/types';
 
 /**
@@ -42,6 +43,9 @@ export function useConceptSheetEditor() {
   const [category, setCategory] = useState<BuilderCategory>(DEFAULT_CONCEPT_CATEGORY);
   const [editorHTML, setEditorHTML] = useState('');
   const [marks, setMarks] = useState<MarkItem[]>([]);
+  // 합격 기준(%) — 단어 시험지와 같은 규약. 커트라인 미만이면 재시험이고,
+  // 이 값이 학원 관리 시스템의 합격/불합격 판정 기준이 된다(sql/25).
+  const [passPercentage, setPassPercentage] = useState(DEFAULT_PASS_PERCENTAGE);
   const [previewTab, setPreviewTab] = useState('concept');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(!isNew);
@@ -101,6 +105,7 @@ export function useConceptSheetEditor() {
           schoolName: sheet.school_name ?? '',
         });
         setLoadedUpdatedAt(sheet.updated_at);
+        setPassPercentage(sheet.pass_percentage ?? DEFAULT_PASS_PERCENTAGE);
         // 저장 시 sanitize 했더라도 과거 오염 데이터나 직접 DB/RPC 쓰기가 남아 있을 수
         // 있다. 편집기 content 로 주입하기 전에 읽기 경로에서도 정화한다.
         const safeHTML = sanitizeConceptHTML(sheet.editor_html);
@@ -131,6 +136,7 @@ export function useConceptSheetEditor() {
       category,
       html: sanitizeConceptHTML(editor ? editor.getHTML() : editorHTML),
       marks: currentMarks,
+      passPercentage,
     });
 
     setSaving(true);
@@ -184,7 +190,9 @@ export function useConceptSheetEditor() {
     } finally {
       setSaving(false);
     }
-  }, [user, title, category, editorHTML, marks, savedId, loadedUpdatedAt, router]);
+    // ⚠️ passPercentage 를 deps 에 넣지 않으면 방금 바꾼 합격 기준이 아니라 마운트 시점 값으로
+    //    저장된다(화면엔 70% 인데 저장은 80% 가 되는 조용한 어긋남).
+  }, [user, title, category, editorHTML, marks, passPercentage, savedId, loadedUpdatedAt, router]);
 
   return {
     router,
@@ -198,6 +206,8 @@ export function useConceptSheetEditor() {
     setEditorHTML,
     marks,
     setMarks,
+    passPercentage,
+    setPassPercentage,
     previewTab,
     setPreviewTab,
     saving,

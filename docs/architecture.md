@@ -108,7 +108,8 @@ src/
 2. 단어 입력 → categories + words 테이블에 저장 (RLS로 사용자별 격리)
 3. 시험지 생성 → 선택된 단어를 exam_words에 스냅샷 저장 → exams 테이블에 메타 저장
 4. 시험지 보기 → exam_words에서 스냅샷 로드 → 문항 블록 실측 → A4 낱장 배치(`lib/print`) → 인쇄
-5. 개념지 저장 → `api/sync-concept-to-grades` → ara-system 성적에 채점 회차 멱등 등록. 폴더 매핑은 **그룹 = 중등/고등이면 출판사 · 외부지문이면 학교명**, **시리즈 = 학년 + 학기**(외부지문은 학기가 없어 학년만), 회차명 = 단원(외부지문은 프린트/작품명). 년도는 시리즈에 넣지 않는다(회차 라벨이 연도별로 리셋됨)
+5. 개념지 저장 → `api/sync-concept-to-grades` → ara-system 성적에 채점 회차 멱등 등록. 폴더 매핑은 **그룹 = 중등/고등이면 출판사 · 외부지문이면 학교명**, **시리즈 = 학년 + 학기**(외부지문은 학기가 없어 학년만), 회차명 = 단원(외부지문은 프린트/작품명). 년도는 시리즈에 넣지 않는다(회차 라벨이 연도별로 리셋됨). **합격 기준(`pass_percentage`, 기본 80)도 함께 보낸다** — 그쪽이 합격/불합격을 판정한다
+6. 재시험 생성 → `create_exam_with_words`(부모 단어 재조립·서버 셔플) → `api/sync-to-grades` → ara-system 이 **원본 회차에 딸린 재시험지**로 붙인다(회차를 새로 만들지 않는다, 그쪽 mig477). 학생별 차수는 채점할 때 `exam_results.attempt_no` 가 오른다. 원본이 미등록이면 409 → 경고 토스트
 
 ## concept_sheets HTML 파이프라인
 - 입력 (저장): TipTap `editor.getHTML()` → `sanitizeConceptHTML` → supabase insert/update (`src/hooks/useConceptSheetEditor.ts` 의 `handleSave`)

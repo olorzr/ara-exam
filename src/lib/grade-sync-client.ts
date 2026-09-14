@@ -53,6 +53,9 @@ export function gradeSyncFailureMessage(res: GradeSyncResponse | undefined): str
 
   if (res.reason === 'intake_failed') {
     if (res.status === 401) return '시험관리 시스템이 인증을 거절했어요 (주소·시크릿 확인 필요)';
+    // 409 = 재시험인데 원본 시험지가 아직 학원 성적에 등록되지 않은 경우.
+    // 재시험은 원본 회차에 붙으므로 원본이 먼저 등록돼 있어야 한다(ara-system mig477).
+    if (res.status === 409) return '원본 시험지가 학원 성적에 아직 등록되지 않았어요 — 관리자에게 알려주세요';
     return `시험관리 시스템이 등록을 거절했어요 (${res.status ?? '오류'})`;
   }
   return REASON_MESSAGES[res.reason ?? ''] ?? '등록에 실패했어요';

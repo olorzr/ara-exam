@@ -11,6 +11,13 @@ import { resolveSingleDivision } from '@/lib/grade-division';
  * 공유 시크릿(ARA_SYSTEM_INTAKE_SECRET)은 서버에만 두어 브라우저에 노출하지 않는다.
  * ara-system 쪽은 멱등이라 재호출/재시험도 안전하다.
  *
+ * ⚠️ **재시험은 ara-system 에서 회차를 만들지 않는다**(그쪽 mig477). 원본 회차에 딸린
+ *   재시험지(exam_retake_papers)로 붙고, 학생별 차수는 채점할 때 exam_results.attempt_no 가 오른다.
+ *   그래서 **원본이 아직 등록 전이면 409(parent_not_registered)** 가 돌아온다 — 예전처럼 별도
+ *   회차로 폴백 등록하지 않는다(그렇게 만든 회차는 학생별 차수와 이어지지 않아 재시험 점수가
+ *   원본과 따로 논다). 화면에는 경고 토스트가 뜨고, 밀린 건은 백필 스크립트가 원본을 먼저
+ *   등록한 뒤 붙인다.
+ *
  * 실패해도 절대 throw 하지 않는다(시험 생성 UX 를 막지 않도록) — { ok:false } 로만 알린다.
  */
 

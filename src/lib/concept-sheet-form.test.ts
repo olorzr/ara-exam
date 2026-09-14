@@ -96,6 +96,13 @@ describe('buildConceptSheetPayload', () => {
     expect(payload.grade).toBe('중2');
   });
 
+  it('합격 기준은 기본 80, 범위 밖은 잘라 담는다', () => {
+    expect(buildConceptSheetPayload(base).pass_percentage).toBe(80);
+    expect(buildConceptSheetPayload({ ...base, passPercentage: 70 }).pass_percentage).toBe(70);
+    expect(buildConceptSheetPayload({ ...base, passPercentage: 140 }).pass_percentage).toBe(100);
+    expect(buildConceptSheetPayload({ ...base, passPercentage: -5 }).pass_percentage).toBe(0);
+  });
+
   it('제목의 앞뒤 공백을 자른다', () => {
     expect(buildConceptSheetPayload({ ...base, title: '  개념지  ' }).title).toBe('개념지');
   });
