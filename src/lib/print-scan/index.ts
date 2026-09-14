@@ -5,6 +5,7 @@ export * from './page-images';
 export * from './parse';
 export * from './prompt';
 export * from './queries';
+export * from './reading-state';
 export * from './run';
 export * from './run-scan';
 export * from './save';

@@ -3,6 +3,7 @@
 import type { OpenPdf } from '@/lib/pdf/pdfPages';
 import { PageCropper } from '@/lib/problem-ocr/crop-dom';
 import { uploadProblemFile } from '@/lib/problem-bank/storage';
+import { isDuplicateUploadError } from '@/lib/problem-bank/storage-errors';
 import { printScanPagePath } from './storage-paths';
 
 /**
@@ -15,6 +16,8 @@ import { printScanPagePath } from './storage-paths';
  *    무엇보다 이 실패가 본문 읽기를 막으면 안 된다.
  * ⚠️ data URL → fetch → Blob 수법을 쓰지 말 것 — CSP `connect-src` 가 `data:` 를 막아
  *    **전부 실패**한다. 반드시 `canvas.toBlob`(PageCropper.pageBlob)이다.
+ * ⚠️ 실패한 쪽은 **결과에 넣지 않는다.** 경로를 넣어 두면 `rerunBundle` 이 '이미 있다' 고 보고
+ *    건너뛰어(비어 있는 자리만 다시 올린다) 그 쪽은 영영 안 고쳐진다.
  *
  * @param doc - 열어 둔 PDF
  * @param scanId - 스캔 id
@@ -47,10 +50,10 @@ export async function uploadPrintPageImages(
         try {
           await uploadProblemFile(path, blob, 'image/jpeg');
           out.set(page, path);
-        } catch {
-          // 이미 있는 경로면 upsert:false 라 여기로 온다(다시 읽기).
-          // 파일은 이미 있으니 경로는 유효하다 — 그대로 쓴다
-          out.set(page, path);
+        } catch (e) {
+          // 이미 있는 경로면 upsert:false 라 여기로 온다(다시 읽기) — 그때만 경로가 유효하다.
+          // 네트워크·권한·용량 실패까지 '있다' 로 치면 **없는 파일의 경로**를 저장하게 된다
+          if (isDuplicateUploadError(e)) out.set(page, path);
         }
       }
       done += 1;

@@ -36,6 +36,8 @@ export interface PrintScanRunResult {
   failed: number;
   /** 시작조차 못 한 묶음 수 (취소·한도로 멈췄을 때) — '대기' 로 남아 있다 */
   pending: number;
+  /** 시험지는 만들었지만 **확인이 필요한** 묶음 수 (ok 의 부분집합) */
+  warned: number;
 }
 
 /** 저장까지 마친 묶음 행 */
@@ -45,6 +47,8 @@ type SavedRow = PrintBundleDraftRow & { scan_id: string };
 interface RunEnv {
   signal?: AbortSignal;
   onProgress?: (p: PrintRunProgress) => void;
+  /** 묶음이 남긴 경고 — 어느 프린트 얘기인지 이름을 함께 준다 */
+  onWarnings?: (warnings: string[], bundleName: string) => void;
 }
 
 /** 저장 행을 읽기에 쓸 모양으로 (아직 DB 에서 다시 읽지 않는다 — 방금 넣은 값 그대로다) */
@@ -109,7 +113,7 @@ async function readBundlesInOrder(
   rows: SavedRow[],
   doc: OpenPdf,
   env: RunEnv,
-): Promise<{ ok: number; failed: number; pending: number }> {
+): Promise<{ ok: number; failed: number; pending: number; warned: number }> {
   const port = getCodexPort();
   const pref = getCodexModelPref();
 
@@ -121,6 +125,7 @@ async function readBundlesInOrder(
 
   let ok = 0;
   let failed = 0;
+  let warned = 0;
 
   for (const [index, row] of rows.entries()) {
     if (env.signal?.aborted) break;
@@ -130,9 +135,19 @@ async function readBundlesInOrder(
       bundle: { index, total: rows.length, name: row.name },
     });
 
+    // 경고는 읽자마자 화면에 올리되(늦게 알릴 이유가 없다) **세는 것은 저장까지 끝난 뒤**다 —
+    // 여기서 세면 시험지 만들기가 실패한 묶음이 '실패' 와 '확인 필요' 로 두 번 세어진다
+    let sawWarnings = false;
     try {
-      await runBundle(bundle, doc, { port, pref, signal: env.signal, onProgress });
+      await runBundle(bundle, doc, {
+        port, pref, signal: env.signal, onProgress,
+        onWarnings: (w) => {
+          sawWarnings = true;
+          env.onWarnings?.(w, row.name);
+        },
+      });
       ok += 1;
+      if (sawWarnings) warned += 1;
     } catch (e) {
       failed += 1;
       // 한도·권한·취소는 다음 묶음도 같은 이유로 죽는다 — 남은 것은 **손대지 않고** 멈춘다
@@ -141,7 +156,7 @@ async function readBundlesInOrder(
     }
   }
 
-  return { ok, failed, pending: rows.length - ok - failed };
+  return { ok, failed, pending: rows.length - ok - failed, warned };
 }
 
 /**
@@ -176,6 +191,7 @@ export async function rerunBundle(
       pref: getCodexModelPref(),
       signal: env.signal,
       onProgress: env.onProgress,
+      onWarnings: (w) => env.onWarnings?.(w, bundle.name),
     });
   } finally {
     doc.pdf.destroy();

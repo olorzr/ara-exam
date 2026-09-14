@@ -194,7 +194,7 @@ export default function PrintScanUploadPage() {
               {' '}ChatGPT 약 {batchCount}번
             </p>
 
-            <OcrProgress progress={ocr.progress} label={ocr.progressLabel} warnings={[]} />
+            <OcrProgress progress={ocr.progress} label={ocr.progressLabel} warnings={ocr.warnings} />
 
             <div className="flex items-center gap-2">
               <Button

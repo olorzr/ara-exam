@@ -59,7 +59,7 @@ export default function PrintSheetsPage() {
       {ocr.running && (
         <Card>
           <CardContent className="space-y-3 py-4">
-            <OcrProgress progress={ocr.progress} label={ocr.progressLabel} warnings={[]} />
+            <OcrProgress progress={ocr.progress} label={ocr.progressLabel} warnings={ocr.warnings} />
             <Button type="button" variant="outline" size="sm" onClick={ocr.cancel}>
               취소
             </Button>

@@ -30,6 +30,13 @@ export interface PrintRunEnv {
   pref: { model: string | null; effort: string | null };
   signal?: AbortSignal;
   onProgress?: (p: PrintRunProgress) => void;
+  /**
+   * 읽기가 남긴 경고 — **완료를 알리기 전에** 부른다.
+   *
+   * 경고를 `ocr_meta` 에만 넣고 끝내면 화면은 "다 됐어요" 만 말한다. 쪽이 빠졌거나 본문이
+   * 잘렸어도 선생님은 완성본으로 알고 그대로 인쇄한다.
+   */
+  onWarnings?: (warnings: string[]) => void;
 }
 
 export interface PrintRunProgress {
@@ -120,7 +127,10 @@ export async function readBundle(
  *
  * ⚠️ 어떤 길로 빠져나가도 **'읽는중' 으로 남기지 않는다.** 업로드가 그 상태로 만들어 두고
  *    성공 경로만 상태를 바꾸면, 실패·취소한 묶음이 **영영 돌고 있는 것처럼** 보인다
- *    (기출에서 실제로 겪은 결함이다).
+ *    (기출에서 실제로 겪은 결함이다). 다만 탭이 닫히면 이 `catch` 가 아예 못 돌아서
+ *    행이 '읽는중' 으로 남는다 — 그쪽 복구는 [reading-state.ts](./reading-state.ts) 가 맡는다.
+ * ⚠️ **일부만 읽힌 것을 성공으로 알리지 않는다.** 배치가 몇 개 실패하거나 본문이 잘려도
+ *    살아남은 쪽으로 시험지가 만들어지므로, `onWarnings` 로 그 사실을 함께 올린다.
  *
  * @param bundle - 묶음
  * @param doc - 열어 둔 PDF
@@ -136,6 +146,9 @@ export async function runBundle(
   await updateBundle(bundle.id, { status: '읽는중' });
   try {
     const { html, meta } = await readBundle(bundle, doc, env);
+
+    // 저장보다 **먼저** 알린다 — 뒤에서 저장이 실패해도 무엇이 모자랐는지는 남아야 한다
+    if (meta.warnings && meta.warnings.length > 0) env.onWarnings?.(meta.warnings);
 
     env.onProgress?.({ phase: 'save', done: 0, total: 1 });
     const sheetId = await createSheetForBundle(bundle, html);
