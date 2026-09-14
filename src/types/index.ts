@@ -135,6 +135,14 @@ export interface ConceptSheet {
    * 합격/불합격 판정(exam_results.passed)의 기준이 된다.
    */
   pass_percentage: number;
+  /**
+   * 학교 프린트 묶음에서 만든 개념지면 그 묶음 id (손으로 만든 개념지는 null).
+   *
+   * ⚠️ 개념지 목록은 이 값이 **NULL 인 행만** 보여 준다 — 프린트 시험지는 전용 메뉴
+   *    (`/print-sheets`)에서만 보인다. 그래서 목록 조회 컬럼(`LIST_COLUMNS`)에 이 컬럼이
+   *    반드시 있어야 한다. 빠뜨리면 타입엔 있는데 런타임엔 undefined 인 조용한 어긋남이다.
+   */
+  print_bundle_id: string | null;
   user_id: string;
   created_at: string;
   updated_at: string;
@@ -150,3 +158,6 @@ export type ConceptSheetListItem = Omit<ConceptSheet, 'editor_html' | 'pass_perc
 
 // 기출 문제 은행 (sql/17)
 export * from './problem-bank';
+
+// 학교 프린트 시험지 (sql/26)
+export * from './print-scan';

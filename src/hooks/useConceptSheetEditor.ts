@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
@@ -20,9 +20,27 @@ import { useConceptMarkActions } from './useConceptMarkActions';
 import { DEFAULT_PASS_PERCENTAGE } from '@/lib/constants';
 import type { ConceptSheet } from '@/types';
 
+export interface ConceptSheetEditorOptions {
+  /** 편집할 개념지 id. 'new' 면 새로 만든다 */
+  sheetId: string;
+  /**
+   * 목록 화면 경로. 뒤로 가기와 '찾을 수 없음' 이 여기로 돌아가고,
+   * 새로 만든 뒤 주소도 `${listHref}/{id}` 가 된다.
+   *
+   * ⚠️ 그래서 **편집기의 부모 경로**여야 한다(개념지는 `/exam/builder`).
+   *    'new' 로 들어오지 않는 화면(프린트 시험지)은 그 규칙과 무관하다.
+   */
+  listHref: string;
+  /** 처음 보일 화면. 없으면 새 개념지는 편집기, 기존 개념지는 미리보기 */
+  initialScreen?: 'editor' | 'preview';
+}
+
 /**
- * 개념지 에디터 페이지의 상태·로딩·저장을 캡슐화한 훅.
- * [id]가 'new'이면 새 개념지, UUID이면 기존 개념지를 불러와 편집한다.
+ * 개념지 에디터의 상태·로딩·저장을 캡슐화한 훅.
+ * `sheetId` 가 'new' 이면 새 개념지, UUID 이면 기존 개념지를 불러와 편집한다.
+ *
+ * 화면을 두 곳에서 쓴다 — 개념지(`/exam/builder/[id]`)와 학교 프린트 시험지
+ * (`/print-sheets/[bundleId]`). 그래서 경로를 훅 안에서 읽지 않고 **호출부가 넘긴다**.
  *
  * 마킹 조작은 `useConceptMarkActions`, 제목·검증·payload 조립은
  * `@/lib/concept-sheet-form` 이 담당한다.
@@ -30,14 +48,15 @@ import type { ConceptSheet } from '@/types';
  * 보안: editor_html 은 저장 시에도 불러올 때도 `sanitizeConceptHTML` 로 정화한다
  * (Stored XSS 방어 — concept_sheets 는 authenticated 전원이 쓰는 공유 테이블이다).
  */
-export function useConceptSheetEditor() {
-  const params = useParams();
+export function useConceptSheetEditor(opts: ConceptSheetEditorOptions) {
+  const { sheetId, listHref } = opts;
   const router = useRouter();
   const { user } = useAuth();
-  const sheetId = params.id as string;
   const isNew = sheetId === 'new';
 
-  const [screen, setScreen] = useState<'editor' | 'preview'>(isNew ? 'editor' : 'preview');
+  const [screen, setScreen] = useState<'editor' | 'preview'>(
+    opts.initialScreen ?? (isNew ? 'editor' : 'preview'),
+  );
   const [title, setTitle] = useState('');
   const [titleManuallyEdited, setTitleManuallyEdited] = useState(!isNew);
   const [category, setCategory] = useState<BuilderCategory>(DEFAULT_CONCEPT_CATEGORY);
@@ -88,7 +107,7 @@ export function useConceptSheetEditor() {
 
         if (error || !data) {
           toast.error('개념지를 찾을 수 없습니다.');
-          router.push('/exam/builder');
+          router.push(listHref);
           return;
         }
 
@@ -113,12 +132,12 @@ export function useConceptSheetEditor() {
         setEditorHTML(safeHTML);
       } catch {
         toast.error('개념지를 불러오지 못했어요.');
-        router.push('/exam/builder');
+        router.push(listHref);
       } finally {
         setLoading(false);
       }
     })();
-  }, [isNew, sheetId, user, router]);
+  }, [isNew, sheetId, user, router, listHref]);
 
   /* ── 저장 (editor_html 은 sanitizeConceptHTML 로 정화) ── */
   const handleSave = useCallback(async () => {
@@ -183,7 +202,7 @@ export function useConceptSheetEditor() {
         setLoadedUpdatedAt(data.updated_at);
         fireConceptGradeSync(data.id, currentMarks.length);
         toast.success('저장되었습니다.');
-        router.replace(`/exam/builder/${data.id}`);
+        router.replace(`${listHref}/${data.id}`);
       }
     } catch {
       toast.error('저장에 실패했습니다.');
@@ -192,10 +211,11 @@ export function useConceptSheetEditor() {
     }
     // ⚠️ passPercentage 를 deps 에 넣지 않으면 방금 바꾼 합격 기준이 아니라 마운트 시점 값으로
     //    저장된다(화면엔 70% 인데 저장은 80% 가 되는 조용한 어긋남).
-  }, [user, title, category, editorHTML, marks, passPercentage, savedId, loadedUpdatedAt, router]);
+  }, [user, title, category, editorHTML, marks, passPercentage, savedId, loadedUpdatedAt, router, listHref]);
 
   return {
     router,
+    listHref,
     screen,
     setScreen,
     title,
@@ -218,3 +238,6 @@ export function useConceptSheetEditor() {
     ...markActions,
   };
 }
+
+/** 편집기 훅이 돌려주는 것 전부 — 작업 화면 컴포넌트가 그대로 받는다 */
+export type ConceptSheetEditorState = ReturnType<typeof useConceptSheetEditor>;

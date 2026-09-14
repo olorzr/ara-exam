@@ -1,4 +1,5 @@
 import { wrapUntrustedData } from '@/lib/ai/untrusted-data';
+import { describeImages, PROBLEM_SPLIT_RULES } from './describe-images';
 import type { RenderedImage } from '@/lib/pdf/pdfPages';
 import type { PageText } from './page-text';
 import { GRAMMAR_TREE } from '@/lib/problem-bank/grammar-tree';
@@ -201,41 +202,6 @@ const REFERENCE_TEXT_RULES = [
   '- 참고 텍스트에 없는데 이미지에만 보이는 글자가 있으면 이미지를 따르고 warnings 에 적는다.',
 ];
 
-/** 이미지 한 장을 사람 말로 — '4쪽 왼쪽 단' */
-function imageLabel(image: RenderedImage): string {
-  if (image.part === 'left') return `${image.page}쪽 왼쪽 단`;
-  if (image.part === 'right') return `${image.page}쪽 오른쪽 단`;
-  return `${image.page}쪽 전체`;
-}
-
-/**
- * 보낸 이미지가 무엇인지 알리는 줄들.
- *
- * ⚠️ 이 설명이 이미지와 어긋나면 **읽은 내용이 통째로 엉뚱한 쪽에 기록된다** —
- *    그리고 그 잘못된 쪽 번호가 중복 판정·지문 병합·크롭까지 줄줄이 어긋나게 만든다.
- *    그래서 호출부는 요청한 쪽이 아니라 **실제로 그린 이미지**를 넘겨야 한다.
- * @param pages - 이번 묶음이 덮는 쪽
- * @param rendered - 보낸 이미지들 (없으면 한 쪽 = 한 장)
- * @returns 프롬프트에 실을 줄들
- */
-function describeImages(pages: number[], rendered?: RenderedImage[]): string[] {
-  const split = rendered?.some((r) => r.part !== 'full') ?? false;
-  if (!rendered || !split) {
-    return [`- 이번에 보낸 이미지는 ${pages.join('·')}쪽이고, 이미지 순서가 곧 이 쪽 순서다.`];
-  }
-
-  const list = rendered.map((r, i) => `${i + 1}번=${imageLabel(r)}`).join(', ');
-  return [
-    `- 이번에 보낸 이미지는 ${rendered.length}장이고 차례로 이렇다: ${list}.`,
-    '- **단을 따로 찍은 것이라 한 쪽이 두 장**이다. 왼쪽 단 맨 아래에서 같은 쪽 오른쪽 단'
-    + ' 맨 위로 글이 이어진다 — 두 장을 한 쪽으로 이어서 읽는다.',
-    '- 같은 쪽의 두 장에 걸친 지문은 **한 지문**이다. continued·continues 는 **쪽과 쪽 사이**'
-    + '에만 쓴다(단과 단 사이에는 쓰지 않는다).',
-    '- box 의 column 은 **쪽 기준**으로 적는다: 왼쪽 단 이미지에서 본 것은 1, 오른쪽 단'
-    + ' 이미지에서 본 것은 2. top·bottom 은 이미지 세로가 곧 쪽 세로라 그대로 적으면 된다.',
-  ];
-}
-
 /**
  * 기출 OCR 프롬프트를 만든다.
  * @param input - 출처 메타·이번 묶음의 쪽·영역 트리
@@ -247,7 +213,7 @@ export function buildProblemOcrPrompt(input: ProblemOcrPromptInput): string {
   const hasUnits = unitTree.length > 0;
 
   const scope: string[] = [
-    ...describeImages(pages, input.rendered),
+    ...describeImages(pages, input.rendered, PROBLEM_SPLIT_RULES),
     `- 전체를 ${batch.total}묶음으로 나눠 읽는 중 **${batch.index + 1}번째** 묶음이다.`,
     '- **이 묶음에 실제로 보이는 것만** 낸다. 다른 쪽에 있을 내용은 추측하지 않는다.',
     '- 이 묶음에 없는 문항이 비어 있는 것은 정상이다. 나머지 묶음이 채운다.',

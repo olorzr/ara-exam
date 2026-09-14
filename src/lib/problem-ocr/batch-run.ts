@@ -29,8 +29,11 @@ import {
  * 만나면 즉시 멈추는 코드 — 다음 묶음을 보내봐야 같은 이유로 실패하거나(한도·권한),
  * 사람이 이미 그만두라고 한 경우다. 나머지(timeout·invalid_output·provider_unavailable)는
  * 그 묶음만의 문제일 수 있으므로 다시 시도하고, 그래도 안 되면 건너뛰고 계속한다.
+ *
+ * 학교 프린트 읽기(`print-scan/run-scan.ts`)가 **프린트와 프린트 사이**에서도 같은 판단을
+ * 한다 — 목록을 두 벌로 두면 한쪽만 고쳐져 한도를 다 태운 뒤에도 계속 보내게 된다.
  */
-const FATAL_CODES = new Set<AiErrorCode>([
+export const FATAL_CODES: ReadonlySet<AiErrorCode> = new Set<AiErrorCode>([
   'cancelled', 'feature_disabled', 'usage_limit_exceeded',
   'unauthorized', 'not_connected', 'login_expired',
   'access_denied', 'sensitive_input_rejected',

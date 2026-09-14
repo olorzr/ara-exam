@@ -49,6 +49,39 @@
 - 코드에서의 사용: `school_materials.year/grade`, `categories.year/grade`, `concept_sheets.year/grade`. 값은 TEXT(`'2026'`, `'중2'`)이고 **빈 문자열 `''` 이 "미지정"** 이다. UI 표시값 `'미지정'` ↔ 저장값 `''` 변환은 `toStoredValue`/`toOptionValue` 한 곳에서만 한다
 - 관련 파일: `src/lib/external-category.ts`, `src/lib/kst-year.ts`, `sql/15_migration_external_year_grade.sql`
 
+## 학교 프린트 시험지 (print sheet)
+- 정의: 아이들이 학교에서 받아 온 **프린트를 스캔해 만든 개념지**. 시험지 자체는 `concept_sheets` 행이고 `print_bundle_id` 가 채워져 있다는 점만 다르다 — 편집·빈칸 변환·인쇄·합격 기준·성적 연동이 전부 개념지와 같다
+- ⚠️ **개념지 목록(`/exam/builder`)에는 보이지 않는다.** `print_bundle_id IS NULL` 인 행만 그 목록에 나오고, 프린트 시험지는 `/print-sheets` 에서만 보인다(한 학기에 수십 장이라 섞이면 개념지가 묻힌다)
+- ⚠️ '프린트' 라는 말이 이 저장소에 **셋** 있다: ① 카테고리 레벨 `외부지문 및 프린트`(단어·개념지의 학교별 분류), ② 기출 출처 유형 `프린트`(기출 문제 은행), ③ 이 기능. 이 기능은 ①의 카테고리를 **그대로 쓴다**(학교 > 년도 > 학년 > 프린트명)
+- 코드에서의 사용: `concept_sheets.print_bundle_id`, `createSheetForBundle`, `bundleSheetCategory`
+- 관련 파일: `src/lib/print-scan/save.ts`, `src/lib/print-scan/bundle-plan.ts`, `src/app/(main)/print-sheets/`, `sql/26_print_scans.sql`
+
+## 프린트 스캔 (PrintScan)
+- 정의: 선생님이 올린 **스캔 PDF 한 건**. 한 파일에 여러 아이의 여러 프린트가 섞여 있는 것이 보통이라 묶음으로 나눠 읽는다
+- 원본 PDF 를 Storage 에 남긴다 — **'다시 읽기' 가 이 파일에 달려 있다**(파일 없이 다시 읽을 방법이 없다)
+- 코드에서의 사용: `PrintScan`, `printScanPdfPath(scanId)`, `print-scans/{id}/original.pdf`
+- 관련 파일: `src/types/print-scan.ts`, `src/lib/print-scan/storage-paths.ts`, `src/lib/print-scan/run-scan.ts`
+
+## 프린트 묶음 (PrintBundle)
+- 정의: 스캔 안의 **프린트 한 장** = 시험지 한 장. 원본 쪽 집합(`pages`) + 학교·년도·학년·프린트명 + 손글씨 포함 여부를 들고 있다. OCR 은 묶음 단위로 돈다
+- 상태: `대기 → 읽는중 → 읽기완료 | 실패`. ⚠️ 어떤 길로 실패해도 **'읽는중' 으로 남기지 않는다**(영영 돌고 있는 것처럼 보인다). 취소로 시작조차 못 한 묶음은 '실패' 가 아니라 **'대기'** 다
+- ⚠️ `page_paths` 는 `pages` 와 **같은 순서**다. 못 올린 쪽은 빈 문자열로 자리를 남긴다 — 압축하면 쪽 번호와 어긋나 엉뚱한 쪽 이미지가 옆에 붙는다
+- 코드에서의 사용: `PrintBundle`, `PrintBundleStatus`, `runBundle`, `bundleBatches`
+- 관련 파일: `src/lib/print-scan/run.ts`, `src/lib/print-scan/bundles.ts`, `sql/26_print_scans.sql`
+
+## 손글씨 포함 (include_handwriting)
+- 정의: 아이가 **손으로 적은 답·필기까지** 옮길지 여부. 묶음마다 고르고 기본은 꺼짐(인쇄된 활자만)
+- 꺼짐: 손글씨는 무시하고 손으로 채운 빈칸도 `(   )` 로 남긴다. 켜짐: 손글씨를 `<em>` 으로 감싸 인쇄된 글과 구분한다(채점 표시 ○×✓ 는 양쪽 다 옮기지 않는다)
+- 코드에서의 사용: `PrintBundle.include_handwriting`, `buildPrintOcrPrompt` 의 손글씨 블록
+- 관련 파일: `src/lib/print-scan/prompt.ts`
+
+## AI 추천 빈칸 (concept pick)
+- 정의: 개념지 본문에서 빈칸으로 낼 용어를 AI 가 골라 **곧바로 마킹**하는 기능. 근거 한 줄과 함께 목록으로 보여 주고 개별·전체 되돌리기가 있다. 개념지와 프린트 시험지 **양쪽**에서 쓴다(같은 편집기)
+- ⚠️ 추천은 **띄어쓰기 없는 한 어절**이어야 한다. `extractMarks` 가 마킹 구간을 공백으로 쪼개 세므로, 구절을 고르면 빈칸이 여러 개가 되고 마킹 수(= 문항 수 = 합격 기준의 분모)가 부풀어 학원 성적까지 어긋난다
+- ⚠️ 본문에 **글자 그대로** 있는 말만 쓴다. `addMarkByText` 는 한 텍스트 노드 안에서만 찾으므로 서식으로 쪼개진 구절은 못 붙이고, 그 개수를 사람에게 알린다
+- 코드에서의 사용: `runConceptPick`, `parseConceptPicks`, `useConceptPick`, `AiPickSection`
+- 관련 파일: `src/lib/concept-pick/`, `src/hooks/useConceptPick.ts`, `src/components/exam-builder/AiPickSection.tsx`
+
 ## 미지정 (UNSPECIFIED_OPTION)
 - 정의: 년도·학년이 정해지지 않은 상태. Select 에는 `'미지정'` 으로 보이고 DB 에는 `''` 로 저장된다. base-ui Select 가 빈 문자열 value 를 다루기 까다로워 센티널을 쓴다
 - 코드에서의 사용: `UNSPECIFIED_OPTION`, `toStoredValue`, `toOptionValue`

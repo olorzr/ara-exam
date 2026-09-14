@@ -1,3 +1,6 @@
+export { default as AiPickSection } from './AiPickSection';
+export type { AiPickSectionProps } from './AiPickSection';
+export { default as ConceptSheetWorkspace } from './ConceptSheetWorkspace';
 export { default as ExamCategoryBar } from './ExamCategoryBar';
 export type { BuilderCategory } from './ExamCategoryBar';
 export { default as ExamEditor } from './ExamEditor';

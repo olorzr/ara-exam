@@ -17,12 +17,15 @@ src/
 │       ├── categories/      # 카테고리 관리 (최상위 메뉴 — 출판사·대단원·소단원 마스터)
 │       ├── words/           # 단어 관리
 │       │   └── new/         # 단어 입력 (직접/CSV)
-│       └── exam/            # 시험 관련
-│           ├── create/      # 단어 시험지 생성 (메뉴 없음 — 단어 시험지 화면의 버튼으로 들어간다)
-│           ├── history/     # 단어 시험지 (목록 + 새 시험지 버튼)
-│           └── view/        # 시험지/답안지/단어장 보기
+│       ├── exam/            # 시험 관련
+│       │   ├── create/      # 단어 시험지 생성 (메뉴 없음 — 단어 시험지 화면의 버튼으로 들어간다)
+│       │   ├── history/     # 단어 시험지 (목록 + 새 시험지 버튼)
+│       │   ├── builder/     # 개념지 (목록 + [id] 편집기)
+│       │   └── view/        # 시험지/답안지/단어장 보기
+│       └── print-sheets/    # 학교 프린트 시험지 (목록 · upload 스캔 올리기 · [bundleId] 편집)
 ├── components/
 │   ├── layout/              # 앱 셸 (AppShell·Sidebar·nav-items — 좌측 사이드바 네비게이션)
+│   ├── print-scan/          # 학교 프린트 스캔 (쪽 묶기·묶음 폼·목록 줄·원본 쪽 패널)
 │   ├── words/               # 단어 입력 관련 분리 컴포넌트
 │   └── ui/                  # Shadcn UI 컴포넌트
 ├── lib/                     # 유틸리티, 설정
@@ -112,6 +115,8 @@ src/
 6. 재시험 생성 → `create_exam_with_words`(부모 단어 재조립·서버 셔플) → `api/sync-to-grades` → ara-system 이 **원본 회차에 딸린 재시험지**로 붙인다(회차를 새로 만들지 않는다, 그쪽 mig477). 학생별 차수는 채점할 때 `exam_results.attempt_no` 가 오른다. 원본이 미등록이면 409 → 경고 토스트
 
 ## concept_sheets HTML 파이프라인
+- 입력이 둘이다: ① 선생님이 편집기에서 직접 친 것, ② **학교 프린트 읽기**가 만든 것
+  (`finalizePrintHtml` → `sanitizeConceptHTML` 을 거쳐 저장된다). 그 뒤 경로는 완전히 같다
 - 입력 (저장): TipTap `editor.getHTML()` → `sanitizeConceptHTML` → supabase insert/update (`src/hooks/useConceptSheetEditor.ts` 의 `handleSave`)
 - 출력 (렌더): supabase select → `src/lib/exam-transform.ts` 의 `transformHTML` / `stripTrailingEmpty` / `extractMarkedWords` 각 함수 entry 에서 `sanitizeConceptHTML` 호출 → `ExamSheetRenderer` 의 `dangerouslySetInnerHTML`
 - 화이트리스트 위치: `src/lib/sanitize-html.ts` (`ALLOWED_TAGS`, `ALLOWED_ATTR`). 새 TipTap 확장 추가 시 같이 갱신 필수
@@ -172,10 +177,29 @@ src/
 - 글자 레이어(`pdfText`)는 **있으면 보너스**다. 기출은 대부분 스캔본이라 보통 비어 있고,
   복합기 자동 OCR 레이어는 `hasUsableText` 가 걸러낸다(없느니만 못하다)
 
+## lib/print-scan (학교 프린트 스캔 → 묶음 → 시험지)
+- 역할: 스캔 PDF 를 프린트(묶음)별로 나눠 읽고 그 결과로 **개념지**를 만든다
+- 의존: lib/problem-ocr(batch-plan·batch-run·describe-images·normalize-html), lib/pdf, lib/ai,
+  lib/sanitize-html, lib/concept-sheet-form, lib/problem-bank/storage
+- 주요 파일: bundles.ts(초안·쪽 배정), bundle-plan.ts(검증·읽기 횟수·저장 모양),
+  prompt.ts, schema.ts, parse.ts, run.ts(묶음 하나), run-scan.ts(스캔 전체·다시 읽기),
+  save.ts, queries.ts, page-images.ts, storage-paths.ts, scan-delete.ts
+- **시험지를 위한 표를 따로 만들지 않았다** — `concept_sheets` 에 `print_bundle_id` 만 더했다.
+  편집기·빈칸 변환·인쇄·합격 기준·성적 연동이 전부 그대로 재사용된다
+- 기출과 **다른 점**: 겹쳐 읽지 않는다(평문은 병합할 수 없다), 정답표·크롭이 없다,
+  프롬프트가 `BODY_FORMAT_RULES` 를 쓰지 않는다(개념지 정화기가 figure·data-box 를 지운다)
+
+## lib/concept-pick (AI 추천 빈칸)
+- 역할: 개념지 본문에서 빈칸으로 낼 용어를 골라 온다. 개념지·프린트 시험지 **양쪽**의 편집기에서 쓴다
+- 의존: lib/ai(generateDraft)
+- 주요 파일: plain-text.ts(HTML→평문), prompt.ts, schema.ts, parse.ts, run.ts
+- 추천은 **띄어쓰기 없는 한 어절**만 통과시킨다 — `extractMarks` 가 공백으로 쪼개 세기 때문이다
+
 ## lib/problem-ocr
 - 역할: 프롬프트 조립 → 구조화 출력 파싱 → 묶음 실행 → 병합 → 영역 크롭
 - 의존: lib/ai, lib/pdf, lib/sanitize-problem
-- 주요 파일: schema.ts, prompt.ts, prompt-answer-key.ts, parse.ts, parse-answer-key.ts,
+- 주요 파일: schema.ts, prompt.ts, describe-images.ts(보낸 이미지 설명 — **lib/print-scan 과 공유**.
+  기출 전용 문구는 호출자가 `splitRules` 로 넘긴다), prompt-answer-key.ts, parse.ts, parse-answer-key.ts,
   normalize-html.ts, batch-plan.ts, batch-attempt.ts, batch-run.ts,
   merge.ts, merge-keys.ts, merge-fill.ts, crop.ts, run.ts, run-images.ts,
   page-text.ts, verify-structure.ts, verify-text.ts, continue-passage.ts,

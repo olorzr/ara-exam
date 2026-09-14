@@ -1,6 +1,7 @@
 import {
   BookOpen,
   ClipboardCheck,
+  FileScan,
   FolderCog,
   FolderOpen,
   History,
@@ -102,8 +103,13 @@ export function buildNavSections(isAdmin: boolean): NavSection[] {
       id: 'concept',
       label: '개념 관리',
       icon: Lightbulb,
-      // 개념지 편집기(/exam/builder/new, /exam/builder/[id])도 이 항목에 속한다
-      items: [{ href: '/exam/builder', label: '개념지', icon: ScrollText }],
+      items: [
+        // 개념지 편집기(/exam/builder/new, /exam/builder/[id])도 이 항목에 속한다
+        { href: '/exam/builder', label: '개념지', icon: ScrollText },
+        // 스캔 올리기(/print-sheets/upload)와 시험지(/print-sheets/[bundleId])도 이 항목이다.
+        // 개념지와 경로가 갈려 있어 서로를 켜지 않는다(세그먼트 접두사 비교).
+        { href: '/print-sheets', label: '학교 프린트 시험지', icon: FileScan },
+      ],
     },
     {
       kind: 'group',

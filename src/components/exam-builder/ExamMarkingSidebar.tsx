@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import { Trash2, Eye } from 'lucide-react';
+import AiPickSection, { type AiPickSectionProps } from './AiPickSection';
 
 /** 마킹된 개념 아이템 */
 export interface MarkItem {
@@ -15,13 +16,18 @@ interface ExamMarkingSidebarProps {
   onDelete: (pos: number, len: number) => void;
   onClearAll: () => void;
   onPreview: () => void;
+  /** AI 추천 빈칸을 얹을 때 (기능이 꺼져 있으면 그려지지 않는다) */
+  aiPick?: AiPickSectionProps;
 }
 
 /**
  * 에디터 우측 마킹 목록 사이드바.
- * 마킹된 개념 번호 목록 + 개별/전체 삭제 + 미리보기 전환.
+ * 마킹된 개념 번호 목록 + 개별/전체 삭제 + 미리보기 전환,
+ * 그리고 (열려 있으면) AI 추천 빈칸.
  */
-export default function ExamMarkingSidebar({ marks, onDelete, onClearAll, onPreview }: ExamMarkingSidebarProps) {
+export default function ExamMarkingSidebar({
+  marks, onDelete, onClearAll, onPreview, aiPick,
+}: ExamMarkingSidebarProps) {
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col h-full overflow-hidden">
       {/* 헤더 */}
@@ -31,6 +37,9 @@ export default function ExamMarkingSidebar({ marks, onDelete, onClearAll, onPrev
           총 {marks.length}개
         </span>
       </div>
+
+      {/* AI 추천 — 목록 위에 둔다(마킹을 만드는 도구이므로 결과보다 앞이다) */}
+      {aiPick && <AiPickSection {...aiPick} />}
 
       {/* 목록 */}
       <div className="flex-1 overflow-y-auto p-3 space-y-0.5">

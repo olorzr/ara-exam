@@ -21,13 +21,17 @@ export function isAiOcrEnabled(): boolean {
 }
 
 /**
- * 기능별 활성 여부. 지금은 기능이 하나뿐이라 마스터 스위치와 같다.
+ * 기능별 활성 여부. 지금은 셋 다 같은 마스터 스위치(`AI_OCR_BETA`)를 본다 —
+ * 전부 '선생님 PC 의 ChatGPT 를 쓴다' 는 같은 성질이라 한 번에 끄고 켜는 편이 맞다.
+ * 나중에 하나만 따로 열어야 하면 여기서 갈라진다(호출부는 이미 기능별로 물어본다).
  * @param feature - 확인할 기능
  * @returns 사용 가능하면 true
  */
 export function isFeatureEnabled(feature: AiFeature): boolean {
   switch (feature) {
     case 'problem_ocr':
+    case 'print_ocr':
+    case 'concept_pick':
       return isAiOcrEnabled();
     default:
       return false;

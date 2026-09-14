@@ -16,6 +16,12 @@
 - UPDATE: 단어/뜻 수정
 - DELETE: 개별 단어 삭제
 
+### print_scans / print_bundles (학교 프린트 시험지, sql/26)
+- SELECT/INSERT/UPDATE/DELETE: 공유(도메인 로그인 전원). `user_id` 는 트리거가 채운다
+- `print_scans` 업로드한 스캔 PDF 1건 · `print_bundles` 그 안의 프린트 한 장(쪽 집합 + 학교/년도/학년/프린트명 + 손글씨 여부 + 상태)
+- 시험지는 `concept_sheets.print_bundle_id` 로 이어지고 **묶음당 하나**다(부분 유니크 인덱스).
+  묶음을 지우면 그 시험지도 CASCADE 로 함께 지워진다 — 확인창이 그 수를 반드시 밝힌다
+
 ### exams
 - SELECT: 시험지 목록 및 상세 조회
 - INSERT: 새 시험지 생성
@@ -32,9 +38,13 @@
 - signOut: 로그아웃
 
 ## GET /api/ai/status
-- 설명: AI 기능(기출 OCR) 활성 여부 조회. 화면이 AI UI 를 그릴지 판단하는 데 쓴다
+- 설명: AI 기능 활성 여부 조회. 화면이 AI UI 를 그릴지 판단하는 데 쓴다
 - 인증: `Authorization: Bearer <supabase access_token>` (도메인 검사 포함)
-- Response: `{ enabled: boolean, features: { problem_ocr: boolean } }`
+- Response: `{ enabled: boolean, features: { problem_ocr: boolean, print_ocr: boolean, concept_pick: boolean } }`
+  - `problem_ocr` 기출 PDF 읽기 · `print_ocr` 학교 프린트 스캔 읽기 · `concept_pick` 개념지 빈칸 추천
+  - 셋 다 같은 서버 env `AI_OCR_BETA` 를 본다. ⚠️ 기능을 추가하면 **다섯 곳을 함께** 고칠 것
+    (`AiFeature` 타입 · `isFeatureEnabled` · 이 라우트의 OFF·응답 · `useAiEnabled` 의 타입과 OFF ·
+    `ocrStillEnabled` 호출부). 하나라도 빠지면 그 키가 undefined 가 되어 '꺼짐'과 '아직 모름'이 섞인다
 - 에러: 401 `{ ok: false, reason: 'unauthorized' }`
 - 비고: **연결 상태·사용량은 여기서 다루지 않는다.** 그건 브라우저가 선생님 PC 의
   코덱스 브릿지에 직접 물어본다(서버는 AI 를 호출하지 않는다).

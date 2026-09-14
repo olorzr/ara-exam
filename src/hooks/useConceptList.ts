@@ -11,9 +11,16 @@ import type { ConceptSheetListItem, Category } from '@/types';
 /** 한 번에 렌더링할 개념지 카드 수(스크롤 렌더 비용 상한) */
 const PAGE_SIZE = 24;
 
-/** 목록/트리에 필요한 컬럼만 조회한다(무거운 editor_html 제외) */
-const LIST_COLUMNS =
-  'id,title,level,year,grade,publisher,semester,unit,subunit,school_name,marks,user_id,created_at,updated_at';
+/**
+ * 목록/트리에 필요한 컬럼만 조회한다(무거운 editor_html 제외).
+ *
+ * ⚠️ `ConceptSheetListItem` 과 **1:1로 맞춰 둔다** — 타입엔 있는데 조회에 없으면
+ *    런타임에 조용한 undefined 가 된다. `print_bundle_id` 는 화면에 그리지는 않지만
+ *    타입에 있어서(그리고 아래 필터의 근거라서) 함께 읽는다.
+ */
+// ⚠️ 한 줄로 둘 것 — 문자열을 `+` 로 이으면 리터럴 타입이 string 으로 넓어져
+//    PostgREST 의 행 타입 추론이 통째로 풀린다(조회 결과가 GenericStringError[] 가 된다).
+const LIST_COLUMNS = 'id,title,level,year,grade,publisher,semester,unit,subunit,school_name,marks,print_bundle_id,user_id,created_at,updated_at';
 
 /**
  * 개념지 목록 페이지의 상태·데이터·트리·필터·삭제·렌더 페이지네이션을 캡슐화한 훅.
@@ -32,9 +39,12 @@ export function useConceptList() {
       if (!user) return;
       // 네트워크 예외(throw)가 나도 스피너가 멈추도록 finally 에서 loading 을 내린다.
       try {
+        // 학교 프린트에서 만든 시험지는 여기 섞지 않는다 — 전용 메뉴(/print-sheets)에서만
+        // 보인다. 프린트는 한 학기에도 수십 장이라 섞이면 개념지 목록이 프린트에 묻힌다.
         const { data, error } = await supabase
           .from('concept_sheets')
           .select(LIST_COLUMNS)
+          .is('print_bundle_id', null)
           .order('updated_at', { ascending: false });
 
         if (error) {

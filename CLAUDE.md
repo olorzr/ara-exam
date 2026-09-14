@@ -205,6 +205,23 @@ node /Users/ara/Projects/Ara-system/scripts/post-update.js --app exam "<HTML>"
 - [2026-09-04] 표 재분할은 한 패스에 **표 하나**만 쪼갠다(상한 32). 표가 많은 개념지는 그만큼 재측정이 돈다 — 렌더가 몇 프레임 늦을 뿐 내용에는 영향이 없다. 페이지 끝에 걸린 조각이 측정 오차로 다시 밀리면 **1행짜리 조각(+반복된 제목 행)** 이 남을 수 있다(내용 유실 없음, 외관 문제)
 
 ## Architecture Decisions
+- [2026-09-14] **학교 프린트 시험지 — 스캔을 프린트별로 묶어 읽고 개념지로 만든다**([sql/26](sql/26_print_scans.sql), [src/lib/print-scan/](src/lib/print-scan/), [src/lib/concept-pick/](src/lib/concept-pick/)). 되돌리지 말아야 할 판단들:
+  - **시험지를 위한 표를 만들지 않았다.** 프린트 시험지는 `concept_sheets` 행이고 `print_bundle_id` 만 더했다 — 편집기·`exam-transform`·인쇄 엔진·합격 기준·ara-system 동기화가 **전부 공짜로** 따라온다. 새 표를 팠다면 그 다섯 가지를 전부 두 벌로 만들어야 했고, 그중 하나만 고쳐지는 날이 반드시 온다
+  - **`print_bundle_id` 는 ON DELETE CASCADE 다**(SET NULL 아님). 개념지 목록은 `print_bundle_id IS NULL` 로 프린트를 숨기는데, SET NULL 이면 묶음을 지운 순간 그 시험지들이 개념지 목록에 **갑자기 나타난다** — 숨기기로 한 결정이 삭제로 깨진다. 앱에서 시험지를 먼저 지우는 방법은 두 번의 DELETE 라 원자적이지 않다. 대신 확인창이 **함께 사라지는 시험지 수를 반드시 밝힌다**([scan-delete.ts](src/lib/print-scan/scan-delete.ts))
+  - ⚠️ **`ConceptSheet` 에 컬럼을 더하면 `LIST_COLUMNS` 도 같이 고친다**([useConceptList.ts](src/hooks/useConceptList.ts)). `ConceptSheetListItem` 이 `Omit<ConceptSheet, …>` 라 타입엔 있는데 조회엔 없는 조용한 undefined 가 생긴다(이번에 `tsc` 가 잡아 줬다). 그리고 그 상수는 **한 줄이어야 한다** — `+` 로 이으면 리터럴 타입이 `string` 으로 넓어져 PostgREST 의 행 타입 추론이 통째로 풀린다
+  - **묶음은 3쪽·겹침 0 이다**([print-scan/constants.ts](src/lib/print-scan/constants.ts)). 기출이 1쪽을 겹치는 이유는 쪽 경계를 넘는 **지문**을 `merge.ts` 가 합치기 때문인데, 프린트 읽기의 결과는 구조 없는 평문 HTML 이라 합칠 수가 없다 — 겹치면 같은 글이 시험지에 **두 번** 들어간다. 대신 프롬프트가 "이 쪽의 마지막 문단은 이 쪽에서 끝나는 곳까지만" 이라고 못박는다
+  - ⚠️ **`BODY_FORMAT_RULES` 를 개념지 HTML 에 재사용하지 말 것.** 그 규약은 `<figure data-figure>`·`<blockquote data-box>` 를 시키는데 `sanitizeConceptHTML` 은 그 둘을 **지운다** — 모델은 시킨 대로 잘 냈는데 화면에서만 사라지는, 원인을 찾을 수 없는 결함이 된다. [print-scan/prompt.ts](src/lib/print-scan/prompt.ts) 가 개념지 편집기가 실제로 받는 태그만 따로 적는다([parse.test.ts](src/lib/print-scan/parse.test.ts) 가 그 금지 목록을 고정한다)
+  - **이미지 설명은 [describe-images.ts](src/lib/problem-ocr/describe-images.ts) 한 벌**이고 기출 전용 문구(`continued`·`box.column`)는 **호출자가 `splitRules` 로 넘긴다.** 섞어 두면 프린트 프롬프트가 **자기 스키마에 없는 필드**를 설명하게 된다
+  - **취소·한도로 멈춘 묶음은 '실패' 가 아니라 '대기' 로 둔다**([run-scan.ts](src/lib/print-scan/run-scan.ts)). 시작도 안 했으니 실패라고 적으면 거짓말이고, 목록의 '읽기' 버튼이 곧 복구 경로다. 반대로 **'읽는중' 으로는 절대 남기지 않는다** — 영영 돌고 있는 것처럼 보인다(기출 `run.ts` 와 같은 규약)
+  - **'다시 읽기' 는 올려 둔 원본 PDF 로 한다.** 그래서 `print_scans.file_path` 를 반드시 남긴다 — 파일이 없으면 다시 읽을 방법이 아예 없다. 업로드 때와 **같은 `runBundle`** 을 쓴다(상태 전이·시험지 만들기가 두 벌이 되면 조용히 갈라진다)
+  - **행을 AI 호출보다 먼저 만든다.** 읽다가 실패하거나 탭이 닫혀도 목록에 남아 이어갈 수 있다 — 안 그러면 올린 PDF 가 흔적 없이 사라진다. 킬스위치 재확인도 **행을 만들기 전**이다
+  - **버킷은 `exam-problem-bank` 를 같이 쓴다**(경로만 `print-scans/` 로 가른다). 정책이 버킷 단위라 새 버킷은 정책 세 벌을 더 관리하게 만들고 허용 MIME 도 똑같다. 업로드는 여기서도 `upsert:false` 다
+  - **AI 기능 플래그는 다섯 곳이 한 벌이다** — `AiFeature` 타입 / `isFeatureEnabled` / `/api/ai/status` 의 OFF·응답 / `useAiEnabled` 의 타입과 OFF / `ocrStillEnabled(feature)` 호출부. 하나라도 빠지면 그 키가 `undefined` 가 되어 '꺼짐' 과 '아직 모름' 이 뒤섞인다
+  - **AI 추천 빈칸은 고른 즉시 마킹한다**([useConceptPick.ts](src/hooks/useConceptPick.ts)). 목록만 주고 하나씩 누르게 하면 직접 드래그하는 것과 품이 같아 도움이 안 된다 — 대신 **되돌리기를 쉽게** 뒀다(붙인 것만 기억해 개별·전체 해제). ⚠️ 추천은 **띄어쓰기 없는 한 어절**만 통과시킨다: `extractMarks` 가 마킹 구간을 공백으로 쪼개 세므로 구절을 고르면 빈칸이 여러 개가 되고 **마킹 수 = 문항 수 = 합격 기준의 분모**가 부풀어 학원 성적까지 어긋난다
+  - ⚠️ **`addMarkByText` 는 boolean 을 돌려준다**(한 텍스트 노드 안에서만 찾는 한계는 그대로다). 못 붙인 것을 조용히 넘기면 "10개 추천" 이라고 해 놓고 7개만 붙는다 — 개수를 세어 사람에게 알린다
+  - **`exam.sync_school_name` / `exam.sync_school_material_name` 의 정본은 sql/26 이다.** sql/01·15 는 무자격(`public` 가능) 정의라 이번에 `exam.` 으로 다시 만들고 **트리거도 다시 걸었다**. 묶음도 학교명·프린트명을 텍스트로 복사해 들고 있어 이름 변경을 따라가야 한다(앱 폴백도 [schools.ts](src/lib/category-master/schools.ts)·[school-materials.ts](src/lib/category-master/school-materials.ts) 에 함께 넣었다)
+  - **편집 화면은 [ConceptSheetWorkspace](src/components/exam-builder/ConceptSheetWorkspace.tsx) 한 벌**이고, `useConceptSheetEditor` 는 경로를 **인자로 받는다**(`sheetId`·`listHref`). 두 벌로 두면 인쇄·마킹·저장이 갈라진다
+  - **신규 부트스트랩 범위는 01~26 이다**
 - [2026-09-12] **출처 삭제는 DB 행만 지운다 — Storage 는 건드리지 않는다**([useSourceDelete.ts](src/hooks/useSourceDelete.ts), [source-delete.ts](src/lib/problem-bank/source-delete.ts)). 되돌리지 말아야 할 판단들:
   - **`deleteSource` 는 예전부터 있었지만 부르는 곳이 하나도 없었다.** DB 는 막는 게 없다(sql/17 의 `FOR ALL` 정책에 DELETE 가 포함되고, 지문·문항은 CASCADE, `problem_paper_items.problem_id` 는 SET NULL). "삭제가 아예 안 된다" 는 제보의 원인은 **버튼이 없던 것뿐**이었다
   - **Storage 파일은 남긴다.** `deleteProblems` 와 같은 근거다 — 잘라 둔 `problems/`·`passages/` 이미지는 문제지 스냅샷이 들고 있어 지우면 인쇄물이 빈칸이 된다. `sources/{id}/` 아래(원본 PDF·쪽 이미지·답지)는 스냅샷이 참조하지 않아 지워도 안전하지만, **규칙을 하나로 두는 편이 낫다고 보고 전부 남긴다**. 그래서 `removeProblemFiles`·`sourceFolder` 는 계속 미사용이다 — 나중에 정리 기능을 만든다면 그 둘이 출발점이다

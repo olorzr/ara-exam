@@ -4,7 +4,7 @@ import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/auth-fetch';
 import { aiErrorMessage } from '@/lib/ai/errors';
-import { isAiError } from '@/lib/ai/types';
+import { isAiError, type AiFeature } from '@/lib/ai/types';
 import { updateSource } from '@/lib/problem-bank/save';
 import { runProblemOcr, type OcrRunInput, type OcrRunProgress } from '@/lib/problem-ocr/run';
 import type { OcrWarning } from '@/lib/problem-ocr/warnings';
@@ -25,16 +25,17 @@ const PHASE_LABEL: Record<OcrRunProgress['phase'], string> = {
  * 그 탭에서는 계속 새 작업이 나가 버린다 — 배포 없이 끄는 스위치가 되지 못한다.
  * 확인 자체가 실패해도 **막는다**(fail-closed) — 코덱스 리뷰 13R.
  *
- * 검수 화면의 '다음 쪽 이어 읽기' 도 같은 것을 쓴다 — 게이트가 두 벌이면
- * 한쪽만 고쳐져 꺼 둔 기능이 계속 나간다.
+ * 검수 화면의 '다음 쪽 이어 읽기', 학교 프린트 읽기, 빈칸 추천도 같은 것을 쓴다 —
+ * 게이트가 여러 벌이면 한쪽만 고쳐져 꺼 둔 기능이 계속 나간다.
+ * @param feature - 확인할 기능 (기본: 기출 OCR)
  * @returns 지금 써도 되면 true
  */
-export async function ocrStillEnabled(): Promise<boolean> {
+export async function ocrStillEnabled(feature: AiFeature = 'problem_ocr'): Promise<boolean> {
   try {
     const res = await authFetch('/api/ai/status');
     if (!res.ok) return false;
     const json = await res.json();
-    return json?.enabled === true && json?.features?.problem_ocr === true;
+    return json?.enabled === true && json?.features?.[feature] === true;
   } catch {
     return false;
   }

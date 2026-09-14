@@ -2,11 +2,14 @@
 
 import Link from 'next/link';
 import { AlertTriangle } from 'lucide-react';
-import type { OcrRunProgress } from '@/lib/problem-ocr/run';
 import { toWarningObject, warningKey, type OcrWarning, type OcrWarningTarget } from '@/lib/problem-ocr/warnings';
 
 interface OcrProgressProps {
-  progress: OcrRunProgress | null;
+  /**
+   * 진행률. **단계 이름은 받지 않는다** — 문구는 `label` 이 완성해 온다.
+   * 그래야 기출 읽기와 학교 프린트 읽기가 각자의 단계 이름을 쓰면서 이 막대를 공유한다.
+   */
+  progress: { done: number; total: number } | null;
   label: string;
   warnings: OcrWarning[];
   /** 대상을 누르면 그 항목으로 데려간다 (검수 화면). 없으면 이름만 보여 준다 */

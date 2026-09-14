@@ -12,13 +12,21 @@ import { authFetch } from '@/lib/auth-fetch';
 export interface AiEnabled {
   enabled: boolean;
   features: {
+    /** 기출 PDF 읽기 */
     problem_ocr: boolean;
+    /** 학교 프린트 스캔 읽기 */
+    print_ocr: boolean;
+    /** 개념지 빈칸 추천 */
+    concept_pick: boolean;
   };
 }
 
 // ⚠️ features 타입에 기능을 추가하면 여기 OFF 에도 반드시 넣을 것.
 //    빠뜨리면 런타임에 undefined 가 되어 '꺼짐'과 '아직 모름'이 뒤섞인다.
-const OFF: AiEnabled = { enabled: false, features: { problem_ocr: false } };
+const OFF: AiEnabled = {
+  enabled: false,
+  features: { problem_ocr: false, print_ocr: false, concept_pick: false },
+};
 
 /**
  * 서버에 AI 기능 활성 여부를 물어본다.

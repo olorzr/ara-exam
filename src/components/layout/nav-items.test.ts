@@ -56,6 +56,20 @@ describe('isNavItemActive', () => {
   });
 });
 
+describe('학교 프린트 시험지 메뉴', () => {
+  it('스캔 올리기와 시험지 화면이 이 항목에 붙는다', () => {
+    const printSheets = findItem(sections, '/print-sheets');
+    expect(isNavItemActive('/print-sheets', printSheets)).toBe(true);
+    expect(isNavItemActive('/print-sheets/upload', printSheets)).toBe(true);
+    expect(isNavItemActive('/print-sheets/abc-123', printSheets)).toBe(true);
+  });
+
+  it('개념지와 서로를 켜지 않는다 — 같은 그룹이지만 다른 화면이다', () => {
+    expect(isNavItemActive('/print-sheets', findItem(sections, '/exam/builder'))).toBe(false);
+    expect(isNavItemActive('/exam/builder/abc', findItem(sections, '/print-sheets'))).toBe(false);
+  });
+});
+
 describe('기출 문제 메뉴', () => {
   it('형제 경로가 서로를 켜지 않는다 — /problems 를 실제 경로로 두지 않은 이유', () => {
     const archive = findItem(sections, '/problems/archive');
@@ -96,7 +110,7 @@ describe('buildNavSections', () => {
 
     const concept = sections.find((s) => s.id === 'concept')!;
     expect(concept.kind).toBe('group');
-    expect(concept.items.map((i) => i.label)).toEqual(['개념지']);
+    expect(concept.items.map((i) => i.label)).toEqual(['개념지', '학교 프린트 시험지']);
 
     const words = sections.find((s) => s.id === 'words')!;
     expect(words.kind).toBe('group');

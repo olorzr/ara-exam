@@ -7,8 +7,15 @@
 //
 // 원본: ara-system `app/lib/ai/types.ts` (성적표·상담 도메인 타입은 제외하고 이식)
 
-/** AI 초안을 쓸 수 있는 기능. 기능마다 게이트가 하나씩 붙으므로 무분별하게 늘리지 않는다. */
-export type AiFeature = 'problem_ocr';
+/**
+ * AI 초안을 쓸 수 있는 기능. 기능마다 게이트가 하나씩 붙으므로 무분별하게 늘리지 않는다.
+ *
+ * ⚠️ 여기에 기능을 더하면 **다섯 곳을 함께** 고쳐야 한다. 하나라도 빠지면 응답에 그 키가
+ *    없어 `undefined` 가 되고, '꺼짐' 과 '아직 모름' 이 뒤섞인다:
+ *    ① 이 타입 ② `flags.ts` 의 `isFeatureEnabled` ③ `/api/ai/status` 의 OFF·응답
+ *    ④ `useAiEnabled.ts` 의 `AiEnabled.features` 와 OFF ⑤ `ocrStillEnabled` 호출부
+ */
+export type AiFeature = 'problem_ocr' | 'print_ocr' | 'concept_pick';
 
 /** 생성 주체. 현재는 선생님 PC 의 codex 한 가지뿐. */
 export type ProviderKind = 'codex_app_server';

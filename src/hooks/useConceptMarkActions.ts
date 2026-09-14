@@ -72,10 +72,18 @@ export function useConceptMarkActions(
     setEditorHTML(editor.getHTML());
   }, [editorRef, setEditorHTML]);
 
-  /** 텍스트로 처음 찾은 자리에 마킹을 붙인다 */
-  const addMarkByText = useCallback((text: string) => {
+  /**
+   * 텍스트로 처음 찾은 자리에 마킹을 붙인다.
+   *
+   * ⚠️ **한 텍스트 노드 안에서만** 찾는다 — 서식(굵게 등)으로 쪼개진 구절은 못 찾는다.
+   *    그래서 붙였는지 여부를 돌려준다: AI 추천은 이 값으로 '몇 개를 마킹했는지' 를 센다.
+   *    못 찾은 것을 조용히 넘기면 "10개 추천" 이라고 해 놓고 7개만 붙는다.
+   * @param text - 붙일 글자
+   * @returns 실제로 붙였으면 true
+   */
+  const addMarkByText = useCallback((text: string): boolean => {
     const editor = editorRef.current;
-    if (!editor) return;
+    if (!editor) return false;
 
     let found = false;
     editor.state.doc.descendants((node, pos) => {
@@ -93,6 +101,7 @@ export function useConceptMarkActions(
       return false;
     });
     setEditorHTML(editor.getHTML());
+    return found;
   }, [editorRef, setEditorHTML]);
 
   return { deleteMark, clearAllMarks, removeMarkByText, addMarkByText };
