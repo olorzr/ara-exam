@@ -208,8 +208,11 @@ src/
 ## lib/concept-pick (AI 추천 빈칸)
 - 역할: 개념지 본문에서 빈칸으로 낼 용어를 골라 온다. 개념지·프린트 시험지 **양쪽**의 편집기에서 쓴다
 - 의존: lib/ai(generateDraft)
-- 주요 파일: plain-text.ts(HTML→평문), prompt.ts, schema.ts, parse.ts, run.ts
+- 주요 파일: plain-text.ts(HTML→평문), prompt.ts, schema.ts, parse.ts, run.ts,
+  notice.ts(하나도 못 붙였을 때의 안내 — AI 가 일부러 안 고른 것과 다 걸러진 것을 가른다)
 - 추천은 **띄어쓰기 없는 한 어절**만 통과시킨다 — `extractMarks` 가 공백으로 쪼개 세기 때문이다
+- **개수는 AI 가 정한다** — prompt.ts 가 눈대중·상한만 주고, schema.ts 의 `maxItems` 와 parse.ts 의
+  자름이 `CONCEPT_PICK_MAX_COUNT` **하나**를 본다(셋이 갈라지면 스키마 위반으로 출력이 통째 실패)
 
 ## lib/problem-ocr
 - 역할: 프롬프트 조립 → 구조화 출력 파싱 → 묶음 실행 → 병합 → 영역 크롭

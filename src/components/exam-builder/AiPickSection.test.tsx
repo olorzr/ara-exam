@@ -17,10 +17,12 @@ describe('AiPickSection', () => {
     expect(container.innerHTML).toBe('');
   });
 
-  it('켜지면 기본 10개로 추천 버튼을 보여 준다', () => {
+  it('켜지면 개수 칸 없이 추천 버튼만 보여 준다 — 몇 개 고를지는 AI 가 정한다', () => {
     render(<AiPickSection {...props()} />);
-    expect(screen.getByRole('button', { name: '10개 추천받기' })).toBeTruthy();
-    expect((screen.getByLabelText('추천받을 개수') as HTMLInputElement).value).toBe('10');
+    expect(screen.getByRole('button', { name: '추천받기' })).toBeTruthy();
+    expect(screen.queryByRole('spinbutton')).toBeNull();
+    expect(screen.queryByLabelText('추천받을 개수')).toBeNull();
+    expect(screen.getByText(/AI 가 정해요/)).toBeTruthy();
   });
 
   it('되돌리기는 붙인 추천이 있을 때만 나온다', () => {

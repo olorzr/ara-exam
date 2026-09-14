@@ -19,15 +19,14 @@ export interface ConceptPickInput {
   html: string;
   /** 이미 마킹된 용어 */
   existing: readonly string[];
-  count: number;
   port: number;
   pref: { model: string | null; effort: string | null };
   signal?: AbortSignal;
 }
 
 /**
- * 추천을 받아 온다.
- * @param input - 본문·기존 마킹·개수·연결 정보
+ * 추천을 받아 온다. 몇 개를 고를지는 AI 가 본문을 보고 정한다.
+ * @param input - 본문·기존 마킹·연결 정보
  * @returns 고른 용어와 버린 이유
  * @throws AiError - 본문이 너무 길거나(`context_exceeded`) 읽지 못했을 때
  */
@@ -39,7 +38,7 @@ export async function runConceptPick(input: ConceptPickInput): Promise<ConceptPi
 
   const raw = await generateDraft({
     port: input.port,
-    prompt: buildConceptPickPrompt({ plain, existing: input.existing, count: input.count }),
+    prompt: buildConceptPickPrompt({ plain, existing: input.existing }),
     outputSchema: CONCEPT_PICK_SCHEMA,
     model: input.pref.model,
     effort: input.pref.effort,
@@ -47,9 +46,7 @@ export async function runConceptPick(input: ConceptPickInput): Promise<ConceptPi
     timeoutMs: CONCEPT_PICK_TIMEOUT_MS,
   });
 
-  const result = parseConceptPicks(raw, {
-    plain, existing: input.existing, count: input.count,
-  });
+  const result = parseConceptPicks(raw, { plain, existing: input.existing });
   if (!result) throw new AiError('invalid_output');
   return result;
 }

@@ -113,7 +113,8 @@
 - 정의: 개념지 본문에서 빈칸으로 낼 용어를 AI 가 골라 **곧바로 마킹**하는 기능. 근거 한 줄과 함께 목록으로 보여 주고 개별·전체 되돌리기가 있다. 개념지와 프린트 시험지 **양쪽**에서 쓴다(같은 편집기)
 - ⚠️ 추천은 **띄어쓰기 없는 한 어절**이어야 한다. `extractMarks` 가 마킹 구간을 공백으로 쪼개 세므로, 구절을 고르면 빈칸이 여러 개가 되고 마킹 수(= 문항 수 = 합격 기준의 분모)가 부풀어 학원 성적까지 어긋난다
 - ⚠️ 본문에 **글자 그대로** 있는 말만 쓴다. `addMarkByText` 는 한 텍스트 노드 안에서만 찾으므로 서식으로 쪼개진 구절은 못 붙이고, 그 개수를 사람에게 알린다
-- 코드에서의 사용: `runConceptPick`, `parseConceptPicks`, `useConceptPick`, `AiPickSection`
+- **개수는 사람이 정하지 않는다**(2026-09-15). 프롬프트가 눈대중(`CONCEPT_PICK_TYPICAL_COUNT`, 10개 안팎)과 상한(`CONCEPT_PICK_MAX_COUNT`, 30)만 주고 AI 가 본문을 보고 정한다. 다시 누르면 '이미고른용어' 를 뺀 나머지에서 아직 외울 만한 것만 더 고르며, **빈 배열은 정상 응답**이다 — `conceptPickEmptyNotice` 가 셋을 가른다 — '더 추천할 용어가 없어요'(안내) / '고른 용어를 본문에 붙이지 못했어요'(서식으로 쪼개진 낱말) / '마킹할 용어를 찾지 못했어요'(검증에서 전부 걸러짐)
+- 코드에서의 사용: `runConceptPick`, `parseConceptPicks`, `conceptPickEmptyNotice`, `useConceptPick`, `AiPickSection`
 - 관련 파일: `src/lib/concept-pick/`, `src/hooks/useConceptPick.ts`, `src/components/exam-builder/AiPickSection.tsx`
 
 ## 미지정 (UNSPECIFIED_OPTION)

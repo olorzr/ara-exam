@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
+import { CONCEPT_PICK_MAX_COUNT } from './constants';
 import { parseConceptPicks } from './parse';
 
 const PLAIN = '이 시의 갈래는 서정시이고 화자는 어머니를 그린다. 수미 상관 구조다.';
 const ctx = (over: Partial<Parameters<typeof parseConceptPicks>[1]> = {}) => ({
-  plain: PLAIN, existing: [] as string[], count: 10, ...over,
+  plain: PLAIN, existing: [] as string[], ...over,
 });
 const raw = (picks: unknown[]) => JSON.stringify({ picks });
 
@@ -47,12 +48,19 @@ describe('parseConceptPicks', () => {
     expect(result?.dropped.duplicate).toBe(2);
   });
 
-  it('개수 상한을 지킨다', () => {
+  it('상한을 넘는 추천은 잘라 낸다 — 스키마의 maxItems 를 믿지 않는다', () => {
+    const words = Array.from({ length: CONCEPT_PICK_MAX_COUNT + 1 }, (_, i) => `용어${i}`);
     const result = parseConceptPicks(
-      raw([{ text: '갈래', reason: '' }, { text: '화자', reason: '' }, { text: '서정시', reason: '' }]),
-      ctx({ count: 2 }),
+      raw(words.map((text) => ({ text, reason: '' }))),
+      ctx({ plain: words.join(' ') }),
     );
-    expect(result?.picks).toHaveLength(2);
+    expect(result?.picks).toHaveLength(CONCEPT_PICK_MAX_COUNT);
+  });
+
+  it('AI 가 하나도 안 골라도(빈 배열) 모양이 깨진 것이 아니다', () => {
+    expect(parseConceptPicks(raw([]), ctx())).toEqual({
+      picks: [], dropped: { notInText: 0, duplicate: 0, malformed: 0 },
+    });
   });
 
   it('근거가 없거나 길면 잘라서 받는다 — 용어까지 버리지는 않는다', () => {

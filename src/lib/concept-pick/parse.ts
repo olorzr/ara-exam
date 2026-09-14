@@ -1,5 +1,5 @@
 import {
-  CONCEPT_PICK_REASON_MAX, CONCEPT_PICK_TEXT_MAX, CONCEPT_PICK_TEXT_MIN,
+  CONCEPT_PICK_MAX_COUNT, CONCEPT_PICK_REASON_MAX, CONCEPT_PICK_TEXT_MAX, CONCEPT_PICK_TEXT_MIN,
 } from './constants';
 import type { ConceptPick } from './schema';
 
@@ -32,15 +32,13 @@ export interface ConceptPickParseContext {
   plain: string;
   /** 이미 마킹된 용어 */
   existing: readonly string[];
-  /** 최대 개수 */
-  count: number;
 }
 
 /**
  * 응답 JSON 을 검증해 마킹할 목록으로.
  * @param raw - 검증 전 JSON 문자열
- * @param ctx - 본문·기존 마킹·개수
- * @returns 고른 용어와 버린 이유. 모양이 깨졌으면 null
+ * @param ctx - 본문·기존 마킹
+ * @returns 고른 용어와 버린 이유. 모양이 깨졌으면 null. 빈 목록은 정상이다(AI 가 더 고를 게 없다고 본 것)
  */
 export function parseConceptPicks(
   raw: string,
@@ -62,7 +60,8 @@ export function parseConceptPicks(
   const dropped: ConceptPickDropped = { notInText: 0, duplicate: 0, malformed: 0 };
 
   for (const item of value.picks) {
-    if (picks.length >= ctx.count) break;
+    // 스키마 maxItems 가 막지만 파서는 스키마를 믿지 않는다 — 순수 함수 쪽에서도 상한을 지킨다
+    if (picks.length >= CONCEPT_PICK_MAX_COUNT) break;
     if (!item || typeof item !== 'object') {
       dropped.malformed += 1;
       continue;
