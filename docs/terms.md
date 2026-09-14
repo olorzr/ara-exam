@@ -42,7 +42,8 @@
 ## 외부지문 및 프린트 (External Level)
 - 정의: 교과서 외 학교별 특이 지문/프린트물의 단어를 관리하는 별도 카테고리. 계층은 `학교 > 년도 > 학년 > 프린트/작품명`
 - 코드에서의 사용: `EXTERNAL_LEVEL` 상수, `CategoryLevel` 타입, `buildExternalTree`
-- 관련 파일: `src/lib/constants.ts`, `src/types/index.ts`, `src/lib/category-tree.ts`, `src/components/words/ExternalCategoryTab.tsx`
+- 관련 파일: `src/lib/constants.ts`, `src/types/index.ts`, `src/lib/category-tree.ts`, `src/components/words/CategoryForm.tsx`
+- ⚠️ **카테고리 관리(`/categories`)에 외부지문 탭은 없다**(2026-09-14). 학교는 관리자시스템이 원본이고, 프린트는 `학교 프린트 시험지` 업로드가 `ensureSchoolMaterial` 로 자동 등록한다 — 앱에 프린트 이름을 고치거나 지우는 화면은 없다(이름 변경 전파는 DB 트리거 `exam.sync_school_material_name` 뿐)
 
 ## 년도 / 학년 (외부지문의 year · grade)
 - 정의: 프린트/작품명이 어느 **학년도**의 어느 **학년** 것인지. 같은 이름의 프린트를 해마다 따로 둘 수 있게 하는 구분자다. 중등/고등 교과 카테고리는 `year` 를 쓰지 않는다(학기가 그 역할)
@@ -53,8 +54,21 @@
 - 정의: 아이들이 학교에서 받아 온 **프린트를 스캔해 만든 개념지**. 시험지 자체는 `concept_sheets` 행이고 `print_bundle_id` 가 채워져 있다는 점만 다르다 — 편집·빈칸 변환·인쇄·합격 기준·성적 연동이 전부 개념지와 같다
 - ⚠️ **개념지 목록(`/exam/builder`)에는 보이지 않는다.** `print_bundle_id IS NULL` 인 행만 그 목록에 나오고, 프린트 시험지는 `/print-sheets` 에서만 보인다(한 학기에 수십 장이라 섞이면 개념지가 묻힌다)
 - ⚠️ '프린트' 라는 말이 이 저장소에 **셋** 있다: ① 카테고리 레벨 `외부지문 및 프린트`(단어·개념지의 학교별 분류), ② 기출 출처 유형 `프린트`(기출 문제 은행), ③ 이 기능. 이 기능은 ①의 카테고리를 **그대로 쓴다**(학교 > 년도 > 학년 > 프린트명)
+- 묶음마다 **단어 등록**을 켤 수 있다 — 아래 '프린트 단어 등록' 참조
 - 코드에서의 사용: `concept_sheets.print_bundle_id`, `createSheetForBundle`, `bundleSheetCategory`
 - 관련 파일: `src/lib/print-scan/save.ts`, `src/lib/print-scan/bundle-plan.ts`, `src/app/(main)/print-sheets/`, `sql/26_print_scans.sql`
+
+## 프린트 단어 등록 (register_words · words_meta)
+- 정의: 학교 프린트에 **'단어 — 뜻' 으로 인쇄된 어휘**를 그 프린트의 카테고리(학교 > 년도 > 학년 > 프린트명)에 단어로 등록하는 기능. 묶음마다 켜고 끄며 기본은 꺼짐(`print_bundles.register_words`)
+- ⚠️ **뜻이 적힌 단어만 등록한다.** 뜻이 없는 단어는 AI 가 사전 뜻을 지어내지 않고 이름만 경고로 알린다 — 지어내면 학생이 외울 답이 선생님이 나눠 준 프린트와 달라진다
+- ⚠️ 단어가 들어갈 카테고리는 시험지와 **같은 자연키**여야 한다: `bundleWordsCategory` 가 `bundleSheetCategory` 를 변환해 만든다(따로 적으면 언젠가 한쪽만 고쳐져 시험지와 단어가 다른 폴더로 갈라진다)
+- 등록 영수증은 `print_bundles.words_meta`. ⚠️ `ocr_meta` 와 **따로 둔다** — '다시 읽기' 가 `ocr_meta` 를 통째로 덮어쓰는데 단어 등록은 목록 버튼으로 따로 돌 수 있어 수명이 다르다
+- ⚠️ 영수증 안에서도 **누적값과 마지막 시도를 가른다**: `wordCount`(올려 둔 단어 수, 줄지 않음)가 칩·단어 관리 링크·삭제 안내의 단일 출처(`registeredWordCount`)이고, `status`/`registered`/`skipped`/`noMeaning`/`unverified` 는 **마지막 시도**의 결과다. 다시 등록하면 전부 중복이라 `registered` 가 0 이고, 다시 등록하다 실패하면 그 시도의 숫자가 전부 0 인데 단어는 DB 에 그대로 있다
+- ⚠️ **뜻도 본문과 대조한다.** 단어만 본문에 있으면 모델이 사전 풀이를 붙여 와도 통과하므로, 공백을 접은 본문에 그 뜻이 글자 그대로 있어야 등록한다(아니면 `unverified` 로 돌려주고 알린다)
+- 읽기가 끝난 뒤 자동으로 돌고, 목록의 **'단어 등록'** 버튼으로 나중에 따로 돌릴 수도 있다(업로드 때 안 켠 프린트·옛 프린트를 되살리는 유일한 길). 다시 등록해도 `ON CONFLICT DO NOTHING` 이라 멱등이다
+- 기능 플래그는 `print_ocr` 을 **재사용한다**(새 `AiFeature` 는 다섯 곳을 함께 고쳐야 한다)
+- 코드에서의 사용: `registerBundleWords`, `runPrintWords`, `parsePrintWords`, `wordsChip`, `usePrintWordsRegister`
+- 관련 파일: `src/lib/print-words/`, `src/hooks/usePrintWordsRegister.ts`, `sql/28_print_bundle_words.sql`
 
 ## 프린트 스캔 (PrintScan)
 - 정의: 선생님이 올린 **스캔 PDF 한 건**. 한 파일에 여러 아이의 여러 프린트가 섞여 있는 것이 보통이라 묶음으로 나눠 읽는다
@@ -66,7 +80,7 @@
 - 정의: 스캔 안의 **프린트 한 장** = 시험지 한 장. 원본 쪽 집합(`pages`) + 학교·년도·학년·프린트명 + 손글씨 포함 여부를 들고 있다. OCR 은 묶음 단위로 돈다
 - 상태: `대기 → 읽는중 → 읽기완료 | 실패`. ⚠️ 어떤 길로 실패해도 **'읽는중' 으로 남기지 않는다**(영영 돌고 있는 것처럼 보인다). 취소로 시작조차 못 한 묶음은 '실패' 가 아니라 **'대기'** 다
 - ⚠️ `page_paths` 는 `pages` 와 **같은 순서**다. 못 올린 쪽은 빈 문자열로 자리를 남긴다 — 압축하면 쪽 번호와 어긋나 엉뚱한 쪽 이미지가 옆에 붙는다
-- 코드에서의 사용: `PrintBundle`, `PrintBundleStatus`, `runBundle`, `bundleBatches`
+- 코드에서의 사용: `PrintBundle`, `PrintBundleStatus`, `runBundle`, `bundleBatches`, `register_words`
 - 관련 파일: `src/lib/print-scan/run.ts`, `src/lib/print-scan/bundles.ts`, `sql/26_print_scans.sql`
 
 ## 손글씨 포함 (include_handwriting)

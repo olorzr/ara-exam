@@ -14,7 +14,7 @@ src/
 │   ├── (auth)/login/        # 인증 관련 페이지
 │   └── (main)/              # 인증 필요 페이지 (레이아웃에서 가드)
 │       ├── dashboard/       # 대시보드
-│       ├── categories/      # 카테고리 관리 (최상위 메뉴 — 출판사·대단원·소단원 마스터)
+│       ├── categories/      # 카테고리 관리 (최상위 메뉴 — 중등/고등 출판사·대단원·소단원 마스터)
 │       ├── words/           # 단어 관리
 │       │   └── new/         # 단어 입력 (직접/CSV)
 │       ├── exam/            # 시험 관련
@@ -65,12 +65,20 @@ src/
 - 의존: 없음
 - 주요 파일: `src/types/index.ts`
 
-### lib/category-master (카테고리 마스터 CRUD + 선택 가능 카테고리 집계)
-- 역할: 출판사/대단원/소단원/학교/프린트 마스터의 CRUD 와, **앱에서 선택 가능한 모든 카테고리**의 단일 출처(`getAllSelectableCategories`) 제공
+### lib/category-master (카테고리 마스터 + 선택 가능 카테고리 집계)
+- 역할: 출판사/대단원/소단원 마스터의 CRUD, 학교·프린트 마스터의 **조회(+프린트 생성)**, 그리고 **앱에서 선택 가능한 모든 카테고리**의 단일 출처(`getAllSelectableCategories`) 제공
+- ⚠️ 전부가 CRUD 는 아니다(2026-09-14): **학교**는 관리자시스템 `public.schools` 가 원본이라 조회 + `ensureSchoolMirror` 뿐이고(sql/27), **프린트(`school_materials`)** 는 `학교 프린트 시험지` 업로드가 만든다(`ensureSchoolMaterial`) — 조회 + 생성뿐이고 앱에 수정·삭제 화면이 없다
 - 의존: `lib/supabase`, `lib/constants`, `types`
 - 주요 파일: `src/lib/category-master/{publishers,major-chapters,sub-chapters,schools,school-materials,aggregate}.ts`
 - `getAllSelectableCategories`: **마스터 중등/고등 전개 ∪ 마스터 외부지문 전개 ∪ `categories` 테이블** 을 자연키로 dedupe(중복 시 `categories` 행 우선 — 실제 UUID 를 가진 쪽). 단어 등록 여부와 무관하게 빈 카테고리도 포함하므로 개념지 편집기가 그대로 쓴다. 소단원이 있는 대단원도 `sub_chapter: ''` 단독 행을 함께 만들어 "대단원 전체"를 고를 수 있다
-- rename 동기화: 마스터 이름 수정은 DB 트리거(`sync_*_name`)가 `categories` + `concept_sheets` 를 갱신하고, 각 CRUD 모듈이 앱 레벨에서도 **같은 두 테이블**을 갱신한다(트리거 누락 환경 안전장치). 한쪽만 고치면 단어지와 개념지 표기가 갈라진다
+- rename 동기화: 마스터 이름 수정은 DB 트리거(`sync_*_name`)가 `categories` + `concept_sheets` 를 갱신하고, 출판사·대단원·소단원 모듈은 앱 레벨에서도 **같은 두 테이블**을 갱신한다(트리거 누락 환경 안전장치). 한쪽만 고치면 단어지와 개념지 표기가 갈라진다. 학교·프린트는 앱에 rename 경로가 없어 트리거(`sync_school_name`/`sync_school_material_name`, sql/26)가 정본이다
+
+### lib/print-words (학교 프린트 단어 등록)
+- 역할: 읽어 둔 프린트 본문에서 **'단어 — 뜻' 으로 인쇄된 어휘**를 뽑아 그 프린트의 카테고리에 단어로 등록한다. 프린트 읽기와 **별개의 텍스트 한 턴**이다(목록의 '단어 등록' 버튼으로도 돌아야 하고, OCR 의 쪽 배치 병합을 건드리지 않는다)
+- 의존: `lib/ai/codex`, `lib/concept-pick`(`htmlToPlainText`), `lib/words-save`(`ensureCategoryId`·`insertWordsToCategory`), `lib/problem-ocr/batch-run`(`FATAL_CODES`)
+- ⚠️ **`lib/print-scan` 을 값으로 import 하지 않는다.** 카테고리와 영수증 저장 함수를 호출자가 주입한다 — 안 그러면 `print-scan/index → run → print-words → print-scan/save` 순환이 되고 `__checks/import-cycles.test.ts` 가 잡는다(2026-09-11 장애와 같은 모양)
+- ⚠️ `registerBundleWords` 는 **절대 던지지 않는다.** 시험지는 이미 저장돼 있어, 던지면 `runBundle` 의 catch 가 멀쩡한 묶음을 '실패' 로 되돌린다. 무슨 일이 있었는지는 `words_meta` 영수증과 `onWarnings` 로만 말한다
+- 주요 파일: `src/lib/print-words/{constants,schema,prompt,parse,run,register,summary}.ts`, `src/hooks/usePrintWordsRegister.ts`
 
 ### lib/external-category (외부지문 년도·학년)
 - 역할: 년도/학년 Select 옵션 생성과 `'미지정'` ↔ `''` 변환을 한 곳에 모은다

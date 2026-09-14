@@ -9,6 +9,7 @@ import OcrProgress from '@/components/problem-ocr/OcrProgress';
 import { useAiEnabled } from '@/hooks/useAiEnabled';
 import { usePrintScanOcr } from '@/hooks/usePrintScanOcr';
 import { usePrintSheetList } from '@/hooks/usePrintSheetList';
+import { usePrintWordsRegister } from '@/hooks/usePrintWordsRegister';
 import type { PrintBundleRow, PrintScanRow } from '@/types/print-scan';
 
 /**
@@ -22,6 +23,7 @@ export default function PrintSheetsPage() {
   const ai = useAiEnabled();
   const list = usePrintSheetList();
   const ocr = usePrintScanOcr();
+  const words = usePrintWordsRegister();
 
   /** 실패·대기 묶음을 다시 읽는다. 끝나면 목록을 다시 읽어 상태를 맞춘다 */
   const read = async (bundle: PrintBundleRow) => {
@@ -30,6 +32,16 @@ export default function PrintSheetsPage() {
     await ocr.rerunBundle(bundle, scan);
     await list.reload();
   };
+
+  /** 읽어 둔 원문으로 단어만 등록한다. 끝나면 목록을 다시 읽어 칩을 갱신한다 */
+  const registerWords = async (bundle: PrintBundleRow) => {
+    await words.run(bundle);
+    await list.reload();
+  };
+
+  // ⚠️ AI 작업 둘을 **한 잠금으로 묶는다** — 따로 두면 읽는 도중에 단어 등록을 눌러
+  //    같은 브릿지로 두 생성이 겹친다
+  const busy = ocr.running || words.running || list.busyId !== null;
 
   if (list.loading) {
     return (
@@ -67,6 +79,25 @@ export default function PrintSheetsPage() {
         </Card>
       )}
 
+      {/*
+        단어 등록도 **몇십 초 걸리는 AI 작업**이다. 도는 동안 목록 버튼이 전부 잠기므로,
+        무엇을 하고 있는지와 멈추는 길을 함께 보여 준다(코덱스 리뷰 P2).
+        진행률 막대를 쓰지 않는 까닭: 한 번의 생성이라 셀 단계가 없다 — 0% 막대는 멈춘 것처럼 보인다.
+      */}
+      {words.running && (
+        <Card>
+          <CardContent className="flex flex-wrap items-center gap-3 py-4">
+            <div className="h-4 w-4 shrink-0 animate-spin rounded-full border-b-2 border-primary" />
+            <span className="flex-1 text-sm text-gray-600">
+              {words.runningName && `${words.runningName} · `}단어 등록 중… 몇십 초 걸려요.
+            </span>
+            <Button type="button" variant="outline" size="sm" onClick={words.cancel}>
+              취소
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {list.scans.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-gray-300">
           <FileScan className="mb-3 h-12 w-12" />
@@ -81,10 +112,11 @@ export default function PrintSheetsPage() {
             <PrintScanCard
               key={scan.id}
               scan={scan}
-              busy={ocr.running || list.busyId !== null}
+              busy={busy}
               aiEnabled={ai.features.print_ocr}
               onRead={read}
               onCreateSheet={list.createSheet}
+              onRegisterWords={registerWords}
               onDeleteBundle={list.deleteBundle}
               onDeleteScan={list.deleteScan}
             />

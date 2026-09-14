@@ -1,6 +1,8 @@
 'use client';
 
+import { Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -15,11 +17,16 @@ import { PlusCircle, Search, Settings } from 'lucide-react';
 import { useWordsManager } from '@/hooks/useWordsManager';
 
 /**
- * 단어 관리 페이지. 트리 구조로 카테고리 탐색, 단어 조회/수정/삭제 기능을 제공한다.
- * 상태·데이터·핸들러는 useWordsManager 훅이 담당하고, 이 컴포넌트는 화면 구성만 한다.
+ * 단어 관리 화면 본체.
+ *
+ * `?categoryId=` 로 들어오면 그 카테고리를 펼친 채 시작한다 — 학교 프린트 목록의
+ * '단어 N개' 칩이 방금 등록한 단어를 바로 보여 주려고 넘긴다.
+ * ⚠️ 주소 읽기가 여기 있으므로 이 컴포넌트는 **반드시 `<Suspense>` 안**에 있어야 한다
+ *    (`words/print/page.tsx` 와 같은 모양).
  */
-export default function WordsPage() {
-  const m = useWordsManager();
+function WordsContent() {
+  const categoryId = useSearchParams().get('categoryId') ?? undefined;
+  const m = useWordsManager(categoryId);
 
   if (m.loading) {
     return (
@@ -129,5 +136,21 @@ export default function WordsPage() {
         />
       )}
     </div>
+  );
+}
+
+/**
+ * 단어 관리 페이지. 트리 구조로 카테고리 탐색, 단어 조회/수정/삭제 기능을 제공한다.
+ * 상태·데이터·핸들러는 useWordsManager 훅이 담당하고, 이 컴포넌트는 화면 구성만 한다.
+ */
+export default function WordsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center py-20">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    }>
+      <WordsContent />
+    </Suspense>
   );
 }

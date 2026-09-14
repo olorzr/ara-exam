@@ -1,4 +1,5 @@
 import type { BuilderCategory } from '@/components/exam-builder';
+import type { CategoryMatchInput } from '@/lib/words-save';
 import { normalizeCategoryName } from '@/lib/category-name';
 import { EXTERNAL_LEVEL } from '@/lib/constants';
 import { toStoredValue } from '@/lib/external-category';
@@ -111,6 +112,7 @@ export interface PrintBundleDraftRow {
   year: string;
   grade: string;
   include_handwriting: boolean;
+  register_words: boolean;
   pages: number[];
   status: '대기';
 }
@@ -139,6 +141,7 @@ export function toBundleInsert(
     year: toStoredValue(draft.year),
     grade: toStoredValue(draft.grade),
     include_handwriting: draft.includeHandwriting,
+    register_words: draft.registerWords,
     pages: pagesOfBundle(map, draft.localId),
     status: '대기',
   };
@@ -167,5 +170,34 @@ export function bundleSheetCategory(bundle: {
     unit: bundle.name,
     subunit: '',
     schoolName: bundle.school_name,
+  };
+}
+
+/**
+ * 묶음의 단어가 들어갈 카테고리.
+ *
+ * ⚠️ **`bundleSheetCategory` 에서 변환해 만든다 — 따로 적지 않는다.** 카테고리 모양이 셋이라
+ *    (`BuilderCategory` 는 unit/subunit, `CategoryMatchInput` 은 chapter/subChapter,
+ *    자연키는 sub_chapter/school_name) 형제 함수로 두면 언젠가 한쪽만 고쳐진다.
+ *    그러면 시험지와 단어가 **다른 카테고리**에 들어가 트리에서 서로를 못 찾는다.
+ * @param bundle - 묶음(저장된 값 기준 — 년도·학년은 '' 가 미지정)
+ * @returns `ensureCategoryId` 에 넘길 카테고리
+ */
+export function bundleWordsCategory(bundle: {
+  name: string;
+  school_name: string;
+  year: string;
+  grade: string;
+}): CategoryMatchInput {
+  const sheet = bundleSheetCategory(bundle);
+  return {
+    level: sheet.level,
+    year: sheet.year,
+    grade: sheet.grade,
+    publisher: sheet.publisher,
+    semester: sheet.semester,
+    chapter: sheet.unit,
+    subChapter: sheet.subunit,
+    schoolName: sheet.schoolName,
   };
 }

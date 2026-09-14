@@ -8,6 +8,7 @@ import {
   ensureSchoolMaterial,
 } from '@/lib/print-scan/save';
 import { bundleDeleteConfirmMessage, scanDeleteConfirmMessage } from '@/lib/print-scan/scan-delete';
+import { registeredWordCount } from '@/lib/print-words';
 import type { PrintBundleRow, PrintScanRow } from '@/types/print-scan';
 
 /**
@@ -70,6 +71,8 @@ export function usePrintSheetList() {
       bundleCount: scan.bundles.length,
       sheetCount: scan.bundles.filter((b) => b.sheetId).length,
       running: scan.bundles.some((b) => b.status === '읽는중'),
+      // 칩과 **같은 함수**로 센다 — 다시 등록하면 registered 가 0 이라 따로 세면 안내가 사라진다
+      wordCount: scan.bundles.reduce((sum, b) => sum + registeredWordCount(b.words_meta), 0),
     });
     if (!window.confirm(message)) return;
     await withBusy(scan.id, async () => {
@@ -83,6 +86,7 @@ export function usePrintSheetList() {
       name: bundle.name,
       hasSheet: Boolean(bundle.sheetId),
       running: bundle.status === '읽는중',
+      wordCount: registeredWordCount(bundle.words_meta),
     });
     if (!window.confirm(message)) return;
     await withBusy(bundle.id, async () => {
@@ -105,6 +109,8 @@ export function usePrintSheetList() {
       // 읽기 경로(`runBundle`)와 **같이** 카테고리 트리에도 올린다 — 예전엔 이 길로 만든
       // 시험지만 트리에서 빠져 있었다(편집기 카테고리 바에서 고른 자리가 비어 보인다)
       await ensureSchoolMaterial(bundle, (warning) => toast.warning(warning));
+      // 단어는 여기서 건드리지 않는다 — 이 길은 **ChatGPT 를 안 쓰는** 길이고,
+      // 단어 등록은 목록의 '단어 등록' 버튼이 맡는다(누를 때마다 한 번 쓴다)
       toast.success('시험지를 만들었어요.');
     });
   }, [withBusy]);

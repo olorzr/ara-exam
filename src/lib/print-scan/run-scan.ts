@@ -9,7 +9,7 @@ import { uploadProblemFile } from '@/lib/problem-bank/storage';
 import type { PrintBundle } from '@/types/print-scan';
 import type { PrintBundleDraftRow } from './bundle-plan';
 import { uploadPrintPageImages } from './page-images';
-import { runBundle, type PrintRunProgress } from './run';
+import { runBundle, type PrintBundleRunResult, type PrintRunProgress } from './run';
 import { insertBundles, insertScan } from './save';
 import { printScanPdfPath } from './storage-paths';
 
@@ -38,6 +38,8 @@ export interface PrintScanRunResult {
   pending: number;
   /** 시험지는 만들었지만 **확인이 필요한** 묶음 수 (ok 의 부분집합) */
   warned: number;
+  /** 이 스캔에서 등록된 단어 수 합계 */
+  words: number;
 }
 
 /** 저장까지 마친 묶음 행 */
@@ -62,6 +64,7 @@ function toBundle(row: SavedRow, pagePaths: Map<number, string>): PrintBundle {
     page_paths: row.pages.map((p) => pagePaths.get(p) ?? ''),
     ocr_html: '',
     ocr_meta: {},
+    words_meta: {},
     user_id: '',
     updated_by: null,
     created_at: now,
@@ -113,7 +116,7 @@ async function readBundlesInOrder(
   rows: SavedRow[],
   doc: OpenPdf,
   env: RunEnv,
-): Promise<{ ok: number; failed: number; pending: number; warned: number }> {
+): Promise<{ ok: number; failed: number; pending: number; warned: number; words: number }> {
   const port = getCodexPort();
   const pref = getCodexModelPref();
 
@@ -126,6 +129,7 @@ async function readBundlesInOrder(
   let ok = 0;
   let failed = 0;
   let warned = 0;
+  let words = 0;
 
   for (const [index, row] of rows.entries()) {
     if (env.signal?.aborted) break;
@@ -139,7 +143,7 @@ async function readBundlesInOrder(
     // 여기서 세면 시험지 만들기가 실패한 묶음이 '실패' 와 '확인 필요' 로 두 번 세어진다
     let sawWarnings = false;
     try {
-      await runBundle(bundle, doc, {
+      const result = await runBundle(bundle, doc, {
         port, pref, signal: env.signal, onProgress,
         onWarnings: (w) => {
           sawWarnings = true;
@@ -147,7 +151,11 @@ async function readBundlesInOrder(
         },
       });
       ok += 1;
+      words += result.wordsRegistered;
       if (sawWarnings) warned += 1;
+      // 단어 등록이 한도·권한·취소로 끝났으면 **다음 묶음도 같은 이유로 죽는다.**
+      // 시험지는 이미 만들어졌으니 실패로 세지 않고, 남은 묶음만 '대기' 로 남긴다
+      if (result.wordsFatal) break;
     } catch (e) {
       failed += 1;
       // 한도·권한·취소는 다음 묶음도 같은 이유로 죽는다 — 남은 것은 **손대지 않고** 멈춘다
@@ -156,7 +164,7 @@ async function readBundlesInOrder(
     }
   }
 
-  return { ok, failed, pending: rows.length - ok - failed, warned };
+  return { ok, failed, pending: rows.length - ok - failed, warned, words };
 }
 
 /**
@@ -168,14 +176,14 @@ async function readBundlesInOrder(
  * @param source - 저장해 둔 원본 PDF (서명 URL)
  * @param scanId - 스캔 id (쪽 이미지 경로에 쓴다)
  * @param env - 취소·진행률
- * @returns 만들어진 시험지 id
+ * @returns 시험지 id 와 단어 등록 결과
  */
 export async function rerunBundle(
   bundle: PrintBundle,
   source: PdfSource,
   scanId: string,
   env: RunEnv = {},
-): Promise<string> {
+): Promise<PrintBundleRunResult> {
   const doc = await openPdfSource(source);
   try {
     // 처음 읽을 때 실패한 쪽이 있으면 이때 다시 올린다(경로가 비어 있는 자리)

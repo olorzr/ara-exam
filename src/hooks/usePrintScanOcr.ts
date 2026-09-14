@@ -20,6 +20,7 @@ const PHASE_LABEL: Record<PrintRunProgress['phase'], string> = {
   page: '원본 페이지 저장 중',
   ocr: '프린트 읽는 중',
   save: '시험지 만드는 중',
+  words: '단어 등록 중',
 };
 
 /**
@@ -118,16 +119,17 @@ export function usePrintScanOcr() {
     setProgress(null);
     const warn = collector();
     try {
-      await rerunBundleOnce(bundle, { kind: 'url', url }, scan.id, {
+      const result = await rerunBundleOnce(bundle, { kind: 'url', url }, scan.id, {
         signal: controller.signal,
         onProgress: setProgress,
         onWarnings: warn.onWarnings,
       });
+      const words = result.wordsRegistered > 0 ? ` · 단어 ${result.wordsRegistered}개 등록` : '';
       // 다 읽은 것과 '읽히긴 했는데 모자란 것' 을 같은 말로 알리지 않는다
       if (warn.collected.length > 0) {
-        toast.warning(`"${bundle.name}" 시험지를 만들었어요 — 확인이 필요한 곳이 ${warn.collected.length}군데 있어요.`);
+        toast.warning(`"${bundle.name}" 시험지를 만들었어요${words} — 확인이 필요한 곳이 ${warn.collected.length}군데 있어요.`);
       } else {
-        toast.success(`"${bundle.name}" 시험지를 만들었어요.`);
+        toast.success(`"${bundle.name}" 시험지를 만들었어요${words}.`);
       }
       return true;
     } catch (e) {
@@ -155,8 +157,9 @@ function bundlePrefix(progress: PrintRunProgress): string {
 
 /** 결과를 한 줄로 알린다 — 실패·미시작·'모자란 완료' 를 뭉뚱그리지 않는다 */
 function announce(result: PrintScanRunResult): void {
+  const words = result.words > 0 ? ` 단어 ${result.words}개도 등록했어요.` : '';
   if (result.failed === 0 && result.pending === 0 && result.warned === 0) {
-    toast.success(`프린트 ${result.ok}장을 읽어 시험지를 만들었어요.`);
+    toast.success(`프린트 ${result.ok}장을 읽어 시험지를 만들었어요.${words}`);
     return;
   }
   const parts = [`${result.ok}장 완료`];
@@ -165,6 +168,7 @@ function announce(result: PrintScanRunResult): void {
   if (result.pending > 0) parts.push(`${result.pending}장은 시작 전`);
   // 만들어지긴 했으나 빠진 데가 있는 것 — 성공으로 뭉뚱그리면 그대로 인쇄된다
   if (result.warned > 0) parts.push(`${result.warned}장은 확인 필요`);
+  if (result.words > 0) parts.push(`단어 ${result.words}개 등록`);
   toast.warning(`${parts.join(' · ')} — 목록에서 다시 읽을 수 있어요.`);
 }
 

@@ -61,7 +61,7 @@ export function useCategoryFormState(props: CategoryFormProps) {
 
   const yearOptions = useMemo(() => buildYearOptions(materials.map((m) => m.year)), [materials]);
 
-  // 프린트 목록은 학교 단위로 받아 년도/학년으로 클라이언트에서 거른다(ExternalCategoryTab 과 동일)
+  // 프린트 목록은 학교 단위로 받아 년도/학년으로 클라이언트에서 거른다(학교당 수십 건 규모)
   const visibleMaterials = useMemo(
     () => (year && grade
       ? materials.filter((m) => m.year === toStoredValue(year) && m.grade === toStoredValue(grade))
@@ -220,6 +220,13 @@ export function useCategoryFormState(props: CategoryFormProps) {
 
   const noPublishers = publishers.length === 0 && !!grade && level !== EXTERNAL_LEVEL;
   const noSchools = schools.length === 0 && level === EXTERNAL_LEVEL;
+  /**
+   * 학교·년도·학년까지 골랐는데 프린트가 하나도 없는 상태.
+   * `noSchools`(마스터가 비었다 = 관리자시스템 문제)와 **원인도 갈 곳도 다르다** —
+   * 프린트는 이제 `학교 프린트 시험지` 업로드만 만든다(2026-09-14).
+   */
+  const noMaterials = visibleMaterials.length === 0
+    && level === EXTERNAL_LEVEL && !!schoolId && !!year && !!grade;
 
   return {
     publishers, chapters, subChaptersList, schools,
@@ -229,6 +236,6 @@ export function useCategoryFormState(props: CategoryFormProps) {
     handleLevelChange, handleYearChange, handleGradeChange, handlePublisherSelect,
     handleSemesterChange, handleChapterSelect, handleSubChapterSelect,
     handleSchoolSelect, handleMaterialSelect,
-    noPublishers, noSchools,
+    noPublishers, noSchools, noMaterials,
   };
 }

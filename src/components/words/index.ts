@@ -8,5 +8,4 @@ export { default as DuplicateWordsDialog } from './DuplicateWordsDialog';
 export { default as WordListHeader } from './WordListHeader';
 export { default as WordEditDialog } from './WordEditDialog';
 export { default as CurriculumCategoryTab } from './CurriculumCategoryTab';
-export { default as ExternalCategoryTab } from './ExternalCategoryTab';
 export type { WordEntry } from './WordEntryTable';

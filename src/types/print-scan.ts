@@ -24,6 +24,40 @@ export interface PrintOcrMeta {
   ranAt?: string;
 }
 
+/**
+ * 단어 등록 영수증 — 몇 개 넣었고 무엇을 확인해야 하는가.
+ *
+ * ⚠️ `PrintOcrMeta` 에 합치지 않는다. '다시 읽기' 는 `ocr_meta` 를 통째로 덮어쓰는데
+ *    단어 등록은 목록의 '단어 등록' 버튼으로 **따로** 돌 수 있어 수명이 다르다.
+ */
+export interface PrintWordsMeta {
+  /** **마지막 시도**의 결과. done = 등록함 · empty = 뜻 있는 단어가 없음 · failed = 못 했음 */
+  status?: 'done' | 'empty' | 'failed';
+  /**
+   * 이 프린트가 카테고리에 올려 둔 단어 수 — **누적값이고 줄지 않는다.**
+   *
+   * ⚠️ 마지막 시도의 숫자(`registered`/`skipped`)와 **반드시 따로 둔다.** 다시 등록하다
+   *    실패하면 그 시도의 숫자는 0 인데 단어는 DB 에 그대로 있다. 한 칸으로 합치면
+   *    실패 한 번에 칩·단어 관리 링크·삭제 안내가 통째로 사라진다(코덱스 리뷰 P2).
+   */
+  wordCount?: number;
+  /** 마지막 시도에 실제로 들어간 단어 수 */
+  registered?: number;
+  /** 마지막 시도에 이미 있어서 건너뛴 수 */
+  skipped?: number;
+  /** 뜻이 안 적혀 있어 뺀 수 */
+  noMeaning?: number;
+  /** 뜻이 프린트에 없는 말이어서 뺀 수 (모델이 지어낸 풀이) */
+  unverified?: number;
+  /** 본문에 그 글자가 없어 뺀 수 */
+  notInText?: number;
+  /** 단어가 들어간 카테고리 — 목록에서 단어 관리로 건너뛸 때 쓴다. 한 번 정해지면 유지된다 */
+  categoryId?: string | null;
+  /** 사람이 확인해야 하는 것들 */
+  warnings?: string[];
+  ranAt?: string;
+}
+
 /** 업로드한 스캔 PDF 1건 */
 export interface PrintScan {
   id: string;
@@ -52,6 +86,8 @@ export interface PrintBundle {
   grade: string;
   /** 손으로 적은 답·필기까지 옮길 것인가 */
   include_handwriting: boolean;
+  /** 프린트에 적힌 '단어 — 뜻' 을 이 프린트 카테고리의 단어로 등록할 것인가 */
+  register_words: boolean;
   /** 이 묶음이 덮는 원본 쪽 번호(1-based, 오름차순) */
   pages: number[];
   /** pages 와 **같은 순서**의 Storage 경로. 못 올린 쪽은 '' */
@@ -59,6 +95,8 @@ export interface PrintBundle {
   /** 읽어 낸 원문(정화 완료) */
   ocr_html: string;
   ocr_meta: PrintOcrMeta;
+  /** 단어 등록 영수증. 한 번도 안 돌렸으면 빈 객체다 */
+  words_meta: PrintWordsMeta;
   status: PrintBundleStatus;
   user_id: string;
   updated_by: string | null;

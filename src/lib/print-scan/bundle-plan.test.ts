@@ -1,15 +1,16 @@
 import { describe, it, expect } from 'vitest';
+import { categoryNaturalKey } from '@/lib/category-key';
 import { EXTERNAL_LEVEL } from '@/lib/constants';
 import { UNSPECIFIED_OPTION } from '@/lib/external-category';
 import type { BundleDraft, PageAssignment } from './bundles';
 import {
-  bundleBatches, bundleSheetCategory, printRunConfirmMessage,
+  bundleBatches, bundleSheetCategory, bundleWordsCategory, printRunConfirmMessage,
   toBundleInsert, totalBatchCount, validateBundles,
 } from './bundle-plan';
 
 const draft = (over: Partial<BundleDraft> = {}): BundleDraft => ({
   localId: 'b1', name: '문학 프린트', schoolId: 's1', schoolName: '상현중',
-  year: '2026', grade: '중2', includeHandwriting: false, ...over,
+  year: '2026', grade: '중2', includeHandwriting: false, registerWords: false, ...over,
 });
 
 describe('validateBundles', () => {
@@ -86,6 +87,11 @@ describe('toBundleInsert', () => {
   it('학교를 안 골랐으면 school_id 는 null 이다 (FK 가 아니라 스냅샷이다)', () => {
     expect(toBundleInsert(draft({ schoolId: '' }), map, 'u').school_id).toBeNull();
   });
+
+  it('단어 등록 여부를 그대로 싣는다 — 읽기가 끝난 뒤 이 값으로 단어 단계를 돈다', () => {
+    expect(toBundleInsert(draft(), map, 'u').register_words).toBe(false);
+    expect(toBundleInsert(draft({ registerWords: true }), map, 'u').register_words).toBe(true);
+  });
 });
 
 describe('bundleSheetCategory', () => {
@@ -98,5 +104,43 @@ describe('bundleSheetCategory', () => {
     expect(cat.schoolName).toBe('상현중');
     expect(cat.publisher).toBe('');
     expect(cat.semester).toBe('');
+  });
+});
+
+describe('bundleWordsCategory', () => {
+  const bundle = {
+    name: '천재 (정호웅) 프린트', school_name: '상현중', year: '2026', grade: '중2',
+  };
+
+  it('시험지와 **같은 자연키**를 낸다 — 어긋나면 시험지와 단어가 다른 폴더로 갈라진다', () => {
+    const sheet = bundleSheetCategory(bundle);
+    const words = bundleWordsCategory(bundle);
+    expect(categoryNaturalKey({
+      level: words.level,
+      year: words.year,
+      grade: words.grade,
+      publisher: words.publisher,
+      semester: words.semester,
+      chapter: words.chapter,
+      sub_chapter: words.subChapter,
+      school_name: words.schoolName,
+    })).toBe(categoryNaturalKey({
+      level: sheet.level,
+      year: sheet.year,
+      grade: sheet.grade,
+      publisher: sheet.publisher,
+      semester: sheet.semester,
+      chapter: sheet.unit,
+      sub_chapter: sheet.subunit,
+      school_name: sheet.schoolName,
+    }));
+  });
+
+  it('프린트명이 chapter 로, 학교가 schoolName 으로 간다 (ensureCategoryId 가 쓰는 이름)', () => {
+    const words = bundleWordsCategory(bundle);
+    expect(words.level).toBe(EXTERNAL_LEVEL);
+    expect(words.chapter).toBe('천재 (정호웅) 프린트');
+    expect(words.subChapter).toBe('');
+    expect(words.schoolName).toBe('상현중');
   });
 });

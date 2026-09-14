@@ -39,6 +39,8 @@ export interface BundleDraft {
   /** 학년 **표시값** ('미지정' 일 수 있다) */
   grade: string;
   includeHandwriting: boolean;
+  /** 프린트에 적힌 '단어 — 뜻' 을 단어로도 등록할 것인가 */
+  registerWords: boolean;
 }
 
 /** 쪽 → 묶음 localId. 없는 쪽은 **건너뛴다**(기출과 달리 기본이 '안 읽음' 이다) */
@@ -49,7 +51,8 @@ export type PageAssignment = ReadonlyMap<number, string>;
  *
  * 앞 묶음의 **학교·년도·학년을 물려받는다** — 한 번에 가져온 프린트는 대개 같은 학교
  * 같은 학년 것이라 매번 다시 고르게 하면 같은 값을 대여섯 번 입력하게 된다.
- * 프린트명과 손글씨 여부는 물려받지 않는다(프린트마다 다르고, 손글씨는 기본 꺼짐이 안전하다).
+ * 프린트명·손글씨·단어 등록 여부는 물려받지 않는다 — 프린트마다 다르고, 둘 다 켜면 돈(ChatGPT
+ * 호출)이 드는 쪽이라 기본 꺼짐이 안전하다.
  *
  * @param localId - 화면용 임시 id
  * @param previous - 바로 앞 묶음 (없으면 null)
@@ -69,6 +72,7 @@ export function newBundleDraft(
     year: previous?.year ?? defaultYear,
     grade: previous?.grade ?? UNSPECIFIED_OPTION,
     includeHandwriting: false,
+    registerWords: false,
   };
 }
 

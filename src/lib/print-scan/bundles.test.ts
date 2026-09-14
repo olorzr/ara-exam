@@ -7,7 +7,7 @@ import {
 
 const draft = (over: Partial<BundleDraft> = {}): BundleDraft => ({
   localId: 'b1', name: '문학 프린트', schoolId: 's1', schoolName: '상현중',
-  year: '2026', grade: '중2', includeHandwriting: false, ...over,
+  year: '2026', grade: '중2', includeHandwriting: false, registerWords: false, ...over,
 });
 
 describe('newBundleDraft', () => {
@@ -19,10 +19,13 @@ describe('newBundleDraft', () => {
     expect(next.grade).toBe('중2');
   });
 
-  it('프린트명과 손글씨 여부는 물려받지 않는다 — 프린트마다 다르다', () => {
-    const next = newBundleDraft('b2', draft({ includeHandwriting: true }), '2025');
+  it('프린트명·손글씨·단어 등록은 물려받지 않는다 — 프린트마다 다르고 돈이 드는 쪽이다', () => {
+    const next = newBundleDraft(
+      'b2', draft({ includeHandwriting: true, registerWords: true }), '2025',
+    );
     expect(next.name).toBe('');
     expect(next.includeHandwriting).toBe(false);
+    expect(next.registerWords).toBe(false);
   });
 
   it('앞 묶음이 없으면 올해와 미지정으로 시작한다', () => {

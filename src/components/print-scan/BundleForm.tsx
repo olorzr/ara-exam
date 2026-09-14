@@ -27,6 +27,8 @@ interface BundleFormProps {
  *
  * ⚠️ 학교는 **관리자시스템 학교 마스터**에서 온다. 여기서 새 학교를 만들지 않는다 —
  *    손으로 적은 이름이 마스터와 갈라지는 바람에 예전엔 선택지가 두 곳뿐이었다.
+ * 단어 등록을 켜면 읽기가 끝난 뒤 **같은 카테고리**(학교/년도/학년/프린트명)에 단어가 들어간다 —
+ * 시험지와 단어가 한 자리에 모이도록 `bundleWordsCategory` 가 시험지 카테고리에서 변환한다.
  * ⚠️ 선택지의 값은 이름이 아니라 **학교 id** 다. 마스터에는 이름 UNIQUE 가 없어,
  *    이름으로 id 를 되찾으면 동명 학교가 생기는 순간 조용히 엉뚱한 학교에 붙는다.
  */
@@ -110,6 +112,23 @@ export default function BundleForm({
           <span className="font-medium text-gray-900">손글씨(학생 답·필기)도 읽기</span>
           <span className="mt-0.5 block text-xs text-gray-500">
             꺼 두면 인쇄된 글만 옮기고, 손으로 채운 빈칸도 빈칸으로 남깁니다.
+          </span>
+        </span>
+      </label>
+
+      <label className="flex items-start gap-2 rounded-md border border-gray-200 p-2.5">
+        <Checkbox
+          checked={bundle.registerWords}
+          onCheckedChange={(checked) => onChange({ registerWords: checked === true })}
+          disabled={disabled}
+          aria-label="단어 목록도 등록"
+          className="mt-0.5"
+        />
+        <span className="text-sm">
+          <span className="font-medium text-gray-900">단어 목록도 등록</span>
+          <span className="mt-0.5 block text-xs text-gray-500">
+            프린트에 &apos;단어 — 뜻&apos; 으로 적힌 어휘를 이 프린트의 단어로 등록해요.
+            뜻이 안 적힌 단어는 등록하지 않고 따로 알려 드려요. 읽기가 끝난 뒤 ChatGPT 를 한 번 더 씁니다.
           </span>
         </span>
       </label>

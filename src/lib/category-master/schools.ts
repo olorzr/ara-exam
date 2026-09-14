@@ -12,8 +12,9 @@ import type { School, SelectableSchool } from '@/types';
  * ⚠️ **여기서 학교를 만들거나 이름을 고치지 말 것.** 학교 등록·수정·삭제는 관리자시스템에서만
  *    한다. 예전의 `createSchool`/`updateSchool`/`deleteSchool` 은 그래서 없앴다 — 손으로 적은
  *    이름이 마스터와 갈라지는 바람에 프린트 스캔의 학교 선택지가 두 곳뿐이었다.
- * ⚠️ 마스터 전체를 거울에 미리 복사하지 말 것. 카테고리 관리의 외부지문 트리가 이 표를 그대로
- *    그려서(`aggregate.ts` 의 `fetchAll('schools')`) 프린트가 하나도 없는 학교로 가득 찬다.
+ * ⚠️ 마스터 전체를 거울에 미리 복사하지 말 것. `aggregate.ts` 의 `getAllSelectableCategories`
+ *    (개념지 편집기 카테고리 바 `ExamCategoryBar`·기출 `UnitTreePanel`)가 이 표를 `fetchAll('schools')`
+ *    로 그대로 그려서, 미리 복사하면 프린트가 하나도 없는 학교로 트리가 가득 찬다.
  */
 
 /** Postgres 유니크 위반 */

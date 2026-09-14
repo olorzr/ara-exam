@@ -2,6 +2,7 @@
 
 import { generateDraft } from '@/lib/ai/codex/generateDraft';
 import { AiError } from '@/lib/ai/types';
+import { registerBundleWords } from '@/lib/print-words/register';
 import { renderPagesToImages, type OpenPdf } from '@/lib/pdf/pdfPages';
 import { planPageBatches } from '@/lib/problem-ocr/batch-plan';
 import { representativeFailure, runOcrBatches } from '@/lib/problem-ocr/batch-run';
@@ -12,6 +13,7 @@ import { PRINT_BATCH_OVERLAP, PRINT_MAX_MERGED_WARNINGS, PRINT_PAGES_PER_BATCH }
 import { finalizePrintHtml, joinPageHtml, parsePrintOcrDraft } from './parse';
 import { buildPrintOcrPrompt } from './prompt';
 import { PRINT_OCR_SCHEMA, type PrintOcrDraft } from './schema';
+import { bundleWordsCategory } from './bundle-plan';
 import { createSheetForBundle, ensureSchoolMaterial, updateBundle } from './save';
 
 /**
@@ -40,11 +42,24 @@ export interface PrintRunEnv {
 }
 
 export interface PrintRunProgress {
-  phase: 'upload' | 'page' | 'ocr' | 'save';
+  phase: 'upload' | 'page' | 'ocr' | 'save' | 'words';
   done: number;
   total: number;
   /** 여러 묶음을 이어 읽을 때 지금 몇 번째인지 */
   bundle?: { index: number; total: number; name: string };
+}
+
+/** 묶음 하나를 끝까지 처리한 결과 */
+export interface PrintBundleRunResult {
+  /** 만들어진(또는 이미 있던) 시험지 id */
+  sheetId: string;
+  /** 이 묶음에서 등록된 단어 수 (안 켰거나 못 했으면 0) */
+  wordsRegistered: number;
+  /**
+   * 단어 단계가 **다음 묶음도 같은 이유로 죽을** 오류로 끝났는가(취소·한도·권한).
+   * 호출자가 이어 읽기를 멈추는 데 쓴다. 이 값이 있어도 이 묶음의 시험지는 멀쩡하다.
+   */
+  wordsFatal: AiError | null;
 }
 
 /**
@@ -135,23 +150,27 @@ export async function readBundle(
  * @param bundle - 묶음
  * @param doc - 열어 둔 PDF
  * @param env - 읽기 환경
- * @returns 읽어서 만든 시험지 id
+ * @returns 시험지 id 와 단어 등록 결과
  * @throws AiError - 멈춰야 하는 오류(취소·한도·권한)일 때만 다시 던진다
  */
 export async function runBundle(
   bundle: PrintBundle,
   doc: OpenPdf,
   env: PrintRunEnv,
-): Promise<string> {
+): Promise<PrintBundleRunResult> {
   await updateBundle(bundle.id, { status: '읽는중' });
+  let sheetId: string;
+  let html: string;
   try {
-    const { html, meta } = await readBundle(bundle, doc, env);
+    const read = await readBundle(bundle, doc, env);
+    html = read.html;
+    const meta = read.meta;
 
     // 저장보다 **먼저** 알린다 — 뒤에서 저장이 실패해도 무엇이 모자랐는지는 남아야 한다
     if (meta.warnings && meta.warnings.length > 0) env.onWarnings?.(meta.warnings);
 
     env.onProgress?.({ phase: 'save', done: 0, total: 1 });
-    const sheetId = await createSheetForBundle(bundle, html);
+    sheetId = await createSheetForBundle(bundle, html);
     // 카테고리 트리에도 올려 둔다(실패해도 시험지는 멀쩡하다).
     // 못 올렸으면 **말한다** — 시험지는 멀쩡한데 트리에서만 안 보이는 것이 가장 찾기 어렵다
     await ensureSchoolMaterial(bundle, (warning) => env.onWarnings?.([warning]));
@@ -163,7 +182,6 @@ export async function runBundle(
       page_paths: bundle.page_paths,
     });
     env.onProgress?.({ phase: 'save', done: 1, total: 1 });
-    return sheetId;
   } catch (e) {
     await updateBundle(bundle.id, {
       status: '실패',
@@ -182,4 +200,48 @@ export async function runBundle(
     });
     throw e;
   }
+
+  // ⚠️ 단어 등록은 **위 try/catch 바깥**이다. 시험지는 이미 저장됐고 상태도 '읽기완료' 라,
+  //    여기서 무슨 일이 나도 묶음을 '실패' 로 되돌리면 안 된다 — 멀쩡한 시험지가 실패로 보인다.
+  //    (`registerBundleWords` 는 던지지 않고 영수증·경고로만 말한다.)
+  const words = bundle.register_words
+    ? await registerWordsForBundle(bundle, html, env)
+    : null;
+
+  return {
+    sheetId,
+    wordsRegistered: words?.meta.registered ?? 0,
+    wordsFatal: words?.fatal ?? null,
+  };
+}
+
+/**
+ * 이 묶음의 단어를 등록한다.
+ *
+ * 카테고리와 저장 함수를 **여기서 주입한다** — `print-words` 는 묶음 표를 모르고,
+ * 알게 하면 `print-scan` ↔ `print-words` 순환 import 가 된다(import-cycles 테스트가 잡는다).
+ * @param bundle - 묶음
+ * @param html - 읽어 낸 본문
+ * @param env - 읽기 환경
+ * @returns 영수증과 치명 오류
+ */
+async function registerWordsForBundle(
+  bundle: PrintBundle,
+  html: string,
+  env: PrintRunEnv,
+) {
+  env.onProgress?.({ phase: 'words', done: 0, total: 1 });
+  const result = await registerBundleWords({
+    bundle,
+    html,
+    category: bundleWordsCategory(bundle),
+    previous: bundle.words_meta,
+    persist: (meta) => updateBundle(bundle.id, { words_meta: meta }),
+    port: env.port,
+    pref: env.pref,
+    signal: env.signal,
+    onWarnings: (w) => env.onWarnings?.(w),
+  });
+  env.onProgress?.({ phase: 'words', done: 1, total: 1 });
+  return result;
 }

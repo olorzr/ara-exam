@@ -26,6 +26,20 @@ describe('scanDeleteConfirmMessage', () => {
     expect(message).toContain('읽는 중');
   });
 
+  it('등록해 둔 단어는 남는다고 밝힌다 — 안 밝히면 지워진 줄 알고 다시 등록한다', () => {
+    const message = scanDeleteConfirmMessage({
+      title: 'x', bundleCount: 1, sheetCount: 0, running: false, wordCount: 12,
+    });
+    expect(message).toContain('단어 12개는 단어 관리에 그대로 남습니다');
+  });
+
+  it('단어가 0개면 단어 얘기를 하지 않는다', () => {
+    const message = scanDeleteConfirmMessage({
+      title: 'x', bundleCount: 1, sheetCount: 0, running: false, wordCount: 0,
+    });
+    expect(message).not.toContain('단어');
+  });
+
   it('제목이 비어도 문장이 무너지지 않는다', () => {
     expect(scanDeleteConfirmMessage({ title: '', bundleCount: 0, sheetCount: 0, running: false }))
       .toContain('제목 없는 스캔');
@@ -38,5 +52,13 @@ describe('bundleDeleteConfirmMessage', () => {
       .toContain('시험지도 함께 지워집니다');
     expect(bundleDeleteConfirmMessage({ name: '문학', hasSheet: false, running: false }))
       .not.toContain('시험지');
+  });
+
+  it('등록해 둔 단어는 남는다 — 단어는 묶음이 아니라 카테고리에 매달려 있다', () => {
+    expect(bundleDeleteConfirmMessage({
+      name: '문학', hasSheet: true, running: false, wordCount: 7,
+    })).toContain('단어 7개는 단어 관리에 그대로 남습니다');
+    expect(bundleDeleteConfirmMessage({ name: '문학', hasSheet: true, running: false }))
+      .not.toContain('단어');
   });
 });

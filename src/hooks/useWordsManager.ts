@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { formatCategoryLabel } from '@/lib/format';
@@ -19,8 +19,13 @@ interface EditForm {
 /**
  * 단어 관리 페이지의 상태·데이터 로딩·CRUD 핸들러를 캡슐화한 훅.
  * 카테고리 트리 탐색, 단어 조회/수정/삭제, 선택 모드(일괄 삭제·이동)를 제공한다.
+ *
+ * @param initialCategoryId - 처음 한 번 자동으로 펼쳐 보여 줄 카테고리
+ *   (프린트 목록의 '단어 N개' 칩이 `?categoryId=` 로 넘겨준다).
+ *   ⚠️ 주소는 **페이지가** 읽어 넘긴다 — 훅에서 `useSearchParams` 를 부르면 이 훅을 쓰는
+ *   모든 화면이 Suspense 경계를 갖춰야 한다.
  */
-export function useWordsManager() {
+export function useWordsManager(initialCategoryId?: string) {
   const { user } = useAuth();
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
@@ -36,6 +41,18 @@ export function useWordsManager() {
   const [selectedWordIds, setSelectedWordIds] = useState<Set<string>>(new Set());
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
 
+  const loadWords = useCallback(async (categoryId: string) => {
+    const { data } = await supabase
+      .from('words')
+      .select('*')
+      .eq('category_id', categoryId)
+      .order('order_index');
+    setWords(data ?? []);
+  }, []);
+
+  /** 주소로 건너온 카테고리는 **처음 목록을 읽을 때 한 번만** 펼친다 */
+  const initialIdRef = useRef(initialCategoryId);
+
   useEffect(() => {
     (async () => {
       if (!user) return;
@@ -46,19 +63,22 @@ export function useWordsManager() {
         .order('grade')
         .order('publisher')
         .order('chapter');
-      setCategories(data ?? []);
+      const rows = data ?? [];
+      setCategories(rows);
+
+      // 주소로 건너왔으면 그 카테고리를 펼친 채 시작한다(프린트 목록의 '단어 N개' 칩).
+      // ⚠️ 목록을 다 읽은 **바로 이 자리**에서 한 번만 한다 — 따로 효과를 두면 사람이 고른
+      //    카테고리를 나중에 덮어쓸 수 있고, 못 찾은 경우(지워진 카테고리) 계속 다시 시도한다.
+      const wanted = initialIdRef.current;
+      initialIdRef.current = undefined;
+      const found = wanted ? rows.find((c) => c.id === wanted) : undefined;
+      if (found) {
+        setSelectedCategory(found);
+        await loadWords(found.id);
+      }
       setLoading(false);
     })();
-  }, [user]);
-
-  const loadWords = useCallback(async (categoryId: string) => {
-    const { data } = await supabase
-      .from('words')
-      .select('*')
-      .eq('category_id', categoryId)
-      .order('order_index');
-    setWords(data ?? []);
-  }, []);
+  }, [user, loadWords]);
 
   /** 정렬된 단어 목록 */
   const sortedWords = useMemo(() => {

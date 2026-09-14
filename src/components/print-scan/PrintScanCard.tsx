@@ -13,13 +13,14 @@ interface PrintScanCardProps {
   aiEnabled: boolean;
   onRead: (bundle: PrintBundleRow) => void;
   onCreateSheet: (bundle: PrintBundleRow) => void;
+  onRegisterWords: (bundle: PrintBundleRow) => void;
   onDeleteBundle: (bundle: PrintBundleRow) => void;
   onDeleteScan: (scan: PrintScanRow) => void;
 }
 
 /** 스캔 한 건 + 그 안의 프린트들 */
 export default function PrintScanCard({
-  scan, busy, aiEnabled, onRead, onCreateSheet, onDeleteBundle, onDeleteScan,
+  scan, busy, aiEnabled, onRead, onCreateSheet, onRegisterWords, onDeleteBundle, onDeleteScan,
 }: PrintScanCardProps) {
   return (
     <Card>
@@ -53,6 +54,7 @@ export default function PrintScanCard({
               aiEnabled={aiEnabled}
               onRead={onRead}
               onCreateSheet={onCreateSheet}
+              onRegisterWords={onRegisterWords}
               onDelete={onDeleteBundle}
             />
           ))}

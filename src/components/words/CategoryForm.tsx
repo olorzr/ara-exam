@@ -167,11 +167,28 @@ export default function CategoryForm(props: CategoryFormProps) {
           )}
         </div>
 
-        {(s.noPublishers || s.noSchools) && (
+        {/*
+          안내는 **비어 있는 이유마다 가는 곳이 다르다.** 한 문장으로 묶으면 학교가 없어도
+          "카테고리 관리에서 등록" 이라고 말하게 되는데, 학교는 관리자시스템이 원본이고
+          프린트는 프린트 업로드만 만든다(2026-09-14).
+        */}
+        {s.noPublishers && (
           <p className="mt-3 text-xs text-gray-500">
-            등록된 항목이 없습니다.{' '}
+            등록된 출판사가 없습니다.{' '}
             <Link href="/categories" className="text-primary underline">카테고리 관리</Link>
             에서 먼저 등록해주세요.
+          </p>
+        )}
+        {s.noSchools && (
+          <p className="mt-3 text-xs text-gray-500">
+            등록된 학교가 없습니다. 관리자시스템 › 학원 관리 › 학교 에서 먼저 등록해 주세요.
+          </p>
+        )}
+        {s.noMaterials && (
+          <p className="mt-3 text-xs text-gray-500">
+            이 학교·학년의 프린트가 아직 없습니다.{' '}
+            <Link href="/print-sheets/upload" className="text-primary underline">학교 프린트 시험지</Link>
+            에서 프린트를 올리면 여기 나타나요.
           </p>
         )}
       </CardContent>
