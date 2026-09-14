@@ -49,16 +49,20 @@ export function usePdfPagePreview(file: File | null, page: number | null) {
       docRef.current = { file, doc: openPdfSource({ kind: 'file', file }) };
     }
     const entry = docRef.current;
+    let opened = false;
 
     entry.doc
-      .then((doc) => pdfPagePreview(doc, page))
+      .then((doc) => { opened = true; return pdfPagePreview(doc, page); })
       .then((src) => {
         if (!fresh || !aliveRef.current) return;
         setStored({ forFile: file, page, src, error: null });
       })
       .catch(() => {
-        // 여는 데 실패한 문서를 붙들고 있으면 다음 쪽도 같은 실패를 물려받는다
-        if (docRef.current === entry) docRef.current = null;
+        // ⚠️ **여는 데** 실패한 것만 놓는다. 그 약속을 붙들고 있으면 다음 쪽도 같은 실패를
+        //    물려받는데, 실패한 약속에는 닫을 문서가 없어 놓아도 새는 것이 없다.
+        //    반대로 **그리는 데만** 실패했으면 문서는 멀쩡히 열려 있다 — 여기서 놓으면
+        //    정리가 그 문서를 못 찾아 `destroy` 를 영영 못 하고, 실패를 되풀이할수록 쌓인다
+        if (!opened && docRef.current === entry) docRef.current = null;
         if (!fresh || !aliveRef.current) return;
         setStored({ forFile: file, page, src: null, error: '이 쪽을 크게 그리지 못했어요.' });
       });
