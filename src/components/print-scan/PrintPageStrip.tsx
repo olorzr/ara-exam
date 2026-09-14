@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import type { SignedImages } from '@/hooks/useSignedImageUrls';
+import PagePreviewDialog from './PagePreviewDialog';
 
 interface PrintPageStripProps {
   /** 묶음이 덮는 쪽 번호 */
@@ -16,8 +18,15 @@ interface PrintPageStripProps {
  *
  * 이게 없으면 잘못 읽은 글자를 알아챌 방법이 없다 — 기출 검수 화면의 원본 대조와 같은
  * 근거다. 다만 여기서는 좌표·상자가 없어 `PageImageWithBoxes` 대신 단순한 목록이다.
+ *
+ * 패널이 좁아 작은 글씨는 이대로 대조하기 어렵다 — 누르면 크게 본다(업로드 화면의 썸네일과
+ * 같은 창). 여기서는 **이미 올려 둔 원본 이미지**를 그대로 쓰므로 다시 그리지 않는다.
  */
 export default function PrintPageStrip({ pages, paths, images }: PrintPageStripProps) {
+  const [preview, setPreview] = useState<number | null>(null);
+  const previewPath = preview === null ? '' : (paths[pages.indexOf(preview)] ?? '');
+  const previewUrl = previewPath ? images.urls.get(previewPath) : undefined;
+
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
@@ -42,9 +51,16 @@ export default function PrintPageStrip({ pages, paths, images }: PrintPageStripP
             <figure key={page} className="space-y-1">
               <figcaption className="text-xs font-medium text-gray-500">{page}쪽</figcaption>
               {url ? (
-                // 서명 URL 이라 만료된다 — next/image 최적화 캐시에 넣지 않는다
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={url} alt={`${page}쪽 원본`} className="block w-full rounded border border-gray-200" />
+                <button
+                  type="button"
+                  onClick={() => setPreview(page)}
+                  className="block w-full"
+                  aria-label={`${page}쪽 크게 보기`}
+                >
+                  {/* 서명 URL 이라 만료된다 — next/image 최적화 캐시에 넣지 않는다 */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt={`${page}쪽 원본`} className="block w-full rounded border border-gray-200" />
+                </button>
               ) : (
                 <div className="flex h-32 items-center justify-center rounded border border-dashed border-gray-200 text-xs text-gray-400">
                   {images.loading ? '불러오는 중…' : '이미지 없음'}
@@ -54,6 +70,15 @@ export default function PrintPageStrip({ pages, paths, images }: PrintPageStripP
           );
         })}
       </div>
+
+      <PagePreviewDialog
+        page={preview}
+        pages={pages}
+        src={previewUrl ?? null}
+        loading={images.loading && !previewUrl}
+        onClose={() => setPreview(null)}
+        onNavigate={setPreview}
+      />
     </div>
   );
 }

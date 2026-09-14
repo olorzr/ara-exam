@@ -3,90 +3,36 @@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { OptionSelect } from '@/components/ui/option-select';
-import { schoolOptionLabel } from '@/lib/category-master';
-import { buildYearOptions, EXTERNAL_GRADE_OPTIONS } from '@/lib/external-category';
 import type { BundleDraft } from '@/lib/print-scan/bundles';
-import type { SelectableSchool } from '@/types';
+import { composePrintName } from '@/lib/print-scan/scan-meta';
 
 interface BundleFormProps {
   bundle: BundleDraft;
-  schools: SelectableSchool[];
-  errors?: { name?: string; school?: string; pages?: string };
+  /** 스캔 제목 — 저장되는 프린트 이름의 앞부분 */
+  scanTitle: string;
+  errors?: { name?: string; pages?: string };
   pageCount: number;
   disabled?: boolean;
   onChange: (patch: Partial<BundleDraft>) => void;
 }
 
 /**
- * 고른 프린트 한 장의 정보 — 학교·년도·학년·이름·손글씨 여부.
+ * 고른 프린트 한 장의 정보 — 이름·손글씨·단어 등록.
  *
- * 값은 개념지와 **같은 규약**이다: 학교/년도/학년/프린트명이 그대로 외부지문 카테고리가 된다.
- * 그래서 '미지정' ↔ '' 변환도 같은 함수(`toStoredValue`)를 지나며, 그 변환은 저장 직전
- * (`toBundleInsert`)에 한 번만 한다 — 화면은 표시값을 그대로 들고 있는다.
+ * 학교·학년도·학년·학기·시험은 **스캔을 올릴 때 한 번** 고른다(`ScanMetaForm`) — 여기는
+ * 프린트마다 실제로 다른 것만 묻는다.
  *
- * ⚠️ 학교는 **관리자시스템 학교 마스터**에서 온다. 여기서 새 학교를 만들지 않는다 —
- *    손으로 적은 이름이 마스터와 갈라지는 바람에 예전엔 선택지가 두 곳뿐이었다.
- * 단어 등록을 켜면 읽기가 끝난 뒤 **같은 카테고리**(학교/년도/학년/프린트명)에 단어가 들어간다 —
- * 시험지와 단어가 한 자리에 모이도록 `bundleWordsCategory` 가 시험지 카테고리에서 변환한다.
- * ⚠️ 선택지의 값은 이름이 아니라 **학교 id** 다. 마스터에는 이름 UNIQUE 가 없어,
- *    이름으로 id 를 되찾으면 동명 학교가 생기는 순간 조용히 엉뚱한 학교에 붙는다.
+ * 저장되는 이름은 **스캔 제목 + 여기 적은 이름**이다(`composePrintName`). 그 값이 그대로
+ * 시험지 제목이자 카테고리 트리의 프린트 이름이 되므로, 무엇으로 저장되는지 미리 보여 준다 —
+ * 안 보여 주면 트리에서 처음 보는 긴 이름을 만나게 된다.
  */
 export default function BundleForm({
-  bundle, schools, errors, pageCount, disabled, onChange,
+  bundle, scanTitle, errors, pageCount, disabled, onChange,
 }: BundleFormProps) {
-  const schoolOptions = schools.map((s) => ({ value: s.id, label: schoolOptionLabel(s) }));
-  // 새로 올리는 프린트라 '데이터에 있는 년도' 가 없다 — 롤링 윈도만으로 충분하다
-  const yearOptions = buildYearOptions([]);
+  const fullName = composePrintName(scanTitle, bundle.name);
 
   return (
     <div className="space-y-3">
-      <div className="space-y-1.5">
-        <Label htmlFor="bundle-school">학교</Label>
-        <OptionSelect
-          id="bundle-school"
-          value={bundle.schoolId}
-          options={schoolOptions}
-          placeholder="학교를 고르세요"
-          disabled={disabled}
-          onChange={(id) => onChange({
-            schoolId: id,
-            // 저장되는 이름은 꼬리표가 붙지 않은 원래 이름이다(라벨과 값을 헷갈리지 말 것)
-            schoolName: schools.find((s) => s.id === id)?.name ?? '',
-          })}
-          className="w-full"
-        />
-        {errors?.school && <p className="text-xs text-red-600">{errors.school}</p>}
-        <p className="text-xs text-gray-400">
-          목록에 없는 학교는 관리자시스템 › 학원 관리 › 학교 에서 먼저 등록해 주세요.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="bundle-year">학년도</Label>
-          <OptionSelect
-            id="bundle-year"
-            value={bundle.year}
-            options={yearOptions}
-            disabled={disabled}
-            onChange={(year) => onChange({ year })}
-            className="w-full"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="bundle-grade">학년</Label>
-          <OptionSelect
-            id="bundle-grade"
-            value={bundle.grade}
-            options={EXTERNAL_GRADE_OPTIONS}
-            disabled={disabled}
-            onChange={(grade) => onChange({ grade })}
-            className="w-full"
-          />
-        </div>
-      </div>
-
       <div className="space-y-1.5">
         <Label htmlFor="bundle-name">프린트 이름</Label>
         <Input
@@ -97,7 +43,12 @@ export default function BundleForm({
           disabled={disabled}
         />
         {errors?.name && <p className="text-xs text-red-600">{errors.name}</p>}
-        <p className="text-xs text-gray-400">시험지 제목과 카테고리에 그대로 쓰입니다.</p>
+        <p className="text-xs text-gray-400">
+          저장되는 이름: <span className="text-gray-600">{fullName || '—'}</span>
+        </p>
+        <p className="text-xs text-gray-400">
+          비우면 스캔 제목이 그대로 프린트 이름이 됩니다. 시험지 제목과 카테고리에 그대로 쓰입니다.
+        </p>
       </div>
 
       <label className="flex items-start gap-2 rounded-md border border-gray-200 p-2.5">

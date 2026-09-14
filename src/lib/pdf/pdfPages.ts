@@ -37,6 +37,13 @@ type PdfDocumentProxy = Awaited<ReturnType<typeof getPdfDocument>>['pdf']
 const THUMB_SCALE = 0.35
 const THUMB_QUALITY = 0.55
 /**
+ * 크게 보기 배율·화질. 글자를 **읽을 수 있을 만큼**이면 되고(원문 대조는 편집 화면에서 한다)
+ * 화면에만 쓰므로 AI 예산과 무관하다.
+ */
+const PREVIEW_SCALE = 1.5
+const PREVIEW_QUALITY = 0.8
+const PREVIEW_MAX_SIDE = 1800
+/**
  * 한 번에 그리는 썸네일 수. 상한이 아니라 **창 크기**다 —
  * 모의고사는 정답지가 뒤쪽(25쪽 이후)에 붙는 경우가 흔해서, 앞 24장만 보여주면
  * 정작 필요한 쪽을 고를 수가 없다. 호출부가 from 을 옮겨 뒤쪽도 볼 수 있게 한다.
@@ -159,6 +166,23 @@ export async function renderPagesToImages(
   }
 
   return { images, rendered, skipped }
+}
+
+/**
+ * 쪽 하나를 **크게** 그린다 (썸네일로는 무슨 쪽인지 분간이 안 될 때).
+ *
+ * 썸네일(0.35배 ≈ 208px)을 CSS 로 늘리면 뭉개지므로 다시 그린다. 이미 열어 둔 문서를 받는
+ * 이유는 앞뒤 쪽을 넘길 때마다 파일 전체를 다시 복사하지 않기 위해서다 — 호출부(훅)가
+ * 문서를 들고 있다가 `destroy` 한다.
+ *
+ * 예산(`encodeWithinBudget`)을 쓰지 않는다: 이 그림은 화면에만 쓰고 AI 로 보내지 않는다.
+ * @param doc - 열어 둔 PDF
+ * @param page - 쪽 번호 (1-based, 범위를 벗어나면 가까운 쪽으로 당긴다)
+ * @returns JPEG data URL
+ */
+export async function pdfPagePreview(doc: OpenPdf, page: number): Promise<string> {
+  const wanted = Math.min(Math.max(1, Math.floor(page)), doc.numPages)
+  return encodeAt(await renderPdfPage(doc.pdf, wanted, PREVIEW_SCALE), PREVIEW_MAX_SIDE, PREVIEW_QUALITY)
 }
 
 /**

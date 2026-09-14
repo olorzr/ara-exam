@@ -64,8 +64,6 @@ export default function BundleList({
                       {bundle.name || `${i + 1}번 프린트 (이름 없음)`}
                     </span>
                     <span className="block truncate text-xs text-gray-500">
-                      {[bundle.schoolName, bundle.grade].filter(Boolean).join(' ') || '학교 미선택'}
-                      {' · '}
                       {pages.length}쪽
                       {invalid && <span className="ml-1 text-red-600">· 확인 필요</span>}
                     </span>
@@ -91,7 +89,7 @@ export default function BundleList({
         프린트 추가
       </Button>
       <p className="text-xs text-gray-400">
-        추가하면 지금 프린트의 학교·학년도·학년을 그대로 가져옵니다.
+        학교·학년은 스캔 전체에 한 번만 고릅니다. 프린트 이름은 스캔 제목 뒤에 붙어요.
       </p>
     </div>
   );

@@ -1,5 +1,6 @@
 'use client';
 
+import { Maximize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { bundleColor, type BundleDraft, type PageAssignment } from '@/lib/print-scan/bundles';
 
@@ -25,6 +26,8 @@ interface PrintPageGridProps {
   onTogglePage: (page: number) => void;
   onAssignWindow: (toActive: boolean) => void;
   onShowFrom: (from: number) => void;
+  /** 쪽을 크게 보기 */
+  onPreview: (page: number) => void;
 }
 
 /**
@@ -35,7 +38,7 @@ interface PrintPageGridProps {
  */
 export default function PrintPageGrid({
   pageCount, from, windowSize, thumbnails, bundles, assignments, activeId, loading,
-  onTogglePage, onAssignWindow, onShowFrom,
+  onTogglePage, onAssignWindow, onShowFrom, onPreview,
 }: PrintPageGridProps) {
   const end = Math.min(pageCount, from + thumbnails.length - 1);
   const orderOf = new Map(bundles.map((b, i) => [b.localId, i]));
@@ -69,6 +72,7 @@ export default function PrintPageGrid({
 
       <p className="text-xs text-gray-400">
         고르지 않은 쪽은 읽지 않아요. 프린트 한 장이 시험지 한 장이 됩니다.
+        무슨 쪽인지 흐릿하면 <strong className="text-gray-500">구석의 확대 단추</strong>로 크게 볼 수 있어요.
       </p>
 
       <div className="flex flex-wrap items-center gap-1 text-xs">
@@ -100,31 +104,44 @@ export default function PrintPageGrid({
             : '건너뜀';
 
           return (
-            <button
-              key={page}
-              type="button"
-              onClick={() => onTogglePage(page)}
-              className={`relative overflow-hidden rounded border bg-white ring-2 transition ${
-                color ? color.ring : 'ring-gray-200 opacity-60 hover:opacity-100'
-              }`}
-              aria-label={
-                assigned === activeId
-                  ? `${page}쪽 — ${label}. 누르면 뺍니다`
-                  : `${page}쪽 — 지금 ${label}. 누르면 ${activeName} 에 넣습니다`
-              }
-            >
-              {/* next/image 는 지연 로딩이라 썸네일 판에서 깜빡인다 — data URL 이므로 img 로 그린다 */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={src} alt={`${page}쪽`} className="block w-full" />
-              <span className="absolute left-1 top-1 rounded bg-black/60 px-1 text-[10px] text-white">
-                {page}
-              </span>
-              {order !== undefined && color && (
-                <span className={`absolute right-1 top-1 rounded px-1 text-[10px] text-white ${color.badge}`}>
-                  {order + 1}
+            /*
+              타일 자체가 이미 '이 프린트에 넣기' 단추라, 확대는 **형제 단추**로 얹는다 —
+              단추 안에 단추를 넣는 것은 잘못된 HTML 이고 키보드로도 못 쓴다.
+            */
+            <div key={page} className="relative">
+              <button
+                type="button"
+                onClick={() => onTogglePage(page)}
+                className={`relative block w-full overflow-hidden rounded border bg-white ring-2 transition ${
+                  color ? color.ring : 'ring-gray-200 opacity-60 hover:opacity-100'
+                }`}
+                aria-label={
+                  assigned === activeId
+                    ? `${page}쪽 — ${label}. 누르면 뺍니다`
+                    : `${page}쪽 — 지금 ${label}. 누르면 ${activeName} 에 넣습니다`
+                }
+              >
+                {/* next/image 는 지연 로딩이라 썸네일 판에서 깜빡인다 — data URL 이므로 img 로 그린다 */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={src} alt={`${page}쪽`} className="block w-full" />
+                <span className="absolute left-1 top-1 rounded bg-black/60 px-1 text-[10px] text-white">
+                  {page}
                 </span>
-              )}
-            </button>
+                {order !== undefined && color && (
+                  <span className={`absolute right-1 top-1 rounded px-1 text-[10px] text-white ${color.badge}`}>
+                    {order + 1}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => onPreview(page)}
+                className="absolute bottom-1 right-1 rounded bg-black/60 p-1 text-white transition-colors hover:bg-black/80"
+                aria-label={`${page}쪽 크게 보기`}
+              >
+                <Maximize2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
           );
         })}
       </div>

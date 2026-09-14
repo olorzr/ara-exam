@@ -1,11 +1,13 @@
-import { UNSPECIFIED_OPTION } from '@/lib/external-category';
-
 /**
  * 묶음(= 프린트 한 장) 초안과 쪽 배정 (순수 함수).
  *
  * 화면(업로드 페이지)에서 떼어 둔 이유: 쪽 배정은 값만 다루는 일인데 화면에 두면
  * supabase 없이는 검증할 수 없다. `problem-bank/source-form.ts` 와 같은 규약이다.
  * 이 초안으로 **무엇을 하는지**(검증·묶음 수·저장 모양)는 [bundle-plan.ts](./bundle-plan.ts) 가 맡는다.
+ *
+ * ⚠️ **학교·학년도·학년·학기·시험은 여기 없다** — 스캔 하나에 한 번만 고르고
+ *    ([scan-meta.ts](./scan-meta.ts)) 저장할 때 묶음마다 복사한다. 프린트마다 묻던 시절의
+ *    '앞 묶음에서 물려받기' 도 그래서 사라졌다.
  */
 
 /** 묶음 하나에 딸 수 있는 색 (썸네일 테두리·칩) */
@@ -29,15 +31,11 @@ export function bundleColor(index: number): BundleColor {
 export interface BundleDraft {
   /** 화면 안에서만 쓰는 임시 id — 저장할 때 진짜 UUID 로 바뀐다 */
   localId: string;
-  /** 프린트명 */
+  /**
+   * 프린트별 이름. **비울 수 있다** — 저장되는 이름은 `composePrintName` 이
+   * 스캔 제목 뒤에 이것을 붙여 만든다(비우면 스캔 제목이 곧 프린트 이름이다).
+   */
   name: string;
-  /** 고른 학교 마스터 id ('' 면 아직 안 고름) */
-  schoolId: string;
-  schoolName: string;
-  /** 학년도 **표시값** ('미지정' 일 수 있다) */
-  year: string;
-  /** 학년 **표시값** ('미지정' 일 수 있다) */
-  grade: string;
   includeHandwriting: boolean;
   /** 프린트에 적힌 '단어 — 뜻' 을 단어로도 등록할 것인가 */
   registerWords: boolean;
@@ -47,33 +45,15 @@ export interface BundleDraft {
 export type PageAssignment = ReadonlyMap<number, string>;
 
 /**
- * 새 묶음 초안.
+ * 새 묶음 초안 — 빈 이름에 두 스위치 모두 꺼짐.
  *
- * 앞 묶음의 **학교·년도·학년을 물려받는다** — 한 번에 가져온 프린트는 대개 같은 학교
- * 같은 학년 것이라 매번 다시 고르게 하면 같은 값을 대여섯 번 입력하게 된다.
- * 프린트명·손글씨·단어 등록 여부는 물려받지 않는다 — 프린트마다 다르고, 둘 다 켜면 돈(ChatGPT
- * 호출)이 드는 쪽이라 기본 꺼짐이 안전하다.
- *
+ * 물려받을 것이 없다: 학교·학년도·학년은 스캔 단위로 올라갔고(`scan-meta.ts`), 프린트별
+ * 이름은 프린트마다 다르다. 손글씨·단어 등록은 켜면 ChatGPT 를 더 쓰는 쪽이라 기본이 꺼짐이다.
  * @param localId - 화면용 임시 id
- * @param previous - 바로 앞 묶음 (없으면 null)
- * @param defaultYear - 앞 묶음이 없을 때 쓸 학년도 표시값
  * @returns 새 초안
  */
-export function newBundleDraft(
-  localId: string,
-  previous: BundleDraft | null,
-  defaultYear: string,
-): BundleDraft {
-  return {
-    localId,
-    name: '',
-    schoolId: previous?.schoolId ?? '',
-    schoolName: previous?.schoolName ?? '',
-    year: previous?.year ?? defaultYear,
-    grade: previous?.grade ?? UNSPECIFIED_OPTION,
-    includeHandwriting: false,
-    registerWords: false,
-  };
+export function newBundleDraft(localId: string): BundleDraft {
+  return { localId, name: '', includeHandwriting: false, registerWords: false };
 }
 
 /**

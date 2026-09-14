@@ -37,8 +37,10 @@ const WORDS_CHIP_CLASS: Record<'ok' | 'muted' | 'error', string> = {
 export default function PrintBundleRow({
   bundle, busy, aiEnabled, onRead, onCreateSheet, onRegisterWords, onDelete,
 }: PrintBundleRowProps) {
-  const meta = [bundle.school_name, bundle.year && `${bundle.year}학년도`, bundle.grade]
-    .filter(Boolean).join(' ');
+  const meta = [
+    bundle.school_name, bundle.year && `${bundle.year}학년도`,
+    bundle.grade, bundle.semester, bundle.exam_type,
+  ].filter(Boolean).join(' ');
   const reading = bundle.status === '읽는중';
   // 탭이 닫혀 '읽는중' 으로 잠긴 줄 — 확인창을 거쳐 다시 읽을 수 있다
   const stalled = isStalledReading(bundle);

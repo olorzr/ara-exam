@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { pdfPageCount, pdfThumbnails, THUMB_WINDOW } from '@/lib/pdf/pdfPages';
-import { kstYear } from '@/lib/kst-year';
 import {
   assignPage, assignPages, newBundleDraft, pagesOfBundle, unassignBundle,
   type BundleDraft, type PageAssignment,
@@ -81,7 +80,7 @@ export function usePrintScanPages(file: File | null) {
         if (!fresh()) return;
         // 묶음 하나를 미리 만들어 둔다 — 첫 화면에서 '묶음 추가' 를 먼저 눌러야 하면
         // 쪽을 고를 수가 없어 막힌 것처럼 보인다
-        const first = newBundleDraft(crypto.randomUUID(), null, String(kstYear()));
+        const first = newBundleDraft(crypto.randomUUID());
         setState({
           forFile: file,
           pageCount: count,
@@ -121,14 +120,10 @@ export function usePrintScanPages(file: File | null) {
     }
   }, [file]);
 
-  /** 새 묶음을 만들고 활성으로 — 앞 묶음의 학교·년도·학년을 물려받는다 */
+  /** 새 묶음을 만들고 활성으로 — 학교·학년은 스캔 단위라 물려받을 것이 없다 */
   const addBundle = useCallback(() => {
     setState((s) => {
-      const draft = newBundleDraft(
-        crypto.randomUUID(),
-        s.bundles[s.bundles.length - 1] ?? null,
-        String(kstYear()),
-      );
+      const draft = newBundleDraft(crypto.randomUUID());
       return { ...s, bundles: [...s.bundles, draft], activeId: draft.localId };
     });
   }, []);

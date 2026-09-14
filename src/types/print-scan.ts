@@ -84,6 +84,10 @@ export interface PrintBundle {
   year: string;
   /** 학년('중2'). '' 가 미지정 */
   grade: string;
+  /** 학기('1학기'·'2학기'). '' 가 미지정. 스캔 단위로 고른 값을 묶음마다 복사한다 */
+  semester: string;
+  /** 시험 구분('중간'·'기말'). '' 가 미지정 */
+  exam_type: string;
   /** 손으로 적은 답·필기까지 옮길 것인가 */
   include_handwriting: boolean;
   /** 프린트에 적힌 '단어 — 뜻' 을 이 프린트 카테고리의 단어로 등록할 것인가 */

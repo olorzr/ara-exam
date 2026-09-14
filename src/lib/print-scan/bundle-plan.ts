@@ -6,6 +6,7 @@ import { toStoredValue } from '@/lib/external-category';
 import { planPageBatches, type PageBatch } from '@/lib/problem-ocr/batch-plan';
 import { PRINT_BATCH_OVERLAP, PRINT_PAGES_PER_BATCH } from './constants';
 import { pagesOfBundle, type BundleDraft, type PageAssignment } from './bundles';
+import { composePrintName, type ScanMetaValues } from './scan-meta';
 
 /**
  * 묶음 초안으로 **무엇을 할 수 있는지** 판단하는 순수 함수들 —
@@ -15,7 +16,7 @@ import { pagesOfBundle, type BundleDraft, type PageAssignment } from './bundles'
 /** 묶음별 오류 문구 */
 export interface BundleErrors {
   /** localId → 칸별 오류 */
-  byId: Record<string, { name?: string; school?: string; pages?: string }>;
+  byId: Record<string, { name?: string; pages?: string }>;
   /** 묶음과 무관한 오류 (묶음이 아예 없음 등) */
   general?: string;
 }
@@ -23,23 +24,39 @@ export interface BundleErrors {
 /**
  * 읽기를 시작해도 되는지 검사한다.
  *
- * 학교·프린트명을 요구하는 것은 개념지 저장 규칙(`isCategoryIncomplete`)과 같다 —
- * 읽고 나서 저장이 막히면 ChatGPT 를 이미 쓴 뒤라 되돌릴 수 없다.
+ * 프린트명을 요구하는 것은 개념지 저장 규칙(`isCategoryIncomplete`)과 같다 —
+ * 읽고 나서 저장이 막히면 ChatGPT 를 이미 쓴 뒤라 되돌릴 수 없다. 학교는 여기서 안 본다:
+ * 스캔 단위 값이라 `validateScanMeta` 가 맡고, 화면도 학교를 고르기 전에는 이 단계를 안 연다.
+ *
+ * ⚠️ 검사하는 것은 프린트별 이름이 아니라 **저장될 이름**(스캔 제목 + 프린트별 이름)이다.
+ *    프린트별 이름은 비워도 되지만(한 장짜리 스캔) 합친 이름이 비면 안 되고,
+ *    한 스캔 안에서 **겹쳐서도 안 된다** — 겹치면 `school_materials` 의
+ *    UNIQUE(name, school_id, year, grade) 에 막혀 두 번째 프린트가 카테고리 트리에서
+ *    첫 번째와 한 자리를 쓰고, 시험지 제목도 똑같아져 어느 것이 어느 것인지 알 수 없다.
  * @param bundles - 묶음 초안들
  * @param map - 쪽 배정
+ * @param scanTitle - 스캔 제목 (이름의 앞부분)
  * @returns 오류 (없으면 빈 byId 와 general 없음)
  */
 export function validateBundles(
   bundles: readonly BundleDraft[],
   map: PageAssignment,
+  scanTitle: string,
 ): BundleErrors {
   const byId: BundleErrors['byId'] = {};
+  const seen = new Set<string>();
+
   for (const bundle of bundles) {
-    const errors: { name?: string; school?: string; pages?: string } = {};
-    if (!bundle.name.trim()) errors.name = '프린트 이름을 적어 주세요.';
-    // 이름이 아니라 **id** 를 요구한다 — 학교 거울(`exam.schools`)과 프린트 마스터가 id 로 붙는다.
-    // 이름만 있고 id 가 비면 시험지는 만들어지는데 카테고리 트리에는 안 올라간다
-    if (!bundle.schoolId) errors.school = '학교를 골라 주세요.';
+    const errors: { name?: string; pages?: string } = {};
+    const name = composePrintName(scanTitle, bundle.name);
+    if (!name) {
+      errors.name = '프린트 이름을 적어 주세요.';
+    } else if (seen.has(name)) {
+      // 뒤에 온 쪽을 짚는다 — 먼저 적은 것을 고치라고 하면 방금 친 것이 지워진다
+      errors.name = '같은 이름의 프린트가 있어요. 프린트 이름을 다르게 적어 주세요.';
+    } else {
+      seen.add(name);
+    }
     if (pagesOfBundle(map, bundle.localId).length === 0) {
       errors.pages = '이 묶음에 넣을 쪽을 골라 주세요.';
     }
@@ -111,6 +128,8 @@ export interface PrintBundleDraftRow {
   school_name: string;
   year: string;
   grade: string;
+  semester: string;
+  exam_type: string;
   include_handwriting: boolean;
   register_words: boolean;
   pages: number[];
@@ -120,26 +139,34 @@ export interface PrintBundleDraftRow {
 /**
  * 초안을 저장 행으로 바꾼다.
  *
- * 이름은 `normalizeCategoryName` 을 거친다 — 트리 노드가 이름 문자열 완전 일치로 묶이는데
- * 표기 변형(`상현중 ` / `상현중`)이 섞이면 폴더가 둘로 갈라진다.
- * 년도·학년은 표시값('미지정') → 저장값('') 으로 바꾼다.
- * @param draft - 화면 초안
+ * 분류(학교·학년도·학년·학기·시험)는 **스캔에서 온다** — 화면은 한 번만 물었고 여기서
+ * 묶음마다 복사한다. DB 가 묶음 단위인 까닭은 읽는 쪽(카테고리 트리·rename 트리거·목록 줄)이
+ * 전부 묶음 행을 보기 때문이다(sql/29 헤더 참고).
+ *
+ * 이름은 `composePrintName` 이 만들고 `normalizeCategoryName` 을 거친다 — 트리 노드가 이름
+ * 문자열 완전 일치로 묶이는데 표기 변형(`상현중 ` / `상현중`)이 섞이면 폴더가 둘로 갈라진다.
+ * 년도·학년·학기·시험은 표시값('미지정') → 저장값('') 으로 바꾼다.
+ * @param draft - 화면 초안 (이름·손글씨·단어 등록)
  * @param map - 쪽 배정
  * @param id - 이 묶음의 UUID
+ * @param scan - 스캔 단위로 고른 값
  * @returns 스캔 id 를 뺀 insert 행
  */
 export function toBundleInsert(
   draft: BundleDraft,
   map: PageAssignment,
   id: string,
+  scan: ScanMetaValues,
 ): PrintBundleDraftRow {
   return {
     id,
-    name: normalizeCategoryName(draft.name),
-    school_id: draft.schoolId || null,
-    school_name: normalizeCategoryName(draft.schoolName),
-    year: toStoredValue(draft.year),
-    grade: toStoredValue(draft.grade),
+    name: composePrintName(scan.title, draft.name),
+    school_id: scan.schoolId || null,
+    school_name: normalizeCategoryName(scan.schoolName),
+    year: toStoredValue(scan.year),
+    grade: toStoredValue(scan.grade),
+    semester: toStoredValue(scan.semester),
+    exam_type: toStoredValue(scan.examType),
     include_handwriting: draft.includeHandwriting,
     register_words: draft.registerWords,
     pages: pagesOfBundle(map, draft.localId),
@@ -152,6 +179,11 @@ export function toBundleInsert(
  *
  * 프린트는 전부 **외부지문 및 프린트** 레벨이고, 프린트명이 `unit`(= categories.chapter) 이다.
  * 이 매핑을 바꾸면 이미 만든 시험지가 트리에서 다른 자리로 옮겨간다.
+ *
+ * ⚠️ 묶음의 `semester` 를 여기 **넣지 않는다**(sql/29 로 생긴 뒤에도 `''` 그대로다).
+ *    외부지문 계층은 `학교 > 년도 > 학년 > 프린트` 이고 학기는 그 자연키에 없다 —
+ *    넣으면 이미 만든 시험지가 트리에서 다른 자리로 옮겨가고, ara-system 성적의
+ *    시리즈 이름(외부지문은 학년만 쓴다)도 갈라진다. 학기·시험은 묶음 행에만 남는다.
  * @param bundle - 묶음(저장된 값 기준 — 년도·학년은 '' 가 미지정)
  * @returns 개념지 카테고리
  */

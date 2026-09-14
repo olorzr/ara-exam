@@ -1,38 +1,21 @@
 import { describe, it, expect } from 'vitest';
-import { UNSPECIFIED_OPTION } from '@/lib/external-category';
 import {
   assignPage, assignPages, assignedPages, bundleColor, BUNDLE_COLORS,
-  newBundleDraft, pagesOfBundle, unassignBundle, type BundleDraft, type PageAssignment,
+  newBundleDraft, pagesOfBundle, unassignBundle, type PageAssignment,
 } from './bundles';
 
-const draft = (over: Partial<BundleDraft> = {}): BundleDraft => ({
-  localId: 'b1', name: '문학 프린트', schoolId: 's1', schoolName: '상현중',
-  year: '2026', grade: '중2', includeHandwriting: false, registerWords: false, ...over,
-});
-
 describe('newBundleDraft', () => {
-  it('앞 묶음의 학교·년도·학년을 물려받는다 — 같은 값을 대여섯 번 고르게 하지 않는다', () => {
-    const next = newBundleDraft('b2', draft(), '2025');
-    expect(next.schoolId).toBe('s1');
-    expect(next.schoolName).toBe('상현중');
-    expect(next.year).toBe('2026');
-    expect(next.grade).toBe('중2');
+  it('빈 이름에 두 스위치 모두 꺼짐으로 시작한다 — 켜면 ChatGPT 를 더 쓴다', () => {
+    const first = newBundleDraft('b1');
+    expect(first.localId).toBe('b1');
+    expect(first.name).toBe('');
+    expect(first.includeHandwriting).toBe(false);
+    expect(first.registerWords).toBe(false);
   });
 
-  it('프린트명·손글씨·단어 등록은 물려받지 않는다 — 프린트마다 다르고 돈이 드는 쪽이다', () => {
-    const next = newBundleDraft(
-      'b2', draft({ includeHandwriting: true, registerWords: true }), '2025',
-    );
-    expect(next.name).toBe('');
-    expect(next.includeHandwriting).toBe(false);
-    expect(next.registerWords).toBe(false);
-  });
-
-  it('앞 묶음이 없으면 올해와 미지정으로 시작한다', () => {
-    const first = newBundleDraft('b1', null, '2026');
-    expect(first.year).toBe('2026');
-    expect(first.grade).toBe(UNSPECIFIED_OPTION);
-    expect(first.schoolName).toBe('');
+  it('학교·학년도·학년을 들지 않는다 — 스캔 단위(scan-meta)로 올라갔다', () => {
+    expect(Object.keys(newBundleDraft('b1')).sort())
+      .toEqual(['includeHandwriting', 'localId', 'name', 'registerWords']);
   });
 });
 

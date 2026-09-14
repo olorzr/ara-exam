@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { createSchoolMaterial, ensureSchoolMirror } from '@/lib/category-master';
-import { buildConceptSheetPayload, generateConceptTitle } from '@/lib/concept-sheet-form';
+import { buildConceptSheetPayload } from '@/lib/concept-sheet-form';
 import { removeProblemFiles } from '@/lib/problem-bank/storage';
 import type { PrintBundle, PrintBundleStatus, PrintOcrMeta, PrintWordsMeta } from '@/types/print-scan';
 import { bundleSheetCategory, type PrintBundleDraftRow } from './bundle-plan';
@@ -86,7 +86,10 @@ export async function createSheetForBundle(bundle: PrintBundle, html: string): P
 
   const category = bundleSheetCategory(bundle);
   const payload = buildConceptSheetPayload({
-    title: generateConceptTitle(category),
+    // 제목은 **프린트 이름 그대로**다. 그 이름이 이미 '2026 상현중 중2 1학기 중간 봄봄 학습지'
+    // 라서, 학교·년도·학년을 다시 앞에 붙이는 `generateConceptTitle` 을 쓰면 같은 말이
+    // 두 번 나온다. 제목은 편집기에서 고칠 수 있다
+    title: bundle.name,
     category,
     html,
     // 빈칸은 선생님이(또는 AI 추천이) 고른다 — 읽자마자 마킹하지 않는다

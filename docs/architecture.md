@@ -25,7 +25,7 @@ src/
 │       └── print-sheets/    # 학교 프린트 시험지 (목록 · upload 스캔 올리기 · [bundleId] 편집)
 ├── components/
 │   ├── layout/              # 앱 셸 (AppShell·Sidebar·nav-items — 좌측 사이드바 네비게이션)
-│   ├── print-scan/          # 학교 프린트 스캔 (쪽 묶기·묶음 폼·목록 줄·원본 쪽 패널)
+│   ├── print-scan/          # 학교 프린트 스캔 (스캔 정보 폼·쪽 묶기·묶음 폼·목록 줄·원본 쪽 패널·쪽 크게 보기)
 │   ├── words/               # 단어 입력 관련 분리 컴포넌트
 │   └── ui/                  # Shadcn UI 컴포넌트
 ├── lib/                     # 유틸리티, 설정
@@ -189,9 +189,17 @@ src/
 - 역할: 스캔 PDF 를 프린트(묶음)별로 나눠 읽고 그 결과로 **개념지**를 만든다
 - 의존: lib/problem-ocr(batch-plan·batch-run·describe-images·normalize-html), lib/pdf, lib/ai,
   lib/sanitize-html, lib/concept-sheet-form, lib/problem-bank/storage
-- 주요 파일: bundles.ts(초안·쪽 배정), bundle-plan.ts(검증·읽기 횟수·저장 모양),
+- 주요 파일: scan-meta.ts(스캔 단위 학교·학년·시험 + 제목·프린트 이름 규칙),
+  bundles.ts(초안·쪽 배정), bundle-plan.ts(검증·읽기 횟수·저장 모양),
+  page-preview.ts(크게 보기 이동 규칙),
   prompt.ts, schema.ts, parse.ts, run.ts(묶음 하나), run-scan.ts(스캔 전체·다시 읽기),
   save.ts, queries.ts, page-images.ts, storage-paths.ts, scan-delete.ts
+- **분류는 스캔마다 한 번 묻고 묶음마다 복사한다**(`scan-meta.ts` → `toBundleInsert`). DB 는
+  묶음 단위 그대로다 — 카테고리 트리·rename 트리거·목록 줄이 전부 묶음 행을 본다
+- 쪽 **크게 보기**는 화면마다 그림의 출처가 다르다: 업로드 화면은 PDF 를 1.5배로 다시 그리고
+  (`pdfPagePreview` + `src/hooks/usePdfPagePreview.ts` — 문서를 한 번만 열고 들고 있는다),
+  편집 화면은 이미 올려 둔 원본 이미지를 그대로 쓴다. 창(`PagePreviewDialog`)과 앞뒤 이동
+  규칙(`page-preview.ts`)은 한 벌이다
 - **시험지를 위한 표를 따로 만들지 않았다** — `concept_sheets` 에 `print_bundle_id` 만 더했다.
   편집기·빈칸 변환·인쇄·합격 기준·성적 연동이 전부 그대로 재사용된다
 - 기출과 **다른 점**: 겹쳐 읽지 않는다(평문은 병합할 수 없다), 정답표·크롭이 없다,

@@ -3,45 +3,57 @@ import { categoryNaturalKey } from '@/lib/category-key';
 import { EXTERNAL_LEVEL } from '@/lib/constants';
 import { UNSPECIFIED_OPTION } from '@/lib/external-category';
 import type { BundleDraft, PageAssignment } from './bundles';
+import type { ScanMetaValues } from './scan-meta';
 import {
   bundleBatches, bundleSheetCategory, bundleWordsCategory, printRunConfirmMessage,
   toBundleInsert, totalBatchCount, validateBundles,
 } from './bundle-plan';
 
 const draft = (over: Partial<BundleDraft> = {}): BundleDraft => ({
-  localId: 'b1', name: '문학 프린트', schoolId: 's1', schoolName: '상현중',
-  year: '2026', grade: '중2', includeHandwriting: false, registerWords: false, ...over,
+  localId: 'b1', name: '문학 프린트', includeHandwriting: false, registerWords: false, ...over,
+});
+
+const scan = (over: Partial<ScanMetaValues> = {}): ScanMetaValues => ({
+  level: '중등', schoolId: 's1', schoolName: '상현중',
+  year: '2026', grade: '중2', semester: '1학기', examType: '중간',
+  title: '2026 상현중 중2 1학기 중간', ...over,
 });
 
 describe('validateBundles', () => {
   const map: PageAssignment = new Map([[1, 'b1']]);
+  const title = '2026 상현중 중2 1학기 중간';
 
   it('다 채웠으면 오류가 없다', () => {
-    expect(validateBundles([draft()], map)).toEqual({ byId: {} });
+    expect(validateBundles([draft()], map, title)).toEqual({ byId: {} });
   });
 
-  it('프린트명·학교가 비면 막는다 — 읽고 나서 저장이 막히면 ChatGPT 를 이미 쓴 뒤다', () => {
-    const errors = validateBundles([draft({ name: '  ', schoolId: '', schoolName: '' })], map);
+  it('프린트별 이름을 비워도 된다 — 스캔 제목이 곧 프린트 이름이다(한 장짜리 스캔)', () => {
+    expect(validateBundles([draft({ name: '  ' })], map, title)).toEqual({ byId: {} });
+  });
+
+  it('스캔 제목까지 비면 막는다 — 읽고 나서 저장이 막히면 ChatGPT 를 이미 쓴 뒤다', () => {
+    const errors = validateBundles([draft({ name: '  ' })], map, '');
     expect(errors.byId.b1.name).toBeTruthy();
-    expect(errors.byId.b1.school).toBeTruthy();
   });
 
-  it('학교 이름만 있고 id 가 없으면 막는다 — 그 상태로 저장하면 카테고리 트리에 안 올라간다', () => {
-    // 학교 거울(exam.schools)과 프린트 마스터가 id 로 붙는다. 이름만 남은 묶음은
-    // 시험지는 멀쩡히 만들어지는데 `ensureSchoolMaterial` 이 아무것도 못 한다.
-    const errors = validateBundles([draft({ schoolId: '', schoolName: '상현중학교' })], map);
-    expect(errors.byId.b1.school).toBeTruthy();
+  it('합친 이름이 겹치면 뒤 묶음을 짚는다 — 겹치면 트리에서 한 자리를 쓰고 제목도 같아진다', () => {
+    const both: PageAssignment = new Map([[1, 'b1'], [2, 'b2']]);
+    const errors = validateBundles(
+      [draft({ name: '' }), draft({ localId: 'b2', name: '' })], both, title,
+    );
+    expect(errors.byId.b1).toBeUndefined();
+    expect(errors.byId.b2.name).toContain('같은 이름');
   });
 
   it('쪽이 하나도 없는 묶음을 짚어 준다', () => {
-    const errors = validateBundles([draft(), draft({ localId: 'b2' })], map);
+    const errors = validateBundles([draft(), draft({ localId: 'b2', name: '독서' })], map, title);
     expect(errors.byId.b2.pages).toBeTruthy();
     expect(errors.byId.b1).toBeUndefined();
   });
 
   it('묶음이 없거나 고른 쪽이 없으면 전체 오류다', () => {
-    expect(validateBundles([], new Map()).general).toBeTruthy();
-    expect(validateBundles([draft()], new Map()).general).toBeTruthy();
+    expect(validateBundles([], new Map(), title).general).toBeTruthy();
+    expect(validateBundles([draft()], new Map(), title).general).toBeTruthy();
   });
 });
 
@@ -68,29 +80,45 @@ describe('읽기 횟수', () => {
 describe('toBundleInsert', () => {
   const map: PageAssignment = new Map([[3, 'b1'], [1, 'b1']]);
 
-  it('이름을 정규화하고 쪽을 정렬한다', () => {
-    const row = toBundleInsert(draft({ name: '천재 (정호웅)  프린트' }), map, 'uuid-1');
-    expect(row.name).toBe('천재(정호웅) 프린트');
+  it('스캔 제목 뒤에 프린트별 이름을 붙이고, 정규화하고, 쪽을 정렬한다', () => {
+    const row = toBundleInsert(draft({ name: '천재 (정호웅)  프린트' }), map, 'uuid-1', scan());
+    expect(row.name).toBe('2026 상현중 중2 1학기 중간 천재(정호웅) 프린트');
     expect(row.pages).toEqual([1, 3]);
     expect(row.status).toBe('대기');
     expect(row.id).toBe('uuid-1');
   });
 
+  it('학교·학년도·학년·학기·시험을 스캔에서 복사한다 — 화면은 한 번만 물었다', () => {
+    const row = toBundleInsert(draft(), map, 'uuid-1', scan());
+    expect(row.school_id).toBe('s1');
+    expect(row.school_name).toBe('상현중');
+    expect(row.year).toBe('2026');
+    expect(row.grade).toBe('중2');
+    expect(row.semester).toBe('1학기');
+    expect(row.exam_type).toBe('중간');
+  });
+
   it("'미지정' 표시값은 빈 문자열로 저장한다", () => {
-    const row = toBundleInsert(
-      draft({ year: UNSPECIFIED_OPTION, grade: UNSPECIFIED_OPTION }), map, 'uuid-1',
-    );
+    const row = toBundleInsert(draft(), map, 'uuid-1', scan({
+      year: UNSPECIFIED_OPTION, grade: UNSPECIFIED_OPTION,
+      semester: UNSPECIFIED_OPTION, examType: UNSPECIFIED_OPTION,
+    }));
     expect(row.year).toBe('');
     expect(row.grade).toBe('');
+    expect(row.semester).toBe('');
+    expect(row.exam_type).toBe('');
   });
 
   it('학교를 안 골랐으면 school_id 는 null 이다 (FK 가 아니라 스냅샷이다)', () => {
-    expect(toBundleInsert(draft({ schoolId: '' }), map, 'u').school_id).toBeNull();
+    expect(toBundleInsert(draft(), map, 'u', scan({ schoolId: '' })).school_id).toBeNull();
   });
 
-  it('단어 등록 여부를 그대로 싣는다 — 읽기가 끝난 뒤 이 값으로 단어 단계를 돈다', () => {
-    expect(toBundleInsert(draft(), map, 'u').register_words).toBe(false);
-    expect(toBundleInsert(draft({ registerWords: true }), map, 'u').register_words).toBe(true);
+  it('손글씨·단어 등록은 묶음마다 다르다 — 초안에서 그대로 온다', () => {
+    const row = toBundleInsert(
+      draft({ includeHandwriting: true, registerWords: true }), map, 'u', scan(),
+    );
+    expect(row.include_handwriting).toBe(true);
+    expect(row.register_words).toBe(true);
   });
 });
 

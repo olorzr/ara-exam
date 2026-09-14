@@ -70,6 +70,24 @@
 - 코드에서의 사용: `registerBundleWords`, `runPrintWords`, `parsePrintWords`, `wordsChip`, `usePrintWordsRegister`
 - 관련 파일: `src/lib/print-words/`, `src/hooks/usePrintWordsRegister.ts`, `sql/28_print_bundle_words.sql`
 
+## 스캔 정보 (ScanMeta)
+- 정의: 스캔 한 건이 공통으로 지니는 값 — **학교급 → 학교 → 학년 → 학년도 → 학기 → 중간·기말**. PDF 를 고르는 자리에서 **한 번만** 묻고, 저장할 때 그 스캔의 묶음마다 복사한다
+- 묻는 차례가 곧 좁혀 가는 차례다(기출 업로드의 `SourceMetaForm` 과 같은 규약): 학교급을 골라야 학교 목록(중등 15 / 고등 5)과 학년(중1~3 / 고1~3)을 그 급으로 좁힌다. 학교급을 바꾸면 **학교·학년을 비운다**(학년도·학기·시험은 급과 무관해 남긴다)
+- ⚠️ **학교급은 저장하지 않는다** — 선택지를 좁히는 데만 쓰고 `grade`('중2')의 접두사로 되찾는다(`levelFromGrade`). 아래 '학교급' 항목과 같은 규약
+- ⚠️ 값은 **표시값**이다('미지정' 이 섞일 수 있다). `''` 로 바꾸는 일은 저장 직전 `toBundleInsert` 에서 `toStoredValue` 로 한 번만 한다
+- ⚠️ DB 는 여전히 **묶음 단위**다(`print_bundles.school_id`·`year`·`grade`·`semester`·`exam_type`). 읽는 쪽(카테고리 트리·rename 트리거·목록 줄)이 전부 묶음 행을 보기 때문이다 — 스캔 표에 두면 그 모두가 조인을 하나 더 타야 한다
+- 제목은 학교를 고르면 `2026 상현중 중2 1학기 중간` 으로 **자동으로 채워지고**, 직접 치면 멈추고, 비우면 다시 따라간다(`titleAuto` — 기출 폼의 `suggestTitle` 과 같은 규약). 학교를 고르기 전에는 **빈 제목**이다(학교 없는 `2026` 이 이름으로 박히면 그대로 남는다)
+- 코드에서의 사용: `ScanMetaValues`, `ScanMetaState`, `applyScanMetaPatch`, `suggestScanTitle`, `schoolsForLevel`, `validateScanMeta`, `ScanMetaForm`
+- 관련 파일: `src/lib/print-scan/scan-meta.ts`, `src/components/print-scan/ScanMetaForm.tsx`, `sql/29_print_bundle_exam_meta.sql`
+
+## 프린트 이름 규칙 (composePrintName)
+- 정의: 저장되는 프린트 이름은 **스캔 제목 + 프린트별 이름**이다 — `2026 상현중 중2 1학기 중간` + `봄봄 학습지`. 합치는 자리는 `composePrintName` **한 곳**이고 `normalizeCategoryName` 을 거친다
+- 프린트별 이름은 **비워도 된다**(프린트가 한 장뿐인 스캔). 그때는 스캔 제목이 곧 프린트 이름이다
+- ⚠️ 한 스캔 안에서 합친 이름이 **겹치면 막는다**(`validateBundles`). 겹치면 `school_materials` 의 `UNIQUE(name, school_id, year, grade)` 에 막혀 두 프린트가 카테고리 트리에서 한 자리를 쓰고 시험지 제목까지 같아진다
+- 이 이름 하나가 `print_bundles.name` → `concept_sheets.unit`(= 시험지 제목이자 카테고리) → `school_materials.name`(트리 잎) → 단어 카테고리 `chapter` 로 그대로 흐른다. 그래서 **시험지 제목도 이 이름 그대로**다(`generateConceptTitle` 을 쓰면 학교·년도가 두 번 나온다)
+- 코드에서의 사용: `composePrintName`, `validateBundles`, `toBundleInsert`, `createSheetForBundle`
+- 관련 파일: `src/lib/print-scan/scan-meta.ts`, `src/lib/print-scan/bundle-plan.ts`, `src/lib/print-scan/save.ts`
+
 ## 프린트 스캔 (PrintScan)
 - 정의: 선생님이 올린 **스캔 PDF 한 건**. 한 파일에 여러 아이의 여러 프린트가 섞여 있는 것이 보통이라 묶음으로 나눠 읽는다
 - 원본 PDF 를 Storage 에 남긴다 — **'다시 읽기' 가 이 파일에 달려 있다**(파일 없이 다시 읽을 방법이 없다)
@@ -77,7 +95,9 @@
 - 관련 파일: `src/types/print-scan.ts`, `src/lib/print-scan/storage-paths.ts`, `src/lib/print-scan/run-scan.ts`
 
 ## 프린트 묶음 (PrintBundle)
-- 정의: 스캔 안의 **프린트 한 장** = 시험지 한 장. 원본 쪽 집합(`pages`) + 학교·년도·학년·프린트명 + 손글씨 포함 여부를 들고 있다. OCR 은 묶음 단위로 돈다
+- 정의: 스캔 안의 **프린트 한 장** = 시험지 한 장. 원본 쪽 집합(`pages`) + 분류(학교·년도·학년·학기·시험) + 프린트명 + 손글씨·단어 등록 여부를 들고 있다. OCR 은 묶음 단위로 돈다
+- 분류는 **스캔에서 복사된다**(위 '스캔 정보' 참조) — 화면은 스캔마다 한 번만 묻는다. 학기·시험은 `sql/29` 로 생겼고 `''` 가 미지정이다
+- ⚠️ 그 `semester` 를 `bundleSheetCategory` 에 **넣지 않는다** — 외부지문 계층은 `학교 > 년도 > 학년 > 프린트` 라 학기가 자연키에 없다. 넣으면 이미 만든 시험지가 트리에서 다른 자리로 옮겨가고 ara-system 성적 시리즈 이름도 갈라진다
 - 상태: `대기 → 읽는중 → 읽기완료 | 실패`. ⚠️ 어떤 길로 실패해도 **'읽는중' 으로 남기지 않는다**(영영 돌고 있는 것처럼 보인다). 취소로 시작조차 못 한 묶음은 '실패' 가 아니라 **'대기'** 다
 - ⚠️ `page_paths` 는 `pages` 와 **같은 순서**다. 못 올린 쪽은 빈 문자열로 자리를 남긴다 — 압축하면 쪽 번호와 어긋나 엉뚱한 쪽 이미지가 옆에 붙는다
 - 코드에서의 사용: `PrintBundle`, `PrintBundleStatus`, `runBundle`, `bundleBatches`, `register_words`
