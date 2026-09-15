@@ -45,6 +45,13 @@ export function parsePrintOcrDraft(
     ? value.warnings.filter((w): w is string => typeof w === 'string' && w.trim() !== '')
     : [];
 
+  /**
+   * 옛한글 쪽 경고 — **모델 경고와 따로 모은다**(코덱스 리뷰).
+   * 섞어 두면 모델이 낸 경고 20개가 상한을 먼저 채워, 못 바꾼 표기 경고가 통째로 사라진다.
+   * 글자는 남아 있는데 고치라는 말만 없어져 그대로 인쇄된다.
+   */
+  const yetWarnings: string[] = [];
+
   const wanted = new Set(ctx.pages);
   const byPage = new Map<number, PrintPageDraft>();
   const unknownPages: number[] = [];
@@ -74,8 +81,8 @@ export function parsePrintOcrDraft(
     // (코덱스 리뷰 5R). 저장 직전 `finalizePrintHtml` 이 정화 뒤에 한 번 더 굳힌다(멱등)
     const html = normalizeBlankParagraphs(finalizeYetHangul(body.slice(0, PAGE_HTML_MAX)));
     // 옛 글자는 선생님이 눈으로 한 번 더 봐야 한다(비슷한 다른 자모로 읽어도 그럴듯해 보인다)
-    if (hasUnconvertedNotation(html)) warnings.push(`${page}쪽 — ${UNCONVERTED_NOTATION_WARNING}`);
-    else if (hasYetHangul(html)) warnings.push(yetHangulPageWarning(page));
+    if (hasUnconvertedNotation(html)) yetWarnings.push(`${page}쪽 — ${UNCONVERTED_NOTATION_WARNING}`);
+    else if (hasYetHangul(html)) yetWarnings.push(yetHangulPageWarning(page));
     byPage.set(page, { page, html });
   }
 
@@ -95,10 +102,12 @@ export function parsePrintOcrDraft(
 
   return {
     pages: [...byPage.values()].sort((a, b) => a.page - b.page),
-    // ⚠️ 빠진 쪽 경고를 **맨 앞**에 둔다(코덱스 리뷰 2R). 모델이 낸 경고가 상한을 채우면
-    //    뒤에 붙은 이 경고가 잘려 나가는데, 그 쪽은 뒤에서 다시 경고하지 않으므로
-    //    **쪽 하나가 통째로 빠진 사실이 어디에도 안 남는다**
-    warnings: [...missing, ...warnings].slice(0, PRINT_OCR_MAX_WARNINGS),
+    // ⚠️ 차례가 곧 우선순위다 — 상한에 걸리면 **뒤엣것부터** 잘린다.
+    //    ① 빠진 쪽(코덱스 리뷰 2R): 뒤에서 다시 경고하지 않으므로 잘리면 쪽 하나가
+    //       통째로 빠진 사실이 어디에도 안 남는다.
+    //    ② 옛한글(코덱스 리뷰): 못 바꾼 표기는 틀린 글자가 그대로 인쇄되는 자리다.
+    //    ③ 모델이 낸 경고.
+    warnings: [...missing, ...yetWarnings, ...warnings].slice(0, PRINT_OCR_MAX_WARNINGS),
   };
 }
 

@@ -33,6 +33,8 @@ export interface OcrWarningTarget {
 export interface OcrWarningObject {
   message: string;
   targets?: OcrWarningTarget[];
+  /** 상한에 밀려도 버리지 않는 경고인가 — `DraftWarning.critical` 이 그대로 넘어온다 */
+  critical?: boolean;
 }
 
 /** 저장·표시되는 경고. 문자열은 옛 저장분이거나 대상이 없는 묶음 단위 경고다 */
@@ -48,6 +50,21 @@ export interface DraftWarning {
   page?: number;
   /** 시험지에 인쇄된 문항 번호 */
   number?: number | null;
+  /**
+   * 상한에 밀려도 **버리지 않는** 경고인가.
+   *
+   * 못 바꾼 옛한글 표기처럼 **안 보이면 틀린 글이 그대로 인쇄되는** 것들만 표시한다.
+   * 상한이 이미 찼으면 경고 하나를 뒤에서 밀어내고 들어간다.
+   */
+  critical?: boolean;
+  /**
+   * 모델이 스스로 적은 경고인가 — **가장 먼저 밀려난다**(코덱스 리뷰 2R).
+   *
+   * 우리 파서가 낸 경고는 '2번 선지를 못 읽었다' 처럼 **무엇이 빠졌는지 아는 말**이고
+   * 가리킬 항목도 있다. 모델의 자유 서술을 남기고 그것을 버리면, 내용이 빠진 문항이
+   * 검수 카드에 아무 표시 없이 남는다.
+   */
+  fromModel?: boolean;
 }
 
 /**
@@ -66,7 +83,36 @@ export function pushDraftWarning(
   warning: DraftWarning,
   max: number = OCR_MAX_WARNINGS,
 ): void {
-  if (warnings.length < max) warnings.push(warning);
+  if (warnings.length < max) { warnings.push(warning); return; }
+  if (!warning.critical) return;
+
+  // ⚠️ 상한이 찼다고 **필수 경고를 버리면 안 된다**(코덱스 리뷰). 모델 경고 20개가 먼저
+  //    차면 못 바꾼 옛한글 표기 경고가 통째로 사라져, 틀린 글자가 검수 카드에 아무 표시
+  //    없이 남았다. 자리가 없으면 하나를 밀어내고 들어간다.
+  //
+  // ⚠️ 밀어낼 차례가 있다(코덱스 리뷰 2R): **모델이 적은 경고가 먼저**다. 그냥 뒤에서부터
+  //    밀면 방금 담은 '선지를 못 읽었다' 가 나가고 모델의 자유 서술 19개가 남는다 —
+  //    내용이 빠진 문항이 아무 표시 없이 검수를 통과한다.
+  const victim = lastIndexWhere(warnings, (w) => w.fromModel === true)
+    ?? lastIndexWhere(warnings, (w) => w.critical !== true);
+  if (victim === undefined) return; // 전부 필수 경고면 더 넣지 않는다
+
+  warnings.splice(victim, 1);
+  warnings.push(warning);
+}
+
+/**
+ * 조건에 맞는 **마지막** 자리 — 없으면 undefined.
+ * @param list - 찾을 목록
+ * @param match - 조건
+ * @returns 자리 또는 undefined
+ */
+function lastIndexWhere(
+  list: readonly DraftWarning[],
+  match: (w: DraftWarning) => boolean,
+): number | undefined {
+  for (let i = list.length - 1; i >= 0; i -= 1) if (match(list[i])) return i;
+  return undefined;
 }
 
 /** 항목 하나를 가리키는 이름 — 번호를 모르면 쪽으로 말한다 */
@@ -144,7 +190,13 @@ export function dedupeWarnings(warnings: readonly OcrWarning[]): OcrWarning[] {
  * @returns 잘라 낸 목록
  */
 export function capWarnings(warnings: readonly OcrWarning[], max: number): OcrWarning[] {
-  return warnings.slice(0, max);
+  if (warnings.length <= max) return [...warnings];
+  // ⚠️ 그냥 자르면 뒤에 붙은 **필수 경고**(못 바꾼 옛한글 표기 등)가 먼저 사라진다.
+  //    필수 경고를 앞으로 당겨 살리고, 남은 자리를 원래 순서대로 채운다.
+  const critical = warnings.filter((w) => typeof w !== 'string' && w.critical === true);
+  if (critical.length === 0) return warnings.slice(0, max);
+  const rest = warnings.filter((w) => typeof w === 'string' || w.critical !== true);
+  return [...critical, ...rest].slice(0, max);
 }
 
 /**
@@ -185,11 +237,14 @@ export function resolveDraftWarning(
   warning: DraftWarning,
   refToId: Map<string, string>,
 ): OcrWarning {
-  const { message, ref, kind, page, number } = warning;
+  const { message, ref, kind, page, number, critical } = warning;
   const id = ref ? refToId.get(ref) : undefined;
+  // 필수 표시는 최종 경고까지 들고 간다 — 병합 뒤 상한(capWarnings)에서 또 걸러지기 때문
+  const mark = critical ? { critical: true as const } : {};
 
   if (id) {
     return {
+      ...mark,
       message,
       targets: [{
         kind: kind ?? 'problem',
@@ -199,8 +254,8 @@ export function resolveDraftWarning(
       }],
     };
   }
-  if (page) return { message, targets: [pageTarget(page)] };
-  return { message };
+  if (page) return { ...mark, message, targets: [pageTarget(page)] };
+  return { ...mark, message };
 }
 
 /**

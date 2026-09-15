@@ -230,6 +230,32 @@ export function renumberedImageItems(
   return out;
 }
 
+/**
+ * 번호가 어긋난 채로 인쇄하기 전에 한 번 묻는 말 — 없으면 null.
+ *
+ * ⚠️ 화면 경고만으로는 모자랐다(코덱스 리뷰). 경고는 `data-no-print` 라 **인쇄물에는
+ *    안 나가고**, 아래로 스크롤해 인쇄 버튼을 누르면 그대로 찍힌다 — 학생은 '01' 이라고
+ *    적힌 문항 안에서 '17' 을 보고 답안지의 1번과 맞추지 못한다. 자동으로 지울 방법은
+ *    여전히 없으므로(잘라 둔 이미지에 번호가 찍혀 있다) **누를 때 한 번 더 묻는다.**
+ * @param renumbered - `renumberedImageItems` 의 결과
+ * @returns 확인창 문구 또는 null(물을 것이 없다)
+ */
+export function renumberedPrintConfirmMessage(
+  renumbered: readonly { printed: number; original: number }[],
+): string | null {
+  if (renumbered.length === 0) return null;
+  const some = renumbered.slice(0, 5)
+    .map((r) => `${r.printed}번(원본 ${r.original}번)`).join(', ');
+  const rest = renumbered.length > 5 ? ` 외 ${renumbered.length - 5}개` : '';
+  return [
+    `이미지로 출제한 ${renumbered.length}개 문항의 번호가 원본과 달라요: ${some}${rest}.`,
+    '잘라 둔 이미지에는 원본 번호가 찍혀 있어 인쇄물에 두 번호가 함께 보이고,',
+    '학생이 답안지와 맞추기 어렵습니다.',
+    '',
+    '그대로 인쇄할까요?',
+  ].join('\n');
+}
+
 /** 가장 긴 지문의 글자 수 — 1단 권유 판단에 쓴다 */
 export function longestPassageChars(items: readonly PaperItemSnapshot[]): number {
   let longest = 0;

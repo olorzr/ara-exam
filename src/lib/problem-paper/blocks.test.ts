@@ -5,7 +5,7 @@ import {
   imagePathsOf,
   longestPassageChars,
   renumberedImageItems,
-  MISSING_ANSWER_LABEL,
+  MISSING_ANSWER_LABEL, renumberedPrintConfirmMessage,
 } from './blocks';
 import type { PaperItemSnapshot } from '@/types/problem-bank';
 
@@ -263,5 +263,24 @@ describe('buildPaperBlocks — 옛한글 지문', () => {
     const blocks = build([snap({ passage: passage('p1', '<p>소나기가 그쳤다</p>') })]);
     const parts = blocks.filter((b) => b.kind === 'passage-part');
     expect(parts.every((b) => b.kind === 'passage-part' && !b.serif)).toBe(true);
+  });
+});
+
+describe('renumberedPrintConfirmMessage', () => {
+  it('어긋난 문항이 없으면 묻지 않는다', () => {
+    expect(renumberedPrintConfirmMessage([])).toBeNull();
+  });
+
+  // ⚠️ 코덱스 리뷰: 화면 경고는 data-no-print 라 인쇄물에 안 나가고,
+  //    스크롤해 버튼만 누르면 두 번호가 함께 찍힌 시험지가 그대로 나갔다
+  it('어긋난 문항을 번호까지 밝혀 묻는다', () => {
+    const msg = renumberedPrintConfirmMessage([{ printed: 1, original: 17 }]);
+    expect(msg).toContain('1번(원본 17번)');
+    expect(msg).toContain('그대로 인쇄할까요?');
+  });
+
+  it('많으면 다섯 개만 보여 주고 나머지는 세어 준다', () => {
+    const many = Array.from({ length: 7 }, (_, i) => ({ printed: i + 1, original: i + 20 }));
+    expect(renumberedPrintConfirmMessage(many)).toContain('외 2개');
   });
 });

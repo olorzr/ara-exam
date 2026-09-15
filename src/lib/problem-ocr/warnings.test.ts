@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
-  capWarnings, dedupeWarnings, issuesByTargetId, itemTargetLabel, listSome, listSomeLabels,
-  pageTarget, resolveDraftWarning, toWarningObject, warningKey, warningText,
+  capWarnings, dedupeWarnings, type DraftWarning, issuesByTargetId, itemTargetLabel,
+  listSome, listSomeLabels, pageTarget, pushDraftWarning, resolveDraftWarning,
+  toWarningObject, warningKey, warningText,
 } from './warnings';
 
 describe('itemTargetLabel', () => {
@@ -58,6 +59,80 @@ describe('warningKey · dedupeWarnings', () => {
 describe('capWarnings', () => {
   it('상한을 넘으면 자른다', () => {
     expect(capWarnings(['a', 'b', 'c'], 2)).toEqual(['a', 'b']);
+  });
+
+  // ⚠️ 코덱스 리뷰: 그냥 자르면 뒤에 붙은 필수 경고가 먼저 사라졌다
+  it('필수 경고는 상한에 밀려도 남는다 — 앞으로 당겨 살린다', () => {
+    const must = { message: '못 바꾼 표기가 있어요', critical: true };
+    const capped = capWarnings(['a', 'b', 'c', must], 2);
+    expect(capped).toContainEqual(must);
+    expect(capped).toHaveLength(2);
+  });
+
+  it('필수 경고가 없으면 순서를 흔들지 않는다', () => {
+    expect(capWarnings([{ message: 'a' }, { message: 'b' }, { message: 'c' }], 2))
+      .toEqual([{ message: 'a' }, { message: 'b' }]);
+  });
+});
+
+describe('pushDraftWarning', () => {
+  it('상한 안에서는 순서대로 담는다', () => {
+    const list: DraftWarning[] = [];
+    pushDraftWarning(list, { message: 'a' }, 2);
+    pushDraftWarning(list, { message: 'b' }, 2);
+    pushDraftWarning(list, { message: 'c' }, 2);
+    expect(list.map((w) => w.message)).toEqual(['a', 'b']);
+  });
+
+  // ⚠️ 코덱스 리뷰: 모델 경고가 상한을 채우면 옛한글 경고가 통째로 사라졌다 —
+  //    틀린 글자는 남아 있는데 고치라는 말만 없어져 그대로 인쇄된다
+  it('상한이 찼어도 필수 경고는 들어간다 — 평범한 경고를 뒤에서 밀어낸다', () => {
+    const list: DraftWarning[] = [{ message: 'a' }, { message: 'b' }];
+    pushDraftWarning(list, { message: '못 바꾼 표기가 있어요', critical: true }, 2);
+    expect(list).toHaveLength(2);
+    expect(list.map((w) => w.message)).toEqual(['a', '못 바꾼 표기가 있어요']);
+  });
+
+  // ⚠️ 코덱스 리뷰 2R: 그냥 뒤에서 밀면 방금 담은 '선지를 못 읽었다' 가 나가고
+  //    모델의 자유 서술이 남아, 내용이 빠진 문항이 아무 표시 없이 검수를 통과했다
+  it('밀어낼 때는 모델이 적은 경고가 먼저다 — 우리 파서 경고가 더 값지다', () => {
+    const list: DraftWarning[] = [
+      { message: '흐릿해요', fromModel: true },
+      { message: '2번 선지를 못 읽었어요', ref: 'Q1' },
+    ];
+    pushDraftWarning(list, { message: '못 바꾼 표기가 있어요', critical: true }, 2);
+    expect(list.map((w) => w.message)).toEqual([
+      '2번 선지를 못 읽었어요', '못 바꾼 표기가 있어요',
+    ]);
+  });
+
+  it('모델 경고가 없으면 평범한 경고를 뒤에서 밀어낸다', () => {
+    const list: DraftWarning[] = [{ message: 'a' }, { message: 'b' }];
+    pushDraftWarning(list, { message: '필수', critical: true }, 2);
+    expect(list.map((w) => w.message)).toEqual(['a', '필수']);
+  });
+
+  it('전부 필수 경고면 더 넣지 않는다 — 목록이 무한정 길어지면 안 된다', () => {
+    const list: DraftWarning[] = [
+      { message: 'x', critical: true }, { message: 'y', critical: true },
+    ];
+    pushDraftWarning(list, { message: 'z', critical: true }, 2);
+    expect(list.map((w) => w.message)).toEqual(['x', 'y']);
+  });
+});
+
+describe('resolveDraftWarning', () => {
+  it('필수 표시를 최종 경고까지 들고 간다 — 병합 뒤 상한에서 또 걸러진다', () => {
+    const resolved = resolveDraftWarning(
+      { message: '못 바꾼 표기가 있어요', ref: 'Q1', kind: 'problem', critical: true },
+      new Map([['Q1', 'row-1']]),
+    );
+    expect(resolved).toMatchObject({ critical: true });
+  });
+
+  it('평범한 경고에는 표시를 붙이지 않는다', () => {
+    const resolved = resolveDraftWarning({ message: '그냥 경고', page: 2 }, new Map());
+    expect(resolved).not.toHaveProperty('critical');
   });
 });
 

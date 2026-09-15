@@ -18,6 +18,23 @@ describe('foldStrict', () => {
     expect(foldStrict('- 표현법은 의인법이다')).toBe('표현법은 의인법이다');
     expect(foldStrict('# 제재 개관')).toBe('제재 개관');
   });
+
+  // ⚠️ 위의 '값은 -3이다' 는 기호가 **글 가운데**라 고치기 전에도 통과했다(코덱스 리뷰).
+  //    진짜 구멍은 **맨 앞**이다 — 거기를 줄머리로 보고 지워서 '-3' 이 '3' 이 됐다.
+  it('맨 앞의 부호는 줄머리가 아니다 — "-3" 이 "3" 과 같아지면 지어낸 뜻이 통과한다', () => {
+    expect(foldStrict('-3')).toBe('-3');
+    expect(foldStrict('-3')).not.toBe(foldStrict('3'));
+  });
+
+  it('줄머리 표시는 뒤에 공백이 온다 — 그 자리만 걷어낸다', () => {
+    expect(foldStrict('-3도 값이다')).toBe('-3도 값이다');
+    expect(foldStrict('- 3도 값이다')).toBe('3도 값이다');
+  });
+
+  it('줄이 바뀐 뒤의 맨 앞도 같은 규칙이다', () => {
+    expect(foldStrict('값\n-3')).toBe('값 -3');
+    expect(foldStrict('값\n- 셋')).toBe('값 셋');
+  });
 });
 
 describe('foldLoose', () => {

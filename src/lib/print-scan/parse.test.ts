@@ -14,6 +14,34 @@ describe('parsePrintOcrDraft', () => {
     expect(draft?.warnings).toEqual(['흐려요']);
   });
 
+  // ⚠️ 코덱스 리뷰: 모델 경고 20개가 상한을 먼저 채우면 옛한글 경고가 통째로 사라졌다.
+  //    글자는 남아 있는데 고치라는 말만 없어져 그대로 인쇄된다
+  it('못 바꾼 옛한글 경고는 모델 경고가 상한을 채워도 살아남는다', () => {
+    const draft = parsePrintOcrDraft(
+      raw({
+        pages: [{ page: 1, html: '<p>⟦ㅎㆍㄴ⟧글</p>' }],
+        warnings: Array.from({ length: 20 }, (_, i) => `모델 경고 ${i + 1}`),
+      }),
+      { pages: [1] },
+    );
+    expect(draft?.warnings).toHaveLength(20);
+    // 모델 경고에 밀리지 않고 맨 앞에 남는다
+    expect(draft?.warnings[0]).toContain('1쪽');
+    expect(draft?.warnings[0]).toContain('옛한글');
+  });
+
+  it('자모로 못 바꾼 표기 경고도 상한에 밀리지 않는다', () => {
+    const draft = parsePrintOcrDraft(
+      raw({
+        pages: [{ page: 1, html: '<p>⟦없는자모⟧</p>' }],
+        warnings: Array.from({ length: 20 }, (_, i) => `모델 경고 ${i + 1}`),
+      }),
+      { pages: [1] },
+    );
+    expect(draft?.warnings).toHaveLength(20);
+    expect(draft?.warnings[0]).toContain('1쪽 —');
+  });
+
   it('모양이 깨지면 null — 부분만 저장하지 않는다', () => {
     expect(parsePrintOcrDraft('{', { pages: [1] })).toBeNull();
     expect(parsePrintOcrDraft(raw({ warnings: [] }), { pages: [1] })).toBeNull();

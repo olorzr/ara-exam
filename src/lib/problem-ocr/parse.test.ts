@@ -47,9 +47,11 @@ describe('parseOcrDraft — 구조', () => {
     expect(draft.items[0].choices).toHaveLength(5);
   });
 
-  it('모델 경고를 그대로 가져온다', () => {
+  it('모델 경고를 그대로 가져오되 모델이 적었다고 표시한다', () => {
     const draft = parseOcrDraft(json([item()], ['정답표가 안 보여요']), ctx)!;
-    expect(draft.warnings).toEqual([{ message: '정답표가 안 보여요' }]);
+    // `fromModel` — 상한이 찼을 때 가장 먼저 밀려난다(코덱스 리뷰 2R).
+    // 우리 파서 경고는 무엇이 빠졌는지 아는 말이라 더 값지다
+    expect(draft.warnings).toEqual([{ message: '정답표가 안 보여요', fromModel: true }]);
   });
 });
 

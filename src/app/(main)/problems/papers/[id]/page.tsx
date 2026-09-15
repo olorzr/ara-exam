@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AlertTriangle, ArrowLeft, Printer } from 'lucide-react';
@@ -13,7 +13,9 @@ import ProblemAnswerSheetView from '@/components/problem-paper/ProblemAnswerShee
 import { supabase } from '@/lib/supabase';
 import { useImagesReady } from '@/hooks/useImagesReady';
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls';
-import { imagePathsOf, renumberedImageItems } from '@/lib/problem-paper/blocks';
+import {
+  imagePathsOf, renumberedImageItems, renumberedPrintConfirmMessage,
+} from '@/lib/problem-paper/blocks';
 import { normalizePaperSettings } from '@/lib/problem-paper/settings';
 import type { PaperItemSnapshot, ProblemPaper } from '@/types/problem-bank';
 
@@ -49,6 +51,37 @@ export default function ProblemPaperViewPage() {
   const imagesBlocked = images.loading || ready.loading || brokenCount > 0;
   // 이미지에는 원본 시험지의 번호가 그대로 찍혀 있다 — 자리가 바뀌면 두 번호가 함께 보인다
   const renumbered = useMemo(() => renumberedImageItems(items), [items]);
+
+  /**
+   * 번호 어긋남을 **사람이 확인했는가.**
+   *
+   * ⚠️ 확인 전에는 안내가 **인쇄물에도 찍힌다**(코덱스 리뷰 3R). 확인창만 두면
+   *    `Cmd/Ctrl+P` 와 브라우저 메뉴 인쇄가 그것을 통째로 건너뛰는데, 화면 안내는
+   *    `data-no-print` 라 **인쇄물에 아무 표시가 없다** — 조용히 나가는 바로 그 경로다.
+   *    인쇄 자체를 막지는 않는다(급할 때 뽑아 손으로 고치는 길까지 막힌다, 사용자 결정).
+   */
+  const [renumberAcked, setRenumberAcked] = useState(false);
+  /** 확인창을 통과해 인쇄를 잇는 중인가 — 안내를 인쇄물에서 뺀 **뒤에** 인쇄해야 한다 */
+  const printAfterAckRef = useRef(false);
+
+  useEffect(() => {
+    if (!renumberAcked || !printAfterAckRef.current) return;
+    printAfterAckRef.current = false;
+    window.print();
+  }, [renumberAcked]);
+
+  /**
+   * 인쇄 — 번호가 어긋난 이미지 문항이 있으면 **한 번 묻는다**(코덱스 리뷰).
+   * 확인하면 안내를 인쇄물에서 빼고(위 효과가) 이어서 인쇄한다.
+   */
+  const handlePrint = () => {
+    const ask = mode === 'paper' && !renumberAcked
+      ? renumberedPrintConfirmMessage(renumbered) : null;
+    if (!ask) { window.print(); return; }
+    if (!window.confirm(ask)) return;
+    printAfterAckRef.current = true;
+    setRenumberAcked(true);
+  };
 
   useEffect(() => {
     let alive = true;
@@ -120,7 +153,7 @@ export default function ProblemPaperViewPage() {
           ))}
           <Button
             type="button" size="sm"
-            onClick={() => window.print()}
+            onClick={handlePrint}
             disabled={mode === 'paper' && imagesBlocked}
           >
             <Printer className="h-3.5 w-3.5" />
@@ -147,9 +180,11 @@ export default function ProblemPaperViewPage() {
       )}
 
       {mode === 'paper' && renumbered.length > 0 && (
+        // ⚠️ 확인 전에는 `data-no-print` 를 붙이지 않는다 — Cmd/Ctrl+P 로 바로 뽑아도
+        //    이 안내가 함께 찍혀야 번호가 어긋난 사실이 조용히 넘어가지 않는다
         <div
           className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
-          data-no-print
+          data-no-print={renumberAcked ? '' : undefined}
         >
           <p className="font-semibold">이미지로 출제한 문항의 번호가 달라요.</p>
           <p className="mt-0.5">
@@ -158,6 +193,14 @@ export default function ProblemPaperViewPage() {
             {renumbered.length > 5 && ` 외 ${renumbered.length - 5}개`}).
             자리를 원래 번호에 맞추거나, 검수에서 그 문항을 글로 출제하도록 바꿔 주세요.
           </p>
+          {!renumberAcked && (
+            <Button
+              type="button" variant="outline" size="sm" className="mt-2" data-no-print
+              onClick={() => setRenumberAcked(true)}
+            >
+              확인했어요 — 인쇄물에서 이 안내 빼기
+            </Button>
+          )}
         </div>
       )}
 

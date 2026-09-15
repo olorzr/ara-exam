@@ -320,7 +320,10 @@ export function parseOcrDraft(raw: string, ctx: ParseContext): OcrDraft | null {
     ? parsed.warnings
       .map((w) => str(w, 300)).filter(Boolean)
       .slice(0, OCR_MAX_WARNINGS)
-      .map((message) => ({ message }))
+      // `fromModel` — 상한이 찼을 때 **가장 먼저 밀려나는** 경고다(코덱스 리뷰 2R).
+      // 우리 파서가 낸 경고는 '선지를 못 읽었다' 처럼 무엇이 빠졌는지 아는 말이라
+      // 모델의 자유 서술보다 값이 크다
+      .map((message) => ({ message, fromModel: true }))
     : [];
 
   const pageSet = new Set(ctx.pages);

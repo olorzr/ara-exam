@@ -54,6 +54,41 @@ describe('findMarkTarget', () => {
     expect(textAt(target)).toBe('대상');
   });
 
+  // ⚠️ 코덱스 리뷰: 접고 나면 '가 | 나의 대비' 와 '가 나의 대비' 가 같아져,
+  //    힌트가 정확히 가리킨 뒤 문단 대신 앞 문단이 이겼다
+  it('글자 그대로 맞는 자리가 먼저다 — 기호를 지워서만 맞는 앞 문단에 지면 안 된다', () => {
+    const twin = schema.nodeFromJSON({
+      type: 'doc',
+      content: [p('가 | 나의 대비'), p('가 나의 대비')],
+    });
+    const target = findMarkTarget(twin, '대비', '가 나의 대비');
+    expect(twin.textBetween(target!.from, target!.to)).toBe('대비');
+    // 둘째 문단이어야 한다 — 힌트와 글자가 그대로 같은 쪽이다
+    expect(target!.from).toBeGreaterThan(twin.child(0).nodeSize);
+  });
+
+  it("'-' 를 지워서만 맞는 자리보다 그대로 맞는 자리를 고른다", () => {
+    const twin = schema.nodeFromJSON({
+      type: 'doc',
+      content: [p('가-나의 대비'), p('가나의 대비')],
+    });
+    const target = findMarkTarget(twin, '대비', '가나의 대비');
+    expect(target!.from).toBeGreaterThan(twin.child(0).nodeSize);
+  });
+
+  // ⚠️ 코덱스 리뷰 2R: 자리 표를 코드포인트로 세면 이모지 하나에 표가 짧아져
+  //    끝 자리가 NaN 이 되고, 글자 그대로 맞는 후보가 통째로 밀렸다
+  it('이모지가 섞여도 글자 그대로 맞는 자리를 고른다 — 자리 표는 UTF-16 단위다', () => {
+    const twin = schema.nodeFromJSON({
+      type: 'doc',
+      content: [p('😀 가 나의 대비'), p('😀 가 나의 대비 설명')],
+    });
+    const target = findMarkTarget(twin, '대비', '😀 가 나의 대비');
+    expect(twin.textBetween(target!.from, target!.to)).toBe('대비');
+    // 힌트와 글자가 그대로 같은 **첫** 문단이어야 한다
+    expect(target!.from).toBeLessThan(twin.child(0).nodeSize);
+  });
+
   it('표가 없으면 처음 나오는 자리', () => {
     const plainDoc = schema.nodeFromJSON({
       type: 'doc', content: [p('서정시다'), p('다시 서정시')],
