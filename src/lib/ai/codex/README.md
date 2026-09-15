@@ -70,6 +70,7 @@ ws://127.0.0.1:8899 → HTTP 101 Switching Protocols
 | `approval_policy="never"` = 명령 실행 금지 | **아니다.** "승인을 묻지 않고 실패를 모델에 반환". 실행은 된다 |
 | `turn/interrupt { threadId }` | **turnId가 필수** — 없으면 `missing field turnId`로 거부. turn/start 응답(즉시 옴)의 `turn.id`를 써야 한다 |
 | 모델은 codex 기본값 고정 | `turn/start`가 `model`/`effort` 턴 단위 오버라이드를 받는다(실측 수용 확인). 목록·지원 effort는 `model/list`가 준다. **잘못된 model id도 turn/start는 일단 수용**되고 이후 `error` 알림으로 비동기 실패한다 |
+| effort만 보내도 걸린다 | **model 과 함께 보내야 한다.** `sanitizeOverride` 는 effort 가 유효한지 **그 모델의 지원 목록**으로 판정하므로, model 이 없으면 기본 모델이 무엇인지 몰라 effort 를 통째로 버린다 → `src/lib/ai/ocrPref.ts` 가 늘 둘을 함께 싣는다 |
 
 **우리가 쓰는 메서드는 전부 stable — `experimentalApi` 불필요.**
 

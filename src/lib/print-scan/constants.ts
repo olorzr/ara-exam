@@ -9,6 +9,23 @@
 export const PRINT_PAGES_PER_BATCH = 3;
 
 /**
+ * 본문 읽기 턴이 **선호하는 모델** — 목록(`model/list`)에 있는 첫 id 를 쓴다.
+ *
+ * 선생님이 설정에서 고른 모델이 있으면 그것이 이긴다. 목록에 하나도 없으면 계정 기본 모델로
+ * 물러선다(`resolveOcrPref`). ⚠️ 모델 id 를 코드에 박지 않는다는 규약의 **의도된 예외**다 —
+ * 요구가 아니라 선호이고, 매번 실재를 확인한다.
+ */
+export const PRINT_OCR_MODEL_PREFERENCE: readonly string[] = ['gpt-5.6-terra'];
+
+/**
+ * 본문 읽기 턴의 **추론 노력** 선호 순서. 그 모델이 지원하는 첫 값을 쓴다.
+ *
+ * 낮은 노력으로 읽으면 낱말이 바뀌거나 행이 빠진 채 그럴듯한 결과가 돌아온다 —
+ * 시험지는 한 글자만 틀려도 틀린 시험지다. 대가는 turn 이 길어지는 것뿐이다.
+ */
+export const PRINT_OCR_EFFORT_PREFERENCE: readonly string[] = ['high', 'medium'];
+
+/**
  * 앞 묶음과 겹칠 쪽 수 — **0 이다. 1 로 올리지 말 것.**
  *
  * 기출은 쪽 경계를 넘는 '지문' 을 온전히 보려고 한 쪽을 겹쳐 읽고, 겹쳐 읽은 결과를
@@ -17,6 +34,27 @@ export const PRINT_PAGES_PER_BATCH = 3;
  * 대신 프롬프트가 "이 쪽의 마지막 문단은 이 쪽에서 끝나는 곳까지만" 이라고 못박는다.
  */
 export const PRINT_BATCH_OVERLAP = 0;
+
+/**
+ * 1단으로 짜인 쪽을 **빈 줄에서 위·아래로** 갈라 보낼 것인가.
+ *
+ * 2단 쪽은 단 가르기가 이미 글자를 키우지만, 1단 쪽은 통째로 나가면서 사다리에 깎여
+ * 글자가 가장 작다 — 가르면 10pt 글자가 대략 13px → 18px 이 된다(rowDetect.ts 머리말).
+ * ⚠️ `maxSide` 를 올려 크게 보내는 것으로는 안 된다. 모델이 자기 상한에 맞춰 **도로 줄인다**.
+ */
+export const PRINT_SPLIT_ROWS = true;
+
+/**
+ * 2단 쪽의 **단까지** 위·아래로 가를 것인가 — **기본 false.**
+ *
+ * 단은 이미 가로가 절반이라 더 가르는 이득이 작은데, 쪽 하나가 **4장**이 되어
+ * `PRINT_PAGES_PER_BATCH` 를 2 로 내려야 하고(한 turn 의 이미지 상한) 그만큼 ChatGPT 호출이
+ * 는다. 켤 때는 묶음 크기를 **함께** 내릴 것 — constants.test 가 그 짝을 강제한다.
+ */
+export const PRINT_SPLIT_COLUMN_ROWS = false;
+
+/** 쪽 하나가 될 수 있는 최대 이미지 장수 — 묶음 크기 검사의 재료다 */
+export const PRINT_IMAGES_PER_PAGE_MAX = PRINT_SPLIT_COLUMN_ROWS ? 4 : 2;
 
 /** 한 묶음(= 한 번의 읽기)이 낼 수 있는 경고 수 */
 export const PRINT_OCR_MAX_WARNINGS = 20;

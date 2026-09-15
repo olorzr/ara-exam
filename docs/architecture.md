@@ -174,7 +174,12 @@ src/
 ## lib/ai (+ lib/ai/codex)
 - 역할: 선생님 PC 의 코덱스 브릿지와 통신. **서버는 AI 를 호출하지 않는다**
 - 의존: 없음(순수 프로토콜) — 원본은 ara-system `app/lib/ai/`
-- 주요 파일: codex/protocol.ts, codex/localClient.ts, codex/generateDraft.ts, errors.ts, flags.ts
+- 주요 파일: codex/protocol.ts, codex/localClient.ts, codex/generateDraft.ts, errors.ts, flags.ts,
+  ocrPref.ts(읽기 턴의 모델·노력 고르기)
+- **읽기 턴은 모델·노력을 명시한다**(`resolveOcrPref`). 아무것도 안 보내면 선생님 PC 의
+  `config.toml` 기본값(대개 낮은 노력)으로 도는데, 시험지 전사는 한 글자만 틀려도 틀린 시험지다.
+  ⚠️ **모델 id 를 노력과 함께** 보내야 한다 — `sanitizeOverride` 가 모델의 지원 목록으로
+  노력을 검증하므로, 모델이 없으면 노력을 통째로 버린다. 선생님이 고른 값은 늘 이긴다
 - 환경 판정: setupOs.ts(윈도우/맥 · Safari 여부), winInstaller.ts·macInstaller.ts(설치 주소·명령 조립).
   ⚠️ **Safari 는 https 문서에서 로컬 연결을 막아 쓸 수 없다** — 맥은 Chrome 필수
 - 설치 안내: components/ai/AiSetupGuide(탭) → AiSetupSteps{Windows,Mac}. 설치 파일·스크립트는
@@ -184,12 +189,22 @@ src/
 ## lib/pdf
 - 역할: PDF → 캔버스 → JPEG data URL. 썸네일. 글자 레이어 읽기
 - 의존: pdfjs-dist (⚠️ `wasmUrl: '/pdfjs-wasm/'` 필수 — 없으면 스캔본이 백지로 렌더된다)
-- 주요 파일: pdfRenderer.ts, pdfPages.ts, pdfColumns.ts, columnDetect.ts, pdfText.ts,
-  imageToJpeg.ts(사진 답지 → JPEG, EXIF 회전 반영)
+- 주요 파일: pdfRenderer.ts, pdfPages.ts, pdfColumns.ts, columnDetect.ts, rowDetect.ts, pdfRows.ts,
+  pdfText.ts, imageToJpeg.ts(사진 답지 → JPEG, EXIF 회전 반영)
 - **2단 쪽은 단별로 갈라 보낸다**(`OCR_SPLIT_COLUMNS`). 읽는 순서가 하나뿐이 되고 글자가
   커진다. 홈을 못 찾으면 **가르지 않는다** — 1단을 반으로 자르면 모든 줄이 두 동강 난다.
   **가로만** 자르므로 모델이 주는 `top`·`bottom` 은 쪽 기준 그대로다
-- `RenderedPages.rendered` 는 `{page, part}[]` 다(쪽 번호 배열이 아니다) — 한 쪽이 두 장이
+- **1단 쪽은 빈 줄에서 위·아래로 가른다**(`splitRows`, rowDetect.ts). 비전 모델은 받은 이미지를
+  자기 상한에 맞춰 도로 줄이므로 `maxSide` 를 올려도 글자는 안 커진다 — **한 장에 담는 글의 양**을
+  줄이는 것만이 효과가 있다(A4 1단 10pt 기준 13px → 18px). 빈 줄을 못 찾으면 가르지 않고,
+  조각이 예산에 안 들어가면 **통째로 되돌린다**(조각 예산 = 쪽 예산 ÷ 조각 수, `pieceBudget`)
+- ⚠️ **기출은 세로를 자르지 않는다** — 그림 크롭이 쪽 기준 `top`·`bottom` 에 달려 있다.
+  위아래 가르기는 프린트 읽기 전용이다
+- **화질을 낮춰 보낸 쪽을 남긴다**(`encodeWithinBudgetStep` → `RenderedPages.degraded`,
+  `{page, step}`). 노이즈가 많아 압축이 안 되는 스캔이 사다리를 내려가는데, 그런 쪽이 가장
+  안 읽힌다. ⚠️ **기록은 한 칸부터, 경고는 두 칸부터**다 — 한 칸까지 알리면 큰 스캔마다
+  '확인 필요' 가 붙어 경고 전체를 안 믿게 된다
+- `RenderedPages.rendered` 는 `{page, part}[]` 다(쪽 번호 배열이 아니다) — 한 쪽이 두 장 넘게
   되므로 "이미지 순서 = 이 쪽" 약속을 쪽 번호만으로는 지킬 수 없다
 - 글자 레이어(`pdfText`)는 **있으면 보너스**다. 기출은 대부분 스캔본이라 보통 비어 있고,
   복합기 자동 OCR 레이어는 `hasUsableText` 가 걸러낸다(없느니만 못하다)
@@ -203,7 +218,8 @@ src/
 - 주요 파일: scan-meta.ts(스캔 단위 학교·학년·시험 + 제목·프린트 이름 규칙),
   bundles.ts(초안·쪽 배정), bundle-plan.ts(검증·읽기 횟수·저장 모양),
   page-preview.ts(크게 보기 이동 규칙),
-  prompt.ts, schema.ts, parse.ts, run.ts(묶음 하나), run-scan.ts(스캔 전체·다시 읽기),
+  prompt.ts, schema.ts, parse.ts, read-bundle.ts(묶음 읽기), run-env.ts(실행 환경 타입),
+  quality.ts(화질 경고), run.ts(묶음 하나의 상태 전이), run-scan.ts(스캔 전체·다시 읽기),
   save.ts, queries.ts, page-images.ts, storage-paths.ts, scan-delete.ts
 - **분류는 스캔마다 한 번 묻고 묶음마다 복사한다**(`scan-meta.ts` → `toBundleInsert`). DB 는
   묶음 단위 그대로다 — 카테고리 트리·rename 트리거·목록 줄이 전부 묶음 행을 본다
@@ -214,7 +230,13 @@ src/
 - **시험지를 위한 표를 따로 만들지 않았다** — `concept_sheets` 에 `print_bundle_id` 만 더했다.
   편집기·빈칸 변환·인쇄·합격 기준·성적 연동이 전부 그대로 재사용된다
 - 기출과 **다른 점**: 겹쳐 읽지 않는다(평문은 병합할 수 없다), 정답표·크롭이 없다,
-  프롬프트가 `BODY_FORMAT_RULES` 를 쓰지 않는다(개념지 정화기가 figure·data-box 를 지운다)
+  프롬프트가 `BODY_FORMAT_RULES` 를 쓰지 않는다(개념지 정화기가 figure·data-box 를 지운다),
+  **1단 쪽을 위·아래로 가른다**(기출은 크롭 좌표 때문에 못 한다)
+- **본문 읽기 턴만 꼼꼼한 모델·노력으로 부른다**(`ocrPref` → `read-bundle`). 쪽 방향 판정과
+  단어 등록은 선생님 선택(`pref`) 그대로다 — 하나는 각도만 묻고 하나는 이미 읽은 글자만 다룬다
+- **PDF 글자 레이어가 있으면 참고 텍스트로 함께 보낸다**(`ocr_meta.textSource`). 스캔본은
+  'none' 이 정상이고, 아래아한글로 만든 프린트에서만 값이 붙는다. ⚠️ 규칙은 기출 것과 **따로**다 —
+  프린트에는 "줄 나눔은 참고 텍스트를 믿지 않는다" 가 더 필요하다(산문 줄바꿈이 그대로 들어온다)
 
 ## lib/concept-pick (AI 추천 빈칸)
 - 역할: 개념지 본문에서 빈칸으로 낼 용어를 골라 온다. 개념지·프린트 시험지 **양쪽**의 편집기에서 쓴다

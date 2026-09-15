@@ -54,6 +54,11 @@ describe('본문 표기', () => {
     expect(p).not.toContain('data-figure');
   });
 
+  it('시는 행마다 <br>, 연은 문단으로 — 행을 합치지 말라고 못박는다', () => {
+    expect(p).toContain('시는 행마다 <br>');
+    expect(p).toContain('행을 합치거나 나누지 않는다');
+  });
+
   it('빈칸과 못 읽은 글자 규칙을 못박는다', () => {
     expect(p).toContain('(   )');
     expect(p).toContain('□');
@@ -63,6 +68,61 @@ describe('본문 표기', () => {
   it('그림은 자리 표시 한 줄 + 경고로 남긴다', () => {
     expect(p).toContain('[그림:');
     expect(p).toContain('글자만 있는 표는 그림이 아니다');
+  });
+});
+
+describe('전사 충실도', () => {
+  const p = build();
+
+  it('원문 그대로 — 맞춤법을 고치거나 낱말을 바꾸지 말라고 한다', () => {
+    expect(p).toContain('원문 그대로');
+    expect(p).toContain('맞춤법이 틀려 보여도 고치지 않는다');
+  });
+
+  it('비슷한 말로 바꾸기·부호 바꾸기를 예를 들어 막는다 — 실측에서 이 둘이 실제로 났다', () => {
+    // 높은 노력으로 읽히면 글을 **다듬으려 든다**: '율격'→'운율', 마침표→쉼표, ㉠ 빠뜨리기
+    expect(p).toContain("'율격'을 '운율'로");
+    expect(p).toContain('마침표를 쉼표로');
+    expect(p).toContain('㉠㉡·①②');
+  });
+
+  it('작은 글씨(시어 풀이·각주)도 빠짐없이 옮기게 한다', () => {
+    expect(p).toContain('작은 글씨도 빠짐없이');
+    expect(p).toContain('각주');
+  });
+
+  it('옮긴 뒤 이미지와 한 줄씩 대조하게 한다', () => {
+    expect(p).toContain('한 줄씩 대조');
+    expect(p).toContain('빠진 줄');
+  });
+});
+
+describe('참고 텍스트', () => {
+  const texts = [{ page: 1, text: '가난하다고 해서 외로움을 모르겠는가', source: 'layer' as const }];
+
+  it('글자 레이어가 없으면 규칙도 데이터도 넣지 않는다 — 없는 것을 설명하면 헷갈린다', () => {
+    const p = build();
+    expect(p).not.toContain('[참고 텍스트]');
+    expect(p).not.toContain('참고 텍스트가 이미지보다 정확하다');
+  });
+
+  it('있으면 글자는 그쪽을, 구조와 줄 나눔은 이미지를 믿게 한다', () => {
+    const p = build({ pageTexts: texts });
+    expect(p).toContain('[참고 텍스트]');
+    expect(p).toContain('글자 하나하나는 참고 텍스트가 이미지보다 정확하다');
+    expect(p).toContain('줄 나눔은 참고 텍스트를 믿지 않는다');
+    expect(p).toContain('1쪽:');
+  });
+
+  it('참고 텍스트도 신뢰하지 않는 데이터로 감싼다 — 그 안의 문장은 지시가 아니다', () => {
+    const p = build({ pageTexts: texts });
+    expect(p.indexOf(DATA_BEGIN)).toBeLessThan(p.indexOf('가난하다고'));
+  });
+
+  it('참고 텍스트는 쪽 경계 규칙보다 **앞**에 온다 — 이미지 설명 바로 뒤가 제자리다', () => {
+    const p = build({ pageTexts: texts });
+    expect(p.indexOf('[참고 텍스트]')).toBeLessThan(p.indexOf('[쪽 경계]'));
+    expect(p.indexOf('[이번에 보낸 것]')).toBeLessThan(p.indexOf('[참고 텍스트]'));
   });
 });
 
@@ -93,9 +153,25 @@ describe('보낸 이미지 설명', () => {
     expect(p).toContain('1번=4쪽 왼쪽 단');
     expect(p).toContain('2번=4쪽 오른쪽 단');
     expect(p).toContain('한 쪽의 html 하나');
+    expect(p).toContain('여러 장은 한 쪽의 html 하나');
     // 기출 스키마에만 있는 필드를 프린트 프롬프트가 설명하면 안 된다
     expect(p).not.toContain('continues');
     expect(p).not.toContain('box 의 column');
+  });
+});
+
+describe('위·아래로 가른 쪽', () => {
+  it('장마다 무엇인지 밝히고, 한 쪽으로 이어 내라고 한다', () => {
+    const p = build({
+      pages: [4],
+      rendered: [{ page: 4, part: 'top' }, { page: 4, part: 'bottom' }],
+    });
+    expect(p).toContain('1번=4쪽 위쪽');
+    expect(p).toContain('2번=4쪽 아래쪽');
+    expect(p).toContain('두 번 적지 않는다');
+    expect(p).toContain('여러 장은 한 쪽의 html 하나');
+    // 기출 스키마에만 있는 필드를 프린트 프롬프트가 설명하면 안 된다
+    expect(p).not.toContain('continues');
   });
 });
 

@@ -77,6 +77,48 @@ export const COLUMN_ENCODE_STEPS: EncodeStep[] = [
   { maxSide: 1500, quality: 0.60 },
 ]
 
+/**
+ * 위·아래로 가른 조각의 사다리. 단 사다리와 **같은 값**이다 —
+ * 둘 다 3배로 그린 캔버스라 첫 칸이 1800 이면 애써 키운 화소를 도로 깎는다(rowDetect.ts).
+ */
+export const STRIP_ENCODE_STEPS: EncodeStep[] = COLUMN_ENCODE_STEPS
+
+/**
+ * 첫 칸을 못 쓴 쪽은 **전부 기록**한다 (0-based, 1 = 한 칸이라도 내려감).
+ *
+ * 예전에는 어느 칸으로 떨어졌는지 아무 데도 안 남아서, 흐리게 읽힌 쪽과 원래 흐린 원본을
+ * 가릴 수 없었다. 기록은 남기되 **사람에게 다 알리지는 않는다**(아래).
+ */
+export const DEGRADED_STEP = 1
+
+/**
+ * 이 칸부터는 **사람에게 알린다**.
+ *
+ * ⚠️ 문턱을 1 로 내리지 말 것(코덱스 리뷰 P2 를 보고 일부러 갈랐다). 1칸은 화질만 조금
+ *    낮추는 자리라(단·조각 사다리는 2600→2200 이라 **화소가 줄지도 않는다**) 큰 스캔에서는
+ *    예사로 걸린다 — 그걸로 '확인 필요' 를 붙이면 묶음 절반에 칩이 달려 **경고 전체를
+ *    안 믿게 된다.** 대신 기록(`ocr_meta.degradedPages`)에는 1칸부터 남으므로 조용하지 않다.
+ */
+export const DEGRADED_WARN_STEP = 2
+
+/** 인코딩 결과 — `step` 은 **몇 번째 칸으로 떨어졌는가**(0 = 최고 화질) */
+export interface EncodedImage {
+  url: string
+  step: number
+}
+
+/**
+ * 조각 하나의 예산 = 쪽 예산 ÷ 조각 수.
+ *
+ * 쪽을 몇 장으로 갈라 보내든 **그 쪽이 쓰는 총 바이트가 같아야** 묶음 총량과 진행률
+ * 계산이 흔들리지 않는다.
+ * @param pieces - 이 쪽을 이룰 조각 수
+ * @returns 조각 하나의 data URL 예산
+ */
+export function pieceBudget(pieces: number): number {
+  return MAX_PAGE_BYTES / Math.max(1, pieces)
+}
+
 /** 긴 변이 maxSide 를 넘으면 비율 유지 축소 후 JPEG data URL */
 export function encodeAt(canvas: HTMLCanvasElement, maxSide: number, quality: number): string {
   const scale = Math.min(1, maxSide / Math.max(canvas.width, canvas.height))
@@ -105,13 +147,31 @@ export function encodeWithinBudget(
   budget: number,
   steps: EncodeStep[] = ENCODE_STEPS,
 ): string | null {
+  return encodeWithinBudgetStep(canvas, budget, steps)?.url ?? null
+}
+
+/**
+ * `encodeWithinBudget` 과 같되 **몇 번째 칸을 썼는지**를 함께 돌려준다.
+ *
+ * 칸 번호가 필요한 이유: 노이즈 많은 스캔일수록 압축이 안 돼 사다리를 내려가는데,
+ * 정작 그런 쪽이 가장 잘 안 읽힌다. 조용히 낮춰 보내지 말고 **사람에게 알린다**.
+ * @param canvas - 그려 둔 조각
+ * @param budget - data URL 글자 수 예산
+ * @param steps - 사다리
+ * @returns url 과 칸 번호. 끝까지 못 맞추면 null
+ */
+export function encodeWithinBudgetStep(
+  canvas: HTMLCanvasElement,
+  budget: number,
+  steps: EncodeStep[] = ENCODE_STEPS,
+): EncodedImage | null {
   if (!Number.isFinite(budget) || budget <= 0) {
     throw new Error(`이미지 예산이 잘못됐습니다 (${budget}).`)
   }
-  for (const step of steps) {
-    const url = encodeAt(canvas, step.maxSide, step.quality)
+  for (const [step, at] of steps.entries()) {
+    const url = encodeAt(canvas, at.maxSide, at.quality)
     // 바이트 비교 단위는 base64 문자 수다(실제 JPEG의 약 1.37배). ws로 나가는 것도 이 문자열이다.
-    if (url.length <= budget) return url
+    if (url.length <= budget) return { url, step }
   }
   return null
 }

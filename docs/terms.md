@@ -305,6 +305,37 @@
 - 코드에서의 사용: `OCR_SPLIT_COLUMNS`, `detectGutter`, `RenderedImage.part`
 - 관련 파일: src/lib/pdf/columnDetect.ts, src/lib/pdf/pdfColumns.ts
 
+## 위아래 가르기 (row split)
+- 정의: 한 조각(1단 쪽, 또는 켜 두면 단 하나)을 **빈 줄에서 위·아래 두 장**으로 나눠 보내는 것.
+  한 장에 담는 글이 절반이 되어 글자가 더 큰 화소로 보인다(A4 1단 10pt 기준 13px → 18px)
+- ⚠️ **이미지를 더 크게 보내는 것으로는 대신할 수 없다** — 모델이 자기 상한에 맞춰 도로 줄인다
+- ⚠️ 빈 줄을 못 찾으면 **가르지 않는다**. 겹침은 최소 틈의 절반보다 작아, 겹친 부분이 빈 틈
+  안에 머문다(같은 줄이 두 장에 나오면 모델이 두 번 옮긴다)
+- ⚠️ **기출은 쓰지 않는다** — 그림 크롭이 쪽 기준 `top`·`bottom` 에 달려 있다
+- 코드에서의 사용: `PRINT_SPLIT_ROWS`, `PRINT_SPLIT_COLUMN_ROWS`, `findRowGap`, `RenderedImage.part`
+- 관련 파일: src/lib/pdf/rowDetect.ts, src/lib/pdf/pdfRows.ts, src/lib/pdf/pdfColumns.ts
+
+## 추론 노력 (reasoning effort)
+- 정의: 코덱스 턴 하나가 얼마나 오래 생각할지. 모델마다 지원 목록이 다르다(`model/list`)
+- 안 보내면 선생님 PC `~/.codex/config.toml` 의 기본값으로 돈다 — 대개 낮은 노력이라
+  **전사에서 글자가 바뀌는 오류**가 난다. 그래서 프린트 본문 읽기는 값을 **명시**한다
+- ⚠️ 노력은 **모델 id 와 함께** 보내야 한다. 모델이 없으면 지원 목록을 몰라 노력이 버려진다
+- ⚠️ 높은 노력은 반대 방향으로 틀린다 — 글을 **다듬는다**(마침표→쉼표, 비슷한 말로 바꾸기).
+  프롬프트가 그 예를 들어 막는다
+- 코드에서의 사용: `resolveOcrPref`, `PRINT_OCR_MODEL_PREFERENCE`, `PRINT_OCR_EFFORT_PREFERENCE`,
+  `ocr_meta.model`·`ocr_meta.effort`
+- 관련 파일: src/lib/ai/ocrPref.ts, src/lib/print-scan/constants.ts, src/lib/ai/codex/generateDraft.ts
+
+## 화질 강등 (degraded page)
+- 정의: 쪽 이미지가 바이트 예산을 못 맞춰 사다리 아래 칸(작게·낮은 화질)으로 인코딩된 것
+- 노이즈가 많아 압축이 안 되는 스캔일수록 여기 걸리는데, 그런 쪽이 가장 안 읽힌다 —
+  조용히 낮추지 말고 '확인 필요' 로 알린다
+- ⚠️ **기록과 경고의 문턱이 다르다**: 한 칸이라도 내려가면 기록(`DEGRADED_STEP`),
+  사람에게는 두 칸부터 알린다(`DEGRADED_WARN_STEP`). 한 칸은 큰 스캔에서 예사로 걸린다
+- 코드에서의 사용: `encodeWithinBudgetStep`, `DEGRADED_STEP`, `DEGRADED_WARN_STEP`,
+  `RenderedPages.degraded`(`{page, step}`), `ocr_meta.degradedPages`
+- 관련 파일: src/lib/pdf/pdfBudget.ts, src/lib/print-scan/quality.ts
+
 ## 코덱스 브릿지 (Codex bridge)
 - 정의: 선생님 PC 에서 도는 작은 중계 프로그램. 브라우저가 자기 ChatGPT 로 OCR 을 돌리게 해 준다. 학원 서버는 AI 를 호출하지 않는다
 - 코드에서의 사용: `src/lib/ai/codex/*`, `ws://127.0.0.1:8899`

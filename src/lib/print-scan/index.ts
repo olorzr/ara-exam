@@ -6,6 +6,7 @@ export * from './page-preview';
 export * from './parse';
 export * from './prompt';
 export * from './queries';
+export * from './read-bundle';
 export * from './reading-state';
 export * from './run';
 export * from './run-scan';

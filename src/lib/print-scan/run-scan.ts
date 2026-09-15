@@ -1,6 +1,7 @@
 'use client';
 
 import { getCodexModelPref } from '@/lib/ai/localModelPref';
+import { resolveOcrPrefFromBridge } from '@/lib/ai/ocrPref';
 import { getCodexPort } from '@/lib/ai/localPort';
 import { isAiError } from '@/lib/ai/types';
 import { probePageOrientation } from '@/lib/page-orientation';
@@ -9,6 +10,7 @@ import { FATAL_CODES } from '@/lib/problem-ocr/batch-run';
 import { uploadProblemFile } from '@/lib/problem-bank/storage';
 import type { PrintBundle } from '@/types/print-scan';
 import type { PrintBundleDraftRow } from './bundle-plan';
+import { PRINT_OCR_EFFORT_PREFERENCE, PRINT_OCR_MODEL_PREFERENCE } from './constants';
 import { uploadPrintPageImages } from './page-images';
 import { runBundle, type PrintBundleRunResult, type PrintRunProgress } from './run';
 import { insertBundles, insertScan } from './save';
@@ -63,6 +65,19 @@ interface RunEnv {
  */
 function pageImageVersion(): string {
   return Date.now().toString(36);
+}
+
+/**
+ * 본문 읽기 턴에 쓸 모델·노력.
+ *
+ * ⚠️ 방향 판정·단어 등록에는 넘기지 않는다 — 그 둘은 싼 단계라 계정 기본값으로 충분하다.
+ * @returns 해석된 값 (못 정하면 선생님 선택 그대로)
+ */
+async function resolveOcrPref() {
+  return resolveOcrPrefFromBridge(getCodexPort(), getCodexModelPref(), {
+    models: PRINT_OCR_MODEL_PREFERENCE,
+    efforts: PRINT_OCR_EFFORT_PREFERENCE,
+  });
 }
 
 /** 저장 행을 읽기에 쓸 모양으로 (아직 DB 에서 다시 읽지 않는다 — 방금 넣은 값 그대로다) */
@@ -131,6 +146,9 @@ async function readBundlesInOrder(
 ): Promise<{ ok: number; failed: number; pending: number; warned: number; words: number }> {
   const port = getCodexPort();
   const pref = getCodexModelPref();
+  // 본문 읽기에 쓸 모델·노력은 **여기서 한 번만** 정한다 — 묶음마다 물으면 프린트 수만큼
+  // `model/list` 를 부르게 된다. 목록을 못 받으면 예전처럼 계정 기본값으로 읽는다
+  const ocrPref = await resolveOcrPref();
 
   // 쪽 이미지는 한 번에 올린다 — 묶음마다 열면 같은 캔버스를 여러 번 그린다
   const pages = [...new Set(rows.flatMap((r) => r.pages))].sort((a, b) => a - b);
@@ -166,7 +184,7 @@ async function readBundlesInOrder(
     let sawWarnings = false;
     try {
       const result = await runBundle(bundle, doc, {
-        port, pref, signal: env.signal, onProgress, orientation,
+        port, pref, ocrPref, signal: env.signal, onProgress, orientation,
         onWarnings: (w) => {
           sawWarnings = true;
           env.onWarnings?.(w, row.name);
@@ -210,6 +228,7 @@ export async function rerunBundle(
   try {
     const port = getCodexPort();
     const pref = getCodexModelPref();
+    const ocrPref = await resolveOcrPref();
 
     // 방향은 저장하지 않는다 — 다시 읽을 때 다시 묻는 편이 싸고, 옛 묶음도 그대로 고쳐진다
     const orientation = await probePageOrientation(doc, bundle.pages, {
@@ -235,6 +254,7 @@ export async function rerunBundle(
     return await runBundle({ ...bundle, page_paths: pagePaths }, doc, {
       port,
       pref,
+      ocrPref,
       signal: env.signal,
       onProgress: env.onProgress,
       onWarnings: (w) => env.onWarnings?.(w, bundle.name),

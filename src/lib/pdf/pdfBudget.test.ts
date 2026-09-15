@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import {
-  COLUMN_ENCODE_STEPS, COLUMN_SCALE, encodeWithinBudget, ENCODE_STEPS,
-  MAX_BATCH_BYTES, MAX_COLUMN_BYTES, MAX_PAGE_BYTES, PAGE_SCALE,
+  COLUMN_ENCODE_STEPS, COLUMN_SCALE, DEGRADED_STEP, DEGRADED_WARN_STEP,
+  encodeWithinBudget, encodeWithinBudgetStep,
+  ENCODE_STEPS, MAX_BATCH_BYTES, MAX_COLUMN_BYTES, MAX_PAGE_BYTES, PAGE_SCALE, pieceBudget,
+  STRIP_ENCODE_STEPS,
 } from './pdfBudget'
 
 /**
@@ -53,12 +55,71 @@ describe('순환 import', () => {
     expect(budget.MAX_COLUMN_BYTES).toBe(600_000)
   })
 
-  it('pdfColumns 는 pdfPages 에서 **값을** 가져오지 않는다', async () => {
+  it('가르기 파일들은 pdfPages 에서 **값을** 가져오지 않는다', async () => {
     const fs = await import('node:fs')
-    const src = fs.readFileSync('src/lib/pdf/pdfColumns.ts', 'utf8')
-    // 타입만 가져오는 import 라야 한다 — 값이면 런타임 순환이 된다
-    const lines = src.split('\n').filter((l) => l.includes("from '@/lib/pdf/pdfPages'"))
-    expect(lines).toHaveLength(1)
-    expect(lines[0]).toContain('import type')
+    for (const file of ['pdfColumns.ts', 'pdfRows.ts', 'rowDetect.ts', 'columnDetect.ts']) {
+      const src = fs.readFileSync(`src/lib/pdf/${file}`, 'utf8')
+      // 타입만 가져오는 import 라야 한다 — 값이면 런타임 순환이 된다
+      for (const line of src.split('\n').filter((l) => l.includes("from '@/lib/pdf/pdfPages'"))) {
+        expect(line, file).toContain('import type')
+      }
+    }
+  })
+})
+
+/** 화질(quality)에 따라 길이가 달라지는 가짜 캔버스 — 축소가 안 걸리게 작게 둔다 */
+function fakeCanvas(lengthOf: (quality: number) => number): HTMLCanvasElement {
+  return {
+    width: 10,
+    height: 10,
+    toDataURL: (_type: string, quality: number) => 'x'.repeat(lengthOf(quality)),
+  } as unknown as HTMLCanvasElement
+}
+
+describe('사다리 칸 알리기', () => {
+  it('첫 칸에 맞으면 step 0 이다', () => {
+    const canvas = fakeCanvas(() => 10)
+    expect(encodeWithinBudgetStep(canvas, 100)?.step).toBe(0)
+  })
+
+  it('화질을 낮춰야 들어가면 **몇 번째 칸인지**를 알려 준다 — 조용히 낮추지 않기 위해서다', () => {
+    // 화질 0.85·0.75 는 예산을 넘고 0.68 부터 들어간다
+    const canvas = fakeCanvas((q) => (q > 0.7 ? 200 : 50))
+    const got = encodeWithinBudgetStep(canvas, 100)
+    expect(got?.step).toBe(2)
+    expect(got?.url).toHaveLength(50)
+  })
+
+  it('끝까지 못 맞추면 null, 예산이 숫자가 아니면 터뜨린다 (예전 규약 그대로)', () => {
+    const canvas = fakeCanvas(() => 500)
+    expect(encodeWithinBudgetStep(canvas, 100)).toBeNull()
+    expect(encodeWithinBudget(canvas, 100)).toBeNull()
+    expect(() => encodeWithinBudgetStep(canvas, Number.NaN)).toThrow('이미지 예산')
+  })
+
+  it('기록은 첫 칸을 못 쓴 순간부터, 경고는 그보다 늦게 — 둘을 같게 두지 말 것', () => {
+    // ⚠️ 같게 두면 큰 스캔마다 '확인 필요' 칩이 달려 경고 전체를 안 믿게 된다(코덱스 리뷰 P2).
+    //    반대로 기록까지 늦추면 흐리게 보낸 사실이 어디에도 안 남는다
+    expect(DEGRADED_STEP).toBe(1)
+    expect(DEGRADED_WARN_STEP).toBeGreaterThan(DEGRADED_STEP)
+    expect(DEGRADED_WARN_STEP).toBeLessThan(STRIP_ENCODE_STEPS.length)
+    expect(DEGRADED_WARN_STEP).toBeLessThan(ENCODE_STEPS.length)
+  })
+})
+
+describe('조각 예산', () => {
+  it('갈라 보내도 그 쪽의 총 바이트는 같다', () => {
+    expect(pieceBudget(1)).toBe(MAX_PAGE_BYTES)
+    expect(pieceBudget(2)).toBe(MAX_COLUMN_BYTES)
+    expect(pieceBudget(4) * 4).toBe(MAX_PAGE_BYTES)
+  })
+
+  it('0 이나 음수를 줘도 예산이 무한대가 되지 않는다', () => {
+    expect(pieceBudget(0)).toBe(MAX_PAGE_BYTES)
+  })
+
+  it('조각 사다리의 첫 칸은 3배로 그린 A4 세로를 깎지 않는다', () => {
+    // 842pt × COLUMN_SCALE = 2526px. 여기서 깎이면 애써 키운 화소가 사라진다
+    expect(STRIP_ENCODE_STEPS[0].maxSide).toBeGreaterThanOrEqual(842 * COLUMN_SCALE)
   })
 })

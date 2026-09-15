@@ -19,6 +19,10 @@ export interface PrintOcrMeta {
   retries?: number;
   durationMs?: number;
   imagesSent?: number;
+  /** 예산을 맞추느라 **화질을 낮춰** 보낸 쪽 (경고와 짝이다) */
+  degradedPages?: number[];
+  /** PDF 글자 레이어를 참고 텍스트로 얼마나 썼는가. 스캔본은 'none' 이 정상이다 */
+  textSource?: 'layer' | 'partial' | 'none';
   /** 확인이 필요한 것들 (흐려서 못 읽은 자리·잘린 본문 등) */
   warnings?: string[];
   ranAt?: string;

@@ -23,9 +23,10 @@
 import { getPdfDocument, renderPdfPage, type PageRotation } from '@/lib/pdf/pdfRenderer'
 import { encodePageImages } from '@/lib/pdf/pdfColumns'
 import {
-  COLUMN_SCALE, encodeAt, encodeWithinBudget,
+  COLUMN_SCALE, DEGRADED_STEP, encodeAt, encodeWithinBudget, encodeWithinBudgetStep,
   MAX_BATCH_BYTES, MAX_PAGE_BYTES, PAGE_SCALE,
 } from '@/lib/pdf/pdfBudget'
+
 
 // 예산·인코딩은 `pdfBudget` 이 단일 출처다. ⚠️ 여기서 다시 선언하면 `pdfColumns` 와
 // **순환 import** 가 되어 단 이미지 예산이 NaN 이 되고, 2단 쪽이 전부 건너뛰어진다
@@ -86,8 +87,17 @@ export async function pdfPageCount(src: PdfSource): Promise<number> {
   return numPages
 }
 
-/** 이미지 한 장이 쪽의 어느 부분인가 */
-export type RenderedPart = 'full' | 'left' | 'right'
+/**
+ * 이미지 한 장이 쪽의 어느 부분인가.
+ *
+ * 위·아래 조각(`top`…)은 **프린트 읽기만** 만든다(`splitRows`). ⚠️ 기출은 모델이 주는
+ * `top`·`bottom` 좌표로 그림을 잘라내므로 **세로를 자르면 크롭이 통째로 어긋난다**.
+ */
+export type RenderedPart =
+  | 'full' | 'left' | 'right'
+  | 'top' | 'bottom'
+  | 'left-top' | 'left-bottom'
+  | 'right-top' | 'right-bottom'
 
 /** 보낸 이미지 한 장의 정체 */
 export type RenderedImage = {
@@ -111,6 +121,16 @@ export type RenderedPages = {
   rendered: RenderedImage[]
   /** 예산 안에 못 넣어 건너뛴 쪽 번호 — 호출부가 경고로 알린다(조용히 빠뜨리지 않기) */
   skipped: number[]
+  /**
+   * 예산을 맞추느라 **화질을 낮춰** 보낸 쪽과 그 정도(사다리 칸, 클수록 나쁘다).
+   *
+   * ⚠️ 쪽 번호만 주지 않는 까닭: 한 칸은 예사로 걸리고 네 칸은 심각한데, 둘을 같은 목록에
+   *    담으면 호출부가 **전부 알리거나 전부 묻거나** 둘 중 하나밖에 못 한다. 기록은 다 남기고
+   *    사람에게는 심한 것만 알리려면 정도가 필요하다(`DEGRADED_WARN_STEP`).
+   * 옵셔널인 까닭: 답지 사진처럼 이 파일을 거치지 않고 `RenderedPages` 를 만드는 자리가
+   * 있다(`problem-ocr/run-answer-key.ts`). 없으면 '낮춘 쪽 없음' 으로 본다.
+   */
+  degraded?: { page: number; step: number }[]
 }
 
 /**
@@ -134,6 +154,13 @@ export async function renderPagesToImages(
   opts?: {
     signal?: AbortSignal
     splitColumns?: boolean
+    /**
+     * 1단 쪽을 **빈 줄에서 위·아래로** 갈라 보낼 것인가 (rowDetect.ts).
+     * ⚠️ 기출은 켜지 않는다 — 세로를 자르면 그림 크롭 좌표가 어긋난다
+     */
+    splitRows?: boolean
+    /** 2단 쪽의 **단까지** 위·아래로 가를 것인가 (쪽 하나가 최대 4장) */
+    splitColumnRows?: boolean
     /** 쪽마다 바로 세우려고 돌릴 각도 (없으면 원본 그대로) */
     rotations?: ReadonlyMap<number, PageRotation>
   },
@@ -143,19 +170,26 @@ export async function renderPagesToImages(
     .sort((a, b) => a - b)
 
   const split = opts?.splitColumns ?? false
+  const rows = opts?.splitRows ?? false
+  const columnRows = opts?.splitColumnRows ?? false
   const images: string[] = []
   const rendered: RenderedImage[] = []
   const skipped: number[] = []
+  const degraded: { page: number; step: number }[] = []
   let bytes = 0
 
   for (const page of wanted) {
     if (opts?.signal?.aborted) break
 
-    // 2단 가르기는 **돌린 캔버스에서** 한다 — 뒤집힌 쪽은 왼쪽 단과 오른쪽 단도 뒤바뀐다
+    // 가르기는 **돌린 캔버스에서** 한다 — 뒤집힌 쪽은 왼쪽 단과 오른쪽 단도, 위와 아래도 뒤바뀐다.
+    // 가를 일이 있으면 3배로 그린다 — 사다리의 `maxSide` 가 긴 변에 걸리므로, 조각은
+    // 긴 변이 그대로여도 짧은 변의 화소가 남는다(pdfBudget 의 COLUMN_SCALE 주석)
     const canvas = await renderPdfPage(
-      doc.pdf, page, split ? COLUMN_SCALE : PAGE_SCALE, opts?.rotations?.get(page) ?? 0,
+      doc.pdf, page, split || rows ? COLUMN_SCALE : PAGE_SCALE, opts?.rotations?.get(page) ?? 0,
     )
-    const parts = encodePageImages(canvas, split, encodeWithinBudget)
+    const parts = encodePageImages(
+      canvas, { columns: split, rows, columnRows }, encodeWithinBudgetStep,
+    )
 
     // ⚠️ 한 조각이라도 예산을 못 맞추면 **그 쪽을 통째로** 건너뛴다. 반쪽만 보내면
     //    그 쪽 내용의 절반이 조용히 사라지는데, 경고에는 아무것도 안 남는다
@@ -166,6 +200,9 @@ export async function renderPagesToImages(
     if (bytes + size > MAX_BATCH_BYTES) { skipped.push(page); continue }
 
     bytes += size
+    // 한 조각이라도 화질을 낮췄으면 **가장 나쁜 칸**으로 적어 둔다 — 조용히 낮추지 않는다
+    const worst = parts.reduce((n, p) => Math.max(n, p.step), 0)
+    if (worst >= DEGRADED_STEP) degraded.push({ page, step: worst })
     for (const { url, part } of parts) {
       images.push(url)
       rendered.push({ page, part })
@@ -173,7 +210,7 @@ export async function renderPagesToImages(
     await new Promise(resolve => setTimeout(resolve, 0))
   }
 
-  return { images, rendered, skipped }
+  return { images, rendered, skipped, degraded }
 }
 
 /**
