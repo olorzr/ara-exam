@@ -53,6 +53,11 @@ $guard$;
 
 SET search_path = exam, public;
 
+-- ⚠️ 이 파일의 최상위 DDL 은 **스키마를 반드시 명시한다**(코덱스 리뷰).
+--    Supabase SQL Editor 는 문마다 다른 백엔드로 갈 수 있어 위의 `SET search_path` 가
+--    뒤따르는 문에 적용된다고 믿을 수 없다 — 무자격 `CREATE FUNCTION` 은 ara-system 의
+--    `public` 스키마에 만들어질 수 있다(sql/16 에서 실제로 그렇게 생성된 사례가 있다).
+
 -- ---------------------------------------------
 -- 1. school_materials: 년도/학년 컬럼 + 유니크 키 확장
 -- ---------------------------------------------
@@ -90,34 +95,43 @@ ALTER TABLE concept_sheets ADD COLUMN IF NOT EXISTS school_name TEXT NOT NULL DE
 -- 4. 외부지문 rename 동기화 트리거 확장
 -- ---------------------------------------------
 -- 학교명 변경 → categories.school_name + concept_sheets.school_name 동기화
-CREATE OR REPLACE FUNCTION sync_school_name()
-RETURNS TRIGGER AS $$
+-- ⚠️ 본문의 표도 **스키마를 명시**하고 함수 자체에 search_path 를 박는다(코덱스 리뷰).
+--    트리거는 이름을 바꾼 세션의 search_path 로 도는데, 그 세션이 public 만 보고 있으면
+--    무자격 `categories` 가 없는 표로 해석되거나 **엉뚱한 표**를 고친다.
+CREATE OR REPLACE FUNCTION exam.sync_school_name()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = exam, pg_temp
+AS $$
 BEGIN
   IF OLD.name != NEW.name THEN
-    UPDATE categories
+    UPDATE exam.categories
     SET school_name = NEW.name
     WHERE school_name = OLD.name
       AND level = '외부지문 및 프린트';
 
-    UPDATE concept_sheets
+    UPDATE exam.concept_sheets
     SET school_name = NEW.name
     WHERE school_name = OLD.name
       AND level = '외부지문 및 프린트';
   END IF;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- 프린트/작품명 변경 → categories.chapter + concept_sheets.unit 동기화
 -- year/grade 조건이 없으면 2026 중2 프린트 이름을 바꿀 때 다른 년도·학년의
 -- 동명 카테고리까지 함께 바뀐다(년도/학년 도입 전에는 구분 자체가 없어 무해했다).
-CREATE OR REPLACE FUNCTION sync_school_material_name()
-RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION exam.sync_school_material_name()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = exam, pg_temp
+AS $$
 BEGIN
   IF OLD.name != NEW.name THEN
-    UPDATE categories
+    UPDATE exam.categories
     SET chapter = NEW.name
-    FROM schools s
+    FROM exam.schools s
     WHERE categories.chapter = OLD.name
       AND categories.school_name = s.name
       AND categories.level = '외부지문 및 프린트'
@@ -125,9 +139,9 @@ BEGIN
       AND categories.grade = OLD.grade
       AND s.id = OLD.school_id;
 
-    UPDATE concept_sheets
+    UPDATE exam.concept_sheets
     SET unit = NEW.name
-    FROM schools s
+    FROM exam.schools s
     WHERE concept_sheets.unit = OLD.name
       AND concept_sheets.school_name = s.name
       AND concept_sheets.level = '외부지문 및 프린트'
@@ -137,7 +151,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- 트리거 자체는 01_schema.sql 에서 이미 생성됨(AFTER UPDATE). 본 마이그레이션은
 -- 함수 본문만 CREATE OR REPLACE 로 교체하므로 트리거 재생성은 불필요하다.

@@ -170,11 +170,25 @@ function sortChildren(nodes: CategoryTreeNode[]): CategoryTreeNode[] {
     .sort((a, b) => naturalCompare(a.label, b.label));
 }
 
+/**
+ * 같은 키끼리 묶는다.
+ *
+ * ⚠️ **모아 담는 그릇은 `{}` 가 아니라 프로토타입 없는 객체여야 한다**(코덱스 리뷰).
+ *    카테고리 이름은 선생님이 직접 치는 자유 텍스트라 `__proto__`·`constructor`·`toString`
+ *    이 그대로 키가 될 수 있는데, 평범한 객체에서는 그 이름들이 **물려받은 속성**으로 잡혀
+ *    `if (!acc[key])` 가 거짓이 되고 `acc[key].push` 가 함수가 아니라 터진다 —
+ *    개념지 목록이 통째로 안 그려진다. `Object.entries` 는 그대로 쓸 수 있다.
+ *    (O/X 별칭표를 `Map` 으로 둔 것과 같은 근거다)
+ * @param items - 묶을 것들
+ * @param keyFn - 키를 뽑는 함수
+ * @returns 키 → 그 키의 것들
+ */
 function groupBy<T>(items: T[], keyFn: (item: T) => string): Record<string, T[]> {
-  return items.reduce<Record<string, T[]>>((acc, item) => {
+  const acc = Object.create(null) as Record<string, T[]>;
+  for (const item of items) {
     const key = keyFn(item);
     if (!acc[key]) acc[key] = [];
     acc[key].push(item);
-    return acc;
-  }, {});
+  }
+  return acc;
 }

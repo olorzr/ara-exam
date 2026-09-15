@@ -96,3 +96,34 @@ describe('buildCategoryTree — 중등/고등', () => {
     expect(chapter?.children.find((n) => n.label === '(전체)')?.category?.id).toBe('a');
   });
 });
+
+describe('buildCategoryTree — 이름이 자바스크립트 예약 속성일 때', () => {
+  // ⚠️ 코덱스 리뷰: 묶는 그릇이 평범한 객체면 이 이름들이 **물려받은 속성**으로 잡혀
+  //    `acc[key].push` 가 함수가 아니라 터지고, 개념지 목록이 통째로 안 그려졌다.
+  //    카테고리 이름은 선생님이 직접 치는 자유 텍스트라 실제로 들어올 수 있다.
+  it.each(['__proto__', 'constructor', 'toString', 'valueOf', 'hasOwnProperty'])(
+    "출판사가 '%s' 여도 트리를 만든다",
+    (name) => {
+      const tree = buildCategoryTree([makeCategory({ id: 'a', publisher: name })]);
+      expect(() => JSON.stringify(tree)).not.toThrow();
+      expect(findByPath(tree, ['중등', '중1', name])).toBeDefined();
+    },
+  );
+
+  it("학교명·프린트명이 '__proto__' 여도 외부지문 트리를 만든다", () => {
+    const tree = buildCategoryTree([
+      external({ id: 'b', school_name: '__proto__', chapter: '__proto__' }),
+    ]);
+    const node = findByPath(tree, ['외부지문 및 프린트', '__proto__', '미지정', '미지정', '__proto__']);
+    expect(node).toBeDefined();
+  });
+
+  it('예약 속성 이름과 평범한 이름이 섞여도 서로 안 먹는다', () => {
+    const tree = buildCategoryTree([
+      makeCategory({ id: 'c', publisher: '__proto__' }),
+      makeCategory({ id: 'd', publisher: '비상' }),
+    ]);
+    const grade = findByPath(tree, ['중등', '중1']);
+    expect(grade?.children.map((n) => n.label).sort()).toEqual(['__proto__', '비상']);
+  });
+});
