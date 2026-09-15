@@ -9,6 +9,7 @@ import {
 } from '@/lib/external-category';
 import type { NaesinSchool } from '@/lib/naesin-scope/types';
 import type { ScopeHint } from '@/lib/problem-bank/scope-resolve';
+import type { WorkCandidate } from '@/lib/problem-bank/work-candidates';
 import {
   EXAM_TYPE_OPTIONS, SCHOOL_LEVEL_OPTIONS, SOURCE_TYPE_OPTIONS, gradeOptionsForLevel,
   suggestTitle, visibleFields,
@@ -17,6 +18,7 @@ import {
 import type { ProblemSourceType } from '@/types/problem-bank';
 import LabeledSelect from './LabeledSelect';
 import SourceTextbookField from './SourceTextbookField';
+import SourceWorksField from './SourceWorksField';
 
 interface SourceMetaFormProps {
   values: SourceFormValues;
@@ -27,6 +29,8 @@ interface SourceMetaFormProps {
   textbooks: string[];
   /** 내신 관리에 등록된 시험범위 힌트 */
   scope: ScopeHint | null;
+  /** 이 학교에 이미 적혀 있는 작품들 (작품 칸 자동 채움의 근거) */
+  works: WorkCandidate[];
   onChange: (patch: Partial<SourceFormValues>) => void;
 }
 
@@ -41,7 +45,7 @@ interface SourceMetaFormProps {
  * 비우면 다시 따라간다.
  */
 export default function SourceMetaForm({
-  values, errors, schools, textbooks, scope, onChange,
+  values, errors, schools, textbooks, scope, works, onChange,
 }: SourceMetaFormProps) {
   const fields = useMemo(() => new Set(visibleFields(values.source_type)), [values.source_type]);
   const yearOptions = useMemo(() => buildYearOptions([values.year]), [values.year]);
@@ -138,6 +142,14 @@ export default function SourceMetaForm({
         scope={scope}
         onChange={(v) => onChange({ textbook: v })}
       />
+
+      {fields.has('works') && (
+        <SourceWorksField
+          value={values.works}
+          candidates={works}
+          onChange={(v) => onChange({ works: v })}
+        />
+      )}
 
       <div className="space-y-2 sm:col-span-2 lg:col-span-3">
         <Label htmlFor="source-title">제목</Label>

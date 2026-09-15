@@ -64,6 +64,35 @@ function fitFigures(html: string, mapping: readonly (number | null)[], count: nu
 /**
  * 항목 하나를 검증한다. 못 쓰겠으면 null 을 돌려주고 경고를 남긴다.
  */
+/**
+ * 작품명 출처를 짚는 경고.
+ *
+ * **지문**과 **지문 없는 단독 문항** 두 곳에서 부른다 — 딸린 지문이 있는 문항은 그 이름을
+ * 지문에서 물려받으므로(sql/20 트리거) 지문 쪽에서 이미 짚었고, 문항마다 또 붙이면 같은 말이
+ * 문항 수만큼 늘어 경고 상한을 먹는다.
+ *
+ * ⚠️ `'printed'` 라고 **말했을 때만** 넘어간다. null·빠뜨림·모르는 값을 인쇄로 넘기면
+ *    제목은 있는데 출처가 없는 응답이 **경고 없이** 인쇄된 이름으로 확정된다(코덱스 리뷰 3R).
+ * @param warnings - 담을 목록
+ * @param at - 이 항목을 가리키는 정보
+ * @param workName - 다듬은 작품명. 없으면 짚을 것도 없다
+ * @param source - 모델이 밝힌 출처
+ */
+function pushWorkSourceWarning(
+  warnings: DraftWarning[],
+  at: Omit<DraftWarning, 'message'>,
+  workName: string | null,
+  source: 'printed' | 'inferred' | null,
+): void {
+  if (!workName || source === 'printed') return;
+  pushWarning(warnings, {
+    ...at,
+    message: source === 'inferred'
+      ? `작품명을 본문으로 알아봤어요(${workName}). 맞는지 확인해 주세요.`
+      : `작품명(${workName})이 인쇄된 것인지 알 수 없어요. 원본과 맞춰 주세요.`,
+  });
+}
+
 function parseItem(
   raw: unknown,
   ctx: ParseContext,
@@ -163,6 +192,25 @@ function parseItem(
 
   // 문법은 경로가 **여러 개**라 하나씩 검증한다. 마스터가 코드 상수라 트리가 늘 있고,
   // 그래서 area/unit 과 달리 '트리를 못 읽어 통과' 하는 길이 없다
+  // ⚠️ 작품명은 **여기서** 다듬는다. 저장 경로(save.ts)는 모델 값을 그대로 넣으므로
+  //    여기서 안 하면 「동백꽃」·동백꽃·"동백꽃" 이 서로 다른 작품으로 쌓인다
+  const title = normalizeWork(nullableStr(raw.title, 120));
+  const work_title = normalizeWork(nullableStr(raw.work_title, 120));
+  const passage_ref = nullableStr(raw.passage_ref, 16);
+  // ⚠️ **'printed' 라고 말했을 때만 인쇄된 것으로 친다**(코덱스 리뷰 3R). null·빠뜨림·모르는
+  //    값을 인쇄로 넘기면, 제목은 있는데 출처가 없는 응답이 **경고 없이** 인쇄된 이름으로
+  //    확정된다 — 문턱을 내린 대가로 얻어야 할 안전장치가 그 자리에서 사라진다
+  const titleSource = raw.title_source === 'printed' || raw.title_source === 'inferred'
+    ? raw.title_source
+    : null;
+  // ⚠️ **알아본 작품명은 우리가 짚는다** — 모델에게 경고까지 적으라고 하면 적을 때도 있고
+  //    안 적을 때도 있어, 인쇄된 이름과 알아낸 이름을 화면에서 구별할 수 없다(코덱스 리뷰 2R).
+  //    딸린 지문이 있는 문항은 건너뛴다(지문 쪽에서 짚었다) — 그 참조가 끝내 안 풀려
+  //    **단독 문항이 되는 경우**는 아래 `parseOcrDraft` 가 보충한다(코덱스 리뷰 4R)
+  if (kind === 'passage' || !passage_ref) {
+    pushWorkSourceWarning(warnings, at, kind === 'passage' ? title : work_title, titleSource);
+  }
+
   const rawGrammar = Array.isArray(raw.grammar_paths) ? raw.grammar_paths : [];
   const kept: string[] = [];
   const dropped: string[] = [];
@@ -214,15 +262,15 @@ function parseItem(
     ref,
     page,
     box: parseBox(raw.box),
-    passage_ref: nullableStr(raw.passage_ref, 16),
+    passage_ref,
     number,
     // 머리글은 **여기서** 다듬는다 — 중복 판정 키(merge-keys)와 같은 글자를 써야
     // 겹쳐 읽은 같은 지문이 표기 차이로 둘로 갈라지지 않는다
     label: normalizeLabel(nullableStr(raw.label, 40)) || null,
-    // ⚠️ 작품명은 **여기서** 다듬는다. 저장 경로(save.ts)는 모델 값을 그대로 넣으므로
-    //    여기서 안 하면 「동백꽃」·동백꽃·"동백꽃" 이 서로 다른 작품으로 쌓인다
-    title: normalizeWork(nullableStr(raw.title, 120)),
+    title,
     author: normalizeWork(nullableStr(raw.author, 60)),
+    // 이름이 없으면 출처도 없다 — 문항은 work_title 이 그 자리다
+    title_source: (kind === 'passage' ? title : work_title) ? titleSource : null,
     // ⚠️ 다듬기가 **정화보다 먼저**다. 정화기는 허용 목록 밖 data-box 를 되돌릴 수 없게
     //    지우므로, 순서가 바뀌면 모델이 낸 '(가)' 상자 표시가 조용히 사라진다
     // ⚠️ 자리표시자를 **실제 그림 수에 맞춘다.** 모델이 한쪽만 내는 일이 흔한데,
@@ -244,7 +292,7 @@ function parseItem(
     answer,
     has_figure: raw.has_figure === true || figures.length > 0,
     figures,
-    work_title: normalizeWork(nullableStr(raw.work_title, 120)),
+    work_title,
     area_path,
     unit_path,
     grammar_paths,
@@ -322,6 +370,20 @@ export function parseOcrDraft(raw: string, ctx: ParseContext): OcrDraft | null {
         number: item.number,
         message: '딸린 지문을 이 묶음에서 못 찾아 지문 없이 뒀어요.',
       });
+      // ⚠️ 이제 **단독 문항**이 됐다 — 물려받을 지문이 없으므로 작품명 출처를 여기서 짚는다.
+      //    참조가 있다는 이유로 위에서 건너뛰었는데 여기서도 안 하면, 그 작품명만 아무 확인
+      //    없이 들어간다(코덱스 리뷰 4R)
+      // ⚠️ **문항일 때만**이다(코덱스 리뷰 5R). 지문은 위에서 참조와 상관없이 이미 짚었으므로,
+      //    참조가 딸린 지문(모델의 실수다)까지 여기서 또 짚으면 같은 경고가 두 번 담겨
+      //    묶음 경고 상한(20)을 헛되이 먹는다
+      if (item.kind === 'problem') {
+        pushWorkSourceWarning(
+          warnings,
+          { ref: item.ref, kind: item.kind, page: item.page, number: item.number },
+          item.work_title,
+          item.title_source,
+        );
+      }
       item.passage_ref = null;
     }
   }

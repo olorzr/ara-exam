@@ -12,7 +12,8 @@ const TREE: AreaTreeNode[] = [
 function item(over: Record<string, unknown> = {}) {
   return {
     kind: 'problem', ref: 'Q1', page: 1, box: null, passage_ref: null, number: 1,
-    label: null, title: null, author: null, html: '', continued: false, continues: false,
+    label: null, title: null, author: null, title_source: null, html: '',
+    continued: false, continues: false,
     question_type: '객관식', stem_html: '<p>물음</p>', choices: ['가', '나', '다', '라', '마'],
     answer: '1', has_figure: false, figures: [], work_title: null, area_path: [], unit_path: [],
     grammar_paths: [],
@@ -512,5 +513,91 @@ describe('parseOcrDraft — 옛한글', () => {
     const draft = parseOcrDraft(json([item({ ref: 'Q1', stem_html: '<p>⟦ㅏ⟧</p>' })]), ctx);
     const left = draft?.warnings.find((w) => w.message.includes('못 바꾼'));
     expect(left).toMatchObject({ ref: 'Q1', kind: 'problem', page: 1 });
+  });
+});
+
+describe('작품명 출처(title_source)', () => {
+  const passage = (over: Record<string, unknown> = {}) => item({
+    kind: 'passage', ref: 'P1', html: '<p>지문</p>', stem_html: '', choices: [], answer: null,
+    number: null, ...over,
+  });
+
+  it('본문으로 알아본 작품명은 확인하라고 짚는다 — 인쇄된 이름과 구별돼야 한다', () => {
+    const draft = parseOcrDraft(
+      json([passage({ title: '동백꽃', title_source: 'inferred' })]),
+      ctx,
+    )!;
+    expect(said(draft.warnings)).toContain('본문으로 알아봤어요');
+    expect(said(draft.warnings)).toContain('동백꽃');
+  });
+
+  it('인쇄된 작품명은 짚지 않는다 — 경고가 흔해지면 아무도 안 읽는다', () => {
+    const draft = parseOcrDraft(
+      json([passage({ title: '동백꽃', title_source: 'printed' })]),
+      ctx,
+    )!;
+    expect(said(draft.warnings)).not.toContain('본문으로 알아봤어요');
+  });
+
+  it("출처를 안 밝히면 '알 수 없어요' 로 짚는다 — 말없이 인쇄된 것으로 치면 안전장치가 사라진다", () => {
+    // null (스키마가 허용하는 값이라 실제로 올 수 있다)
+    const nulled = parseOcrDraft(json([passage({ title: '동백꽃', title_source: null })]), ctx)!;
+    expect(said(nulled.warnings)).toContain('인쇄된 것인지 알 수 없어요');
+
+    // 키 자체가 없는 응답 — fixture 가 null 을 채우므로 **지워서** 검사한다
+    const bare = passage({ title: '동백꽃' });
+    delete (bare as Record<string, unknown>).title_source;
+    expect(said(parseOcrDraft(json([bare]), ctx)!.warnings)).toContain('인쇄된 것인지 알 수 없어요');
+
+    // 모르는 값
+    const wrong = parseOcrDraft(json([passage({ title: '동백꽃', title_source: '추정' })]), ctx)!;
+    expect(said(wrong.warnings)).toContain('인쇄된 것인지 알 수 없어요');
+  });
+
+  it('참조가 끝내 안 풀려 단독이 된 문항도 짚는다 — 참조가 있다고 건너뛰면 영영 안 짚는다', () => {
+    const draft = parseOcrDraft(
+      json([item({ ref: 'Q7', passage_ref: 'P9', number: 7, work_title: '동백꽃', title_source: 'inferred' })]),
+      ctx,
+    )!;
+    expect(said(draft.warnings)).toContain('딸린 지문을 이 묶음에서 못 찾아');
+    // 끊긴 참조는 null 이 되고, 경고는 **그 문항 하나**를 가리켜야 한다
+    expect(draft.items[0].passage_ref).toBeNull();
+    const hits = draft.warnings.filter((w) => w.message.includes('본문으로 알아봤어요'));
+    expect(hits).toHaveLength(1);
+    expect(hits[0]).toMatchObject({ ref: 'Q7', kind: 'problem', number: 7 });
+  });
+
+  it('참조가 딸린 지문은 두 번 짚지 않는다 — 모델이 실수해도 경고 자리를 헛되이 먹지 않는다', () => {
+    const draft = parseOcrDraft(
+      // work_title 까지 있어야 가드가 없을 때 두 번 담긴다 — 없으면 고치기 전에도 통과한다
+      json([passage({
+        ref: 'P1', passage_ref: 'P9', title: '동백꽃', work_title: '동백꽃', title_source: 'inferred',
+      })]),
+      ctx,
+    )!;
+    expect(draft.warnings.filter((w) => w.message.includes('본문으로 알아봤어요'))).toHaveLength(1);
+  });
+
+  it('지문 없는 단독 문항의 작품명도 짚는다 — 물려받을 지문이 없다', () => {
+    const draft = parseOcrDraft(
+      json([item({ work_title: '동백꽃', passage_ref: null, title_source: 'inferred' })]),
+      ctx,
+    )!;
+    expect(said(draft.warnings)).toContain('본문으로 알아봤어요');
+  });
+
+  it('제목이 없으면 짚을 것도 없다', () => {
+    const draft = parseOcrDraft(json([passage({ title: null, title_source: 'inferred' })]), ctx)!;
+    expect(said(draft.warnings)).not.toContain('본문으로 알아봤어요');
+  });
+
+  it('지문에 딸린 문항에는 붙이지 않는다 — 같은 말이 문항 수만큼 늘어난다', () => {
+    const draft = parseOcrDraft(json([
+      passage({ ref: 'P1', title: '동백꽃', title_source: 'inferred' }),
+      item({ ref: 'Q1', passage_ref: 'P1', work_title: '동백꽃', title_source: 'inferred' }),
+    ]), ctx)!;
+    const hits = draft.warnings.filter((w) => w.message.includes('본문으로 알아봤어요'));
+    expect(hits).toHaveLength(1);
+    expect(hits[0].kind).toBe('passage');
   });
 });

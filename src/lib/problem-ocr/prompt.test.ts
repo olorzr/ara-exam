@@ -121,6 +121,24 @@ describe('buildProblemOcrPrompt', () => {
     expect(prompt).toContain('지어내지 않는다');
   });
 
+  it('인쇄되지 않은 문학 작품도 알아본 대로 적게 한다 — 옛 문턱에서는 늘 비어 있었다', () => {
+    expect(prompt).toContain('인쇄돼 있지 않아도, 문학 지문이면 알아본 대로 적는다');
+  });
+
+  it('작품명을 어디서 얻었는지 title_source 로 받는다 — 안내는 파서가 만든다', () => {
+    expect(prompt).toContain('title_source');
+    expect(prompt).toContain('printed');
+    expect(prompt).toContain('inferred');
+    // 경고 문장까지 모델에게 맡기면 쓸 때도 있고 안 쓸 때도 있다
+    expect(prompt).toContain('경고(warnings)에 따로 적지 않는다');
+    // 이름을 적고 출처를 비우면 파서가 '알 수 없어요' 로 짚는다 — 그러지 말라고 못박는다
+    expect(prompt).toContain('null 로 두지 않는다');
+  });
+
+  it('비문학은 인쇄된 제목이 있을 때만 적게 한다', () => {
+    expect(prompt).toContain('비문학은 인쇄된 제목이 있을 때만');
+  });
+
   it('경고에 쪽·문항 번호를 함께 적으라고 한다 — 어디 얘기인지 없으면 못 찾는다', () => {
     expect(prompt).toContain('쪽 번호와 문항 번호를 함께');
   });
@@ -130,6 +148,21 @@ describe('buildProblemOcrPrompt', () => {
     expect(prompt).toContain('(1) 시의 화자');
     expect(prompt).toContain('시험범위단원');
     expect(prompt).toContain('교과서');
+  });
+
+  it('작품 후보가 없으면 null 로 싣는다 — 빈 배열은 "후보가 있는데 비었다"로 읽힌다', () => {
+    expect(prompt).toContain('"작품후보": null');
+    expect(prompt).toContain('작품후보가 없다');
+  });
+
+  it('작품 후보를 실어 보내고 그 표기를 그대로 쓰라고 한다 — 표기가 갈리면 트리가 쪼개진다', () => {
+    const p = buildProblemOcrPrompt({
+      source, pages: [1], batch: { index: 0, total: 1 }, areaTree: [], unitTree: [],
+      scopeUnits: [], workHints: ['홍길동전', '동백꽃 (김유정)'],
+    });
+    expect(p).toContain('홍길동전');
+    expect(p).toContain('동백꽃 (김유정)');
+    expect(p).toContain('후보의 표기를 그대로');
   });
 
   it('단원 트리가 비면 빈 배열로 두라고 한다', () => {

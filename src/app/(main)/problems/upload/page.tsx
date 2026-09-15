@@ -14,25 +14,23 @@ import { insertSource } from '@/lib/problem-bank/save';
 import { uploadProblemFile } from '@/lib/problem-bank/storage';
 import { sourcePdfPath } from '@/lib/problem-bank/storage-paths';
 import {
-  applySourcePatch, applyTextbookHint, initialSourceFormState, toSourcePayload, validateSourceForm,
+  toSourcePayload, validateSourceForm,
   type SourceFormErrors, type SourceFormValues,
 } from '@/lib/problem-bank/source-form';
+import {
+  applySourceHint, applySourcePatch, emptySourceFormValues, initialSourceFormState,
+} from '@/lib/problem-bank/source-form-state';
+import { toWorkHints } from '@/lib/problem-bank/work-candidates';
 import { planPageBatches } from '@/lib/problem-ocr/batch-plan';
 import {
   answerKeyBatchCount, answerKeySummary, type AnswerKeyInput,
 } from '@/lib/problem-ocr/answer-key-input';
 import { uploadAnswerKey } from '@/lib/problem-ocr/answer-key-upload';
 import { OCR_CONFIRM_BATCH_THRESHOLD } from '@/lib/problem-ocr/constants';
-import { kstYear } from '@/lib/kst-year';
 import SourceMetaForm from '@/components/problem-ocr/SourceMetaForm';
 import SourceFilePickers from '@/components/problem-ocr/SourceFilePickers';
 import PdfPageSelect from '@/components/problem-ocr/PdfPageSelect';
 import OcrProgress from '@/components/problem-ocr/OcrProgress';
-
-const EMPTY_FORM: SourceFormValues = {
-  source_type: '내신기출', level: '중등', title: '', school_name: '', school_id: '',
-  textbook: '', year: String(kstYear()), grade: '', semester: '', exam_type: '', publisher: '',
-};
 
 /**
  * 기출 업로드 (`/problems/upload`).
@@ -61,7 +59,7 @@ export default function ProblemUploadPage() {
    * 따로 두면 값 갱신 함수 안에서 다른 state 를 만지게 되는데, 그 갱신 함수는
    * 순수해야 한다(React 가 두 번 부를 수 있다). `applySourcePatch` 가 함께 돌려준다.
    */
-  const [form, setForm] = useState(() => initialSourceFormState(EMPTY_FORM));
+  const [form, setForm] = useState(() => initialSourceFormState(emptySourceFormValues()));
   const [errors, setErrors] = useState<SourceFormErrors>({});
   const [uploading, setUploading] = useState(false);
   /**
@@ -78,11 +76,11 @@ export default function ProblemUploadPage() {
     setErrors({});
   }, []);
 
-  // 마스터(학교·교과서·영역·단원)와 내신 범위 힌트는 훅 하나가 맡는다.
+  // 마스터(학교·교과서·영역·단원)와 내신 범위·작품 힌트는 훅 하나가 맡는다.
   // ⚠️ 힌트를 `onChange({ textbook })` 로 돌리면 안 된다 — 자동으로 채운 값이 '직접 고른 값'
   //    으로 둔갑해, 그다음 학년·학교를 바꿔도 따라오지 않는다
   const masters = useSourceMasters(values, useCallback(
-    (matched: string | null) => setForm((f) => applyTextbookHint(f, matched)),
+    (hint) => setForm((f) => applySourceHint(f, hint)),
     [],
   ));
 
@@ -161,6 +159,8 @@ export default function ProblemUploadPage() {
       unitTree: masters.unitTree,
       // '안 보는 시험'의 잠긴 옛 범위는 힌트에서 이미 비워져 온다
       scopeUnits: masters.scope?.units ?? [],
+      // 작품 칸은 저장하지 않는다 — 프롬프트에만 실어 표기를 맞추게 한다
+      workHints: toWorkHints(values.works),
     });
 
     // 실패해도 출처 행은 남는다 — 검수 화면에서 상태를 보고 다시 돌릴 수 있다
@@ -207,6 +207,7 @@ export default function ProblemUploadPage() {
             schools={masters.schools}
             textbooks={masters.textbooks}
             scope={masters.scope}
+            works={masters.works}
             onChange={onChange}
           />
         </CardContent>

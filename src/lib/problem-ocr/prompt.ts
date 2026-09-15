@@ -6,6 +6,7 @@ import { GRAMMAR_TREE } from '@/lib/problem-bank/grammar-tree';
 import type { AreaTreeNode } from '@/lib/problem-bank/area-tree';
 import type { ProblemSourceType } from '@/types/problem-bank';
 import { YET_HANGUL_PROMPT_RULES, YET_HANGUL_REFERENCE_RULE } from '@/lib/yet-hangul';
+import { WORK_RULES, workHintData, workHintLine } from './prompt-works';
 
 /**
  * 기출 OCR 프롬프트 조립 (클라이언트).
@@ -96,16 +97,7 @@ ${BODY_FORMAT_RULES}
 - 지문이 길어도 **줄이지 않는다.** 요약·발췌는 옮겨 적기가 아니다.
 
 [작품]
-- 지문에 실린 글의 제목과 지은이를 title·author 에 적는다. 보통 지문 끝에
-  '- 김유정, 「동백꽃」 -' 처럼 인쇄돼 있고, 머리글이나 (가) 표시 옆에 있을 때도 있다.
-- **감싸는 기호는 빼고 이름만** 적는다: 「동백꽃」 → 동백꽃, 김유정 → 김유정.
-- 인쇄돼 있지 않아도 **널리 알려진 작품이라 확실하면** 적는다(예: 점순이와 닭싸움이
-  나오면 김유정 「동백꽃」). 조금이라도 아리송하면 null 로 둔다 — **지어내지 않는다.**
-- 한 지문에 (가)(나) 처럼 여러 편이 실렸으면 title 에 ' · ' 로 이어 모두 적는다
-  (예: 봄봄 · 동백꽃). 지은이도 같은 순서로 적는다.
-- 문항의 work_title 은 **그 문항이 딸린 지문의 title 과 같게** 적는다. 다만 여러 편이 실린
-  지문에서 그 문항이 한 편만 묻는다면(예: '(나)의 화자는') 그 한 편만 적는다.
-- 지문 없는 단독 문항은 발문·선지만으로 작품이 분명할 때만 적고, 아니면 null.
+${WORK_RULES}
 
 [영역]
 - 아래 데이터의 '영역세트' 트리에 **있는 이름만** area_path 에 순서대로 담는다.
@@ -187,6 +179,11 @@ export interface ProblemOcrPromptInput {
   unitTree: AreaTreeNode[];
   /** 관리자시스템 내신 관리에 체크된 단원 키 — 어디부터 볼지 알려 주는 힌트 */
   scopeUnits: string[];
+  /**
+   * 이 시험지에 실렸을 법한 **작품 후보** (업로드 폼의 작품 칸 + 자동 채움).
+   * 표기를 맞추게 하는 것이 목적이다 — 없으면 모델이 본문만 보고 판단한다.
+   */
+  workHints?: string[];
 }
 
 /**
@@ -214,6 +211,7 @@ const REFERENCE_TEXT_RULES = [
  */
 export function buildProblemOcrPrompt(input: ProblemOcrPromptInput): string {
   const { source, pages, batch, areaTree, unitTree, scopeUnits } = input;
+  const workHints = input.workHints ?? [];
   const hasTree = areaTree.length > 0;
   const hasUnits = unitTree.length > 0;
 
@@ -229,6 +227,7 @@ export function buildProblemOcrPrompt(input: ProblemOcrPromptInput): string {
       ? '- 단원트리가 주어졌다. 교과서 단원을 그 안에서 고른다.'
       : '- 단원트리가 비어 있다. unit_path 는 전부 빈 배열([])로 둔다.',
     '- 문법트리는 늘 주어진다. 문법 문항일 때만 그 안에서 고른다.',
+    workHintLine(workHints),
   ];
 
   // 겹쳐 읽는 쪽이 있으므로 같은 항목이 두 묶음에 나올 수 있다 — 그게 정상임을 알린다
@@ -266,6 +265,7 @@ export function buildProblemOcrPrompt(input: ProblemOcrPromptInput): string {
       // 문법 트리는 앱의 코드 상수라 늘 실린다(교과서·학년과 무관한 축이다)
       문법트리: flattenTree(GRAMMAR_TREE),
       시험범위단원: scopeUnits.length > 0 ? scopeUnits : null,
+      작품후보: workHintData(workHints),
     }),
   ].join('\n');
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getPublishers } from '@/lib/category-master';
 import { fetchNaesinSchools } from '@/lib/naesin-scope/fetch';
 import type { NaesinSchool } from '@/lib/naesin-scope/types';
@@ -8,8 +8,11 @@ import { fetchAreaSets, fetchAreaTree, pickAreaSetForGrade } from '@/lib/problem
 import type { AreaTreeNode } from '@/lib/problem-bank/area-tree';
 import type { ScopeHint } from '@/lib/problem-bank/scope-resolve';
 import { visibleFields, type SourceFormValues } from '@/lib/problem-bank/source-form';
+import type { SourceHint } from '@/lib/problem-bank/source-form-state';
+import type { WorkCandidate } from '@/lib/problem-bank/work-candidates';
 import { fetchUnitTree } from '@/lib/problem-bank/unit-master';
 import { useScopeHint } from './useScopeHint';
+import { useWorkCandidates } from './useWorkCandidates';
 
 /**
  * 기출 업로드 폼이 쓰는 마스터들을 한 곳에서 읽는다.
@@ -34,17 +37,19 @@ export interface SourceMasters {
   unitTree: AreaTreeNode[];
   /** 내신 관리에 등록된 시험범위 힌트. 학교를 안 골랐으면 null */
   scope: ScopeHint | null;
+  /** 이 학교에 이미 적혀 있는 작품들 — 작품 칸을 채운다 */
+  works: WorkCandidate[];
 }
 
 /**
  * @param values - 지금 폼 값
- * @param onTextbookHint - 내신 관리에서 찾은 교과서 이름(없으면 null).
- *   **채울지는 호출부가 정한다** — 직접 고른 교과서를 덮으면 안 된다
- * @returns 학교·교과서·영역·단원 목록과 시험범위 힌트
+ * @param onHint - 자동으로 찾은 값(교과서·작품)을 알려 준다.
+ *   **채울지는 호출부가 정한다** — 직접 고친 칸을 덮으면 안 된다
+ * @returns 학교·교과서·영역·단원 목록과 시험범위·작품 힌트
  */
 export function useSourceMasters(
   values: SourceFormValues,
-  onTextbookHint: (matched: string | null) => void,
+  onHint: (hint: SourceHint) => void,
 ): SourceMasters {
   const [schools, setSchools] = useState<NaesinSchool[]>([]);
   /**
@@ -60,6 +65,12 @@ export function useSourceMasters(
   const [loadedTextbooks, setLoadedTextbooks] = useState<{ key: string; names: string[] } | null>(null);
   const [loadedArea, setLoadedArea] = useState<{ key: string; tree: AreaTreeNode[] } | null>(null);
   const [loadedUnit, setLoadedUnit] = useState<{ key: string; tree: AreaTreeNode[] } | null>(null);
+
+  // 힌트 콜백은 렌더마다 새로 올 수 있다 — 참조로 들어 두 훅의 효과가 헛돌지 않게 한다
+  // (`useScopeHint` 안에서 하는 것과 같은 수법이지만, 여기서 **칸을 갈라** 넘기므로
+  //  래퍼가 필요하다: 교과서 힌트가 작품 칸을 건드리면 안 된다)
+  const onHintRef = useRef(onHint);
+  useEffect(() => { onHintRef.current = onHint; });
 
   const { level, grade, semester, textbook, source_type: sourceType, school_id: schoolId, year, exam_type: examType } = values;
 
@@ -103,6 +114,7 @@ export function useSourceMasters(
 
   // 학교를 묻는 유형일 때만 내신 관리를 본다 — 문제집·모의고사는 학교 칸이 안 보이는데도
   // 이전에 고른 school_id 가 남아 있을 수 있어, 안 가리면 안 보이는 학교로 교과서를 채운다
+  const asksSchool = visibleFields(sourceType).includes('school_name');
   const scope = useScopeHint({
     schoolId,
     grade,
@@ -110,11 +122,17 @@ export function useSourceMasters(
     semester,
     examType,
     textbookNames: textbooks,
-    enabled: visibleFields(sourceType).includes('school_name'),
-  }, onTextbookHint);
+    enabled: asksSchool,
+  }, useCallback((textbook: string | null) => onHintRef.current({ textbook }), []));
+
+  // 작품 후보도 학교를 묻는 유형에서만 본다 — 문제집·모의고사에는 남아 있는 school_id 가
+  // 화면에 안 보이는데, 안 가리면 그 학교의 작품으로 다른 출처의 칸을 채운다
+  const works = useWorkCandidates({
+    schoolId, year, grade, semester, examType, enabled: asksSchool,
+  }, useCallback((value: string) => onHintRef.current({ works: value }), []));
 
   const areaTree = loadedArea?.key === areaKey ? loadedArea.tree : EMPTY_TREE;
   const unitTree = loadedUnit?.key === unitKey ? loadedUnit.tree : EMPTY_TREE;
 
-  return { schools, textbooks, areaTree, unitTree, scope };
+  return { schools, textbooks, areaTree, unitTree, scope, works };
 }

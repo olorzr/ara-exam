@@ -152,6 +152,24 @@
 - 코드에서의 사용: `Passage`, `passages` 표, 문항의 `passage_id`
 - 관련 파일: src/lib/problem-ocr/merge.ts, src/lib/problem-paper/blocks.ts
 
+## 작품명 (work title)
+- 정의: 지문에 실린 글의 제목(`passages.title`)과 그 지문에 딸린 문항이 물려받는 값(`problems.work_title`). 아카이브 왼쪽 '작품' 탭의 축이고 검색 평문(`search_text`)에도 들어간다
+- 지은이는 **지문에만** 있다(`passages.author`) — 작품 트리가 `지은이 › 작품` 두 단이라 문항의 지은이는 제목으로 되찾는다(`facets.ts` 의 `collectPassageAuthors`)
+- 표기 정규화는 `normalizeWorkTitle` ↔ DB `exam.normalize_work_title` **1:1 거울**이다 — 감싸는 기호(「」『』〈〉"")만 양끝에서 벗긴다. 한쪽만 바꾸면 같은 작품이 두 폴더로 갈라진다
+- 지문 → 문항 전파는 **DB 트리거**가 한다(sql/20). 사람이 문항에 따로 적은 작품명은 보존된다
+- OCR 은 작품명과 함께 **어디서 얻었는지**(`title_source`: `printed`/`inferred`)를 낸다. `inferred` 면 파서가 '본문으로 알아봤어요' 경고를 만들어 검수 화면에 그 지문을 짚어 준다 — 인쇄된 이름과 알아낸 이름을 구별할 수 있어야 틀렸을 때 고친다
+- 코드에서의 사용: `Passage.title`, `Problem.work_title`, `normalizeWorkTitle`, `buildWorkTree`
+- 관련 파일: src/lib/problem-bank/work-title.ts, src/lib/problem-bank/work-tree.ts, sql/20_problem_bank_works.sql
+
+## 작품 후보 (work candidates)
+- 정의: 기출 업로드 화면의 **'작품' 칸**에 자동으로 채워지는, 그 학교에 **이미 적혀 있는 작품명들**. 출처는 둘이다 — ① 학교 프린트 시험지의 프린트별 이름(`print_bundles.name` 에서 스캔 제목 접두를 벗긴 나머지), ② 같은 학교 기출 지문의 `passages.title`/`author`
+- ⚠️ **저장하지 않는다.** OCR 프롬프트의 `작품후보` 로만 실려, 모델이 작품을 알아보고 **그 표기 그대로** 적게 한다(표기가 갈리면 작품 트리가 쪼개진다)
+- 학년이 다른 줄은 후보에서 **뺀다**(작품은 학년마다 통째로 다르다). 학년도·학기·시험은 줄 세우기에만 쓴다
+- 직접 고쳐 적은 값은 힌트가 덮지 않는다(`worksAuto`) — 교과서 자동 채움과 같은 계약이고, **칸을 비우는 것도 직접 고른 값**이다('이 시험지엔 작품 없음'). 자동은 학교·학교급을 바꿀 때 다시 켜진다
+- 기출 지문 쪽 후보는 **검수를 마친(`완료`) 출처**의 것만 쓴다 — 아직 확인 안 된 추측이 다음 업로드의 표준 표기가 되면 틀린 이름이 스스로 번진다
+- 코드에서의 사용: `WorkCandidate`, `rankWorkCandidates`, `toWorkHints`, `useWorkCandidates`, `SourceFormValues.works`
+- 관련 파일: src/lib/problem-bank/work-candidates.ts, src/hooks/useWorkCandidates.ts, src/lib/problem-ocr/prompt-works.ts
+
 ## O,X·단답형 (passage quiz)
 - 정의: 지문(문학 작품·비문학 글)을 넣으면 AI 가 만들어 주는 **O,X 문항과 단답형 문항**. `/problems/quiz`
 - ⚠️ **저장하지 않는다.** DB 표가 없고 새로고침하면 사라진다 — 만들어 고치고 인쇄까지가 한 자리다

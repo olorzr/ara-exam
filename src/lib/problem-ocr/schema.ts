@@ -60,6 +60,15 @@ export interface OcrItem {
   /** 작품명·글 제목 */
   title: string | null;
   author: string | null;
+  /**
+   * 그 작품명을 **어디서 얻었는가** — 시험지에 인쇄돼 있었으면 `'printed'`,
+   * 본문을 보고 알아봤으면 `'inferred'`. 제목이 없으면 null.
+   *
+   * ⚠️ 이 필드가 **'확인해 주세요' 경고의 근거**다(파서가 만든다). 없으면 모델이 경고를
+   *    적어 주기를 바라는 수밖에 없는데, 그러면 알아낸 이름과 인쇄된 이름을 화면에서
+   *    구별할 수 없다(코덱스 리뷰 2R).
+   */
+  title_source: 'printed' | 'inferred' | null;
   /** 지문 본문 HTML */
   html: string;
   /** 앞 쪽에서 이어진 지문(머리글이 없다) */
@@ -141,7 +150,7 @@ export const PROBLEM_OCR_SCHEMA = {
         additionalProperties: false,
         required: [
           'kind', 'ref', 'page', 'box', 'passage_ref', 'number', 'label', 'title', 'author',
-          'html', 'continued', 'continues', 'question_type', 'stem_html', 'choices',
+          'title_source', 'html', 'continued', 'continues', 'question_type', 'stem_html', 'choices',
           'answer', 'has_figure', 'figures', 'work_title', 'area_path', 'unit_path',
           'grammar_paths',
         ],
@@ -164,6 +173,7 @@ export const PROBLEM_OCR_SCHEMA = {
           label: { ...nullableString, maxLength: 40 },
           title: { ...nullableString, maxLength: 120 },
           author: { ...nullableString, maxLength: 60 },
+          title_source: { type: ['string', 'null'], enum: ['printed', 'inferred', null] },
           html: { type: 'string', maxLength: OCR_HTML_MAX },
           continued: { type: 'boolean' },
           continues: { type: 'boolean' },

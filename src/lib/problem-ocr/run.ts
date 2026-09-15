@@ -12,19 +12,15 @@ import { maxProblemNumber } from './answer-key';
 import { answerKeyImageCount, type AnswerKeyInput } from './answer-key-input';
 import { planPageBatches } from './batch-plan';
 import { representativeFailure, runOcrBatches } from './batch-run';
-import { OCR_SPLIT_COLUMNS, ocrTurnBudgetMs } from './constants';
-import { mergeOcrDrafts } from './merge';
+import { OCR_MAX_MERGED_WARNINGS, OCR_SPLIT_COLUMNS, ocrTurnBudgetMs } from './constants';
+import { mergeOcrDrafts, type MergeResult } from './merge';
 import { collectPageTexts, textSourceOf, type PageText } from './page-text';
 import { verifyAgainstText } from './verify-text';
-import type { MergeResult } from './merge';
-import { OCR_MAX_MERGED_WARNINGS } from './constants';
-import { capWarnings, dedupeWarnings, itemTargetLabel } from './warnings';
 import { verifyStructure } from './verify-structure';
+import { capWarnings, dedupeWarnings, itemTargetLabel } from './warnings';
 import { parseOcrDraft } from './parse';
 import { buildProblemOcrPrompt, type OcrSourceMeta } from './prompt';
-import {
-  inDocumentAnswerKey, readAnswerKeys, separateAnswerKey, type AnswerKeySource,
-} from './run-answer-key';
+import { inDocumentAnswerKey, readAnswerKeys, separateAnswerKey, type AnswerKeySource } from './run-answer-key';
 import { cropRegions, uploadPageImages } from './run-images';
 import { PROBLEM_OCR_SCHEMA } from './schema';
 
@@ -52,6 +48,8 @@ export interface OcrRunInput {
   unitTree: AreaTreeNode[];
   /** 관리자시스템 내신 관리에 체크된 단원 키 — 모델에게 어디부터 볼지 알려 준다 */
   scopeUnits: string[];
+  /** 이 시험지에 실렸을 법한 작품 (업로드 폼의 작품 칸) — 표기를 맞추게 하는 힌트다 */
+  workHints?: string[];
   /** 원본 시험지의 마지막 문항 번호(알 때) */
   maxNumber?: number | null;
 }
@@ -119,6 +117,7 @@ export async function runProblemOcr(
             areaTree: input.areaTree,
             unitTree: input.unitTree,
             scopeUnits: input.scopeUnits,
+            workHints: input.workHints,
           }),
           outputSchema: PROBLEM_OCR_SCHEMA,
           model: pref.model,
