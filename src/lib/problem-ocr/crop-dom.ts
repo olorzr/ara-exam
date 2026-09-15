@@ -1,6 +1,6 @@
 'use client';
 
-import { renderPdfPage } from '@/lib/pdf/pdfRenderer';
+import { renderPdfPage, type PageRotation } from '@/lib/pdf/pdfRenderer';
 import type { OpenPdf } from '@/lib/pdf/pdfPages';
 import type { Bbox } from '@/types/problem-bank';
 import { bboxToPixelRect } from './crop';
@@ -25,7 +25,17 @@ const PAGE_QUALITY = 0.72;
 export class PageCropper {
   private cache = new Map<number, HTMLCanvasElement>();
 
-  constructor(private readonly doc: OpenPdf, private readonly scale = 2) {}
+  /**
+   * @param doc - 열어 둔 PDF
+   * @param scale - 렌더 배율
+   * @param rotations - 쪽마다 바로 세우려고 돌릴 각도. **AI 로 보내는 이미지와 같은 값**을
+   *   넘겨야 편집 화면의 원본 대조가 본문과 맞는다
+   */
+  constructor(
+    private readonly doc: OpenPdf,
+    private readonly scale = 2,
+    private readonly rotations?: ReadonlyMap<number, PageRotation>,
+  ) {}
 
   /**
    * 페이지 캔버스를 얻는다(캐시 사용).
@@ -36,7 +46,9 @@ export class PageCropper {
     const hit = this.cache.get(page);
     if (hit) return hit;
 
-    const canvas = await renderPdfPage(this.doc.pdf, page, this.scale);
+    const canvas = await renderPdfPage(
+      this.doc.pdf, page, this.scale, this.rotations?.get(page) ?? 0,
+    );
     // 오래된 것부터 버린다(Map 은 삽입 순서를 지킨다)
     if (this.cache.size >= CANVAS_CACHE_SIZE) {
       const oldest = this.cache.keys().next().value;

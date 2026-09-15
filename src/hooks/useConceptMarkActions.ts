@@ -4,6 +4,7 @@ import { useCallback, type RefObject } from 'react';
 import { toast } from 'sonner';
 import type { Editor } from '@tiptap/react';
 import { extractMarks } from '@/lib/concept-marks';
+import { findMarkTarget } from '@/lib/concept-mark-target';
 
 const CONCEPT_MARK = 'concept';
 
@@ -73,35 +74,31 @@ export function useConceptMarkActions(
   }, [editorRef, setEditorHTML]);
 
   /**
-   * 텍스트로 처음 찾은 자리에 마킹을 붙인다.
+   * 텍스트로 찾은 자리에 마킹을 붙인다.
+   *
+   * 어느 자리를 고를지는 [findMarkTarget](@/lib/concept-mark-target) 이 정한다 —
+   * 자리 힌트 → 표 칸 → 첫 자리 순. **"처음 나오는 곳" 으로 되돌리지 말 것**: 같은 시어가
+   * 작품 원문과 풀이 표에 다 있어서 늘 원문에 구멍이 났다.
    *
    * ⚠️ **한 텍스트 노드 안에서만** 찾는다 — 서식(굵게 등)으로 쪼개진 구절은 못 찾는다.
    *    그래서 붙였는지 여부를 돌려준다: AI 추천은 이 값으로 '몇 개를 마킹했는지' 를 센다.
-   *    못 찾은 것을 조용히 넘기면 "10개 추천" 이라고 해 놓고 7개만 붙는다.
+   *    못 찾은 것을 조용히 넘기면 "10개 골랐다" 고 해 놓고 7개만 붙는다.
    * @param text - 붙일 글자
+   * @param context - 그 말이 있던 자리의 본문 구절 (AI 추천이 준다)
    * @returns 실제로 붙였으면 true
    */
-  const addMarkByText = useCallback((text: string): boolean => {
+  const addMarkByText = useCallback((text: string, context = ''): boolean => {
     const editor = editorRef.current;
     if (!editor) return false;
 
-    let found = false;
-    editor.state.doc.descendants((node, pos) => {
-      if (found) return false;
-      if (!node.isText) return;
-
-      const idx = (node.text ?? '').indexOf(text);
-      if (idx === -1) return;
-
-      const from = pos + idx;
+    const target = findMarkTarget(editor.state.doc, text, context);
+    if (target) {
       editor.chain()
-        .setTextSelection({ from, to: from + text.length })
+        .setTextSelection({ from: target.from, to: target.to })
         .setMark(CONCEPT_MARK).run();
-      found = true;
-      return false;
-    });
-    setEditorHTML(editor.getHTML());
-    return found;
+      setEditorHTML(editor.getHTML());
+    }
+    return target !== null;
   }, [editorRef, setEditorHTML]);
 
   return { deleteMark, clearAllMarks, removeMarkByText, addMarkByText };

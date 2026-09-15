@@ -35,6 +35,19 @@ describe('buildConceptPickPrompt', () => {
     expect(p).toContain('억지로 채우지 않는다');
   });
 
+  it('표와 해설에서 고르라고 한다 — 작품 원문에는 구멍을 내지 않는다', () => {
+    const p = build();
+    expect(p).toContain('설명·정리 쪽에서');
+    expect(p).toContain('| 칸 | 칸 |');
+    expect(p).toContain('표는 행마다');
+  });
+
+  it('같은 말이 원문과 설명에 다 있으면 설명 쪽 구절을 적게 한다 — 그 자리에 빈칸이 뚫린다', () => {
+    const p = build();
+    expect(p).toContain('설명 쪽 구절');
+    expect(p).toContain('context');
+  });
+
   it('이미 고른 용어를 데이터로 넘겨 다시 고르지 않게 한다', () => {
     const p = build({ existing: ['갈래'] });
     expect(p).toContain('이미고른용어');

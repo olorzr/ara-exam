@@ -1,5 +1,6 @@
 import {
-  CONCEPT_PICK_MAX_COUNT, CONCEPT_PICK_REASON_MAX, CONCEPT_PICK_TEXT_MAX,
+  CONCEPT_PICK_CONTEXT_MAX, CONCEPT_PICK_MAX_COUNT, CONCEPT_PICK_REASON_MAX,
+  CONCEPT_PICK_TEXT_MAX,
 } from './constants';
 
 /** 추천 하나 */
@@ -8,6 +9,11 @@ export interface ConceptPick {
   text: string;
   /** 왜 외워야 하는지 한 줄 */
   reason: string;
+  /**
+   * 이 용어가 있던 자리의 본문 구절 (없으면 `''`).
+   * 같은 낱말이 작품 원문과 설명 표에 다 있을 때 **설명 쪽**에 빈칸을 뚫는 데 쓴다.
+   */
+  context: string;
 }
 
 /**
@@ -25,10 +31,11 @@ export const CONCEPT_PICK_SCHEMA = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['text', 'reason'],
+        required: ['text', 'reason', 'context'],
         properties: {
           text: { type: 'string', maxLength: CONCEPT_PICK_TEXT_MAX },
           reason: { type: 'string', maxLength: CONCEPT_PICK_REASON_MAX },
+          context: { type: 'string', maxLength: CONCEPT_PICK_CONTEXT_MAX },
         },
       },
     },

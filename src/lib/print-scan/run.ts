@@ -3,6 +3,7 @@
 import { generateDraft } from '@/lib/ai/codex/generateDraft';
 import { AiError } from '@/lib/ai/types';
 import { registerBundleWords } from '@/lib/print-words/register';
+import { probePageOrientation, type PageOrientation } from '@/lib/page-orientation';
 import { renderPagesToImages, type OpenPdf } from '@/lib/pdf/pdfPages';
 import { planPageBatches } from '@/lib/problem-ocr/batch-plan';
 import { representativeFailure, runOcrBatches } from '@/lib/problem-ocr/batch-run';
@@ -39,10 +40,16 @@ export interface PrintRunEnv {
    * 잘렸어도 선생님은 완성본으로 알고 그대로 인쇄한다.
    */
   onWarnings?: (warnings: string[]) => void;
+  /**
+   * 미리 확인해 둔 쪽 방향. 없으면 이 묶음의 쪽만 여기서 확인한다.
+   *
+   * 스캔 전체를 한 번에 확인한 값을 넘기는 쪽이 싸다 — 여러 묶음이 같은 문서를 나눠 쓴다.
+   */
+  orientation?: PageOrientation;
 }
 
 export interface PrintRunProgress {
-  phase: 'upload' | 'page' | 'ocr' | 'save' | 'words';
+  phase: 'upload' | 'orient' | 'page' | 'ocr' | 'save' | 'words';
   done: number;
   total: number;
   /** 여러 묶음을 이어 읽을 때 지금 몇 번째인지 */
@@ -74,6 +81,7 @@ export async function readBundle(
   bundle: PrintBundle,
   doc: OpenPdf,
   env: PrintRunEnv,
+  orientation?: PageOrientation,
 ): Promise<{ html: string; meta: PrintOcrMeta }> {
   const startedAt = Date.now();
   const batches = planPageBatches(bundle.pages, {
@@ -86,7 +94,10 @@ export async function readBundle(
     // 2단으로 짜인 프린트는 단별로 갈라 보낸다 — 읽을 순서가 하나뿐이라 두 단이 섞이지 않고,
     // 같은 용량이 절반의 넓이에 쓰여 글자가 커진다
     renderBatch: (pages) => renderPagesToImages(doc, pages, {
-      signal: env.signal, splitColumns: OCR_SPLIT_COLUMNS,
+      signal: env.signal,
+      splitColumns: OCR_SPLIT_COLUMNS,
+      // 거꾸로 스캔된 쪽은 바로 세워 보낸다 — 뒤집힌 채 보내면 본문이 통째로 빈 채 돌아온다
+      rotations: orientation?.rotations,
     }),
     runBatch: async ({ pages, rendered, images, index, total }) => {
       const raw = await generateDraft({
@@ -119,6 +130,7 @@ export async function readBundle(
   const warnings = [
     ...run.warnings.map(warningText),
     ...drafts.flatMap((d) => d.warnings),
+    ...unreadablePageWarnings(drafts, orientation),
   ].slice(0, PRINT_MAX_MERGED_WARNINGS);
 
   return {
@@ -135,6 +147,55 @@ export async function readBundle(
       ranAt: new Date().toISOString(),
     },
   };
+}
+
+/**
+ * 글자가 있는데 본문이 비어 돌아온 쪽을 경고로 만든다.
+ *
+ * ⚠️ 프롬프트가 "읽을 내용이 없는 쪽도 html 을 빈 문자열로" 라고 시키므로, **빈 본문은
+ *    스스로는 오류가 아니다.** 그래서 거꾸로 스캔돼 한 글자도 못 읽은 쪽이 경고 하나 없이
+ *    빈 시험지가 되고 화면은 "다 됐어요" 라고 말했다. 방향 판정이 '글자가 있다' 고 본 쪽만
+ *    짚는다 — 빈 뒷면·간지까지 경고하면 경고 전체를 안 믿게 된다.
+ * @param drafts - 배치별 읽기 결과
+ * @param orientation - 방향 판정 결과 (없으면 아무것도 짚지 않는다)
+ * @returns 경고 문구들
+ */
+function unreadablePageWarnings(
+  drafts: readonly PrintOcrDraft[],
+  orientation?: PageOrientation,
+): string[] {
+  if (!orientation) return [];
+  const out: string[] = [];
+  const said = new Set<number>();
+  for (const draft of drafts) {
+    for (const page of draft.pages) {
+      // 모델이 아예 안 낸 쪽은 파서가 이미 경고했다 — 또 하면 같은 쪽 얘기가 두 번 나간다
+      if (page.missing) continue;
+      if (said.has(page.page)) continue;
+      if (orientation.blankPages.has(page.page)) continue;
+      // ⚠️ 문자열이 비었는지가 아니라 **보이는 글자**가 있는지를 본다.
+      //    빈 줄을 `<p></p>` 로 옮기라고 시켰으므로 그것만 든 쪽은 빈 쪽이다
+      if (visibleText(page.html) !== '') continue;
+      said.add(page.page);
+      out.push(`${page.page}쪽에서 글을 하나도 읽지 못했어요. 원본을 확인해 주세요.`);
+    }
+  }
+  return out;
+}
+
+/**
+ * 태그를 걷어낸 보이는 글자.
+ * @param html - 읽어 낸 쪽 HTML
+ * @returns 글자만 남긴 값 (없으면 빈 문자열)
+ */
+function visibleText(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, '')
+    // 공백 엔티티는 이름으로도 숫자로도 온다 — 안 풀면 공백만 든 쪽이 '글이 있다' 가 된다
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&#(?:160|32);/g, ' ')
+    .replace(/&#x(?:a0|20);/gi, ' ')
+    .trim();
 }
 
 /**
@@ -162,7 +223,14 @@ export async function runBundle(
   let sheetId: string;
   let html: string;
   try {
-    const read = await readBundle(bundle, doc, env);
+    // 읽기 전에 종이를 바로 세운다. 스캔 전체를 한 번에 확인한 값이 있으면 그것을 쓴다
+    const orientation = env.orientation ?? await probePageOrientation(doc, bundle.pages, {
+      port: env.port,
+      pref: env.pref,
+      signal: env.signal,
+      onProgress: (done, total) => env.onProgress?.({ phase: 'orient', done, total }),
+    });
+    const read = await readBundle(bundle, doc, env, orientation);
     html = read.html;
     const meta = read.meta;
 

@@ -1,6 +1,8 @@
 import {
-  CONCEPT_PICK_MAX_COUNT, CONCEPT_PICK_REASON_MAX, CONCEPT_PICK_TEXT_MAX, CONCEPT_PICK_TEXT_MIN,
+  CONCEPT_PICK_CONTEXT_MAX, CONCEPT_PICK_MAX_COUNT, CONCEPT_PICK_REASON_MAX,
+  CONCEPT_PICK_TEXT_MAX, CONCEPT_PICK_TEXT_MIN,
 } from './constants';
+import { foldLoose } from './fold';
 import type { ConceptPick } from './schema';
 
 /**
@@ -32,6 +34,30 @@ export interface ConceptPickParseContext {
   plain: string;
   /** 이미 마킹된 용어 */
   existing: readonly string[];
+}
+
+/**
+ * 자리 힌트를 검증한다.
+ *
+ * 쓸 수 없는 힌트는 **빈 값으로 만들 뿐 추천을 버리지 않는다** — 자리 힌트는 '어느 쪽에
+ * 뚫을까' 를 돕는 재료일 뿐이고, 없으면 마킹 쪽이 표를 먼저 보는 규칙으로 물러선다.
+ * 공백과 `|` 를 접어 견주는 까닭: 평문에는 표 기호가 있고 모델은 그것을 빠뜨리거나
+ * 줄바꿈을 공백으로 바꿔 적는다.
+ * @param context - 모델이 준 구절
+ * @param text - 고른 용어
+ * @param plain - 본문 평문
+ * @returns 쓸 수 있으면 그대로, 아니면 `''`
+ */
+function cleanContext(context: string, text: string, plain: string): string {
+  const trimmed = context.trim().slice(0, CONCEPT_PICK_CONTEXT_MAX);
+  if (trimmed === '') return '';
+  // 자리를 **찾기 위한** 힌트라 느슨하게 본다 — 모델은 표 기호를 빠뜨리고 줄바꿈을 공백으로 적는다.
+  // (뜻이 실제로 적혀 있는지 보는 자리와 달리, 여기서 좀 헐거워도 자리 하나를 고를 뿐이다)
+  const folded = foldLoose(trimmed);
+  // 용어를 안 담은 구절은 자리를 가리키지 못하고, 본문에 없는 구절은 지어낸 것이다
+  if (!folded.includes(foldLoose(text))) return '';
+  if (!foldLoose(plain).includes(folded)) return '';
+  return trimmed;
 }
 
 /**
@@ -93,6 +119,7 @@ export function parseConceptPicks(
       reason: typeof row.reason === 'string'
         ? row.reason.trim().slice(0, CONCEPT_PICK_REASON_MAX)
         : '',
+      context: cleanContext(typeof row.context === 'string' ? row.context : '', text, ctx.plain),
     });
   }
 

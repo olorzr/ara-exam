@@ -208,11 +208,21 @@ src/
 ## lib/concept-pick (AI 추천 빈칸)
 - 역할: 개념지 본문에서 빈칸으로 낼 용어를 골라 온다. 개념지·프린트 시험지 **양쪽**의 편집기에서 쓴다
 - 의존: lib/ai(generateDraft)
-- 주요 파일: plain-text.ts(HTML→평문), prompt.ts, schema.ts, parse.ts, run.ts,
+- 주요 파일: plain-text.ts(HTML→평문 — 표·제목·목록의 구조를 기호로 남긴다), prompt.ts,
+  schema.ts, parse.ts, run.ts, fold.ts(대조용 접기),
   notice.ts(하나도 못 붙였을 때의 안내 — AI 가 일부러 안 고른 것과 다 걸러진 것을 가른다)
+- 마킹할 **자리**는 `lib/concept-mark-target.ts` 가 고른다: 자리 힌트 → 표 칸 → 첫 자리 순.
+  "처음 나오는 곳" 으로 되돌리면 작품 원문에 빈칸이 뚫린다
 - 추천은 **띄어쓰기 없는 한 어절**만 통과시킨다 — `extractMarks` 가 공백으로 쪼개 세기 때문이다
 - **개수는 AI 가 정한다** — prompt.ts 가 눈대중·상한만 주고, schema.ts 의 `maxItems` 와 parse.ts 의
   자름이 `CONCEPT_PICK_MAX_COUNT` **하나**를 본다(셋이 갈라지면 스키마 위반으로 출력이 통째 실패)
+
+## lib/page-orientation (쪽 방향 판정)
+- 역할: 스캔한 쪽이 뒤집혔는지 AI 에게 먼저 묻고, 바로 세울 각도를 돌려준다
+- 의존: lib/ai(generateDraft), lib/pdf(renderPdfPage·encodeAt)
+- 주요 파일: chunk.ts(8쪽씩 나누기), prompt.ts, schema.ts, parse.ts(fail-open), run.ts
+- 쓰는 곳: lib/print-scan 뿐이다. 기출(problem-ocr)은 **아직 안 돌린다** — 모델이 준 좌표로
+  그림·문항을 잘라내므로 이미지를 돌리면 크롭 좌표계까지 같이 돌려야 한다
 
 ## lib/problem-ocr
 - 역할: 프롬프트 조립 → 구조화 출력 파싱 → 묶음 실행 → 병합 → 영역 크롭

@@ -29,4 +29,10 @@ describe('AiPickSection', () => {
     render(<AiPickSection {...props()} />);
     expect(screen.queryByText(/추천 전부 되돌리기/)).toBeNull();
   });
+
+  it('버린 추천 안내는 실행 전에는 없다 — 아직 아무것도 안 골랐다', () => {
+    render(<AiPickSection {...props()} />);
+    expect(screen.queryByText(/띄어쓰기가 든 추천/)).toBeNull();
+    expect(screen.queryByText(/본문에 없는 말/)).toBeNull();
+  });
 });

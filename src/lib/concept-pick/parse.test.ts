@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { CONCEPT_PICK_MAX_COUNT } from './constants';
 import { parseConceptPicks } from './parse';
 
-const PLAIN = '이 시의 갈래는 서정시이고 화자는 어머니를 그린다. 수미 상관 구조다.';
+const PLAIN = '이 시의 갈래는 서정시이고 화자는 어머니를 그린다. 수미 상관 구조다.\n| 갈래 | 서정시 |';
 const ctx = (over: Partial<Parameters<typeof parseConceptPicks>[1]> = {}) => ({
   plain: PLAIN, existing: [] as string[], ...over,
 });
@@ -13,7 +13,9 @@ describe('parseConceptPicks', () => {
     const result = parseConceptPicks(
       raw([{ text: '서정시', reason: '갈래를 묻는 문항이 잦다' }]), ctx(),
     );
-    expect(result?.picks).toEqual([{ text: '서정시', reason: '갈래를 묻는 문항이 잦다' }]);
+    expect(result?.picks).toEqual([
+      { text: '서정시', reason: '갈래를 묻는 문항이 잦다', context: '' },
+    ]);
   });
 
   it('모양이 깨지면 null', () => {
@@ -63,10 +65,38 @@ describe('parseConceptPicks', () => {
     });
   });
 
+  it('자리 힌트를 그대로 받는다 — 표에서 골랐으면 그 행이 온다', () => {
+    const result = parseConceptPicks(
+      raw([{ text: '서정시', reason: 'x', context: '| 갈래 | 서정시 |' }]), ctx(),
+    );
+    expect(result?.picks[0].context).toBe('| 갈래 | 서정시 |');
+  });
+
+  it('공백·구분 기호가 달라도 힌트를 받아들인다 — 모델은 표 기호를 빠뜨린다', () => {
+    const result = parseConceptPicks(
+      raw([{ text: '서정시', reason: 'x', context: '갈래  서정시' }]), ctx(),
+    );
+    expect(result?.picks[0].context).toBe('갈래  서정시');
+  });
+
+  it('쓸 수 없는 힌트는 비우되 추천은 살린다 — 힌트가 없으면 표를 먼저 보면 된다', () => {
+    const notInText = parseConceptPicks(
+      raw([{ text: '서정시', reason: 'x', context: '본문에 없는 구절 서정시' }]), ctx(),
+    );
+    expect(notInText?.picks).toHaveLength(1);
+    expect(notInText?.picks[0].context).toBe('');
+
+    // 용어를 안 담은 구절은 자리를 가리키지 못한다
+    const noText = parseConceptPicks(
+      raw([{ text: '서정시', reason: 'x', context: '화자는 어머니를' }]), ctx(),
+    );
+    expect(noText?.picks[0].context).toBe('');
+  });
+
   it('근거가 없거나 길면 잘라서 받는다 — 용어까지 버리지는 않는다', () => {
     const long = '나'.repeat(300);
     const result = parseConceptPicks(raw([{ text: '화자', reason: long }, { text: '갈래' }]), ctx());
     expect(result?.picks[0].reason.length).toBeLessThanOrEqual(120);
-    expect(result?.picks[1]).toEqual({ text: '갈래', reason: '' });
+    expect(result?.picks[1]).toEqual({ text: '갈래', reason: '', context: '' });
   });
 });

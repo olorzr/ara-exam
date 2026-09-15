@@ -19,6 +19,16 @@ describe('parsePrintWords', () => {
     expect(result?.entries).toEqual([{ word: '상기', meaning: '지난 일을 다시 생각해 냄' }]);
   });
 
+  it('표에 실린 뜻도 받는다 — 평문의 칸 구분 기호 때문에 "지어낸 뜻" 으로 몰리면 안 된다', () => {
+    // 코덱스 리뷰가 재현한 자리: 뜻이 두 칸에 걸치면 사이에 우리가 넣은 `|` 가 낀다
+    const table = { plain: '| 경외 | 존경하고 | 두려워함 |' };
+    const result = parsePrintWords(
+      raw([{ word: '경외', meaning: '존경하고 두려워함' }]), table,
+    );
+    expect(result?.entries).toEqual([{ word: '경외', meaning: '존경하고 두려워함' }]);
+    expect(result?.dropped.unverified).toEqual([]);
+  });
+
   it('모양이 깨지면 null', () => {
     expect(parsePrintWords('{', ctx)).toBeNull();
     expect(parsePrintWords(JSON.stringify({}), ctx)).toBeNull();

@@ -12,7 +12,7 @@ export interface AiPickSectionProps {
   enabled: boolean;
   editorRef: { current: Editor | null };
   marks: MarkItem[];
-  addMarkByText: (text: string) => boolean;
+  addMarkByText: (text: string, context?: string) => boolean;
   removeMarkByText: (text: string) => void;
 }
 
@@ -23,6 +23,9 @@ export interface AiPickSectionProps {
  * 기능이 꺼져 있으면 아무것도 그리지 않는다 — 설정에서 끄면 없던 기능처럼 보여야 한다.
  *
  * 개수를 묻는 칸은 없다 — 몇 개를 고를지는 본문을 보고 AI 가 정한다.
+ *
+ * 검증에 걸려 **버린 추천의 수도 밝힌다.** 안 그러면 표에서 구절을 골라 전부 걸러졌을 때
+ * "왜 이렇게 적게 나오지" 만 남는다.
  */
 export default function AiPickSection(props: AiPickSectionProps) {
   const pick = useConceptPick(props);
@@ -92,6 +95,18 @@ export default function AiPickSection(props: AiPickSectionProps) {
             추천 전부 되돌리기 ({pick.applied.length}개)
           </Button>
         </div>
+      )}
+
+      {pick.dropped && pick.dropped.malformed > 0 && (
+        <p className="mt-2 text-xs text-gray-500">
+          띄어쓰기가 든 추천 {pick.dropped.malformed}개는 뺐어요 — 빈칸은 한 어절만 돼요.
+        </p>
+      )}
+
+      {pick.dropped && pick.dropped.notInText > 0 && (
+        <p className="mt-1 text-xs text-gray-500">
+          본문에 없는 말 {pick.dropped.notInText}개는 뺐어요.
+        </p>
       )}
 
       {pick.notFound.length > 0 && (

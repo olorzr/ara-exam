@@ -43,11 +43,15 @@ export function printScanPdfPath(scanId: string): string {
  * 쪽 이미지 경로. 시험지를 고칠 때 원본과 대조하는 데 쓴다.
  * @param scanId - 스캔 id (UUID)
  * @param page - 1-based 쪽 번호
+ * @param version - 다시 만든 판을 가르는 꼬리표 (빈 값이면 처음 올리는 경로)
  * @returns 버킷 기준 경로
  */
-export function printScanPagePath(scanId: string, page: number): string {
+export function printScanPagePath(scanId: string, page: number, version = ''): string {
   if (!Number.isInteger(page) || page < 1) {
     throw new Error(`쪽 번호가 올바르지 않아요: ${page}`);
   }
-  return `${printScanFolder(scanId)}/pages/${page}.jpg`;
+  // 판 번호가 붙으면 **다른 파일**이다 — 다시 만들 때 옛 파일을 지우지 않고 새로 올리기 위해서다.
+  // 버킷에 UPDATE 정책이 없어(제자리 덮어쓰기 금지) 같은 경로를 두 번 쓸 수 없다
+  const suffix = version === '' ? '' : `-${version.replace(/[^a-z0-9]/gi, '')}`;
+  return `${printScanFolder(scanId)}/pages/${page}${suffix}.jpg`;
 }

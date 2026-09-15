@@ -79,15 +79,19 @@ export function parsePrintOcrDraft(
   }
 
   // 보낸 쪽은 전부 자리를 만든다 — 빠진 쪽을 조용히 건너뛰면 시험지에서만 사라진다
+  const missing: string[] = [];
   for (const page of ctx.pages) {
     if (byPage.has(page)) continue;
-    byPage.set(page, { page, html: '' });
-    warnings.push(`${page}쪽 내용을 받지 못했어요. 원본을 확인해 주세요.`);
+    byPage.set(page, { page, html: '', missing: true });
+    missing.push(`${page}쪽 내용을 받지 못했어요. 원본을 확인해 주세요.`);
   }
 
   return {
     pages: [...byPage.values()].sort((a, b) => a.page - b.page),
-    warnings: warnings.slice(0, PRINT_OCR_MAX_WARNINGS),
+    // ⚠️ 빠진 쪽 경고를 **맨 앞**에 둔다(코덱스 리뷰 2R). 모델이 낸 경고가 상한을 채우면
+    //    뒤에 붙은 이 경고가 잘려 나가는데, 그 쪽은 뒤에서 다시 경고하지 않으므로
+    //    **쪽 하나가 통째로 빠진 사실이 어디에도 안 남는다**
+    warnings: [...missing, ...warnings].slice(0, PRINT_OCR_MAX_WARNINGS),
   };
 }
 

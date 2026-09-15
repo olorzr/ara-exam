@@ -7,7 +7,10 @@ import { aiErrorMessage } from '@/lib/ai/errors';
 import { getCodexModelPref } from '@/lib/ai/localModelPref';
 import { getCodexPort } from '@/lib/ai/localPort';
 import { isAiError } from '@/lib/ai/types';
-import { conceptPickEmptyNotice, runConceptPick, type ConceptPick } from '@/lib/concept-pick';
+import {
+  conceptPickEmptyNotice, runConceptPick,
+  type ConceptPick, type ConceptPickDropped,
+} from '@/lib/concept-pick';
 import type { MarkItem } from '@/components/exam-builder';
 import { ocrStillEnabled } from './useProblemOcr';
 
@@ -25,7 +28,7 @@ export interface UseConceptPickInput {
   editorRef: { current: Editor | null };
   marks: MarkItem[];
   /** 붙었으면 true 를 돌려준다 — 이 값으로 적용 수를 센다 */
-  addMarkByText: (text: string) => boolean;
+  addMarkByText: (text: string, context?: string) => boolean;
   removeMarkByText: (text: string) => void;
 }
 
@@ -37,6 +40,8 @@ export function useConceptPick({
   const [applied, setApplied] = useState<ConceptPick[]>([]);
   /** 골랐지만 본문에서 자리를 못 찾은 것 (서식으로 쪼개진 구절) */
   const [notFound, setNotFound] = useState<string[]>([]);
+  /** 마지막 실행에서 검증에 걸려 버린 추천 수 — 왜 적게 왔는지 사람에게 설명할 재료 */
+  const [dropped, setDropped] = useState<ConceptPickDropped | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   // 화면이 사라지면 진행 중인 생성을 끊는다(useProblemOcr 과 같은 이유로 layout effect)
@@ -70,12 +75,14 @@ export function useConceptPick({
       const added: ConceptPick[] = [];
       const missed: string[] = [];
       for (const pick of result.picks) {
-        if (addMarkByText(pick.text)) added.push(pick);
+        // 자리 힌트를 함께 넘긴다 — 같은 시어가 원문과 풀이 표에 다 있으면 표 쪽에 뚫어야 한다
+        if (addMarkByText(pick.text, pick.context)) added.push(pick);
         else missed.push(pick.text);
       }
 
       setApplied((prev) => [...prev, ...added]);
       setNotFound(missed);
+      setDropped(result.dropped);
 
       if (added.length === 0) {
         // AI 가 일부러 안 고른 것과 골랐는데 다 걸러진 것을 가른다 — 앞은 오류가 아니다
@@ -110,8 +117,9 @@ export function useConceptPick({
     for (const pick of applied) removeMarkByText(pick.text);
     setApplied([]);
     setNotFound([]);
+    setDropped(null);
     toast.success('추천 마킹을 되돌렸어요.');
   }, [applied, removeMarkByText]);
 
-  return { running, applied, notFound, run, cancel, removeOne, undoAll };
+  return { running, applied, notFound, dropped, run, cancel, removeOne, undoAll };
 }

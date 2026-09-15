@@ -20,7 +20,7 @@
 //
 // 원본: ara-system `app/lib/ai/pdfPages.ts`.
 
-import { getPdfDocument, renderPdfPage } from '@/lib/pdf/pdfRenderer'
+import { getPdfDocument, renderPdfPage, type PageRotation } from '@/lib/pdf/pdfRenderer'
 import { encodePageImages } from '@/lib/pdf/pdfColumns'
 import {
   COLUMN_SCALE, encodeAt, encodeWithinBudget,
@@ -131,7 +131,12 @@ export function pagesOf(rendered: readonly RenderedImage[]): number[] {
 export async function renderPagesToImages(
   doc: OpenPdf,
   pages: number[],
-  opts?: { signal?: AbortSignal; splitColumns?: boolean },
+  opts?: {
+    signal?: AbortSignal
+    splitColumns?: boolean
+    /** 쪽마다 바로 세우려고 돌릴 각도 (없으면 원본 그대로) */
+    rotations?: ReadonlyMap<number, PageRotation>
+  },
 ): Promise<RenderedPages> {
   const wanted = [...new Set(pages)]
     .filter(p => Number.isInteger(p) && p >= 1 && p <= doc.numPages)
@@ -146,7 +151,10 @@ export async function renderPagesToImages(
   for (const page of wanted) {
     if (opts?.signal?.aborted) break
 
-    const canvas = await renderPdfPage(doc.pdf, page, split ? COLUMN_SCALE : PAGE_SCALE)
+    // 2단 가르기는 **돌린 캔버스에서** 한다 — 뒤집힌 쪽은 왼쪽 단과 오른쪽 단도 뒤바뀐다
+    const canvas = await renderPdfPage(
+      doc.pdf, page, split ? COLUMN_SCALE : PAGE_SCALE, opts?.rotations?.get(page) ?? 0,
+    )
     const parts = encodePageImages(canvas, split, encodeWithinBudget)
 
     // ⚠️ 한 조각이라도 예산을 못 맞추면 **그 쪽을 통째로** 건너뛴다. 반쪽만 보내면

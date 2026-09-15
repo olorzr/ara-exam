@@ -6,9 +6,28 @@ describe('htmlToPlainText', () => {
     expect(htmlToPlainText('<p>가</p><p>나<br>다</p>')).toBe('가\n나\n다');
   });
 
-  it('표의 칸은 탭으로 가른다 — 붙이면 두 칸의 글자가 한 낱말처럼 보인다', () => {
-    const text = htmlToPlainText('<table><tbody><tr><td>갈래</td><td>서정시</td></tr></tbody></table>');
-    expect(text).toContain('갈래\t서정시');
+  it('표의 한 행은 한 줄이다 — TipTap 은 칸마다 <p> 를 넣으므로 칸을 먼저 접어야 짝이 산다', () => {
+    const tiptap = '<table><tbody><tr>'
+      + '<td colspan="1"><p><strong>시어</strong></p></td><td><p>꿈을 지닌 대상</p></td>'
+      + '</tr></tbody></table>';
+    expect(htmlToPlainText(tiptap)).toBe('| 시어 | 꿈을 지닌 대상 |');
+  });
+
+  it('칸 안의 줄바꿈은 공백이다 — 줄을 나누면 그 칸이 옆 칸과 흩어진다', () => {
+    const html = '<table><tbody><tr><td><p>가<br>나</p><p>다</p></td></tr></tbody></table>';
+    expect(htmlToPlainText(html)).toBe('| 가 나 다 |');
+  });
+
+  it('구분 기호는 앞뒤를 공백으로 띄운다 — 붙이면 그 낱말이 "본문에 없음" 이 된다', () => {
+    const text = htmlToPlainText('<table><tbody><tr><td><p>서정시</p></td></tr></tbody></table>');
+    expect(text.includes('서정시')).toBe(true);
+    expect(text).not.toContain('|서정시');
+  });
+
+  it('제목과 목록에 표시를 남긴다 — 제목 자체는 고르지 말라고 할 수 있어야 한다', () => {
+    expect(htmlToPlainText('<h3>제재 개관</h3>')).toBe('# 제재 개관');
+    expect(htmlToPlainText('<h4>표현상 특징</h4>')).toBe('## 표현상 특징');
+    expect(htmlToPlainText('<ul><li><p>의인법</p></li></ul>')).toBe('- 의인법');
   });
 
   it('서식 태그는 지우고 글자만 남긴다 — 본문에 있는가 판정의 기준이다', () => {
@@ -22,7 +41,7 @@ describe('htmlToPlainText', () => {
     expect(htmlToPlainText('<p>가&nbsp;나</p>')).toBe('가 나');
   });
 
-  it('&amp; 를 마지막에 푼다 — 먼저 풀면 &amp;lt; 가 두 번 풀려 < 가 된다', () => {
+  it('& 를 마지막에 푼다 — 먼저 풀면 &amp;lt; 가 두 번 풀려 < 가 된다', () => {
     expect(htmlToPlainText('<p>&amp;lt;</p>')).toBe('&lt;');
   });
 

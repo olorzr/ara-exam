@@ -35,6 +35,18 @@ describe('parsePrintOcrDraft', () => {
     expect(draft?.pages.map((p) => p.page)).toEqual([1, 2]);
     expect(draft?.pages[1].html).toBe('');
     expect(draft?.warnings.join()).toContain('2쪽 내용을 받지 못했어요');
+    // 자리만 만든 쪽은 표시해 둔다 — 뒤에서 같은 쪽을 또 경고하면 같은 말이 두 번 나간다
+    expect(draft?.pages[1].missing).toBe(true);
+    expect(draft?.pages[0].missing).toBeUndefined();
+  });
+
+  it('빠진 쪽 경고는 맨 앞에 둔다 — 상한에 잘리면 그 사실이 어디에도 안 남는다', () => {
+    const many = Array.from({ length: 30 }, (_, i) => `모델 경고 ${i}`);
+    const draft = parsePrintOcrDraft(
+      raw({ pages: [{ page: 1, html: '<p>가</p>' }], warnings: many }),
+      { pages: [1, 2] },
+    );
+    expect(draft?.warnings[0]).toContain('2쪽 내용을 받지 못했어요');
   });
 
   it('같은 쪽이 두 번 오면 먼저 온 것을 쓴다', () => {

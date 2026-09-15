@@ -114,8 +114,18 @@
 - ⚠️ 추천은 **띄어쓰기 없는 한 어절**이어야 한다. `extractMarks` 가 마킹 구간을 공백으로 쪼개 세므로, 구절을 고르면 빈칸이 여러 개가 되고 마킹 수(= 문항 수 = 합격 기준의 분모)가 부풀어 학원 성적까지 어긋난다
 - ⚠️ 본문에 **글자 그대로** 있는 말만 쓴다. `addMarkByText` 는 한 텍스트 노드 안에서만 찾으므로 서식으로 쪼개진 구절은 못 붙이고, 그 개수를 사람에게 알린다
 - **개수는 사람이 정하지 않는다**(2026-09-15). 프롬프트가 눈대중(`CONCEPT_PICK_TYPICAL_COUNT`, 10개 안팎)과 상한(`CONCEPT_PICK_MAX_COUNT`, 30)만 주고 AI 가 본문을 보고 정한다. 다시 누르면 '이미고른용어' 를 뺀 나머지에서 아직 외울 만한 것만 더 고르며, **빈 배열은 정상 응답**이다 — `conceptPickEmptyNotice` 가 셋을 가른다 — '더 추천할 용어가 없어요'(안내) / '고른 용어를 본문에 붙이지 못했어요'(서식으로 쪼개진 낱말) / '마킹할 용어를 찾지 못했어요'(검증에서 전부 걸러짐)
-- 코드에서의 사용: `runConceptPick`, `parseConceptPicks`, `conceptPickEmptyNotice`, `useConceptPick`, `AiPickSection`
+- **표·해설에서 고르고 작품 원문은 건드리지 않는다**(2026-09-15). 평문에 표는 `| 칸 | 칸 |`, 제목은 `#`, 목록은 `-` 로 남겨 모델이 원문과 해설을 가릴 수 있게 하고, 프롬프트가 "설명·정리 쪽에서 고르라" 고 못박는다
+- **자리 힌트(context)**: 추천마다 그 말이 있던 본문 구절을 함께 받는다. 같은 시어가 원문과 풀이표에 다 있을 때 **어디에 빈칸을 뚫을지** 정하는 재료다(`findMarkTarget`). 쓸 수 없는 힌트는 비우되 **추천은 버리지 않는다**
+- 코드에서의 사용: `runConceptPick`, `parseConceptPicks`, `conceptPickEmptyNotice`, `findMarkTarget`, `useConceptPick`, `AiPickSection`
 - 관련 파일: `src/lib/concept-pick/`, `src/hooks/useConceptPick.ts`, `src/components/exam-builder/AiPickSection.tsx`
+
+## 쪽 방향 판정 (page orientation)
+- 정의: 스캔한 쪽이 바로 서 있는지 AI 에게 **먼저 묻고**, 뒤집혔으면 돌려서 읽는 단계. 학교 프린트 스캔에만 있다
+- 작은 이미지(긴 변 900px)로 방향만 묻는다 — 글자를 읽을 필요가 없어 본문 읽기보다 훨씬 싸다
+- ⚠️ **fail-open**: 판정이 실패하면 '돌리지 않음' 으로 두고 그냥 읽는다. 이 단계가 읽기를 막으면 안 된다
+- ⚠️ `hasText` 는 빈 뒷면과 '글이 있는데 못 읽은 쪽' 을 가른다. 프롬프트가 "읽을 내용이 없는 쪽도 html 을 빈 문자열로" 라고 시키므로 **빈 본문만으로는 오류를 알 수 없다**
+- 코드에서의 사용: `probePageOrientation`, `PageOrientation`, `PageRotation`
+- 관련 파일: `src/lib/page-orientation/`, `src/lib/pdf/pdfRenderer.ts`
 
 ## 미지정 (UNSPECIFIED_OPTION)
 - 정의: 년도·학년이 정해지지 않은 상태. Select 에는 `'미지정'` 으로 보이고 DB 에는 `''` 로 저장된다. base-ui Select 가 빈 문자열 value 를 다루기 까다로워 센티널을 쓴다

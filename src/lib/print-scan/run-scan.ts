@@ -3,6 +3,7 @@
 import { getCodexModelPref } from '@/lib/ai/localModelPref';
 import { getCodexPort } from '@/lib/ai/localPort';
 import { isAiError } from '@/lib/ai/types';
+import { probePageOrientation } from '@/lib/page-orientation';
 import { openPdfSource, type OpenPdf, type PdfSource } from '@/lib/pdf/pdfPages';
 import { FATAL_CODES } from '@/lib/problem-ocr/batch-run';
 import { uploadProblemFile } from '@/lib/problem-bank/storage';
@@ -51,6 +52,17 @@ interface RunEnv {
   onProgress?: (p: PrintRunProgress) => void;
   /** 묶음이 남긴 경고 — 어느 프린트 얘기인지 이름을 함께 준다 */
   onWarnings?: (warnings: string[], bundleName: string) => void;
+}
+
+/**
+ * 다시 만드는 쪽 이미지를 가를 꼬리표.
+ *
+ * 같은 경로에 두 번 올릴 수 없고(버킷에 UPDATE 정책이 없다) 지우고 올리면 실패했을 때
+ * 원본을 잃으므로, 다시 만들 때마다 새 이름을 쓴다.
+ * @returns 경로에 붙일 짧은 꼬리표
+ */
+function pageImageVersion(): string {
+  return Date.now().toString(36);
 }
 
 /** 저장 행을 읽기에 쓸 모양으로 (아직 DB 에서 다시 읽지 않는다 — 방금 넣은 값 그대로다) */
@@ -122,9 +134,19 @@ async function readBundlesInOrder(
 
   // 쪽 이미지는 한 번에 올린다 — 묶음마다 열면 같은 캔버스를 여러 번 그린다
   const pages = [...new Set(rows.flatMap((r) => r.pages))].sort((a, b) => a - b);
+
+  // 방향은 **저장하기 전에** 확인한다 — 올려 둔 원본 이미지도 바로 선 채로 저장되어야
+  // 편집 화면의 대조가 본문과 맞는다. 스캔 전체를 한 번에 물어 묶음마다 다시 묻지 않는다
+  const orientation = await probePageOrientation(doc, pages, {
+    port,
+    pref,
+    signal: env.signal,
+    onProgress: (done, total) => env.onProgress?.({ phase: 'orient', done, total }),
+  });
+
   const pagePaths = await uploadPrintPageImages(doc, scanId, pages, env.signal, (done, total) => {
     env.onProgress?.({ phase: 'page', done, total });
-  });
+  }, orientation.rotations);
 
   let ok = 0;
   let failed = 0;
@@ -144,7 +166,7 @@ async function readBundlesInOrder(
     let sawWarnings = false;
     try {
       const result = await runBundle(bundle, doc, {
-        port, pref, signal: env.signal, onProgress,
+        port, pref, signal: env.signal, onProgress, orientation,
         onWarnings: (w) => {
           sawWarnings = true;
           env.onWarnings?.(w, row.name);
@@ -186,20 +208,37 @@ export async function rerunBundle(
 ): Promise<PrintBundleRunResult> {
   const doc = await openPdfSource(source);
   try {
-    // 처음 읽을 때 실패한 쪽이 있으면 이때 다시 올린다(경로가 비어 있는 자리)
-    let pagePaths = bundle.page_paths;
-    if (pagePaths.length !== bundle.pages.length || pagePaths.some((p) => !p)) {
-      const uploaded = await uploadPrintPageImages(doc, scanId, bundle.pages, env.signal,
-        (done, total) => env.onProgress?.({ phase: 'page', done, total }));
-      pagePaths = bundle.pages.map((p) => uploaded.get(p) ?? '');
-    }
+    const port = getCodexPort();
+    const pref = getCodexModelPref();
+
+    // 방향은 저장하지 않는다 — 다시 읽을 때 다시 묻는 편이 싸고, 옛 묶음도 그대로 고쳐진다
+    const orientation = await probePageOrientation(doc, bundle.pages, {
+      port,
+      pref,
+      signal: env.signal,
+      onProgress: (done, total) => env.onProgress?.({ phase: 'orient', done, total }),
+    });
+
+    // 쪽 이미지는 **늘 다시 만든다.** 방향이 이번에 달라졌을 수도, 지난번과 반대로
+    // 돌아갔을 수도 있는데(그때 0도면 옛 이미지는 여전히 거꾸로다) 어느 쪽인지 알 길이 없다 —
+    // 각도를 저장하지 않기로 했으므로 다시 만드는 편이 늘 맞는다(코덱스 리뷰 2R).
+    // ⚠️ **새 판으로 올리고 성공한 것만 갈아 끼운다.** 옛 파일을 먼저 지우면 업로드가
+    //    실패했을 때 멀쩡하던 원본이 사라져 되돌릴 길이 없다(코덱스 정지 리뷰).
+    //    실패한 쪽은 옛 경로를 그대로 쓴다 — 방향이 어긋난 그림이라도 없는 것보다 낫다
+    const uploaded = await uploadPrintPageImages(
+      doc, scanId, bundle.pages, env.signal,
+      (done, total) => env.onProgress?.({ phase: 'page', done, total }),
+      orientation.rotations, pageImageVersion(),
+    );
+    const pagePaths = bundle.pages.map((p, i) => uploaded.get(p) ?? bundle.page_paths[i] ?? '');
 
     return await runBundle({ ...bundle, page_paths: pagePaths }, doc, {
-      port: getCodexPort(),
-      pref: getCodexModelPref(),
+      port,
+      pref,
       signal: env.signal,
       onProgress: env.onProgress,
       onWarnings: (w) => env.onWarnings?.(w, bundle.name),
+      orientation,
     });
   } finally {
     doc.pdf.destroy();

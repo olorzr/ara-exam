@@ -20,6 +20,16 @@ describe('printScanPdfPath / printScanPagePath', () => {
     expect(() => printScanPdfPath('')).toThrow();
   });
 
+  it('판 꼬리표를 주면 다른 파일이 된다 — 옛 원본을 지우지 않고 새로 올리기 위해서다', () => {
+    expect(printScanPagePath(ID, 3, 'm9x1')).toBe(`print-scans/${ID}/pages/3-m9x1.jpg`);
+    // 꼬리표가 달라도 같은 쪽을 가리킨다(옛 파일은 그대로 남는다)
+    expect(printScanPagePath(ID, 3, 'm9x1')).not.toBe(printScanPagePath(ID, 3));
+  });
+
+  it('꼬리표의 기호는 걷어낸다 — Storage 키에 그대로 들어간다', () => {
+    expect(printScanPagePath(ID, 1, 'a/b 2')).toBe(`print-scans/${ID}/pages/1-ab2.jpg`);
+  });
+
   it('쪽 번호는 1 이상 정수여야 한다', () => {
     expect(() => printScanPagePath(ID, 0)).toThrow();
     expect(() => printScanPagePath(ID, 1.5)).toThrow();

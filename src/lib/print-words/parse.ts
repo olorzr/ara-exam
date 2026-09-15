@@ -1,4 +1,6 @@
 import type { WordEntry } from '@/components/words';
+// 순수 함수만 가져온다 — 배럴(`@/lib/concept-pick`)을 타면 이 파서가 브라우저 전용 모듈을 끌고 온다
+import { foldStrict } from '@/lib/concept-pick/fold';
 import {
   PRINT_MEANING_MAX, PRINT_WORD_MAX, PRINT_WORDS_MAX_COUNT,
 } from './constants';
@@ -57,7 +59,14 @@ function withoutTrailingStop(value: string): string {
 function meaningIsPrinted(meaning: string, foldedPlain: string): boolean {
   if (foldedPlain.includes(meaning)) return true;
   const trimmed = withoutTrailingStop(meaning);
-  return trimmed !== '' && foldedPlain.includes(trimmed);
+  if (trimmed !== '' && foldedPlain.includes(trimmed)) return true;
+  // 표에 실린 뜻은 평문에서 `| 단어 | 뜻 |` 로 오고, 뜻이 두 칸·두 줄에 걸쳐 있으면 그 사이에
+  // 우리가 넣은 기호가 낀다. 그 기호 때문에 멀쩡한 뜻이 '지어낸 것' 으로 몰리면 안 된다.
+  // ⚠️ **`foldStrict` 여야 한다**(코덱스 리뷰 2R). 공백까지 지우는 세기로 견주면
+  //    '아버지 가방에' 가 '아버지가 방에' 와 같아지고 '-3' 이 '3' 과 같아져,
+  //    프린트에 없는 뜻이 그대로 등록된다 — 이 함수가 막으려던 바로 그 일이다
+  const folded = foldStrict(trimmed === '' ? meaning : trimmed);
+  return folded !== '' && foldStrict(foldedPlain).includes(folded);
 }
 
 /**

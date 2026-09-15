@@ -17,6 +17,7 @@ import { ocrStillEnabled } from './useProblemOcr';
 /** 단계별 한글 이름 — 진행률 문구가 화면마다 달라지지 않게 한 곳에 둔다 */
 const PHASE_LABEL: Record<PrintRunProgress['phase'], string> = {
   upload: '원본 올리는 중',
+  orient: '쪽 방향 확인 중',
   page: '원본 페이지 저장 중',
   ocr: '프린트 읽는 중',
   save: '시험지 만드는 중',

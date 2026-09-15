@@ -18,6 +18,11 @@ import { PRINT_OCR_MAX_WARNINGS, PRINT_PAGES_PER_BATCH } from './constants';
 export interface PrintPageDraft {
   page: number;
   html: string;
+  /**
+   * 모델이 아예 안 낸 쪽이라 **파서가 자리만 만든 것**인가.
+   * 그 쪽은 파서가 이미 경고했으므로 뒤에서 또 경고하면 같은 말이 두 번 나간다.
+   */
+  missing?: boolean;
 }
 
 export interface PrintOcrDraft {
