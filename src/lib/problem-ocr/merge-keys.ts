@@ -19,6 +19,8 @@ import type { OcrItem } from './schema';
 export function normalizeLabel(label: string | null | undefined): string {
   if (!label) return '';
   return label
+    // ⚠️ NFKC 는 **머리글에만** 쓴다(전각 숫자·괄호를 편다). 본문에 쓰면 호환 자모
+    //    ㆍ·ㅿ 를 조합형 자모로 바꿔 옛한글 표기가 갈린다 — box-labels.ts 의 경고와 같은 결이다
     .normalize('NFKC')
     // 감싼 괄호를 벗긴다 — '[1~3]' 과 '1~3' 은 같은 머리글이다
     .replace(/^[[(（［【〔<〈]+|[\])）］】〕>〉]+$/g, '')
@@ -30,7 +32,10 @@ export function normalizeLabel(label: string | null | undefined): string {
 
 /** 태그를 걷어낸 본문 — 길이 비교와 중복 판정에 쓴다 */
 export function textOf(html: string): string {
-  return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  // ⚠️ **견주기 전에만** NFC 로 접는다(코덱스 리뷰 3R). 저장 형태는 첫가끝이지만, 이미 저장된
+  //    옛 행이나 손으로 고친 값이 섞인 모양일 수 있다 — 같은 낱말이 다른 키로 갈리면 그 지문이
+  //    중복으로 남는다. 저장값은 건드리지 않는다(여기 결과는 비교에만 쓴다)
+  return html.normalize('NFC').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 /**
  * 중복 판정 키. 라벨이 없으면 본문 앞부분으로 대신한다.

@@ -247,3 +247,21 @@ describe('buildPaperBlocks — 지문 안 그림', () => {
     expect(imagePathsOf([snap({ passage: p })])).toContain('pg.jpg');
   });
 });
+
+describe('buildPaperBlocks — 옛한글 지문', () => {
+  const YET = '\u1112\u119E\u11AB'; // \u1112\u119E\u11AB
+
+  it('옛한글 지문은 조각 **전부** 명조 표시를 받는다 — 조각마다 판정하면 한 지문이 두 글꼴로 갈린다', () => {
+    const html = `<p>${YET} 첫 문단</p><p>현대어 풀이 문단</p>`;
+    const blocks = build([snap({ passage: passage('p1', html) })]);
+    const parts = blocks.filter((b) => b.kind === 'passage-part');
+    expect(parts.length).toBeGreaterThan(1);
+    expect(parts.every((b) => b.kind === 'passage-part' && b.serif)).toBe(true);
+  });
+
+  it('현대 국어 지문은 표시가 없다 — 멀쩡한 지문의 글꼴을 바꾸면 안 된다', () => {
+    const blocks = build([snap({ passage: passage('p1', '<p>소나기가 그쳤다</p>') })]);
+    const parts = blocks.filter((b) => b.kind === 'passage-part');
+    expect(parts.every((b) => b.kind === 'passage-part' && !b.serif)).toBe(true);
+  });
+});

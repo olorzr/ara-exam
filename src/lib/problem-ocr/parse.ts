@@ -18,6 +18,8 @@ import {
   reconcileFigurePlaceholders, remapFigurePlaceholders,
 } from '@/lib/problem-bank/figure-placeholders';
 import { normalizeLabel } from './merge-keys';
+import { notationWarning, yetHangulPageWarnings } from './yet-hangul-pages';
+import { finalizeYetHangul } from '@/lib/yet-hangul';
 import { pushDraftWarning as pushWarning, type DraftWarning } from './warnings';
 
 /**
@@ -99,7 +101,9 @@ function parseItem(
   //    정답이 다른 선지를 가리킨다(['A','','C','D','E'] + 정답 '3' → 3번이 D 가 된다).
   //    가운데 빈 자리는 그대로 두고 뒤쪽만 잘라 낸 뒤 경고한다(코덱스 리뷰 13R).
   const rawChoices = Array.isArray(raw.choices)
-    ? raw.choices.slice(0, 5).map((c) => sanitizeInlineHTML(str(c, 600).replace(LEADING_MARKER, '')))
+    // 선지는 `normalizeOcrPassageHtml` 을 안 타므로 옛한글을 여기서 굳힌다(정화 뒤다)
+    ? raw.choices.slice(0, 5)
+      .map((c) => finalizeYetHangul(sanitizeInlineHTML(str(c, 600).replace(LEADING_MARKER, ''))))
     : [];
   let lastChoice = rawChoices.length - 1;
   while (lastChoice >= 0 && rawChoices[lastChoice] === '') lastChoice -= 1;
@@ -224,7 +228,7 @@ function parseItem(
     // ⚠️ 자리표시자를 **실제 그림 수에 맞춘다.** 모델이 한쪽만 내는 일이 흔한데,
     //    어긋난 채 저장하면 없는 그림을 찾다 빈칸이 되거나 잘라 둔 그림이 안 나온다
     html: fitFigures(
-      sanitizeProblemHTML(normalizeOcrPassageHtml(str(raw.html, OCR_HTML_MAX))),
+      finalizeYetHangul(sanitizeProblemHTML(normalizeOcrPassageHtml(str(raw.html, OCR_HTML_MAX)))),
       kind === 'passage' ? figureMap : [],
       kind === 'passage' ? figures.length : 0,
     ),
@@ -232,7 +236,7 @@ function parseItem(
     continues: raw.continues === true,
     question_type,
     stem_html: fitFigures(
-      sanitizeProblemHTML(normalizeOcrStemHtml(str(raw.stem_html, OCR_HTML_MAX))),
+      finalizeYetHangul(sanitizeProblemHTML(normalizeOcrStemHtml(str(raw.stem_html, OCR_HTML_MAX)))),
       kind === 'problem' ? figureMap : [],
       kind === 'problem' ? figures.length : 0,
     ),
@@ -299,6 +303,9 @@ export function parseOcrDraft(raw: string, ctx: ParseContext): OcrDraft | null {
     }
 
     for (const w of itemWarnings) pushWarning(warnings, w);
+    // 못 바꾼 `⟦ ⟧` 는 **여기서** 넣는다 — 끝에 몰면 경고 상한에 밀려 잘린다
+    const notation = notationWarning(item);
+    if (notation) pushWarning(warnings, notation);
     refs.add(item.ref);
     items.push(item);
   }
@@ -318,6 +325,11 @@ export function parseOcrDraft(raw: string, ctx: ParseContext): OcrDraft | null {
       item.passage_ref = null;
     }
   }
+
+  // 옛한글은 비슷한 다른 자모로 읽어도 화면에서는 그럴듯해 보인다 — 살아남은 항목에서 모은다.
+  // 쪽 경고는 ref 가 없어 `resolveDraftWarning` 이 쪽 대상으로 풀고, 겹쳐 읽은 묶음이 낸
+  // 같은 경고는 병합의 `dedupeWarnings` 가 하나로 합친다
+  for (const warning of yetHangulPageWarnings(items)) pushWarning(warnings, warning);
 
   return { items, warnings: warnings.slice(0, OCR_MAX_WARNINGS) };
 }

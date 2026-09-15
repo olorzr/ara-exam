@@ -1,6 +1,7 @@
 'use client';
 
 import { sanitizeProblemHTML } from '@/lib/sanitize-problem';
+import { hasYetHangul } from '@/lib/yet-hangul';
 import { BodyWithFigures } from './ProblemBodyView';
 import type { Passage } from '@/types/problem-bank';
 
@@ -53,8 +54,12 @@ export default function PassageBodyView({
     );
   }
 
+  // 옛한글 지문은 블록째 명조로 그린다 — 글꼴이 없으면 첫가끝 자모가 깨진 네모로 나온다.
+  // 정화기는 class 를 허용하지 않으므로 **바깥 래퍼**에만 붙인다(CLAUDE.md 2026-09-15)
+  const yetHangul = hasYetHangul(passage.html);
+
   return (
-    <div className="pb-sheet pb-sheet--screen">
+    <div className={`pb-sheet pb-sheet--screen${yetHangul ? ' yet-hangul-serif' : ''}`}>
       <div className="pb-passage-part pb-passage-part--first pb-passage-part--last">
         <BodyWithFigures
           html={sanitizeProblemHTML(passage.html)}

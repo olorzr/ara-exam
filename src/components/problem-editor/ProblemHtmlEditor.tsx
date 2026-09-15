@@ -8,6 +8,7 @@ import { Table, TableRow } from '@tiptap/extension-table';
 import { Extension } from '@tiptap/core';
 import { CustomTableCell, CustomTableHeader } from '@/components/exam-builder/CustomTableCell';
 import { sanitizeProblemHTML } from '@/lib/sanitize-problem';
+import { hasYetHangul } from '@/lib/yet-hangul';
 import { FigurePlaceholderNode } from './FigurePlaceholderNode';
 import ProblemEditorToolbar from './ProblemEditorToolbar';
 
@@ -47,6 +48,8 @@ interface ProblemHtmlEditorProps {
   /** 지문처럼 긴 글이면 높이를 키운다 */
   minHeight?: number;
   ariaLabel?: string;
+  /** 지문 편집기인가 — 옛한글이 들어오면 명조로 그린다(발문·선지는 고딕) */
+  serif?: boolean;
 }
 
 /**
@@ -59,7 +62,7 @@ interface ProblemHtmlEditorProps {
  *    남아 있을 수 있어, 편집기에 넣기 **전에** 막는다(개념지에서 실제로 겪은 경로다).
  */
 export default function ProblemHtmlEditor({
-  value, onChange, minHeight = 120, ariaLabel,
+  value, onChange, minHeight = 120, ariaLabel, serif = false,
 }: ProblemHtmlEditorProps) {
   /**
    * 우리가 마지막으로 밖에 내보낸 HTML.
@@ -116,8 +119,12 @@ export default function ProblemHtmlEditor({
 
   if (!editor) return null;
 
+  // 편집기 안에서도 옛한글이 제대로 보여야 검수를 할 수 있다.
+  // 렌더에서 **파생**한다 — `value` 는 onUpdate 마다 갱신되므로 state 도 효과도 필요 없다
+  const yetClass = hasYetHangul(value) ? ` ${serif ? 'yet-hangul-serif' : 'yet-hangul'}` : '';
+
   return (
-    <div className="pb-editor rounded-md border border-gray-200">
+    <div className={`pb-editor rounded-md border border-gray-200${yetClass}`}>
       <ProblemEditorToolbar editor={editor} />
       <EditorContent editor={editor} className="px-3 py-2" style={{ minHeight }} />
     </div>

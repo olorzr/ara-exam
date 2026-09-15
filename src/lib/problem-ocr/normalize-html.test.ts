@@ -74,3 +74,15 @@ describe('normalizeOcrPassageHtml / normalizeOcrStemHtml', () => {
     expect(normalizeOcrStemHtml('')).toBe('');
   });
 });
+
+describe('normalizeOcrPassageHtml — 옛한글', () => {
+  it('대체 표기를 자모로 바꾼다 (정화보다 먼저 도는 자리다)', () => {
+    expect(normalizeOcrPassageHtml('<p>⟦ㅎㆍㄴ⟧</p>')).toBe('<p>\u1112\u119E\u11AB</p>');
+  });
+
+  it('상자 말머리 다듬기와 함께 돈다 — 순서가 어긋나면 한쪽이 조용히 사라진다', () => {
+    const html = normalizeOcrPassageHtml('<blockquote data-box="(가)"><p>⟦ㅅㆍ⟧</p></blockquote>');
+    expect(html).toContain('data-box="가"');
+    expect(html).toContain('\u1109\u119E');
+  });
+});

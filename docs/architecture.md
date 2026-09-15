@@ -189,6 +189,8 @@ src/
   되므로 "이미지 순서 = 이 쪽" 약속을 쪽 번호만으로는 지킬 수 없다
 - 글자 레이어(`pdfText`)는 **있으면 보너스**다. 기출은 대부분 스캔본이라 보통 비어 있고,
   복합기 자동 OCR 레이어는 `hasUsableText` 가 걸러낸다(없느니만 못하다)
+- **한양 PUA(U+E0BC–F8F7)는 깨진 글자가 아니다**(pdfText). 아래아한글이 옛한글을 거기 저장하므로
+  깨진 글자로 세면 중세국어 쪽의 글자 레이어가 통째로 버려진다. 대신 `〔옛〕` 으로 바꿔 자리만 알린다
 
 ## lib/print-scan (학교 프린트 스캔 → 묶음 → 시험지)
 - 역할: 스캔 PDF 를 프린트(묶음)별로 나눠 읽고 그 결과로 **개념지**를 만든다
@@ -244,6 +246,18 @@ src/
 - 쓰는 곳: lib/print-scan 뿐이다. 기출(problem-ocr)은 **아직 안 돌린다** — 모델이 준 좌표로
   그림·문항을 잘라내므로 이미지를 돌리면 크롭 좌표계까지 같이 돌려야 한다
 
+## lib/yet-hangul (옛한글 — 감지 · 자모 조합 · 프롬프트 규칙)
+- 역할: 옛한글(중세국어) 글자를 **알아보고**(글꼴 클래스), 대체 표기 `⟦ㅎㆍㄴ⟧` 를 **첫가끝 자모로
+  합치고**, OCR 프롬프트에 실을 **규칙 문장과 경고 문구**를 한 곳에서 낸다
+- 의존: **없다(잎 모듈)** — problem-ocr·print-scan·pdf 를 import 하지 않는다. 그쪽이 이쪽을 쓴다
+- 주요 파일: detect.ts(`hasYetHangul`·`markHanyangPua`·`YET_HANGUL_UNICODE_RANGE`),
+  jamo-tables.ts(호환 자모 → 첫가끝 표 셋), compose.ts(`composeSyllable`·`convertYetHangulNotation`),
+  prompt-rules.ts(세 프롬프트가 공유), warn.ts(경고 문구), webfont.test.ts(글꼴 파일 고정)
+- 쓰는 곳: 프롬프트 3(problem-ocr·print-scan·continue-passage) · 파서 2 · pdfText · verify-text ·
+  렌더 6(지문·문항 뷰, 인쇄 블록·렌더, 개념지, 편집기) · 편집기 입력 창
+- ⚠️ `YET_HANGUL_UNICODE_RANGE` 는 globals.css 의 `@font-face` 와 **글자 그대로** 같아야 한다
+  (detect.test.ts 가 CSS 를 읽어 대조한다)
+
 ## lib/problem-ocr
 - 역할: 프롬프트 조립 → 구조화 출력 파싱 → 묶음 실행 → 병합 → 영역 크롭
 - 의존: lib/ai, lib/pdf, lib/sanitize-problem
@@ -252,12 +266,15 @@ src/
   normalize-html.ts, batch-plan.ts, batch-attempt.ts, batch-run.ts,
   merge.ts, merge-keys.ts, merge-fill.ts, crop.ts, run.ts, run-images.ts,
   page-text.ts, verify-structure.ts, verify-text.ts, continue-passage.ts,
-  answer-key.ts, answer-key-input.ts, answer-key-upload.ts, run-answer-key.ts
+  answer-key.ts, answer-key-input.ts, answer-key-upload.ts, run-answer-key.ts,
+  yet-hangul-pages.ts(옛한글이 든 쪽 모으기 — 경고를 쪽 단위로 내려는 값)
 - **실패한 묶음은 쪽을 쪼개 한 번 더** 읽는다(batch-attempt/batch-run). 겹침이 1쪽뿐이라
   묶음 가운데 쪽은 그 묶음만 보는데, 죽으면 그 쪽이 통째로 사라졌다. 살려 낸 쪽은
   실패로 세지 않고 **끝내 못 읽은 쪽만** 경고에 싣는다
 - **읽고 난 뒤 기계적으로 대조한다**(verify-structure: 빠진 번호·선지 수·머리글 범위,
   verify-text: PDF 글자와의 대조). **확실할 때만 말한다** — 번호가 겹치는 자료(문제집)는
+  검사를 건너뛰고, **옛한글이 든 항목은 대조하지 않는다**(PDF 는 한양 PUA·모델은 첫가끝 자모라
+  같은 글도 늘 '다르다' 가 된다)
   빠짐 검사를 아예 건너뛴다. 틀린 경고가 섞이면 경고 전체를 못 믿게 된다
 - **그림은 부분만 잘라 본문 제자리에 끼운다.** `figures`(쪽 + 좌표)와 본문의
   `<figure data-figure="n">` 이 순번으로 짝이다. 조각을 이어 붙일 때 번호를 민다 —

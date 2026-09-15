@@ -4,6 +4,7 @@ import { choiceGlyph } from '@/lib/problem-bank/choices';
 import { renderFiguresInHtml, unplacedFigures } from '@/lib/problem-bank/figure-render';
 import { stripTrailingEmptyParagraphs } from '@/lib/problem-paper/html-trim';
 import { sanitizeInlineHTML, sanitizeProblemHTML } from '@/lib/sanitize-problem';
+import { hasYetHangul } from '@/lib/yet-hangul';
 import type { Problem } from '@/types/problem-bank';
 
 /** 그리는 데 필요한 만큼만 */
@@ -38,9 +39,18 @@ export default function ProblemBodyView({ problem, imageUrls }: ProblemBodyViewP
   const asImage = problem.render_mode === 'image' && Boolean(problem.image_path);
   const objective = !asImage && problem.question_type === '객관식' && problem.choices.length > 0;
   const answer = problem.answer.trim();
+  /**
+   * 옛한글(중세국어)이 섞였는가 — 섞였으면 블록째 옛한글 글꼴로 그린다.
+   *
+   * 지문과 달리 **고딕**이다: 발문·선지는 앱 본문과 같은 계열이라야 읽기가 자연스럽다
+   * (지문만 명조로 간다 — CLAUDE.md 2026-09-15).
+   */
+  const yetHangul = hasYetHangul(
+    [problem.stem_html, problem.explanation_html, ...problem.choices].join(''),
+  );
 
   return (
-    <div className="pb-sheet pb-sheet--screen">
+    <div className={`pb-sheet pb-sheet--screen${yetHangul ? ' yet-hangul' : ''}`}>
       <div className="pb-q">
         <div className="pb-q__head">
           {problem.number !== null && (

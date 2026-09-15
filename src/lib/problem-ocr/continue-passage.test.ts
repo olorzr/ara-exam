@@ -123,3 +123,26 @@ describe('parseContinuation', () => {
     expect(parseContinuation('{"continues":true}')).toBeNull();
   });
 });
+
+describe('이어 읽기 — 옛한글', () => {
+  const YET = '\u1112\u119E\u11AB'; // \u1112\u119E\u11AB
+
+  it('프롬프트가 옛한글 규칙을 싣는다 — 본문 규약과 한 벌이어야 이어 붙인 부분만 갈리지 않는다', () => {
+    expect(buildContinuationPrompt({ meta, page: 5, soFarHtml: '<p>앞</p>' })).toContain('첫가끝 조합형 자모');
+  });
+
+  it('대체 표기를 자모로 바꾸고 대조를 부탁한다', () => {
+    const result = parseContinuation(JSON.stringify({
+      html: '<p>⟦ㅎㆍㄴ⟧ 사람</p>', continues: false, has_figure: false, warnings: [],
+    }));
+    expect(result?.html).toContain(YET);
+    expect(result?.warnings.join(' | ')).toContain('옛한글이 있어요');
+  });
+
+  it('현대 국어만 있으면 경고하지 않는다', () => {
+    const result = parseContinuation(JSON.stringify({
+      html: '<p>이어지는 현대 국어 본문</p>', continues: false, has_figure: false, warnings: [],
+    }));
+    expect(result?.warnings.join(' | ')).not.toContain('옛한글');
+  });
+});

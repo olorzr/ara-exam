@@ -313,3 +313,48 @@
 - 정의: 아카이브 필터에서 **저장값이 비어 있는 행만** 고르는 값(`'__none__'`). 필터의 빈 문자열은 '전체'(조건 없음)라서, '미지정인 것만'은 따로 표시해야 한다
 - 코드에서의 사용: `UNSPECIFIED_AXIS`, `toProblemQuery`(센티널만 `''` 조건으로 바꾼다), `queries.ts`(조건 유무를 `!== undefined` 로 가른다)
 - 관련 파일: src/lib/problem-bank/filters.ts, src/lib/problem-bank/queries.ts, src/lib/problem-bank/school-exam-tree.ts, src/components/problem-bank/ProblemFilterBar.tsx
+
+## 옛한글 (Old Hangul) · 중세국어
+- 정의: 지금은 안 쓰는 글자가 섞인 한글. 아래아 `ㆍ`, 반치음 `ㅿ`, 옛이응 `ㆁ`, 여린히읗 `ㆆ`,
+  순경음 `ㅸ`, 어두 자음군 `ㅄ·ㅳ·ㅺ` 등. 국어 시험지에서는 훈민정음 언해·용비어천가·두시언해 같은
+  중세국어 자료로 나온다
+- 코드에서의 사용: `hasYetHangul`(감지 → 글꼴 클래스), `yetHangulPageWarning`(쪽 경고)
+- 관련 파일: src/lib/yet-hangul/, src/app/globals.css(`.yet-hangul`·`.yet-hangul-serif`)
+- ⚠️ **낱자 하나만 있는 글은 옛한글로 세지 않는다** — 'ㆍ의 소실' 을 묻는 문법 문항까지
+  블록 글꼴이 바뀌면 안 된다
+
+## 첫가끝 코드 (조합형 자모, conjoining jamo)
+- 정의: 옛한글 음절을 **초성·중성·종성 자모를 순서대로 늘어놓아** 적는 유니코드 방식
+  (초성 U+1100~115F·U+A960~, 중성 U+1160~11A7·U+D7B0~, 종성 U+11A8~11FF·U+D7CB~).
+  글꼴의 `ljmo`·`vjmo`·`tjmo` 기능이 그 자모들을 한 글자 모양으로 합쳐 그린다.
+  이 앱의 **저장 형태**다
+- 코드에서의 사용: `composeSyllable`, `CHOSEONG`/`JUNGSEONG`/`JONGSEONG`
+- 관련 파일: src/lib/yet-hangul/jamo-tables.ts, src/lib/yet-hangul/compose.ts
+- ⚠️ 현대 한글은 완성형 음절(U+AC00~D7A3) 하나로 저장된다. 옛한글 음절은 **통째로 첫가끝**이라야
+  한다 — `normalizeYetHangul` 이 NFC 뒤에 `가+ᇫ` 같은 섞인 모양을 다시 자모로 푼다(자모만 담은
+  안전망 글꼴이 그 모양을 못 합친다). **NFKC 는 쓰면 안 된다**(호환 자모까지 바꾼다)
+
+## 한양 PUA (Hanyang PUA)
+- 정의: 아래아한글이 옛한글을 저장하던 사용자 정의 영역 코드(U+E0BC–F8F7). 표준이 아니라
+  글꼴이 없으면 깨진 네모로 보이고, AI 에게는 뜻 없는 코드다
+- 코드에서의 사용: `hanyangPuaCount`(옮길 수 있는 글자에서 뺀다), `markHanyangPua`(→ `〔옛〕`),
+  `YET_HANGUL_MARKER`
+- 관련 파일: src/lib/yet-hangul/detect.ts, src/lib/pdf/pdfText.ts
+- ⚠️ `hasUsableText` 의 '깨진 글자' 판정에서 **이 구간은 뺀다** — 세면 중세국어 쪽의 PDF 글자
+  레이어가 통째로 버려진다
+
+## 방점 (tone mark)
+- 정의: 중세국어에서 음절 왼쪽에 찍어 성조를 나타내던 점. 한 점(거성) U+302E, 두 점(상성) U+302F.
+  **그 음절 바로 뒤**에 이어 적는다
+- 코드에서의 사용: `TONE_MARKS`(`'.'`→한 점, `':'`→두 점), `composeSyllable`
+- 관련 파일: src/lib/yet-hangul/jamo-tables.ts
+- ⚠️ 결합 문자라 정규식 **문자 클래스에 넣으면 lint(`no-misleading-character-class`)에 걸린다**
+
+## 옛한글 대체 표기 (⟦ ⟧)
+- 정의: 모델이 조합형 자모를 못 낼 때 음절 하나를 **낱자로 풀어** 적게 하는 약속.
+  `⟦ㅎㆍㄴ⟧` → `ᄒᆞᆫ`, 방점은 닫는 괄호 앞에 `.`·`:` (`⟦ㄴㆍ:⟧`)
+- 코드에서의 사용: `convertYetHangulNotation`, `hasUnconvertedNotation`,
+  `UNCONVERTED_NOTATION_WARNING`
+- 관련 파일: src/lib/yet-hangul/compose.ts, src/lib/problem-ocr/normalize-html.ts,
+  src/lib/print-scan/parse.ts
+- ⚠️ 변환은 **정화보다 먼저**, 괄호 **밖**의 낱자는 건드리지 않는다. 못 바꾼 괄호는 남기고 경고한다

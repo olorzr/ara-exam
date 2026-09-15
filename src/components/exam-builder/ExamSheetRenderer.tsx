@@ -9,6 +9,7 @@ import { decideSheetColumns, maxWrappedTableColumns } from '@/lib/print/sheet-co
 import { EXTERNAL_LEVEL } from '@/lib/constants';
 import { passCountOf } from '@/lib/pass-count';
 import { kstYear } from '@/lib/kst-year';
+import { hasYetHangul } from '@/lib/yet-hangul';
 import type { BuilderCategory } from './ExamCategoryBar';
 
 /** 시트 설정 */
@@ -89,8 +90,14 @@ export default function ExamSheetRenderer({
 
   const { blocks, splittable, handleBeforePaginate, handleSplitRequest } = useConceptSheetBlocks(bodyHTML);
 
+  // ⚠️ `SHEET_BODY_CLASS` 가 **앞**이어야 한다 — 열 폭 맞춤(measureMaxContentWidths)이
+  //    그 클래스로 블록을 고른다. 옛한글은 개념지에서도 고딕이다(지문만 명조)
   const renderedBlocks = blocks.map((html, i) => (
-    <div key={i} className={SHEET_BODY_CLASS} dangerouslySetInnerHTML={{ __html: html }} />
+    <div
+      key={i}
+      className={`${SHEET_BODY_CLASS}${hasYetHangul(html) ? ' yet-hangul' : ''}`}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
   ));
 
   return (

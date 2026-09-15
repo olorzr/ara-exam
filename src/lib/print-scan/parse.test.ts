@@ -118,3 +118,66 @@ describe('finalizePrintHtml', () => {
     expect(html).toContain('상자');
   });
 });
+
+describe('parsePrintOcrDraft — 옛한글', () => {
+  const YET = '\u1112\u119E\u11AB'; // \u1112\u119E\u11AB
+
+  it('대체 표기를 자모로 바꾼다 — 기출 파이프라인과 같은 규약이다', () => {
+    const draft = parsePrintOcrDraft(
+      raw({ pages: [{ page: 1, html: '<p>⟦ㅎㆍㄴ⟧ 사람</p>' }], warnings: [] }),
+      { pages: [1] },
+    );
+    expect(draft?.pages[0].html).toContain(YET);
+    expect(draft?.pages[0].html).not.toContain('⟦');
+  });
+
+  it('옛한글이 있으면 그 쪽을 짚는다 — 비슷한 다른 자모로 읽어도 화면에서는 그럴듯해 보인다', () => {
+    const draft = parsePrintOcrDraft(
+      raw({ pages: [{ page: 3, html: `<p>${YET}</p>` }], warnings: [] }),
+      { pages: [3] },
+    );
+    expect(draft?.warnings.join(' | ')).toContain('3쪽에 옛한글이 있어요');
+  });
+
+  it('현대 국어만 있으면 경고하지 않는다', () => {
+    const draft = parsePrintOcrDraft(
+      raw({ pages: [{ page: 1, html: '<p>현대 국어</p>' }], warnings: [] }),
+      { pages: [1] },
+    );
+    expect(draft?.warnings.join(' | ')).not.toContain('옛한글');
+  });
+
+  it('못 바꾼 ⟦ ⟧ 는 쪽 번호와 함께 다른 말로 알린다 — 할 일이 다르다', () => {
+    const draft = parsePrintOcrDraft(
+      raw({ pages: [{ page: 2, html: '<p>⟦ㅏ⟧</p>' }], warnings: [] }),
+      { pages: [2] },
+    );
+    expect(draft?.warnings.join(' | ')).toContain('2쪽 — 옛한글 표기');
+  });
+
+  it('실체 참조로 온 옛한글도 **쪽 경고**가 알아본다 — 경고가 굳히기 전 글을 보면 놓친다', () => {
+    const draft = parsePrintOcrDraft(
+      raw({ pages: [{ page: 4, html: '<p>\uAC00&#x11EB;</p>' }], warnings: [] }),
+      { pages: [4] },
+    );
+    expect(draft?.pages[0].html).toBe('<p>\u1100\u1161\u11EB</p>');
+    expect(draft?.warnings.join(' | ')).toContain('4쪽에 옛한글이 있어요');
+  });
+
+  it('실체 참조로 온 대체 표기가 못 바뀌면 그것도 알린다', () => {
+    const draft = parsePrintOcrDraft(
+      raw({ pages: [{ page: 2, html: '<p>&#x27E6;&#x314F;&#x27E7;</p>' }], warnings: [] }),
+      { pages: [2] },
+    );
+    expect(draft?.warnings.join(' | ')).toContain('2쪽 — 옛한글 표기');
+  });
+
+  it('실체 참조로 온 옛 자모도 정화 뒤에 굳힌다 — 섞인 모양으로 저장되면 목록에서 쪼개져 보인다', () => {
+    expect(finalizePrintHtml('<p>\uAC00&#x11EB;</p>')).toBe('<p>\u1100\u1161\u11EB</p>');
+  });
+
+  it('정화를 거쳐도 자모와 방점이 그대로 남는다 — 개념지 편집기까지 가는 길이다', () => {
+    const html = `<p>${YET}\u302E 사람</p>`;
+    expect(finalizePrintHtml(html)).toBe(html);
+  });
+});

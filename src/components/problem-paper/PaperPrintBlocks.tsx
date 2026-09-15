@@ -6,6 +6,7 @@ import { choiceGlyph } from '@/lib/problem-bank/choices';
 import { renderFiguresInHtml, unplacedFigures } from '@/lib/problem-bank/figure-render';
 import type { PaperBlock } from '@/lib/problem-paper/blocks';
 import { stripTrailingEmptyParagraphs } from '@/lib/problem-paper/html-trim';
+import { hasYetHangul } from '@/lib/yet-hangul';
 import type { PaperItemSnapshot, PaperSettings } from '@/types/problem-bank';
 
 /**
@@ -37,9 +38,10 @@ export function renderPaperBlocks({ blocks, settings, imageUrls }: RenderArgs): 
         return (
           <div
             key={block.key}
+            // 옛한글 지문은 명조로 — 판정은 blocks.ts 가 지문 전체로 한 번 해서 모든 조각에 싣는다
             className={`pb-passage-part${block.first ? ' pb-passage-part--first' : ''}${
               block.last ? ' pb-passage-part--last' : ''
-            }`}
+            }${block.serif ? ' yet-hangul-serif' : ''}`}
             // 〈보기〉 상자·표 안에 남은 그림 자리표시자를 여기서 끼운다 — 구조를 자르지 않는다
             dangerouslySetInnerHTML={{
               __html: renderFiguresInHtml(block.html, block.figures ?? [], imageUrls),
@@ -154,9 +156,11 @@ function StemWithFigures({
 /** 문항 하나 — 발문·선지·삽화가 한 블록이다(갈리면 읽을 수 없다) */
 function ProblemBlock({ number, snapshot, settings, imageUrls }: ProblemBlockProps) {
   const objective = snapshot.question_type === '객관식' && snapshot.choices.length > 0;
+  // 발문·선지의 옛한글은 **고딕**이다(지문만 명조 — CLAUDE.md 2026-09-15)
+  const yetHangul = hasYetHangul([snapshot.stem_html, ...snapshot.choices].join(''));
 
   return (
-    <div className="pb-q">
+    <div className={`pb-q${yetHangul ? ' yet-hangul' : ''}`}>
       <div className="pb-q__head">
         <span className="q-num q-num--mint">{String(number).padStart(2, '0')}</span>
         <div className="pb-q__stem">

@@ -260,7 +260,7 @@ export default function PassageEditorCard({
 
         <div className="space-y-1">
           <Label className="text-xs text-gray-500">본문</Label>
-          <ProblemHtmlEditor value={html} onChange={setHtml} minHeight={200} ariaLabel="지문 본문" />
+          <ProblemHtmlEditor value={html} onChange={setHtml} minHeight={200} serif ariaLabel="지문 본문" />
         </div>
 
         <FigureStrip

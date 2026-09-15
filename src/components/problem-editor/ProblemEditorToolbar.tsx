@@ -1,8 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { useEditorState, type Editor } from '@tiptap/react';
 import { Bold, Italic, Minus, Table as TableIcon, Underline as UnderlineIcon, WrapText } from 'lucide-react';
 import { BOX_LABEL_OPTIONS } from '@/lib/box-labels';
+import YetHangulDialog from './YetHangulDialog';
 
 /** '상자 아님' 센티널 — 빈 문자열 option 은 브라우저마다 다루기가 다르다 */
 const NO_BOX = '__none__';
@@ -19,6 +21,8 @@ interface ProblemEditorToolbarProps {
  *    다시 그려지지 않아 버튼과 선택 칸이 옛 상태에 머문다. `useEditorState` 로 구독한다.
  */
 export default function ProblemEditorToolbar({ editor }: ProblemEditorToolbarProps) {
+  /** 옛한글 넣기 창 — 아래아·반치음은 보통 입력기로 칠 수 없다 */
+  const [yetOpen, setYetOpen] = useState(false);
   const state = useEditorState({
     editor,
     selector: ({ editor: e }) => ({
@@ -86,6 +90,15 @@ export default function ProblemEditorToolbar({ editor }: ProblemEditorToolbarPro
       >
         <TableIcon className="h-3.5 w-3.5" />
       </button>
+
+      <button
+        type="button" className={buttonClass(yetOpen)}
+        onClick={() => setYetOpen(true)}
+        aria-label="옛한글 넣기" title="옛한글 넣기 (아래아·반치음·방점)"
+      >
+        옛한글
+      </button>
+      <YetHangulDialog editor={editor} open={yetOpen} onOpenChange={setYetOpen} />
 
       <select
         className="ml-1 rounded border border-gray-200 bg-white px-1.5 py-1 text-xs text-gray-700"

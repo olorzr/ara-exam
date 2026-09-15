@@ -10,6 +10,10 @@ import { OCR_SPLIT_COLUMNS, ocrTurnBudgetMs } from './constants';
 import { textOf } from './merge-keys';
 import { normalizeOcrPassageHtml } from './normalize-html';
 import { BODY_FORMAT_RULES, type OcrSourceMeta } from './prompt';
+import {
+  finalizeYetHangul, hasUnconvertedNotation, hasYetHangul, UNCONVERTED_NOTATION_WARNING,
+  YET_HANGUL_CONTINUATION_WARNING, YET_HANGUL_PROMPT_RULES,
+} from '@/lib/yet-hangul';
 
 /**
  * 이미 저장된 지문의 **뒷부분만** 다음 쪽에서 다시 읽어 온다 (브라우저 전용).
@@ -57,6 +61,9 @@ const RULES = `[역할]
   **지어내지 않는다** — 없는 것이 정상일 수 있다.
 - 이 쪽 끝에서 또 다음 쪽으로 이어지면 continues 를 true 로 둔다.
 - 이어지는 부분에 **그림·표·도식**이 있으면 has_figure 를 true 로 둔다.
+
+[옛한글]
+${YET_HANGUL_PROMPT_RULES}
 
 [본문 표기]
 ${BODY_FORMAT_RULES}
@@ -142,7 +149,7 @@ export function parseContinuation(raw: string): ContinuationResult | null {
   //    (자리표시자 번호는 `figure_paths` 의 순번이다). 사람이 직접 잘라 넣게 알린다
   const body = value.html.trim();
   const html = reconcileFigurePlaceholders(
-    sanitizeProblemHTML(normalizeOcrPassageHtml(body.slice(0, CONTINUATION_MAX))),
+    finalizeYetHangul(sanitizeProblemHTML(normalizeOcrPassageHtml(body.slice(0, CONTINUATION_MAX)))),
     0,
   );
   const warnings = Array.isArray(value.warnings)
@@ -153,6 +160,9 @@ export function parseContinuation(raw: string): ContinuationResult | null {
   if (body.length > CONTINUATION_MAX) {
     warnings.unshift('이어지는 글이 너무 길어 뒷부분이 잘렸어요. 원본과 대조해 채워 주세요.');
   }
+  // 옛한글은 비슷한 다른 자모로 읽어도 화면에서는 그럴듯해 보인다 — 눈으로 한 번 더 보게 한다
+  if (hasUnconvertedNotation(html)) warnings.unshift(UNCONVERTED_NOTATION_WARNING);
+  else if (hasYetHangul(html)) warnings.unshift(YET_HANGUL_CONTINUATION_WARNING);
 
   return {
     html,

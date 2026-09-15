@@ -10,6 +10,7 @@
 //    보너스이지 주된 대책이 아니다(주된 대책은 단 가르기 — columnDetect.ts).
 
 import { getPdfDocument } from '@/lib/pdf/pdfRenderer'
+import { hanyangPuaCount, markHanyangPua } from '@/lib/yet-hangul'
 
 type PdfDocumentProxy = Awaited<ReturnType<typeof getPdfDocument>>['pdf']
 
@@ -100,11 +101,21 @@ function linesOf(pieces: readonly TextPiece[]): string {
  */
 export function hasUsableText(text: string): boolean {
   const trimmed = text.replace(/\s/g, '')
-  if (trimmed.length < MIN_USABLE_CHARS) return false
+  // ⚠️ 한양 PUA 는 **옮길 수 있는 글자로 세지 않는다**(코덱스 리뷰 2R). 그 자리는 모델에게
+  //    `〔옛〕` 자리 표시로만 넘어가므로, 쪽이 통째로 PUA 면 참고 텍스트가 표시 200개가 된다 —
+  //    "글자는 참고 텍스트가 이미지보다 정확하다" 는 규칙이 거짓이 되고 모델을 헷갈리게 한다
+  const usable = trimmed.length - hanyangPuaCount(trimmed)
+  if (usable < MIN_USABLE_CHARS) return false
 
-  // U+FFFD(깨진 글자)와 사용자 정의 영역(글꼴에 매핑이 없을 때 나온다)
-  const broken = (trimmed.match(/[�-]/g) ?? []).length
-  return broken <= trimmed.length * MAX_BROKEN_SHARE
+  // U+FFFD(깨진 글자)와 사용자 정의 영역(글꼴에 매핑이 없을 때 나온다).
+  // ⚠️ **한양 PUA(U+E0BC–F8F7)는 빼고 센다** — 아래아한글이 옛한글을 거기 저장하므로
+  //    세면 중세국어 쪽의 글자 레이어가 통째로 버려진다(참고 텍스트 없이 읽게 된다).
+  //    그 글자는 `markHanyangPua` 가 자리 표시로 바꿔 모델에게 넘긴다.
+  // ⚠️ 범위는 **이스케이프로** 적는다 — 날글자로 두면 편집기에서 보이지 않아 고칠 수 없다
+  const broken = (trimmed.match(/[\uFFFD\uE000-\uE0BB\uF8F8-\uF8FF]/g) ?? []).length
+  // ⚠️ 비율의 분모도 **옮길 수 있는 글자**다(코덱스 2R 재검). 쪽 전체로 나누면 PUA 가 분모를
+  //    부풀려, 깨진 글자만 200자에 PUA 가 만 자인 쪽이 '멀쩡한 글자 레이어' 로 통과한다
+  return broken <= usable * MAX_BROKEN_SHARE
 }
 
 /**
@@ -137,7 +148,9 @@ export async function extractPageText(
 
     // 한글 정규화 — 자모가 갈린 글자가 섞이면 모델이 이상한 글자로 읽는다
     const text = groupTextItems(pieces, viewport.width).normalize('NFC')
-    return hasUsableText(text) ? text : null
+    // 한양 PUA 코드는 모델에게 뜻 없는 글자다 — 자리만 알리고 그 글자는 이미지에서 읽게 한다.
+    // 쓸 만한지는 **바꾸기 전** 원문으로 판정한다(자리 표시가 글자 수를 늘린다)
+    return hasUsableText(text) ? markHanyangPua(text) : null
   } catch {
     // 글자 레이어를 못 읽어도 이미지로는 읽을 수 있다 — 여기서 멈추지 않는다
     return null

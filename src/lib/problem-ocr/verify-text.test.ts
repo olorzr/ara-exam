@@ -107,3 +107,48 @@ describe('verifyAgainstText', () => {
     expect(verifyAgainstText(merged, [page(LONG)])).toEqual([]);
   });
 });
+
+describe('verifyAgainstText — 옛한글은 견주지 않는다', () => {
+  const YET = '\u1112\u119E\u11AB';
+  /** 대조 문턱을 넘길 만큼 긴 중세국어 지문 */
+  const MIDDLE = `나랏말\u110A\u119E미 듕귁에 달아 문\u110D\u119E\u11BC와로 서르 \u1109\u119E\u1106\u119E\u11BA디 `
+    + `아니\u1112\u119E\u11AF\u110A\u11A1 이런 젼\u110E\u11A5로 어린 百姓이 니르고져 홂배 이셔도 `
+    + `\u1106\u119E\u110A\u119E \u1109\u119E\u11B7디 몯\u1112\u119E\u11AF 노미 하니라`;
+
+  it('모델이 옛한글로 적었으면 건너뛴다 — 글자 레이어는 한양 PUA 라 조각이 절대 안 맞는다', () => {
+    const p = passage({ html: MIDDLE, page_no: 1 });
+    expect(verifyAgainstText({ passages: [p], problems: [] }, [page(LONG)])).toEqual([]);
+  });
+
+  it('참고 텍스트에 옛 글자가 섞였어도 **현대 항목은 그대로 대조한다** — 한 지문이 그 쪽의 검사를 통째로 끄면 안 된다', () => {
+    const p = passage({ html: LONG, page_no: 1 });
+    const source = page(`${LONG} \u3014옛\u3015 ${MIDDLE}`);
+    // 본문이 참고 텍스트 안에 그대로 있으므로 경고가 없어야 한다(면제가 아니라 대조를 통과한 것)
+    expect(verifyAgainstText({ passages: [p], problems: [] }, [source])).toEqual([]);
+
+    const off = passage({ html: LONG, page_no: 1 });
+    const unrelated = page(`\u3014옛\u3015 문법 문항의 선지는 피동 표현과 사동 표현을 나란히 견주도록 짜여 있어서 `
+      + '어렵다. 어문 규정을 묻는 문항은 표준 발음법과 한글 맞춤법을 함께 물어 범위가 넓은 편이다.');
+    expect(said(verifyAgainstText({ passages: [off], problems: [] }, [unrelated])))
+      .toContain('PDF 에 박힌 글자와 다른 대목');
+  });
+
+  it('자모로 갈린 현대 글자(NFD)는 대조 전에 접는다 — 접지 않으면 조각이 하나도 안 맞는다', () => {
+    const q = problem({ stem_html: LONG.normalize('NFD'), page_no: 1 });
+    expect(verifyAgainstText({ passages: [], problems: [q] }, [page(LONG)])).toEqual([]);
+  });
+
+  it('문항도 같은 규칙이다 — 발문·선지 어디에 있든 건너뛴다', () => {
+    const q = problem({ stem_html: MIDDLE, page_no: 1 });
+    expect(verifyAgainstText({ passages: [], problems: [q] }, [page(LONG)])).toEqual([]);
+  });
+
+  it('현대 국어끼리는 그대로 대조한다 — 건너뛰기가 검사를 통째로 끄면 안 된다', () => {
+    const q = problem({ stem_html: LONG, page_no: 1 });
+    const other = '문법 문항의 선지는 피동 표현과 사동 표현을 나란히 견주도록 짜여 있어서 어렵다. '
+      + '어문 규정을 묻는 문항은 표준 발음법과 한글 맞춤법을 함께 물어 범위가 넓은 편이다.';
+    expect(said(verifyAgainstText({ passages: [], problems: [q] }, [page(other)])))
+      .toContain('PDF 에 박힌 글자와 다른 대목');
+    expect(YET).toHaveLength(3);
+  });
+});

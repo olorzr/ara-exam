@@ -1,6 +1,7 @@
 import { splitHtmlBlocks } from '@/lib/print/split-html-blocks';
 import { soleFigureIndex, unplacedFigures } from '@/lib/problem-bank/figure-render';
 import { sanitizeProblemHTML } from '@/lib/sanitize-problem';
+import { hasYetHangul } from '@/lib/yet-hangul';
 import { trimEdgeEmptyParagraphs } from './html-trim';
 import type { PaperItemSnapshot } from '@/types/problem-bank';
 import { groupRangeLabel, groupsOf, type PaperItem } from './compose';
@@ -25,6 +26,13 @@ export type PaperBlock =
     kind: 'passage-part';
     key: string;
     html: string;
+    /**
+     * 옛한글 지문인가 — 그리는 쪽이 명조 글꼴 클래스를 붙인다.
+     *
+     * ⚠️ 판정은 **지문 전체**로 한 번만 하고 모든 조각이 같은 값을 받는다. 조각마다 따로
+     *    보면 현대어 풀이 문단만 다른 글꼴이 되어 한 지문이 두 글꼴로 갈려 보인다
+     */
+    serif: boolean;
     /** 이 지문의 그림 경로들 — 상자 안에 남은 자리표시자를 그리는 쪽이 끼운다 */
     figures?: string[];
     first: boolean;
@@ -89,6 +97,7 @@ export function buildPaperBlocks(items: readonly PaperItemSnapshot[]): PaperBloc
         //    표 안에 있는 그림에서 여는 태그와 닫는 태그가 갈려 상자가 깨진다.
         //    쪼갠 **뒤에** 그림만인 조각을 가려내고, 상자 안에 남은 것은 그리는 쪽이 끼운다
         const raw = trimEdgeEmptyParagraphs(splitHtmlBlocks(sanitizeProblemHTML(passage.html)));
+        const serif = hasYetHangul(passage.html);
         const parts: PaperBlock[] = raw.map((html, i): PaperBlock => {
           const only = soleFigureIndex(html);
           const path = only === null ? '' : figures[only - 1];
@@ -104,6 +113,7 @@ export function buildPaperBlocks(items: readonly PaperItemSnapshot[]): PaperBloc
             kind: 'passage-part',
             key: `pp-${group.start}-${i}`,
             html,
+            serif,
             // 상자 안에 남은 자리표시자는 그리는 쪽이 서명 URL 로 끼운다
             figures,
             first: false,

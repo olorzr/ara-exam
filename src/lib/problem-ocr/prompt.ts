@@ -5,6 +5,7 @@ import type { PageText } from './page-text';
 import { GRAMMAR_TREE } from '@/lib/problem-bank/grammar-tree';
 import type { AreaTreeNode } from '@/lib/problem-bank/area-tree';
 import type { ProblemSourceType } from '@/types/problem-bank';
+import { YET_HANGUL_PROMPT_RULES, YET_HANGUL_REFERENCE_RULE } from '@/lib/yet-hangul';
 
 /**
  * 기출 OCR 프롬프트 조립 (클라이언트).
@@ -49,6 +50,9 @@ const RULES = `[역할]
 - 글자를 고치거나 요약하지 않는다. 오탈자·띄어쓰기·한자·기호를 원문 그대로 둔다.
 - 이미지에 없는 문항을 지어내지 않는다. 비워 두는 것이 정상이다.
 - **배점 표기는 옮기지 않는다.** 발문 끝의 '(3.4점)'·'[3점]' 은 빼고 적는다.
+
+[옛한글]
+${YET_HANGUL_PROMPT_RULES}
 
 [구조]
 - 지문(kind:"passage")과 문항(kind:"problem")을 **읽는 순서대로** 낸다.
@@ -200,6 +204,7 @@ const REFERENCE_TEXT_RULES = [
   '- 참고 텍스트에는 **이 쪽의 모든 글**이 섞여 있다(문항·지문·머리글). 어느 것이 무엇인지는'
   + ' 이미지를 보고 가른다.',
   '- 참고 텍스트에 없는데 이미지에만 보이는 글자가 있으면 이미지를 따르고 warnings 에 적는다.',
+  YET_HANGUL_REFERENCE_RULE,
 ];
 
 /**

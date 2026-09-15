@@ -1,6 +1,10 @@
 import { sanitizeConceptHTML } from '@/lib/sanitize-html';
 import { OCR_HTML_MAX } from '@/lib/problem-ocr/constants';
 import { normalizeBlankParagraphs } from '@/lib/problem-ocr/normalize-html';
+import {
+  finalizeYetHangul, hasUnconvertedNotation, hasYetHangul,
+  UNCONVERTED_NOTATION_WARNING, yetHangulPageWarning,
+} from '@/lib/yet-hangul';
 import { PRINT_OCR_MAX_WARNINGS } from './constants';
 import type { PrintOcrDraft, PrintPageDraft } from './schema';
 
@@ -66,10 +70,13 @@ export function parsePrintOcrDraft(
     if (body.length > PAGE_HTML_MAX) {
       warnings.push(`${page}쪽 본문이 너무 길어 뒷부분이 잘렸어요. 원본과 대조해 채워 주세요.`);
     }
-    byPage.set(page, {
-      page,
-      html: normalizeBlankParagraphs(body.slice(0, PAGE_HTML_MAX)),
-    });
+    // 옛한글을 **여기서 굳힌다** — 쪽 경고가 실체 참조·대체 표기가 풀린 글을 봐야 한다
+    // (코덱스 리뷰 5R). 저장 직전 `finalizePrintHtml` 이 정화 뒤에 한 번 더 굳힌다(멱등)
+    const html = normalizeBlankParagraphs(finalizeYetHangul(body.slice(0, PAGE_HTML_MAX)));
+    // 옛 글자는 선생님이 눈으로 한 번 더 봐야 한다(비슷한 다른 자모로 읽어도 그럴듯해 보인다)
+    if (hasUnconvertedNotation(html)) warnings.push(`${page}쪽 — ${UNCONVERTED_NOTATION_WARNING}`);
+    else if (hasYetHangul(html)) warnings.push(yetHangulPageWarning(page));
+    byPage.set(page, { page, html });
   }
 
   if (unknownPages.length > 0) {
@@ -114,6 +121,9 @@ export function joinPageHtml(drafts: readonly PrintOcrDraft[]): string {
 /**
  * 개념지에 넣기 직전의 마지막 관문.
  *
+ * ⚠️ 옛한글 굳히기는 **정화 뒤**다(코덱스 리뷰 4R) — 정화가 HTML 실체 참조를 풀기 때문에,
+ *    앞에서만 맞추면 `가&#x11EB;` 같은 입력이 섞인 모양으로 저장된다.
+ *
  * ⚠️ **여기서만 정화한다고 믿지 말 것** — 편집기 로드 경로에도 `sanitizeConceptHTML` 이
  *    있다(공유 표라 Stored XSS 방어가 다층이다). 다만 저장되는 값은 여기서 이미 안전해야
  *    허용 밖 태그가 DB 에 쌓이지 않는다.
@@ -121,5 +131,5 @@ export function joinPageHtml(drafts: readonly PrintOcrDraft[]): string {
  * @returns 정화된 HTML
  */
 export function finalizePrintHtml(html: string): string {
-  return sanitizeConceptHTML(html);
+  return finalizeYetHangul(sanitizeConceptHTML(html));
 }

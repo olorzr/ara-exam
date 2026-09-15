@@ -6,12 +6,52 @@
 @import "../styles/print-a4.css";
 @import "../styles/problem-paper.css";
 
+/* ── 옛한글 글꼴 — 네이버 나눔 옛한글(SIL OFL 1.1, public/fonts 자체 호스팅) ──────────────
+   Pretendard 에는 첫가끝 조합형 자모가 없어 중세국어가 깨진 네모로 나온다. 세 얼굴을 둔다:
+
+   ① 안전망 — 기본 스택 **뒤**에 붙어, 감지 클래스가 닿지 않는 자리(목록 줄·제목·토스트)의
+      옛 글자를 맡는다. **자모·방점·옛 낱자·한양 PUA 만 담은 서브셋(0.27MB)** 이다.
+      ⚠️ 여기에 완성형 음절·한자를 넣어 큰 파일을 물리지 말 것 — **WebKit(사파리)은
+         `unicode-range` 와 무관하게, 스택에 있기만 하면 그 글꼴을 내려받는다**(실측:
+         옛 글자가 한 자도 없는 쪽에서도 status 가 loaded). 크롬·파이어폭스는 건너뛴다.
+         그래서 이 얼굴만 작게 자르고, 큰 얼굴 둘은 감지 클래스에만 건다.
+      ⚠️ 범위가 U+3165 부터인 까닭: 〈보기〉의 ㄱ. ㄴ. ㄷ.(U+3131~) 은 현대 문항에 늘 나오므로
+         그것까지 이 글꼴로 그리면 현대 시험지의 글자 모양이 바뀐다. 옛 낱자만 걸리게 한다.
+   ② 통째 얼굴(고딕, 1.7MB) — `.yet-hangul` 블록 전용. 한 지문이 현대 음절(Pretendard)과
+      옛 음절로 갈려 보이지 않게 블록 전체를 한 글꼴로 그린다. 완성형·한자까지 다 들었다.
+   ③ 명조 — 옛한글 **지문** 블록 전용(교과서·문학 지문의 관례).
+
+   범위 목록은 src/lib/yet-hangul/detect.ts 의 YET_HANGUL_UNICODE_RANGE 와 글자 그대로 같아야
+   한다 — detect.test.ts 가 이 파일을 읽어 대조한다. */
+@font-face {
+  font-family: 'Nanum Barun Gothic YetHangul';
+  src: url('/fonts/NanumBarunGothic-YetHangul-jamo.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+1100-11FF, U+A960-A97F, U+D7B0-D7FF, U+302E-302F, U+3165-318E, U+E0BC-F8F7;
+}
+@font-face {
+  font-family: 'Nanum Barun Gothic YetHangul Text';
+  src: url('/fonts/NanumBarunGothic-YetHangul.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Nanum Myeongjo YetHangul';
+  src: url('/fonts/NanumMyeongjo-YetHangul.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", system-ui, sans-serif;
+  --font-sans: "Pretendard Variable", Pretendard, "Nanum Barun Gothic YetHangul", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -132,6 +172,22 @@
   html {
     @apply font-sans;
   }
+}
+
+/* 옛한글이 든 블록은 통째로 한 글꼴로 그린다 — 현대 음절과 옛 음절이 갈려 보이지 않게.
+   ⚠️ 정화기(sanitize-problem.ts)는 class 를 허용하지 않는다. 이 클래스는 **저장되는 본문이
+      아니라** 렌더가 감싸는 바깥 래퍼에만 붙는다(hasYetHangul 판정).
+   ⚠️ 스택에 안전망 얼굴('Nanum Barun Gothic YetHangul')을 **한 번 더** 넣는다 — 큰 얼굴을
+      못 받았을 때(네트워크 실패) Pretendard 로 떨어지면 옛 글자가 깨진 네모가 된다.
+      안전망은 `unicode-range` 로 옛 글자만 맡으므로 현대 글자에는 영향이 없다 */
+.yet-hangul {
+  font-family: 'Nanum Barun Gothic YetHangul Text', 'Nanum Barun Gothic YetHangul',
+    'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+}
+
+.yet-hangul-serif {
+  font-family: 'Nanum Myeongjo YetHangul', 'Nanum Barun Gothic YetHangul Text',
+    'Nanum Barun Gothic YetHangul', serif;
 }
 
 /* =============================================================== */

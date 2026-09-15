@@ -257,3 +257,26 @@ describe('buildProblemOcrPrompt — 참고 텍스트', () => {
     expect(p).not.toContain('참고 텍스트');
   });
 });
+
+describe('옛한글 규칙', () => {
+  const base = {
+    source, pages: [1], batch: { index: 0, total: 1 }, areaTree: tree, unitTree: units,
+    scopeUnits: [],
+  };
+
+  it('첫가끝 자모·방점·대체 표기를 시킨다 — 중세국어가 현대 글자로 뭉개지는 것을 막는다', () => {
+    const p = buildProblemOcrPrompt(base);
+    expect(p).toContain('[옛한글]');
+    expect(p).toContain('첫가끝 조합형 자모');
+    expect(p).toContain('⟦ㅎㆍㄴ⟧');
+    expect(p).toContain('U+302E');
+  });
+
+  it('참고 텍스트가 있을 때만 자리 표시 규칙을 붙인다 — 없을 때 프롬프트 예산을 쓰지 않는다', () => {
+    const withText = buildProblemOcrPrompt({
+      ...base, pageTexts: [{ page: 1, text: '가나다', source: 'layer' }],
+    });
+    expect(withText).toContain('\u3014옛\u3015');
+    expect(buildProblemOcrPrompt(base)).not.toContain('\u3014옛\u3015');
+  });
+});

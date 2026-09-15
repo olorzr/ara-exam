@@ -136,3 +136,21 @@ describe('그림 자리표시자', () => {
     expect(sanitizeInlineHTML('<figure data-figure="1"></figure>가')).not.toContain('figure');
   });
 });
+
+describe('옛한글 왕복', () => {
+  /** 훈민정음 언해 첫 대목 — 첫가끝 자모와 방점이 섞여 있다 */
+  const MIDDLE = '<p>나랏말\u110A\u119E미 듕귁에 달아\u302E 문\u110D\u119E\u11BC와로 '
+    + '서르 \u1109\u119E\u1106\u119E\u11BA디 아니\u1112\u119E\u11AF\u110A\u11A1</p>';
+
+  it('문항 정화가 자모·방점을 한 글자도 안 건드린다', () => {
+    expect(sanitizeProblemHTML(MIDDLE)).toBe(MIDDLE);
+  });
+
+  it('선지 정화도 같다', () => {
+    expect(sanitizeInlineHTML('\u1112\u119E\u11AB')).toBe('\u1112\u119E\u11AB');
+  });
+
+  it('개념지 정화도 같다 — 프린트 읽기 결과가 지나는 길이다', () => {
+    expect(sanitizeConceptHTML(MIDDLE)).toBe(MIDDLE);
+  });
+});

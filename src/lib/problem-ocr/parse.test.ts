@@ -444,3 +444,73 @@ describe('parseOcrDraft — 본문 속 그림', () => {
     expect(draft.items[0].figures).toHaveLength(3);
   });
 });
+
+describe('parseOcrDraft — 옛한글', () => {
+  const YET = '\u1112\u119E\u11AB'; // \u1112\u119E\u11AB
+
+  it('대체 표기를 자모로 바꾼다 — 모델이 조합형 자모를 못 낼 때의 우회로다', () => {
+    const draft = parseOcrDraft(json([item({ stem_html: '<p>⟦ㅎㆍㄴ⟧ 사람</p>' })]), ctx);
+    expect(draft?.items[0].stem_html).toContain(YET);
+    expect(draft?.items[0].stem_html).not.toContain('⟦');
+  });
+
+  it('선지도 바꾼다 — 선지는 본문 다듬기(normalize-html)를 타지 않는다', () => {
+    const draft = parseOcrDraft(json([item({ choices: ['⟦ㅎㆍㄴ⟧', '나', '다'] })]), ctx);
+    expect(draft?.items[0].choices[0]).toContain(YET);
+  });
+
+  it('옛한글이 있으면 **쪽**을 짚는다 — 항목마다 붙이면 경고 상한을 그것만으로 채운다', () => {
+    const draft = parseOcrDraft(json([item({ page: 2, stem_html: `<p>${YET}</p>` })]), ctx);
+    const yet = draft?.warnings.find((w) => w.message.includes('옛한글이 있어요'));
+    expect(yet).toMatchObject({ page: 2 });
+    expect(yet?.ref).toBeUndefined();
+  });
+
+  it('같은 쪽의 항목이 여럿이어도 경고는 한 줄이다', () => {
+    const draft = parseOcrDraft(json([
+      item({ ref: 'Q1', number: 1, stem_html: `<p>${YET}</p>` }),
+      item({ ref: 'Q2', number: 2, stem_html: `<p>${YET}</p>` }),
+    ]), ctx);
+    const yet = (draft?.warnings ?? []).filter((w) => w.message.includes('옛한글이 있어요'));
+    expect(yet).toHaveLength(1);
+  });
+
+  it('현대 국어만 있으면 경고하지 않는다 — 없는 경고가 붙으면 경고 전체를 안 믿게 된다', () => {
+    const draft = parseOcrDraft(json([item()]), ctx);
+    expect(said(draft?.warnings ?? [])).not.toContain('옛한글');
+  });
+
+  it('HTML 실체 참조로 적힌 옛 자모도 저장 형태로 굳힌다', () => {
+    const draft = parseOcrDraft(json([item({ stem_html: '<p>\uAC00&#x11EB;</p>' })]), ctx);
+    expect(draft?.items[0].stem_html).toBe('<p>\u1100\u1161\u11EB</p>');
+  });
+
+  it('**태그 없는 선지**의 실체 참조도 푼다 — 정화기가 그런 조각을 그대로 돌려준다', () => {
+    const draft = parseOcrDraft(json([item({ choices: ['\uAC00&#x11EB;', '나'] })]), ctx);
+    expect(draft?.items[0].choices[0]).toBe('\u1100\u1161\u11EB');
+  });
+
+  it('모델이 자모를 그대로 낸 지문과 대체 표기로 낸 지문이 **같은 문자열**로 저장된다', () => {
+    const direct = parseOcrDraft(json([item({ stem_html: '<p>\u1100\u1161\u11EB</p>' })]), ctx);
+    const notation = parseOcrDraft(json([item({ stem_html: '<p>\u27E6\u3131\u314F\u317F\u27E7</p>' })]), ctx);
+    expect(direct?.items[0].stem_html).toBe(notation?.items[0].stem_html);
+  });
+
+  it('경고가 상한을 채워도 못 바꾼 ⟦ ⟧ 경고는 살아남는다 — 그 항목을 볼 때 바로 넣기 때문이다', () => {
+    const many = [
+      item({ ref: 'Q1', number: 1, stem_html: '<p>\u27E6\u314F\u27E7</p>' }),
+      // 뒤따르는 문항들이 저마다 '선지를 읽지 못했어요' 경고를 낸다
+      ...Array.from({ length: 25 }, (_, i) => item({
+        ref: `Q${i + 2}`, number: i + 2, choices: ['가', '', '다'],
+      })),
+    ];
+    const draft = parseOcrDraft(json(many), ctx);
+    expect(said(draft?.warnings ?? [])).toContain('못 바꾼');
+  });
+
+  it('자모로 못 바꾼 ⟦ ⟧ 는 **항목**을 짚는다 — 드문 진짜 실패라 카드를 가리켜야 한다', () => {
+    const draft = parseOcrDraft(json([item({ ref: 'Q1', stem_html: '<p>⟦ㅏ⟧</p>' })]), ctx);
+    const left = draft?.warnings.find((w) => w.message.includes('못 바꾼'));
+    expect(left).toMatchObject({ ref: 'Q1', kind: 'problem', page: 1 });
+  });
+});

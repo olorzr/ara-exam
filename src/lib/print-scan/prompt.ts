@@ -1,6 +1,7 @@
 import { wrapUntrustedData } from '@/lib/ai/untrusted-data';
 import type { RenderedImage } from '@/lib/pdf/pdfPages';
 import { describeImages } from '@/lib/problem-ocr/describe-images';
+import { YET_HANGUL_PROMPT_RULES } from '@/lib/yet-hangul';
 
 /**
  * 학교 프린트 읽기 프롬프트 조립 (클라이언트).
@@ -10,6 +11,9 @@ import { describeImages } from '@/lib/problem-ocr/describe-images';
  *    `sanitizeConceptHTML` 은 그 둘을 **지운다**. 재사용하면 모델은 시킨 대로 잘 냈는데
  *    화면에서는 그 부분이 통째로 사라진다 — 아무도 원인을 못 찾는 종류의 결함이다.
  *    그래서 개념지 편집기가 실제로 받는 태그만 따로 적는다.
+ *
+ *    반대로 `YET_HANGUL_PROMPT_RULES` 는 **글자** 규칙이라(태그를 시키지 않는다)
+ *    기출과 함께 써도 안전하다 — 옛한글 표기는 두 파이프라인이 같아야 한다.
  */
 
 /** 개념지 편집기(= sanitizeConceptHTML)가 받아 주는 태그만 적게 한다 */
@@ -73,6 +77,7 @@ const RULES_HEAD = `[역할]
 - **문제를 풀지 않는다.** 정답·해설을 지어내지 않는다. 물음은 물음인 채로 옮긴다.
 - **( ) 빈칸은 빈칸 그대로 옮긴다**: (   ). 밑줄 빈칸 ______ 도 그대로 둔다. 채우지 않는다.
 - 흐리거나 잘려서 못 읽은 글자는 □ 로 두고 warnings 에 몇 쪽인지 적는다. **지어내지 않는다.**
+  다만 **옛한글은 못 읽은 글자가 아니다** — [옛한글] 규칙대로 적는다.
 - 학교명·학번·이름 칸·쪽 번호 같은 머리글·꼬리글은 옮기지 않는다. **프린트 제목은 옮긴다.**`;
 
 const RULES_TAIL = `[쪽 경계]
@@ -98,6 +103,9 @@ export function buildPrintOcrPrompt(input: PrintOcrPromptInput): string {
     '',
     '[손글씨]',
     bundle.include_handwriting ? HANDWRITING_ON : HANDWRITING_OFF,
+    '',
+    '[옛한글]',
+    YET_HANGUL_PROMPT_RULES,
     '',
     '[본문 표기 — 아래 태그만 쓴다]',
     FORMAT_RULES,

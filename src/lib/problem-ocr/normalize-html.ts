@@ -1,4 +1,5 @@
 import { normalizeBoxAttributes } from '@/lib/box-labels';
+import { finalizeYetHangul } from '@/lib/yet-hangul';
 
 /**
  * 모델이 낸 본문 HTML 을 저장 형태로 다듬는다 (순수 함수).
@@ -46,7 +47,13 @@ export function stripPrintedScore(html: string): string {
  * @returns 정화에 넘길 HTML
  */
 export function normalizeOcrPassageHtml(html: string): string {
-  return normalizeBlankParagraphs(normalizeBoxAttributes(html));
+  // ⚠️ 옛한글 대체 표기(`⟦ㅎㆍㄴ⟧` → `ᄒᆞᆫ`)를 **맨 먼저** 바꾼다. 뒤로 미루면 중복 판정
+  //    키(merge-keys 의 textOf)와 검수 화면이 괄호 표기를 보게 되어, 겹쳐 읽은 같은 지문이
+  //    표기 차이로 둘로 갈라진다
+  // ⚠️ 저장 형태로 굳히는 것(`finalizeYetHangul`)은 **정화 뒤**다 — 정화가 HTML 실체 참조를
+  //    풀기 때문이다(코덱스 리뷰 4R). 여기서 미리 바꿔 두는 까닭은 상자 말머리 다듬기가
+  //    괄호 표기에 걸리지 않게 하려는 것뿐이라, 두 번 돌아도 같은 결과다(멱등)
+  return normalizeBlankParagraphs(normalizeBoxAttributes(finalizeYetHangul(html)));
 }
 
 /**

@@ -75,10 +75,39 @@ describe('hasUsableText', () => {
   })
 
   it('깨진 글자가 많으면 안 쓴다 — 복합기 자동 OCR 레이어는 없느니만 못하다', () => {
-    expect(hasUsableText(long(300) + '�'.repeat(30))).toBe(false)
+    expect(hasUsableText(long(300) + '\uFFFD'.repeat(30))).toBe(false)
   })
 
   it('깨진 글자가 조금이면 쓴다', () => {
-    expect(hasUsableText(long(400) + '�')).toBe(true)
+    expect(hasUsableText(long(400) + '\uFFFD')).toBe(true)
+  })
+})
+
+describe('hasUsableText — 옛한글', () => {
+  /** 한 쪽 분량(200자 이상)의 평문 */
+  const body = '가나다라마바사'.repeat(40)
+
+  it('한양 PUA 는 깨진 글자로 세지 않는다 — 세면 중세국어 쪽의 글자 레이어가 통째로 버려진다', () => {
+    const withPua = body + '\uE0BC'.repeat(20)
+    expect(hasUsableText(withPua)).toBe(true)
+  })
+
+  it('그 밖의 사용자 정의 영역은 여전히 깨진 글자다 — 글꼴 매핑이 없는 진짜 실패다', () => {
+    const withBroken = body + '\uE000'.repeat(20)
+    expect(hasUsableText(withBroken)).toBe(false)
+  })
+
+  it('U+FFFD 는 그대로 깨진 글자다', () => {
+    expect(hasUsableText(body + '\uFFFD'.repeat(20))).toBe(false)
+  })
+
+  it('쪽이 온통 한양 PUA 면 쓸 만한 글자 레이어가 아니다 — 참고 텍스트가 자리 표시뿐이 된다', () => {
+    expect(hasUsableText('\uE123'.repeat(250))).toBe(false)
+  })
+
+  it('PUA 는 "옮길 수 있는 글자" 수에서 뺀다 — 현대 글이 모자라면 못 쓴다', () => {
+    const few = '가나다라마'.repeat(30) // 150자
+    expect(hasUsableText(few + '\uE0BC'.repeat(100))).toBe(false)
+    expect(hasUsableText('가나다라마'.repeat(50) + '\uE0BC'.repeat(100))).toBe(true)
   })
 })

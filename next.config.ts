@@ -50,6 +50,12 @@ const nextConfig: NextConfig = {
         source: '/:path*',
         headers: securityHeaders,
       },
+      // 옛한글 글꼴은 파일명이 곧 판이라(내용이 바뀌면 이름을 바꾼다) 오래 캐시해도 안전하다.
+      // Next 는 public/ 을 기본적으로 캐시하지 않아, 두 파일(4MB)을 쪽마다 다시 받게 된다
+      {
+        source: '/fonts/:path*',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+      },
     ];
   },
   async redirects() {
