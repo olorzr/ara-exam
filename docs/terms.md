@@ -174,13 +174,43 @@
 - 정의: 지문(문학 작품·비문학 글)을 넣으면 AI 가 만들어 주는 **O,X 문항과 단답형 문항**. `/problems/quiz`
 - ⚠️ **저장하지 않는다.** DB 표가 없고 새로고침하면 사라진다 — 만들어 고치고 인쇄까지가 한 자리다
   (문항으로 저장하려면 `question_type` CHECK·출처 NOT NULL·인쇄 렌더러 3곳을 함께 고쳐야 한다)
-- ⚠️ 근거 구절과 단답형 답이 지문에 **글자 그대로** 있는지 기계가 대조한다(`foldStrict`). 없으면 그 문항을
-  버리고 몇 개를 왜 뺐는지 화면에 적는다 — 프롬프트와 파서는 한 쌍이라 한쪽만 느슨하게 하지 말 것
+- ⚠️ 근거 구절과 단답형 답이 지문 **또는 참고자료 하나**에 글자 그대로 있는지 기계가 대조한다(`foldStrict`).
+  없으면 그 문항을 버리고 몇 개를 왜 뺐는지 화면에 적는다 — 프롬프트와 파서는 한 쌍이라
+  한쪽만 느슨하게 하지 말 것
 - 개수는 비우면 AI 가 정하고(유형마다 최대 `PASSAGE_QUIZ_MAX_PER_TYPE`), 숫자를 적으면 그만큼, 0 이면 안 낸다
 - 기능 플래그는 `passage_quiz`(마스터는 `AI_OCR_BETA`)
 - 코드에서의 사용: `runPassageQuiz`, `parsePassageQuiz`, `usePassageQuiz`, `QuizItem`, `numberQuizItems`
 - 관련 파일: src/lib/passage-quiz/, src/hooks/usePassageQuiz.ts, src/components/passage-quiz/,
   src/app/(main)/problems/quiz/page.tsx, src/lib/problem-bank/passage-search.ts
+
+## 참고자료 (quiz reference)
+- 정의: 문제 만들기(O,X·단답형)가 지문과 **함께 읽는** 글. 네 곳에서 온다 —
+  개념지 · 학교 프린트 시험지 원문 · 기출 지문 · 작품 전문
+- 왜: 시험지에는 작품의 일부만 실린다. 잘린 지문만 보면 화자·정서·표현법처럼 **가르친 내용**을
+  물을 수가 없는데, 그 내용은 이미 개념지와 프린트에 적혀 있다
+- 고르는 법: **자동으로 붙이고 왜 붙었는지 밝힌다**(`reason`). 사람이 빼거나 더할 수 있고,
+  ⚠️ **뺀 자료는 다시 찾기로 되살아나지 않는다**(`dismissedRef`)
+- 자동 `QUIZ_REFERENCE_MAX_AUTO`(3)건 · 합쳐 `QUIZ_REFERENCE_MAX_TOTAL`(5)건 ·
+  한 건은 `QUIZ_REFERENCE_TEXT_MAX`(15,000자)까지만 보내고 잘리면 화면에 '앞부분만 보냄' 을 띄운다
+- ⚠️ **근거의 출처는 파서가 정한다**(`QuizItem.source`) — 모델에게 묻지 않는다. 지문을 먼저 보므로
+  양쪽에 다 있는 구절은 지문(`''`)이고, 두 자료에 걸쳐 이어 붙인 근거는 버려진다
+- 정답표는 참고자료에서 온 근거에 `[개념지 · 봄봄]` 처럼 자료 이름을 함께 찍는다
+- 코드에서의 사용: `QuizReferenceText`, `AttachedReference`, `useQuizReferences`,
+  `rankReferenceCandidates`, `fetchReferenceCandidates`
+- 관련 파일: src/lib/quiz-references/, src/hooks/useQuizReferences.ts,
+  src/components/passage-quiz/QuizReferencesSection.tsx, src/lib/passage-quiz/reference.ts
+
+## 작품 전문 (ReferenceText)
+- 정의: 개념 관리에 올려 두는 **작품 원문 전체**(sql/30 `exam.reference_texts`). `/reference-texts`
+- ⚠️ 본문(`body`)은 **평문**이다(개념지의 `editor_html` 과 다르다) — 서식이 없고 화면은 텍스트 노드로 그린다
+- 올리는 법: 붙여넣기 · `.txt` · **글자가 박힌** PDF. ⚠️ 스캔한 PDF 는 못 읽는다 —
+  그때는 학교 프린트 시험지로 올리면 AI 가 읽어 준다(`pdfImportVerdict` 가 그 길을 알려 준다)
+- ⚠️ PDF 가져오기는 `readPageText` 를 쓴다(`extractPageText` 아님) — 그쪽의 쪽당 200자 문턱은
+  기출 OCR 용이라 시집처럼 쪽이 짧은 글이 통째로 빈다
+- `char_count` 는 DB 트리거가 채운다 — 목록이 무거운 본문을 읽지 않고 길이를 보여 주려는 값이다
+- 코드에서의 사용: `ReferenceText`, `ReferenceTextListItem`, `useReferenceTextEditor`
+- 관련 파일: sql/30_reference_texts.sql, src/lib/reference-texts/, src/types/reference-text.ts,
+  src/app/(main)/reference-texts/, src/components/reference-texts/
 
 ## 문항 (Problem)
 - 정의: 발문·선지·정답을 가진 문제 하나. 단어 시험지의 '문항'과는 다른 개념이다.

@@ -14,9 +14,9 @@ beforeAll(() => {
 });
 
 const items: QuizItem[] = [
-  { id: 'a', kind: 'ox', text: '화자는 떠나는 이를 붙잡지 않는다.', answer: 'O', evidence: '말없이 고이 보내 드리오리다' },
-  { id: 'b', kind: 'ox', text: '화자는 눈물을 흘린다.', answer: 'X', evidence: '죽어도 아니 눈물 흘리오리다' },
-  { id: 'c', kind: 'short', text: '길에 뿌리는 꽃은?', answer: '진달래꽃', evidence: '영변에 약산 진달래꽃' },
+  { id: 'a', kind: 'ox', text: '화자는 떠나는 이를 붙잡지 않는다.', answer: 'O', evidence: '말없이 고이 보내 드리오리다', source: '' },
+  { id: 'b', kind: 'ox', text: '화자는 눈물을 흘린다.', answer: 'X', evidence: '죽어도 아니 눈물 흘리오리다', source: '' },
+  { id: 'c', kind: 'short', text: '길에 뿌리는 꽃은?', answer: '진달래꽃', evidence: '영변에 약산 진달래꽃', source: '' },
 ];
 
 const TEXT = '나 보기가 역겨워\n가실 때에는\n\n영변에 약산\n진달래꽃';
@@ -104,6 +104,23 @@ describe('PassageQuizKeyView', () => {
     const { container } = render(
       <PassageQuizKeyView title="" items={[{ ...items[0], evidence: '' }]} />,
     );
-    expect(container.querySelector('.a4-measure')!.textContent).not.toContain('지문 근거');
+    expect(container.querySelector('.a4-measure')!.querySelector('.pb-quiz-evidence')).toBeNull();
+  });
+
+  it('참고자료에서 온 근거에는 어느 자료인지 함께 찍는다 — 지문에는 없는 구절이다', () => {
+    const fromSheet = [{ ...items[0], source: '개념지 · 진달래꽃' }];
+    const { container } = render(
+      <PassageQuizKeyView title="진달래꽃" items={fromSheet} references={['개념지 · 진달래꽃']} />,
+    );
+    const measured = container.querySelector('.a4-measure')!;
+    expect(measured.querySelector('.pb-quiz-evidence-src')!.textContent).toBe('[개념지 · 진달래꽃]');
+    // 머리에도 무엇을 함께 읽었는지 밝힌다
+    expect(measured.querySelector('.pb-quiz-refs')!.textContent).toContain('개념지 · 진달래꽃');
+  });
+
+  it('참고자료 없이 만든 정답표에는 그 줄이 아예 없다', () => {
+    const { container } = render(<PassageQuizKeyView title="" items={items} />);
+    expect(container.querySelector('.a4-measure')!.querySelector('.pb-quiz-refs')).toBeNull();
+    expect(container.querySelector('.a4-measure')!.querySelector('.pb-quiz-evidence-src')).toBeNull();
   });
 });

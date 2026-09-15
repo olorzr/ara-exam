@@ -5,5 +5,6 @@ export * from './notice';
 export * from './parse';
 export * from './print-blocks';
 export * from './prompt';
+export * from './reference';
 export * from './run';
 export * from './schema';

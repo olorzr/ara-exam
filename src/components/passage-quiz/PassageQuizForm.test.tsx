@@ -47,6 +47,19 @@ describe('PassageQuizForm', () => {
     expect(screen.getByRole('button', { name: '취소' })).toBeTruthy();
   });
 
+  it('참고자료 사정으로도 막고 그 까닭을 보여 준다', () => {
+    render(<PassageQuizForm {...props({ extraBlocker: '참고자료를 불러오는 중이에요.' })} />);
+    expect((screen.getByRole('button', { name: /문항 만들기/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText('참고자료를 불러오는 중이에요.')).toBeTruthy();
+  });
+
+  it('입력값 문제를 먼저 말한다 — 지문이 비었는데 참고자료 얘기를 하면 안 된다', () => {
+    render(<PassageQuizForm {...props({
+      draft: EMPTY_DRAFT, extraBlocker: '참고자료를 불러오는 중이에요.',
+    })} />);
+    expect(screen.getByText('지문을 붙여 넣어 주세요.')).toBeTruthy();
+  });
+
   it('실행 중이 아니면 취소를 보여 주지 않는다', () => {
     render(<PassageQuizForm {...props()} />);
     expect(screen.queryByRole('button', { name: '취소' })).toBeNull();

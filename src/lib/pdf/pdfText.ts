@@ -119,15 +119,17 @@ export function hasUsableText(text: string): boolean {
 }
 
 /**
- * 한 쪽의 글자 레이어를 읽는다.
+ * 한 쪽의 글자 레이어를 **가리지 않고** 읽는다 (읽는 순서 정리 + NFC 만).
+ *
+ * `extractPageText` 와 달리 `hasUsableText` 문턱을 두지 않는다. 그 문턱(쪽당 200자)은
+ * **기출 OCR 을 위한 것**이다 — 복합기가 붙인 엉터리 자동 OCR 레이어를 "정확한 글자" 라고
+ * 모델에게 주면 오히려 더 틀리기 때문이다. 하지만 작품 전문 가져오기는 사람이 고른 PDF 를
+ * 그대로 옮기는 일이라, 그 문턱을 그대로 쓰면 **시집처럼 쪽이 짧은 글이 통째로 버려진다.**
  * @param pdf - 열어 둔 문서
  * @param page - 1-based 쪽 번호
- * @returns 평문. 글자 레이어가 없거나 못 믿을 값이면 null
+ * @returns 평문. 못 읽으면 빈 문자열
  */
-export async function extractPageText(
-  pdf: PdfDocumentProxy,
-  page: number,
-): Promise<string | null> {
+export async function readPageText(pdf: PdfDocumentProxy, page: number): Promise<string> {
   try {
     const pdfPage = await pdf.getPage(page)
     const content = await pdfPage.getTextContent()
@@ -147,12 +149,25 @@ export async function extractPageText(
     }
 
     // 한글 정규화 — 자모가 갈린 글자가 섞이면 모델이 이상한 글자로 읽는다
-    const text = groupTextItems(pieces, viewport.width).normalize('NFC')
-    // 한양 PUA 코드는 모델에게 뜻 없는 글자다 — 자리만 알리고 그 글자는 이미지에서 읽게 한다.
-    // 쓸 만한지는 **바꾸기 전** 원문으로 판정한다(자리 표시가 글자 수를 늘린다)
-    return hasUsableText(text) ? markHanyangPua(text) : null
+    return groupTextItems(pieces, viewport.width).normalize('NFC')
   } catch {
     // 글자 레이어를 못 읽어도 이미지로는 읽을 수 있다 — 여기서 멈추지 않는다
-    return null
+    return ''
   }
+}
+
+/**
+ * 한 쪽의 글자 레이어를 읽는다 (기출·프린트 OCR 의 참고 텍스트용).
+ * @param pdf - 열어 둔 문서
+ * @param page - 1-based 쪽 번호
+ * @returns 평문. 글자 레이어가 없거나 못 믿을 값이면 null
+ */
+export async function extractPageText(
+  pdf: PdfDocumentProxy,
+  page: number,
+): Promise<string | null> {
+  const text = await readPageText(pdf, page)
+  // 한양 PUA 코드는 모델에게 뜻 없는 글자다 — 자리만 알리고 그 글자는 이미지에서 읽게 한다.
+  // 쓸 만한지는 **바꾸기 전** 원문으로 판정한다(자리 표시가 글자 수를 늘린다)
+  return hasUsableText(text) ? markHanyangPua(text) : null
 }

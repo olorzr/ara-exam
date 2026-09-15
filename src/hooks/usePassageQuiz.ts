@@ -8,7 +8,7 @@ import { getCodexPort } from '@/lib/ai/localPort';
 import { isAiError } from '@/lib/ai/types';
 import {
   passageQuizEmptyNotice, runPassageQuiz, toQuizItems,
-  type PassageQuizCounts, type PassageQuizDropped, type QuizItem,
+  type PassageQuizCounts, type PassageQuizDropped, type QuizItem, type QuizReferenceText,
 } from '@/lib/passage-quiz';
 import { ocrStillEnabled } from './useProblemOcr';
 
@@ -27,6 +27,8 @@ export interface PassageQuizRunInput {
   title: string;
   author: string;
   counts: PassageQuizCounts;
+  /** 지문과 함께 읽힐 참고자료 */
+  references?: readonly QuizReferenceText[];
 }
 
 /** 이 문항들을 만들 때 쓴 지문 — 인쇄는 **이것**을 싣는다 */
@@ -34,6 +36,13 @@ export interface PassageQuizSource {
   text: string;
   title: string;
   author: string;
+  /**
+   * 그때 함께 읽은 자료 이름들.
+   *
+   * ⚠️ 지문과 같은 이유로 **굳혀 둔다** — 만든 뒤에도 참고자료를 빼고 더할 수 있어서,
+   *    인쇄가 지금 목록을 보면 "쓰지도 않은 자료 이름 + 옛 자료로 낸 문항" 이 한 장에 찍힌다.
+   */
+  references: string[];
 }
 
 /**
@@ -82,6 +91,7 @@ export function usePassageQuiz() {
         title: input.title,
         author: input.author,
         counts: input.counts,
+        references: input.references,
         port: getCodexPort(),
         pref: getCodexModelPref(),
         signal: controller.signal,
@@ -90,7 +100,12 @@ export function usePassageQuiz() {
       if (controller.signal.aborted) return;
 
       setItems(toQuizItems(result, Date.now().toString(36)));
-      setSource({ text: input.text, title: input.title, author: input.author });
+      setSource({
+        text: input.text,
+        title: input.title,
+        author: input.author,
+        references: (input.references ?? []).map((ref) => ref.label),
+      });
       setDropped(result.dropped);
 
       if (result.ox.length + result.short.length === 0) {

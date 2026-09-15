@@ -95,8 +95,8 @@ function Group({
 function DroppedNote({ dropped }: { dropped: PassageQuizDropped | null }) {
   if (!dropped) return null;
   const lines = [
-    dropped.evidenceNotInText > 0 && `근거 구절이 지문에 없어 뺀 문항 ${dropped.evidenceNotInText}개`,
-    dropped.answerNotInText > 0 && `답이 지문에 없어 뺀 단답형 ${dropped.answerNotInText}개`,
+    dropped.evidenceNotInText > 0 && `근거 구절이 지문·참고자료에 없어 뺀 문항 ${dropped.evidenceNotInText}개`,
+    dropped.answerNotInText > 0 && `답이 지문·참고자료에 없어 뺀 단답형 ${dropped.answerNotInText}개`,
     dropped.duplicate > 0 && `같은 내용이라 뺀 문항 ${dropped.duplicate}개`,
     dropped.malformed > 0 && `모양이 안 맞아 뺀 문항 ${dropped.malformed}개`,
   ].filter((line): line is string => Boolean(line));

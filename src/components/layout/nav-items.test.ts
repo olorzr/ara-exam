@@ -118,7 +118,7 @@ describe('buildNavSections', () => {
 
     const concept = sections.find((s) => s.id === 'concept')!;
     expect(concept.kind).toBe('group');
-    expect(concept.items.map((i) => i.label)).toEqual(['개념지', '학교 프린트 시험지']);
+    expect(concept.items.map((i) => i.label)).toEqual(['개념지', '학교 프린트 시험지', '작품 전문']);
 
     const words = sections.find((s) => s.id === 'words')!;
     expect(words.kind).toBe('group');

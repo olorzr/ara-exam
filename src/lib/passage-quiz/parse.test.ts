@@ -17,10 +17,10 @@ describe('parsePassageQuiz', () => {
   it('근거가 지문에 있는 문항을 통과시킨다', () => {
     const result = parsePassageQuiz(raw([OX], [SHORT]), ctx());
     expect(result?.ox).toEqual([
-      { statement: OX.statement, answer: 'O', evidence: OX.evidence },
+      { statement: OX.statement, answer: 'O', evidence: OX.evidence, source: '' },
     ]);
     expect(result?.short).toEqual([
-      { question: SHORT.question, answer: '진달래꽃', evidence: SHORT.evidence },
+      { question: SHORT.question, answer: '진달래꽃', evidence: SHORT.evidence, source: '' },
     ]);
     expect(droppedTotal(result!.dropped)).toBe(0);
   });
@@ -138,5 +138,62 @@ describe('parsePassageQuiz', () => {
     }));
     const result = parsePassageQuiz(raw(many), ctx());
     expect(result?.ox).toHaveLength(PASSAGE_QUIZ_MAX_PER_TYPE);
+  });
+});
+
+describe('parsePassageQuiz — 참고자료', () => {
+  const SHEET = { label: '개념지 · 진달래꽃', plain: '이 시의 화자는 이별의 정한을 반어로 드러낸다.' };
+
+  it('참고자료에만 있는 근거도 받아 주고 어느 자료인지 돌려준다', () => {
+    const item = {
+      statement: '화자는 반어로 정서를 드러낸다.', answer: 'O',
+      evidence: '이별의 정한을 반어로 드러낸다',
+    };
+    const result = parsePassageQuiz(raw([item]), ctx({ references: [SHEET] }));
+    expect(result?.ox).toHaveLength(1);
+    expect(result?.ox[0].source).toBe(SHEET.label);
+  });
+
+  it('참고자료를 안 주면 그 근거는 예전처럼 버려진다 — 프롬프트와 파서는 한 쌍이다', () => {
+    const item = {
+      statement: '화자는 반어로 정서를 드러낸다.', answer: 'O',
+      evidence: '이별의 정한을 반어로 드러낸다',
+    };
+    expect(parsePassageQuiz(raw([item]), ctx())?.dropped.evidenceNotInText).toBe(1);
+    expect(parsePassageQuiz(raw([item]), ctx({ references: [] }))?.dropped.evidenceNotInText).toBe(1);
+  });
+
+  it('양쪽에 다 있으면 지문이 이긴다 — 채점하는 사람은 지문부터 편다', () => {
+    const both = { label: '전문 · 진달래꽃', plain: PLAIN };
+    const result = parsePassageQuiz(raw([OX]), ctx({ references: [both] }));
+    expect(result?.ox[0].source).toBe('');
+  });
+
+  it('두 자료에 걸쳐 이어 붙인 근거는 버린다 — 한 자료 안에 그대로 있어야 한다', () => {
+    const result = parsePassageQuiz(
+      raw([{ ...OX, evidence: '고이 보내 드리오리다 이 시의 화자는' }]),
+      ctx({ references: [SHEET] }),
+    );
+    expect(result?.ox).toHaveLength(0);
+    expect(result?.dropped.evidenceNotInText).toBe(1);
+  });
+
+  it('단답형 답도 참고자료에서 찾는다', () => {
+    const item = {
+      question: '화자의 정서를 드러내는 표현법은?', answer: '반어',
+      evidence: '이별의 정한을 반어로 드러낸다',
+    };
+    const result = parsePassageQuiz(raw([], [item]), ctx({ references: [SHEET] }));
+    expect(result?.short).toHaveLength(1);
+    expect(result?.short[0].source).toBe(SHEET.label);
+  });
+
+  it('본문이 빈 참고자료는 없는 셈 친다 — 빈 글자는 무엇에든 들어 있다', () => {
+    const result = parsePassageQuiz(
+      raw([{ ...OX, evidence: '님은 갔습니다 아아' }]),
+      ctx({ references: [{ label: '빈 자료', plain: '   ' }] }),
+    );
+    expect(result?.ox).toHaveLength(0);
+    expect(result?.dropped.evidenceNotInText).toBe(1);
   });
 });

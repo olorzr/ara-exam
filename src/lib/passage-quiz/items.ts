@@ -16,8 +16,10 @@ export interface QuizItem {
   text: string;
   /** O,X 는 'O'|'X', 단답형은 답 */
   answer: string;
-  /** 지문에서 옮겨 온 근거 구절 */
+  /** 지문·참고자료에서 옮겨 온 근거 구절 */
   evidence: string;
+  /** 근거를 찾은 곳. `''` 는 지문, 그 밖은 참고자료 이름 */
+  source: string;
 }
 
 /**
@@ -34,6 +36,7 @@ export function toQuizItems(result: PassageQuizResult, seed: string): QuizItem[]
       text: item.statement,
       answer: item.answer,
       evidence: item.evidence,
+      source: item.source,
     })),
     ...result.short.map((item, i) => ({
       id: `${seed}-short-${i}`,
@@ -41,6 +44,7 @@ export function toQuizItems(result: PassageQuizResult, seed: string): QuizItem[]
       text: item.question,
       answer: item.answer,
       evidence: item.evidence,
+      source: item.source,
     })),
   ];
 }

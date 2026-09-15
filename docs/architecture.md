@@ -23,11 +23,13 @@ src/
 │       │   ├── builder/     # 개념지 (목록 + [id] 편집기)
 │       │   └── view/        # 시험지/답안지/단어장 보기
 │       ├── print-sheets/    # 학교 프린트 시험지 (목록 · upload 스캔 올리기 · [bundleId] 편집)
+│       ├── reference-texts/ # 작품 전문 (목록 · [id] 편집, 'new' 면 새로 올리기)
 │       └── problems/         # 문제 은행 (archive 아카이브 · upload 기출 올리기 · sources 검수 ·
 │                             #            papers 문제지 조합 · quiz O,X·단답형)
 ├── components/
 │   ├── layout/              # 앱 셸 (AppShell·Sidebar·nav-items — 좌측 사이드바 네비게이션)
 │   ├── print-scan/          # 학교 프린트 스캔 (스캔 정보 폼·쪽 묶기·묶음 폼·목록 줄·원본 쪽 패널·쪽 크게 보기)
+│   ├── reference-texts/     # 작품 전문 (목록 줄·편집 폼·파일 가져오기)
 │   ├── words/               # 단어 입력 관련 분리 컴포넌트
 │   └── ui/                  # Shadcn UI 컴포넌트
 ├── lib/                     # 유틸리티, 설정
@@ -227,19 +229,47 @@ src/
   자름이 `CONCEPT_PICK_MAX_COUNT` **하나**를 본다(셋이 갈라지면 스키마 위반으로 출력이 통째 실패)
 
 ## lib/passage-quiz (O,X·단답형)
-- 역할: 지문(문학·비문학)을 받아 O,X 문항과 단답형 문항을 만든다. 만든 것은 **저장하지 않는다**
+- 역할: 지문(문학·비문학)과 **참고자료**를 받아 O,X 문항과 단답형 문항을 만든다.
+  만든 것은 **저장하지 않는다**
 - 의존: lib/ai(generateDraft·wrapUntrustedData), lib/concept-pick/fold(대조용 접기)
   ⚠️ `@/lib/concept-pick` **배럴을 쓰지 않는다** — 그쪽이 run.ts 를 재수출해 순환이 생긴다. 파일 경로로 가져온다
 - 주요 파일: constants.ts, schema.ts, prompt.ts, parse.ts(근거·답 대조), notice.ts,
-  items.ts(화면용 목록·번호 매기기), draft.ts(입력값 검사), print-blocks.ts(지문 쪼개기), run.ts
-- 근거 구절과 단답형 답이 지문에 글자 그대로 있는지 **`foldStrict` 로 대조**한다. `foldLoose` 로 접으면
-  공백이 사라져 '아버지가 방에'와 '아버지 가방에'가 같아진다 — 지어낸 문장이 그대로 통과한다
+  items.ts(화면용 목록·번호 매기기), draft.ts(입력값 검사), reference.ts(참고자료 자르기·이름 유일화),
+  print-blocks.ts(지문 쪼개기), run.ts
+- 근거 구절과 단답형 답이 지문 **또는 참고자료 하나**에 글자 그대로 있는지 **`foldStrict` 로 대조**한다.
+  `foldLoose` 로 접으면 공백이 사라져 '아버지가 방에'와 '아버지 가방에'가 같아진다 —
+  지어낸 문장이 그대로 통과한다
+- ⚠️ **근거의 출처는 파서가 정한다**(스키마에 출처 필드가 없다 — 모델에게 물으면 그 말을 믿게 된다).
+  지문을 먼저 보므로 양쪽에 있는 구절은 지문(`''`)이고, 두 자료에 걸친 근거는 버려진다
+- ⚠️ 참고자료가 **없으면 프롬프트는 예전과 글자 하나까지 같다** — 규칙 블록도 데이터 키도 넣지 않는다
 - **개수는 비우면 AI 가 정한다** — prompt.ts 가 눈대중·상한만 주고, schema.ts 의 `maxItems` 와 parse.ts 의
   자름이 `PASSAGE_QUIZ_MAX_PER_TYPE` **하나**를 본다(셋이 갈라지면 스키마 위반으로 출력이 통째 실패)
 - 번호는 `numberQuizItems` 한 곳에서 매긴다 — 문제지와 정답표가 따로 세면 문항을 뺐을 때 어긋난다
 - 인쇄는 입력칸이 아니라 **만들 때 굳힌 지문**(`usePassageQuiz` 의 `source`)을 싣는다
 - 저장하지 않는 화면이라 떠나기 전에 묻는다: `hooks/useUnsavedGuard.ts` + `lib/nav-guard.ts`
   (`beforeunload` 는 메뉴 이동에서 발화하지 않아 링크 누름을 잡아채는 단계에서 한 번 더 본다)
+
+## lib/quiz-references (참고자료 찾기·붙이기)
+- 역할: 지문과 함께 읽을 자료(개념지·학교 프린트·기출 지문·작품 전문)를 **찾아 점수를 매기고**
+  붙인 것의 본문을 읽는다. 글자를 다루는 일은 `lib/passage-quiz/reference.ts` 가 맡는다
+- 의존: lib/supabase, lib/problem-bank(passage-search·queries.escapeIlike·detail-queries·work-title),
+  lib/reference-texts/queries, lib/concept-pick/plain-text
+  ⚠️ 배럴 셋을 **값으로 쓰지 않는다** — `@/lib/passage-quiz`·`@/lib/concept-pick` 은 순환이 되고
+  `@/lib/reference-texts` 는 pdf.js 를 이 화면 번들로 끌어온다. 전부 파일 경로로 가져온다
+- 주요 파일: types.ts, constants.ts, signals.ts(찾기 신호), labels.ts(이름·부제),
+  match.ts(합치기·점수·까닭), candidates.ts(자동 찾기), search.ts(직접 고르기), bodies.ts(본문 읽기)
+- ⚠️ `.or()` 를 쓰지 않는다 — 신호마다 쿼리를 하나씩 만들어 `allSettled` 로 돌리고 `key` 로 합친다.
+  한 조회가 실패해도 본 기능을 막지 않는다(실패한 수만 알린다)
+- ⚠️ 후보는 **본문을 읽지 않는다**(개념지 본문은 서버에서만 훑는다). 실제로 붙인 것만 `bodies.ts` 가 읽는다
+- 점수: 신호 무게(`MATCH_WEIGHTS`) 합 + 종류 덤(`KIND_BONUS`), `MATCH_MIN_SCORE` 미만은 안 붙인다
+
+## lib/reference-texts (작품 전문)
+- 역할: 작품 원문 CRUD 와 파일 가져오기(`.txt`·PDF 글자 레이어)
+- 의존: lib/supabase, lib/problem-bank/queries(escapeIlike), lib/pdf(openPdfSource·readPageText)
+- 주요 파일: constants.ts, form.ts(입력값·검사·정규화), queries.ts, save.ts(낙관적 동시성),
+  import-text.ts(순수: 잇기·판정), import.ts(브라우저: 파일 읽기)
+- ⚠️ 본문은 **평문**이다 — 정화할 마크업이 없고 화면은 텍스트 노드로 그린다
+- ⚠️ 배럴(`index.ts`)은 pdf.js 를 끌어온다. 조회만 필요한 쪽은 `./queries` 를 파일 경로로 가져갈 것
 
 ## lib/page-orientation (쪽 방향 판정)
 - 역할: 스캔한 쪽이 뒤집혔는지 AI 에게 먼저 묻고, 바로 세울 각도를 돌려준다

@@ -5,9 +5,9 @@ import type { PassageQuizDropped } from '@/lib/passage-quiz';
 import type { QuizItem } from '@/lib/passage-quiz';
 
 const items: QuizItem[] = [
-  { id: 'a', kind: 'ox', text: '화자는 떠나는 이를 붙잡지 않는다.', answer: 'O', evidence: '말없이 고이 보내' },
-  { id: 'b', kind: 'short', text: '길에 뿌리는 꽃은?', answer: '진달래꽃', evidence: '영변에 약산' },
-  { id: 'c', kind: 'ox', text: '화자는 눈물을 흘린다.', answer: 'X', evidence: '죽어도 아니 눈물' },
+  { id: 'a', kind: 'ox', text: '화자는 떠나는 이를 붙잡지 않는다.', answer: 'O', evidence: '말없이 고이 보내', source: '' },
+  { id: 'b', kind: 'short', text: '길에 뿌리는 꽃은?', answer: '진달래꽃', evidence: '영변에 약산', source: '' },
+  { id: 'c', kind: 'ox', text: '화자는 눈물을 흘린다.', answer: 'X', evidence: '죽어도 아니 눈물', source: '개념지 · 진달래꽃' },
 ];
 
 const dropped = (over: Partial<PassageQuizDropped> = {}): PassageQuizDropped => ({
@@ -38,7 +38,9 @@ describe('PassageQuizList', () => {
 
   it('근거는 접어 두되 지운 문항은 보여 주지 않는다', () => {
     render(<PassageQuizList {...props()} />);
-    expect(screen.getAllByText('지문 근거')).toHaveLength(3);
+    // 참고자료에서 온 근거는 어느 자료인지 함께 적는다 — 지문을 아무리 훑어도 없는 구절이다
+    expect(screen.getAllByText('지문 근거')).toHaveLength(2);
+    expect(screen.getByText('근거 · 개념지 · 진달래꽃')).toBeTruthy();
     expect(screen.queryByLabelText('4번 문항 빼기')).toBeNull();
   });
 
@@ -50,8 +52,8 @@ describe('PassageQuizList', () => {
 
   it('왜 적게 나왔는지 적는다 — 안 적으면 "왜 세 개뿐이지" 만 남는다', () => {
     render(<PassageQuizList {...props({ dropped: dropped({ evidenceNotInText: 2, answerNotInText: 1 }) })} />);
-    expect(screen.getByText(/근거 구절이 지문에 없어 뺀 문항 2개/)).toBeTruthy();
-    expect(screen.getByText(/답이 지문에 없어 뺀 단답형 1개/)).toBeTruthy();
+    expect(screen.getByText(/근거 구절이 지문·참고자료에 없어 뺀 문항 2개/)).toBeTruthy();
+    expect(screen.getByText(/답이 지문·참고자료에 없어 뺀 단답형 1개/)).toBeTruthy();
   });
 
   it('버린 것이 없으면 안내를 띄우지 않는다', () => {

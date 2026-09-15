@@ -22,6 +22,19 @@
 - 시험지는 `concept_sheets.print_bundle_id` 로 이어지고 **묶음당 하나**다(부분 유니크 인덱스).
   묶음을 지우면 그 시험지도 CASCADE 로 함께 지워진다 — 확인창이 그 수를 반드시 밝힌다
 
+### reference_texts (작품 전문, sql/30)
+- SELECT/INSERT/UPDATE/DELETE: 공유(도메인 로그인 전원). `user_id` 와 `char_count` 는 **트리거가 채운다**
+  — 앱이 보내는 값은 무시된다
+- UPDATE 는 `.eq('updated_at', 불러올 때의 값)` 으로 **낙관적 동시성**을 건다(0행이면 남이 먼저 고친 것)
+- 목록은 `REFERENCE_TEXT_LIST_COLUMNS`(본문 제외)로만 읽는다 — 전문 한 편이 수만 자다
+- 검색은 칸마다 `ilike` 를 따로 돌려 합친다(`.or()` 금지 — 이스케이프가 인용을 통과하며 풀린다)
+
+### 참고자료 조회 (문제 만들기 화면)
+- 후보 찾기는 `concept_sheets`·`passages`·`reference_texts` 를 **신호마다 한 쿼리씩** 병렬로 돌린다.
+  본문은 안 읽는다(개념지 본문은 `ilike('editor_html', …)` 로 서버에서만 훑는다)
+- 붙인 자료의 본문만 id 로 따로 읽는다 — `concept_sheets(id, editor_html)` ·
+  `fetchPassagesByIds` · `reference_texts(id, body)`
+
 ### exams
 - SELECT: 시험지 목록 및 상세 조회
 - INSERT: 새 시험지 생성

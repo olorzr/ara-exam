@@ -9,6 +9,7 @@ import { htmlToPlainText } from '@/lib/concept-pick/plain-text';
 import { fetchPassagesByIds } from '@/lib/problem-bank/detail-queries';
 import { passagePickName, searchPassages, type PassagePickRow } from '@/lib/problem-bank/passage-search';
 import { sourceLabel } from '@/lib/problem-bank/source-label';
+import type { PickedPassageMeta } from '@/lib/quiz-references/types';
 
 /**
  * 아카이브에 쌓인 지문을 골라 오는 창.
@@ -22,6 +23,13 @@ export interface PickedPassage {
   text: string;
   title: string;
   author: string;
+  /**
+   * 참고자료 자동 매칭이 쓰는 정보 — 단원·교과서·학교.
+   *
+   * 붙여넣기로는 알 수 없는 **강한 신호**다. 같은 교과서의 같은 단원 개념지는 그 지문을
+   * 가르치려고 만든 것이라, 작품명이 안 맞아도 쓸모가 있다.
+   */
+  meta: PickedPassageMeta;
 }
 
 interface PassagePickerDialogProps {
@@ -109,6 +117,14 @@ function PickerBody({ onClose, onPick }: Omit<PassagePickerDialogProps, 'open'>)
           text: htmlToPlainText(passage.html),
           title: passage.title,
           author: passage.author,
+          meta: {
+            id: passage.id,
+            unitPath: passage.unit_path ?? [],
+            textbook: row.source.textbook ?? '',
+            grade: row.source.grade ?? '',
+            schoolName: row.source.school_name ?? '',
+            year: row.source.year ?? '',
+          },
         });
         onClose();
       })

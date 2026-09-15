@@ -111,3 +111,11 @@ describe('hasUsableText — 옛한글', () => {
     expect(hasUsableText('가나다라마'.repeat(50) + '\uE0BC'.repeat(100))).toBe(true)
   })
 })
+
+describe('readPageText 와 extractPageText 의 갈림', () => {
+  it('문턱(hasUsableText)은 기출 OCR 것이다 — 짧은 쪽은 통과하지 못한다', () => {
+    // 시 한 쪽은 200자가 안 된다. 작품 전문 가져오기가 extractPageText 를 쓰면
+    // 그런 쪽이 통째로 빈다 — 그래서 가리지 않는 readPageText 를 따로 둔다
+    expect(hasUsableText('나 보기가 역겨워 가실 때에는 말없이 고이 보내 드리오리다')).toBe(false)
+  })
+})

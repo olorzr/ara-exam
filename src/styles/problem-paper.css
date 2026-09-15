@@ -345,6 +345,21 @@
   overflow-wrap: anywhere;
 }
 
+/* 근거가 지문이 아니라 참고자료에서 왔을 때 — 없으면 지문을 아무리 훑어도 못 찾는다 */
+.pb-quiz-evidence-src {
+  margin-left: 4px;
+  color: #6b7280;
+  font-size: 0.9em;
+}
+
+/* 정답표 머리에 싣는 '함께 읽은 자료' 줄 */
+.pb-quiz-refs {
+  margin: 0 0 6px;
+  font-size: 9pt;
+  color: #6b7280;
+  overflow-wrap: anywhere;
+}
+
 /*
  * 연과 연 사이. 빈 줄은 블록을 나누며 사라지므로 여백을 여기서 되돌린다 —
  * 자리가 모자라 쪼갠 조각에는 붙이지 않는다(원래 이어지던 글이다).

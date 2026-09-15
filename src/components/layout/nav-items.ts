@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  BookText,
   ClipboardCheck,
   FileScan,
   FolderCog,
@@ -110,6 +111,9 @@ export function buildNavSections(isAdmin: boolean): NavSection[] {
         // 스캔 올리기(/print-sheets/upload)와 시험지(/print-sheets/[bundleId])도 이 항목이다.
         // 개념지와 경로가 갈려 있어 서로를 켜지 않는다(세그먼트 접두사 비교).
         { href: '/print-sheets', label: '학교 프린트 시험지', icon: FileScan },
+        // 새로 올리기(/reference-texts/new)와 편집(/reference-texts/[id])도 이 항목이다.
+        // 여기 올린 전문은 문제 만들기가 참고자료로 읽는다
+        { href: '/reference-texts', label: '작품 전문', icon: BookText },
       ],
     },
     {

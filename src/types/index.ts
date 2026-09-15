@@ -177,3 +177,6 @@ export * from './problem-bank';
 
 // 학교 프린트 시험지 (sql/26)
 export * from './print-scan';
+
+// 작품 전문 (sql/30)
+export * from './reference-text';

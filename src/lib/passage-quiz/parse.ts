@@ -3,14 +3,21 @@ import {
   PASSAGE_QUIZ_ANSWER_MAX, PASSAGE_QUIZ_EVIDENCE_MAX, PASSAGE_QUIZ_MAX_PER_TYPE,
   PASSAGE_QUIZ_QUESTION_MAX, PASSAGE_QUIZ_STATEMENT_MAX,
 } from './constants';
+import type { QuizReferenceText } from './reference';
 import type { OxItem, PassageQuizCounts, ShortItem } from './schema';
 
 /**
  * 출제 응답을 검증한다 (순수 함수).
  *
- * 스키마는 모양만 강제하므로 **지문과 맞는지**는 여기서 본다. 막아야 할 것이 둘이다:
- *  ① 지어낸 근거 — 지문에 없는 구절을 근거라고 적으면, 선생님이 채점할 때 근거가 어디에도 없다.
- *  ② 지어낸 답 — 단답형 답이 지문에 없으면 학생이 아무리 읽어도 쓸 수 없다.
+ * 스키마는 모양만 강제하므로 **지문·참고자료와 맞는지**는 여기서 본다. 막아야 할 것이 둘이다:
+ *  ① 지어낸 근거 — 어디에도 없는 구절을 근거라고 적으면, 선생님이 채점할 때 근거가 없다.
+ *  ② 지어낸 답 — 단답형 답이 어디에도 없으면 학생이 아무리 읽어도 쓸 수 없다.
+ *
+ * ⚠️ **근거의 출처는 여기서 정한다**(모델에게 묻지 않는다 — `schema.ts` 참고). 지문을 **먼저**
+ *    보므로 지문과 참고자료 양쪽에 있는 구절은 지문(`''`)이 된다. 채점하는 사람이 지문부터
+ *    펴 보는 것이 자연스럽고, 그래야 참고자료가 없을 때와 결과가 같다.
+ * ⚠️ 한 구절이 **한 자료 안에** 통째로 있어야 한다. 지문 한 조각 + 참고자료 한 조각을 이어 붙인
+ *    근거는 어느 쪽에도 그대로 없으므로 버려진다 — 프롬프트도 그렇게 못박는다.
  *
  * ⚠️ 대조는 **`foldStrict`** 로 한다. `foldLoose` 로 접으면 공백이 사라져
  *    '아버지가 방에' 와 '아버지 가방에' 가 같아진다 — 지어낸 문장이 그대로 통과한다
@@ -20,9 +27,9 @@ import type { OxItem, PassageQuizCounts, ShortItem } from './schema';
 
 /** 왜 버렸는지 — "왜 적게 나왔는지" 를 사람에게 설명할 재료다 */
 export interface PassageQuizDropped {
-  /** 근거 구절이 지문에 없었다 */
+  /** 근거 구절이 지문·참고자료 어디에도 없었다 */
   evidenceNotInText: number;
-  /** 단답형 답이 지문에 없었다 */
+  /** 단답형 답이 지문·참고자료 어디에도 없었다 */
   answerNotInText: number;
   /** 같은 문항이 두 번 왔다 */
   duplicate: number;
@@ -37,10 +44,15 @@ export interface PassageQuizResult {
 }
 
 export interface PassageQuizParseContext {
-  /** 지문 평문 — '지문에 있는가' 판정의 기준 */
+  /** 지문 평문 — '있는가' 판정의 첫 기준 */
   plain: string;
   /** 유형별 요청 개수 (상한을 여기서도 지킨다) */
   counts: PassageQuizCounts;
+  /**
+   * 함께 보낸 참고자료. 근거·답이 여기 있어도 통과하고, 그 이름이 출처가 된다.
+   * 비우면 지문만 본다(예전과 같은 동작).
+   */
+  references?: readonly QuizReferenceText[];
 }
 
 /**
@@ -72,7 +84,7 @@ function str(row: Record<string, unknown>, key: string): string {
 /**
  * 응답 JSON 을 검증해 문항 목록으로.
  * @param raw - 검증 전 JSON 문자열
- * @param ctx - 지문 평문과 요청 개수
+ * @param ctx - 지문 평문·요청 개수·참고자료
  * @returns 만든 문항과 버린 이유. 모양이 깨졌으면 null (빈 배열은 정상이다)
  */
 export function parsePassageQuiz(
@@ -90,7 +102,22 @@ export function parsePassageQuiz(
   const value = parsed as Record<string, unknown>;
   if (!Array.isArray(value.ox) || !Array.isArray(value.short)) return null;
 
-  const folded = foldStrict(ctx.plain);
+  // 근거를 찾을 곳 — **지문이 먼저다**(둘 다 있으면 지문이 이긴다).
+  // 빈 본문은 아예 빼 둔다: 접으면 빈 글자가 되어 무엇에든 들어 있다고 판정된다
+  const sources = [
+    { label: '', folded: foldStrict(ctx.plain) },
+    ...(ctx.references ?? [])
+      .filter((ref) => ref.plain.trim() !== '')
+      .map((ref) => ({ label: ref.label, folded: foldStrict(ref.plain) })),
+  ];
+  /**
+   * 이 구절이 어느 자료에 글자 그대로 있는가.
+   * @param folded - 접어 둔 구절
+   * @returns 찾은 자료의 이름(지문이면 ''). 어디에도 없으면 null
+   */
+  const findSource = (folded: string): string | null =>
+    sources.find((src) => src.folded.includes(folded))?.label ?? null;
+
   const dropped: PassageQuizDropped = {
     evidenceNotInText: 0, answerNotInText: 0, duplicate: 0, malformed: 0,
   };
@@ -103,7 +130,9 @@ export function parsePassageQuiz(
    */
   const check = (
     item: unknown, textKey: string, textMax: number,
-  ): { row: Record<string, unknown>; text: string; evidence: string; key: string } | null => {
+  ): {
+    row: Record<string, unknown>; text: string; evidence: string; key: string; source: string;
+  } | null => {
     if (!item || typeof item !== 'object') {
       dropped.malformed += 1;
       return null;
@@ -118,8 +147,9 @@ export function parsePassageQuiz(
       dropped.malformed += 1;
       return null;
     }
-    // 지어낸 근거를 막는다 — 근거가 지문에 없으면 채점할 자리가 없다
-    if (!folded.includes(foldedEvidence)) {
+    // 지어낸 근거를 막는다 — 근거가 어디에도 없으면 채점할 자리가 없다
+    const source = findSource(foldedEvidence);
+    if (source === null) {
       dropped.evidenceNotInText += 1;
       return null;
     }
@@ -131,7 +161,7 @@ export function parsePassageQuiz(
     // ⚠️ `seen` 에는 **모든 검사를 통과한 뒤**에 넣는다(호출부가 넣는다).
     //    여기서 넣으면 뒤에 오는 검사에 걸려 버려진 문항이 자리를 맡아 버려,
     //    같은 물음의 **멀쩡한 문항**이 중복으로 몰려 함께 사라진다
-    return { row, text, evidence: evidence.slice(0, PASSAGE_QUIZ_EVIDENCE_MAX), key };
+    return { row, text, evidence: evidence.slice(0, PASSAGE_QUIZ_EVIDENCE_MAX), key, source };
   };
 
   const ox: OxItem[] = [];
@@ -147,7 +177,9 @@ export function parsePassageQuiz(
       continue;
     }
     seen.add(checked.key);
-    ox.push({ statement: checked.text, answer, evidence: checked.evidence });
+    ox.push({
+      statement: checked.text, answer, evidence: checked.evidence, source: checked.source,
+    });
   }
 
   const short: ShortItem[] = [];
@@ -163,13 +195,15 @@ export function parsePassageQuiz(
       dropped.malformed += 1;
       continue;
     }
-    // 학생이 지문에서 찾아 쓰는 문항이다 — 지문에 없는 답은 쓸 길이 없다
-    if (!folded.includes(foldedAnswer)) {
+    // 학생이 지문·참고자료에서 찾아 쓰는 문항이다 — 어디에도 없는 답은 쓸 길이 없다
+    if (findSource(foldedAnswer) === null) {
       dropped.answerNotInText += 1;
       continue;
     }
     seen.add(checked.key);
-    short.push({ question: checked.text, answer, evidence: checked.evidence });
+    short.push({
+      question: checked.text, answer, evidence: checked.evidence, source: checked.source,
+    });
   }
 
   return { ox, short, dropped };

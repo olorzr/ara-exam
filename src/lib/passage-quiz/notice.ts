@@ -25,6 +25,6 @@ export function passageQuizEmptyNotice(result: PassageQuizResult): PassageQuizEm
   }
   return {
     level: 'warning',
-    text: '만든 문항이 모두 지문과 맞지 않아 뺐어요. 지문을 다시 확인하고 시도해 주세요.',
+    text: '만든 문항이 모두 지문·참고자료와 맞지 않아 뺐어요. 지문을 다시 확인하고 시도해 주세요.',
   };
 }

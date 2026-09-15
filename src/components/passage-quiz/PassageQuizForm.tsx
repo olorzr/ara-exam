@@ -25,6 +25,13 @@ interface PassageQuizFormProps {
   onGenerate: () => void;
   onCancel: () => void;
   onOpenPicker: () => void;
+  /**
+   * 입력값 밖의 사정으로 못 만드는 까닭 (참고자료를 불러오는 중·합이 너무 김).
+   * ⚠️ 입력값 자체의 문제(`draftBlocker`)가 **먼저다** — 지문이 비었으면 그 말부터 해야 한다.
+   */
+  extraBlocker?: string | null;
+  /** 작품명·지은이 칸을 떠났을 때 (참고자료를 다시 찾는다) */
+  onSignalsBlur?: () => void;
 }
 
 /**
@@ -34,8 +41,9 @@ interface PassageQuizFormProps {
  */
 export default function PassageQuizForm({
   draft, onChange, running, onGenerate, onCancel, onOpenPicker,
+  extraBlocker = null, onSignalsBlur,
 }: PassageQuizFormProps) {
-  const blocker = draftBlocker(draft);
+  const blocker = draftBlocker(draft) ?? extraBlocker;
   const tooLong = draft.text.length > PASSAGE_QUIZ_TEXT_LIMIT;
 
   return (
@@ -47,6 +55,7 @@ export default function PassageQuizForm({
             id="quiz-title"
             value={draft.title}
             placeholder="진달래꽃"
+            onBlur={onSignalsBlur}
             onChange={(e) => onChange({ title: e.target.value })}
           />
         </div>
@@ -56,6 +65,7 @@ export default function PassageQuizForm({
             id="quiz-author"
             value={draft.author}
             placeholder="김소월"
+            onBlur={onSignalsBlur}
             onChange={(e) => onChange({ author: e.target.value })}
           />
         </div>
@@ -101,7 +111,7 @@ export default function PassageQuizForm({
 
       <p className="text-xs text-gray-500">
         개수를 비워 두면 지문을 보고 <b>AI 가 정합니다</b>(유형마다 최대 {PASSAGE_QUIZ_MAX_PER_TYPE}개).
-        0 을 적으면 그 유형은 만들지 않아요. 근거가 지문에 없는 문항은 자동으로 빠집니다.
+        0 을 적으면 그 유형은 만들지 않아요. 근거가 지문·참고자료에 없는 문항은 자동으로 빠집니다.
         AI 는 선생님 컴퓨터의 ChatGPT 를 씁니다 —{' '}
         <Link href="/settings/ai" className="text-primary underline underline-offset-2">
           AI 연결
