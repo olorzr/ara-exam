@@ -9,6 +9,7 @@ import {
   Layers,
   Library,
   Lightbulb,
+  ListChecks,
   ScrollText,
   ShieldCheck,
   Sparkles,
@@ -132,7 +133,7 @@ export function buildNavSections(isAdmin: boolean): NavSection[] {
     {
       kind: 'group',
       id: 'problems',
-      label: '기출 문제',
+      label: '문제 은행',
       icon: Library,
       items: [
         // 경로가 /problems 가 아니라 /problems/archive 인 이유: 활성 판정이 세그먼트
@@ -149,6 +150,8 @@ export function buildNavSections(isAdmin: boolean): NavSection[] {
         { href: '/problems/sources', label: '출처·검수', icon: ClipboardCheck },
         // 저장된 문제지 보기(/problems/papers/[id])도 이 항목 아래다
         { href: '/problems/papers', label: '문제지 조합', icon: Layers },
+        // 지문을 넣으면 AI 가 O,X·단답형을 만든다. 만든 문항은 저장하지 않아 하위 경로가 없다
+        { href: '/problems/quiz', label: 'O,X·단답형', icon: ListChecks },
       ],
     },
     {

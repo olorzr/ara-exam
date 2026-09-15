@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BookOpen, FileText, PlusCircle, History, Upload, FolderOpen, FolderCog, Lightbulb } from 'lucide-react';
+import { BookOpen, FileText, PlusCircle, History, Upload, FolderOpen, FolderCog, Lightbulb, ListChecks } from 'lucide-react';
 
 /**
  * 대시보드 페이지. 통계 요약과 빠른 실행 메뉴를 표시한다.
@@ -50,6 +50,7 @@ export default function DashboardPage() {
     { href: '/problems/archive', icon: FolderOpen, label: '문제 아카이브', desc: '기출 문항을 찾아봐요 🗂️' },
     { href: '/problems/upload', icon: PlusCircle, label: '기출 업로드', desc: 'PDF 를 읽어 문항으로 옮겨요 📤' },
     { href: '/problems/papers/new', icon: FileText, label: '문제지 조합', desc: '기출로 문제지를 만들어요 🧩' },
+    { href: '/problems/quiz', icon: ListChecks, label: 'O,X·단답형', desc: '지문으로 O,X·단답형을 만들어요 ✅' },
   ];
 
   return (

@@ -315,3 +315,39 @@
   font-weight: 700;
   color: #2F8F86;
 }
+
+/* ── O,X·단답형 (지문으로 만든 문항) ───────────────── */
+
+/*
+ * 지문을 붙여 넣은 **평문** 그대로 인쇄한다. 시는 행갈이가 곧 내용이라
+ * 줄바꿈을 접으면 연이 산문처럼 붙는다(HTML 이 아니라 텍스트 노드로 그린다).
+ */
+.pb-quiz-passage {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* O,X 답 쓰는 칸 — 문항 오른쪽 끝에 붙는다 */
+.pb-quiz-box {
+  margin-left: 6px;
+  font-size: 10pt;
+  letter-spacing: 2px;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+/* 정답표 아래의 근거 — 채점하며 지문의 어디인지 바로 찾게 한다 */
+.pb-quiz-evidence {
+  font-size: 9pt;
+  color: #6b7280;
+  margin: 0 0 3px;
+  overflow-wrap: anywhere;
+}
+
+/*
+ * 연과 연 사이. 빈 줄은 블록을 나누며 사라지므로 여백을 여기서 되돌린다 —
+ * 자리가 모자라 쪼갠 조각에는 붙이지 않는다(원래 이어지던 글이다).
+ * margin 이 아니라 padding 인 까닭: 좌우 테두리가 조각마다 이어져야 한 상자로 보인다.
+ */
+.pb-passage-part--gap { padding-top: 7pt; }

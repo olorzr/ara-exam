@@ -40,9 +40,10 @@
 ## GET /api/ai/status
 - 설명: AI 기능 활성 여부 조회. 화면이 AI UI 를 그릴지 판단하는 데 쓴다
 - 인증: `Authorization: Bearer <supabase access_token>` (도메인 검사 포함)
-- Response: `{ enabled: boolean, features: { problem_ocr: boolean, print_ocr: boolean, concept_pick: boolean } }`
-  - `problem_ocr` 기출 PDF 읽기 · `print_ocr` 학교 프린트 스캔 읽기 · `concept_pick` 개념지 빈칸 추천
-  - 셋 다 같은 서버 env `AI_OCR_BETA` 를 본다. ⚠️ 기능을 추가하면 **다섯 곳을 함께** 고칠 것
+- Response: `{ enabled: boolean, features: { problem_ocr: boolean, print_ocr: boolean, concept_pick: boolean, passage_quiz: boolean } }`
+  - `problem_ocr` 기출 PDF 읽기 · `print_ocr` 학교 프린트 스캔 읽기 · `concept_pick` 개념지 빈칸 추천 ·
+    `passage_quiz` 지문으로 O,X·단답형 만들기
+  - 넷 다 같은 서버 env `AI_OCR_BETA` 를 본다. ⚠️ 기능을 추가하면 **다섯 곳을 함께** 고칠 것
     (`AiFeature` 타입 · `isFeatureEnabled` · 이 라우트의 OFF·응답 · `useAiEnabled` 의 타입과 OFF ·
     `ocrStillEnabled` 호출부). 하나라도 빠지면 그 키가 undefined 가 되어 '꺼짐'과 '아직 모름'이 섞인다
 - 에러: 401 `{ ok: false, reason: 'unauthorized' }`

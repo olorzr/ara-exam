@@ -70,7 +70,7 @@ describe('학교 프린트 시험지 메뉴', () => {
   });
 });
 
-describe('기출 문제 메뉴', () => {
+describe('문제 은행 메뉴', () => {
   it('형제 경로가 서로를 켜지 않는다 — /problems 를 실제 경로로 두지 않은 이유', () => {
     const archive = findItem(sections, '/problems/archive');
     const upload = findItem(sections, '/problems/upload');
@@ -92,6 +92,14 @@ describe('기출 문제 메뉴', () => {
   it('출처 상세(검수 화면)는 출처·검수에 붙는다', () => {
     const sources = findItem(sections, '/problems/sources');
     expect(isNavItemActive('/problems/sources/abc-123', sources)).toBe(true);
+  });
+
+  it('O,X·단답형은 자기 경로에서만 켜진다 — 형제와 서로를 켜지 않는다', () => {
+    const quiz = findItem(sections, '/problems/quiz');
+    expect(isNavItemActive('/problems/quiz', quiz)).toBe(true);
+    expect(isNavItemActive('/problems/archive', quiz)).toBe(false);
+    expect(isNavItemActive('/problems/quiz', findItem(sections, '/problems/archive'))).toBe(false);
+    expect(isNavItemActive('/problems/quiz', findItem(sections, '/problems/papers'))).toBe(false);
   });
 });
 
@@ -119,8 +127,10 @@ describe('buildNavSections', () => {
 
     const problems = sections.find((s) => s.id === 'problems')!;
     expect(problems.kind).toBe('group');
+    // 그룹 이름은 '문제 은행' — 접힘 상태 저장 키(id)는 'problems' 그대로다
+    expect(problems.kind === 'group' && problems.label).toBe('문제 은행');
     expect(problems.items.map((i) => i.label)).toEqual([
-      '문제 아카이브', '기출 업로드', '출처·검수', '문제지 조합',
+      '문제 아카이브', '기출 업로드', '출처·검수', '문제지 조합', 'O,X·단답형',
     ]);
 
     const etc = sections.find((s) => s.id === 'etc')!;

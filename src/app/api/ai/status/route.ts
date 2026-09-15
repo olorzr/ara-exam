@@ -11,12 +11,12 @@ import { isAiOcrEnabled, isFeatureEnabled } from '@/lib/ai/flags';
 /** 꺼진 상태 응답 — 마스터가 꺼져 있으면 "없는 기능"처럼 보이게 한다. */
 const OFF = {
   enabled: false,
-  features: { problem_ocr: false, print_ocr: false, concept_pick: false },
+  features: { problem_ocr: false, print_ocr: false, concept_pick: false, passage_quiz: false },
 } as const;
 
 /**
  * GET /api/ai/status
- * @returns `{ enabled, features: { problem_ocr, print_ocr, concept_pick } }` (로그인 안 됐으면 401)
+ * @returns `{ enabled, features: { problem_ocr, print_ocr, concept_pick, passage_quiz } }` (로그인 안 됐으면 401)
  */
 export async function GET(request: NextRequest) {
   const session = await requireSession(request);
@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
       problem_ocr: isFeatureEnabled('problem_ocr'),
       print_ocr: isFeatureEnabled('print_ocr'),
       concept_pick: isFeatureEnabled('concept_pick'),
+      passage_quiz: isFeatureEnabled('passage_quiz'),
     },
   });
 }

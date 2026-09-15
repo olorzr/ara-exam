@@ -18,6 +18,8 @@ export interface AiEnabled {
     print_ocr: boolean;
     /** 개념지 빈칸 추천 */
     concept_pick: boolean;
+    /** 지문으로 O,X·단답형 만들기 */
+    passage_quiz: boolean;
   };
 }
 
@@ -25,7 +27,7 @@ export interface AiEnabled {
 //    빠뜨리면 런타임에 undefined 가 되어 '꺼짐'과 '아직 모름'이 뒤섞인다.
 const OFF: AiEnabled = {
   enabled: false,
-  features: { problem_ocr: false, print_ocr: false, concept_pick: false },
+  features: { problem_ocr: false, print_ocr: false, concept_pick: false, passage_quiz: false },
 };
 
 /**

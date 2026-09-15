@@ -152,6 +152,18 @@
 - 코드에서의 사용: `Passage`, `passages` 표, 문항의 `passage_id`
 - 관련 파일: src/lib/problem-ocr/merge.ts, src/lib/problem-paper/blocks.ts
 
+## O,X·단답형 (passage quiz)
+- 정의: 지문(문학 작품·비문학 글)을 넣으면 AI 가 만들어 주는 **O,X 문항과 단답형 문항**. `/problems/quiz`
+- ⚠️ **저장하지 않는다.** DB 표가 없고 새로고침하면 사라진다 — 만들어 고치고 인쇄까지가 한 자리다
+  (문항으로 저장하려면 `question_type` CHECK·출처 NOT NULL·인쇄 렌더러 3곳을 함께 고쳐야 한다)
+- ⚠️ 근거 구절과 단답형 답이 지문에 **글자 그대로** 있는지 기계가 대조한다(`foldStrict`). 없으면 그 문항을
+  버리고 몇 개를 왜 뺐는지 화면에 적는다 — 프롬프트와 파서는 한 쌍이라 한쪽만 느슨하게 하지 말 것
+- 개수는 비우면 AI 가 정하고(유형마다 최대 `PASSAGE_QUIZ_MAX_PER_TYPE`), 숫자를 적으면 그만큼, 0 이면 안 낸다
+- 기능 플래그는 `passage_quiz`(마스터는 `AI_OCR_BETA`)
+- 코드에서의 사용: `runPassageQuiz`, `parsePassageQuiz`, `usePassageQuiz`, `QuizItem`, `numberQuizItems`
+- 관련 파일: src/lib/passage-quiz/, src/hooks/usePassageQuiz.ts, src/components/passage-quiz/,
+  src/app/(main)/problems/quiz/page.tsx, src/lib/problem-bank/passage-search.ts
+
 ## 문항 (Problem)
 - 정의: 발문·선지·정답을 가진 문제 하나. 단어 시험지의 '문항'과는 다른 개념이다.
   배점 컬럼(`score`)은 남아 있지만 2026-09-08 부터 읽지도 보여 주지도 않는다

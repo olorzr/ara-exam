@@ -22,7 +22,9 @@ src/
 │       │   ├── history/     # 단어 시험지 (목록 + 새 시험지 버튼)
 │       │   ├── builder/     # 개념지 (목록 + [id] 편집기)
 │       │   └── view/        # 시험지/답안지/단어장 보기
-│       └── print-sheets/    # 학교 프린트 시험지 (목록 · upload 스캔 올리기 · [bundleId] 편집)
+│       ├── print-sheets/    # 학교 프린트 시험지 (목록 · upload 스캔 올리기 · [bundleId] 편집)
+│       └── problems/         # 문제 은행 (archive 아카이브 · upload 기출 올리기 · sources 검수 ·
+│                             #            papers 문제지 조합 · quiz O,X·단답형)
 ├── components/
 │   ├── layout/              # 앱 셸 (AppShell·Sidebar·nav-items — 좌측 사이드바 네비게이션)
 │   ├── print-scan/          # 학교 프린트 스캔 (스캔 정보 폼·쪽 묶기·묶음 폼·목록 줄·원본 쪽 패널·쪽 크게 보기)
@@ -132,7 +134,7 @@ src/
 
 ---
 
-## 기출 문제 은행 (2026-09)
+## 문제 은행 (2026-09)
 
 학교 기출·모의고사·문제집 PDF 를 읽어 문항 단위로 쌓고, 골라서 새 문제지를 만든다.
 
@@ -158,6 +160,9 @@ src/
           + 필터(출처·학교·년도·학년·학기·시험·교과서·단원·영역·검색)
           + 페이지네이션 + 선택 삭제
 [문제지]  드래그 조합 → RPC create_problem_paper(스냅샷) → A4 인쇄 3종
+[O,X·단답형] 지문 붙여넣기(또는 아카이브 지문 불러오기) → 코덱스 turn 한 번
+          → 근거·답을 지문과 대조해 거르기 → 화면에서 수정·삭제 → 문제지·정답표 인쇄
+          · **저장하지 않는다**(DB 표 없음, 새로고침하면 사라진다)
 ```
 
 ### 모듈
@@ -217,6 +222,21 @@ src/
 - **개수는 AI 가 정한다** — prompt.ts 가 눈대중·상한만 주고, schema.ts 의 `maxItems` 와 parse.ts 의
   자름이 `CONCEPT_PICK_MAX_COUNT` **하나**를 본다(셋이 갈라지면 스키마 위반으로 출력이 통째 실패)
 
+## lib/passage-quiz (O,X·단답형)
+- 역할: 지문(문학·비문학)을 받아 O,X 문항과 단답형 문항을 만든다. 만든 것은 **저장하지 않는다**
+- 의존: lib/ai(generateDraft·wrapUntrustedData), lib/concept-pick/fold(대조용 접기)
+  ⚠️ `@/lib/concept-pick` **배럴을 쓰지 않는다** — 그쪽이 run.ts 를 재수출해 순환이 생긴다. 파일 경로로 가져온다
+- 주요 파일: constants.ts, schema.ts, prompt.ts, parse.ts(근거·답 대조), notice.ts,
+  items.ts(화면용 목록·번호 매기기), draft.ts(입력값 검사), print-blocks.ts(지문 쪼개기), run.ts
+- 근거 구절과 단답형 답이 지문에 글자 그대로 있는지 **`foldStrict` 로 대조**한다. `foldLoose` 로 접으면
+  공백이 사라져 '아버지가 방에'와 '아버지 가방에'가 같아진다 — 지어낸 문장이 그대로 통과한다
+- **개수는 비우면 AI 가 정한다** — prompt.ts 가 눈대중·상한만 주고, schema.ts 의 `maxItems` 와 parse.ts 의
+  자름이 `PASSAGE_QUIZ_MAX_PER_TYPE` **하나**를 본다(셋이 갈라지면 스키마 위반으로 출력이 통째 실패)
+- 번호는 `numberQuizItems` 한 곳에서 매긴다 — 문제지와 정답표가 따로 세면 문항을 뺐을 때 어긋난다
+- 인쇄는 입력칸이 아니라 **만들 때 굳힌 지문**(`usePassageQuiz` 의 `source`)을 싣는다
+- 저장하지 않는 화면이라 떠나기 전에 묻는다: `hooks/useUnsavedGuard.ts` + `lib/nav-guard.ts`
+  (`beforeunload` 는 메뉴 이동에서 발화하지 않아 링크 누름을 잡아채는 단계에서 한 번 더 본다)
+
 ## lib/page-orientation (쪽 방향 판정)
 - 역할: 스캔한 쪽이 뒤집혔는지 AI 에게 먼저 묻고, 바로 세울 각도를 돌려준다
 - 의존: lib/ai(generateDraft), lib/pdf(renderPdfPage·encodeAt)
@@ -263,7 +283,8 @@ src/
 - 주요 파일: queries.ts, facets.ts, mutations.ts, mutations-source.ts, review-data.ts,
   storage.ts, storage-paths.ts, bbox.ts, figure-placeholders.ts, figure-capture.ts,
   area-tree.ts, area-master.ts, unit-tree.ts, unit-master.ts, grammar-tree.ts,
-  scope-resolve.ts, scope-pick.ts, source-form.ts, filters.ts, selection.ts, school-exam-tree.ts
+  scope-resolve.ts, scope-pick.ts, source-form.ts, filters.ts, selection.ts, school-exam-tree.ts,
+  passage-search.ts(O,X·단답형에서 지문을 골라 오는 조회 — 목록에 html 을 싣지 않고 `.or()` 를 쓰지 않는다)
 - 분류의 세 축: **영역**(ara-system 마스터, 최대 4단), **교과서 단원**(이 앱의 카테고리 관리,
   2단), **문법**(코드 상수 마스터, 최대 3단). 셋 다 노드 id 가 아니라 **이름 경로 스냅샷**이다
 - 문법 축만 **문항에 여러 개** 붙는다(`grammar_paths`, 원소 하나가 경로 하나). 그래서 저장 모양과
