@@ -10,7 +10,7 @@ beforeEach(() => { seq = 0; });
 function passage(over: Partial<OcrItem> = {}): OcrItem {
   return {
     kind: 'passage', ref: 'P1', page: 1, box: null, passage_ref: null, number: null,
-    label: '[1~3]', title: '소나기', author: '황순원', html: '<p>지문</p>',
+    label: '[1~3]', title: '소나기', author: '황순원', title_source: 'printed', html: '<p>지문</p>',
     continued: false, continues: false, question_type: '객관식', stem_html: '',
     choices: [], answer: null, has_figure: false, figures: [], work_title: null,
     area_path: [], unit_path: [], grammar_paths: [], ...over,
@@ -20,7 +20,7 @@ function passage(over: Partial<OcrItem> = {}): OcrItem {
 function problem(over: Partial<OcrItem> = {}): OcrItem {
   return {
     kind: 'problem', ref: 'Q1', page: 1, box: null, passage_ref: null, number: 1,
-    label: null, title: null, author: null, html: '', continued: false, continues: false,
+    label: null, title: null, author: null, title_source: null, html: '', continued: false, continues: false,
     question_type: '객관식', stem_html: '<p>물음</p>', choices: ['가', '나'],
     answer: null, has_figure: false, figures: [], work_title: null, area_path: [], unit_path: [],
     grammar_paths: [], ...over,
@@ -295,11 +295,14 @@ describe('mergeOcrDrafts — 지문 합치기', () => {
     expect(res.passages[0].pageSpan).toBe(1);
   });
 
-  it('끝내 안 닫힌 지문이 있으면 알린다 — 어느 지문인지까지 짚는다', () => {
+  it('끝내 안 닫힌 지문이 있으면 알린다 — 이어 붙이라가 아니라 확인하라고 한다', () => {
     const res = mergeOcrDrafts([
       batch([passage({ continues: true })], [1]),
     ], { newId });
-    expect(said(res)).toContain('이어지는 지문');
+    // 병합이 대부분 자동으로 끝나므로 '이어 붙여 주세요' 는 할 일 없는 지시가 된다
+    expect(said(res)).toContain('이어질 수 있는 지문');
+    expect(said(res)).toContain('확인해 주세요');
+    expect(said(res)).not.toContain('이어 붙여 주세요');
     // 개수만 알려 주면 어느 지문인지 찾을 방법이 없다
     expect(toWarningObject(res.warnings[0]).targets).toEqual([
       { kind: 'passage', id: res.passages[0].id, page: 1, label: '1쪽 지문' },

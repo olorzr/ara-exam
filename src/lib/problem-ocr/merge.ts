@@ -354,6 +354,10 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
 
   // 지문이 끝내 안 닫혔으면 뒷부분이 빠졌을 수 있다 — 조용히 넘기지 않는다.
   // 개수만 세지 말고 **어느 지문인지** 짚는다(개수만으로는 찾을 방법이 없다)
+  // ⚠️ **'이어 붙여 주세요' 가 아니라 '확인해 주세요' 다**(2026-09-15). `findOpenPassage` 가
+  //    닫힌 지문에도 붙이게 된 뒤로 병합은 거의 자동으로 끝나고, 여기 남는 `open` 은 대개
+  //    마지막 조각의 `continues` 표시다 — 온전한 글에 손으로 이어 붙이라고 하면 할 일 없는
+  //    지시가 되어 선생님이 경고 전체를 안 믿게 된다
   const unclosed = passages.filter((p) => p.open);
   if (unclosed.length > 0) {
     const targets: OcrWarningTarget[] = unclosed.map((p) => ({
@@ -363,7 +367,7 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
       label: itemTargetLabel({ kind: 'passage', page: p.page_no }),
     }));
     warn({
-      message: `뒷부분이 이어지는 지문 ${unclosed.length}개가 있어요. 검수에서 이어 붙여 주세요.`,
+      message: `뒷부분이 이어질 수 있는 지문 ${unclosed.length}개가 있어요. 검수에서 본문이 끝까지 있는지만 확인해 주세요.`,
       targets,
     });
   }
