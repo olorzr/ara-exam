@@ -219,14 +219,19 @@ src/
 ## lib/concept-pick (AI 추천 빈칸)
 - 역할: 개념지 본문에서 빈칸으로 낼 용어를 골라 온다. 개념지·프린트 시험지 **양쪽**의 편집기에서 쓴다
 - 의존: lib/ai(generateDraft)
-- 주요 파일: plain-text.ts(HTML→평문 — 표·제목·목록의 구조를 기호로 남긴다), prompt.ts,
+- 주요 파일: plain-text.ts(HTML→평문 — 표·제목·목록의 구조를 기호로 남긴다),
+  chunk.ts(평문을 묶음으로 — **줄 경계로만** 자른다), prompt.ts,
   schema.ts, parse.ts, run.ts, fold.ts(대조용 접기),
   notice.ts(하나도 못 붙였을 때의 안내 — AI 가 일부러 안 고른 것과 다 걸러진 것을 가른다)
 - 마킹할 **자리**는 `lib/concept-mark-target.ts` 가 고른다: 자리 힌트 → 표 칸 → 첫 자리 순.
   "처음 나오는 곳" 으로 되돌리면 작품 원문에 빈칸이 뚫린다
 - 추천은 **띄어쓰기 없는 한 어절**만 통과시킨다 — `extractMarks` 가 공백으로 쪼개 세기 때문이다
-- **개수는 AI 가 정한다** — prompt.ts 가 눈대중·상한만 주고, schema.ts 의 `maxItems` 와 parse.ts 의
-  자름이 `CONCEPT_PICK_MAX_COUNT` **하나**를 본다(셋이 갈라지면 스키마 위반으로 출력이 통째 실패)
+- **양은 선생님 손 마킹의 밀도**다 — prompt.ts 가 `CONCEPT_PICK_DENSITY_PER_100`(100자당 5개)만
+  주고 개수는 본문 길이가 정한다. 근거는 `docs/concept-pick-criteria.md`
+- **묶음마다 한 번씩 부르고 받는 즉시 마킹한다** — run.ts 가 `onChunk` 로 올리고 훅이 그 자리에서
+  붙인다. 취소해도 거기까지는 남는다. `CONCEPT_PICK_MAX_COUNT` 는 **묶음 하나의 상한**이고,
+  schema.ts 의 `maxItems` 와 parse.ts 의 자름과 프롬프트 문구가 그 값 **하나**를 본다
+  (셋이 갈라지면 스키마 위반으로 출력이 통째 실패)
 
 ## lib/passage-quiz (O,X·단답형)
 - 역할: 지문(문학·비문학)과 **참고자료**를 받아 O,X 문항과 단답형 문항을 만든다.

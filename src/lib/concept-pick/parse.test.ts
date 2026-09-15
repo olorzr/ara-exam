@@ -10,12 +10,8 @@ const raw = (picks: unknown[]) => JSON.stringify({ picks });
 
 describe('parseConceptPicks', () => {
   it('본문에 있는 한 어절을 고른다', () => {
-    const result = parseConceptPicks(
-      raw([{ text: '서정시', reason: '갈래를 묻는 문항이 잦다' }]), ctx(),
-    );
-    expect(result?.picks).toEqual([
-      { text: '서정시', reason: '갈래를 묻는 문항이 잦다', context: '' },
-    ]);
+    const result = parseConceptPicks(raw([{ text: '서정시' }]), ctx());
+    expect(result?.picks).toEqual([{ text: '서정시', context: '' }]);
   });
 
   it('모양이 깨지면 null', () => {
@@ -24,26 +20,26 @@ describe('parseConceptPicks', () => {
   });
 
   it('본문에 없는 말은 버리고 센다 — 마킹할 자리가 없어 조용히 사라진다', () => {
-    const result = parseConceptPicks(raw([{ text: '역설법', reason: 'x' }]), ctx());
+    const result = parseConceptPicks(raw([{ text: '역설법' }]), ctx());
     expect(result?.picks).toHaveLength(0);
     expect(result?.dropped.notInText).toBe(1);
   });
 
   it('공백이 든 말은 버린다 — 빈칸이 두 개가 되어 문항 수와 합격 기준이 어긋난다', () => {
-    const result = parseConceptPicks(raw([{ text: '수미 상관', reason: 'x' }]), ctx());
+    const result = parseConceptPicks(raw([{ text: '수미 상관' }]), ctx());
     expect(result?.picks).toHaveLength(0);
     expect(result?.dropped.malformed).toBe(1);
   });
 
   it('한 글자는 버린다 — 더 긴 낱말 안쪽이 마킹된다', () => {
-    const result = parseConceptPicks(raw([{ text: '시', reason: 'x' }]), ctx());
+    const result = parseConceptPicks(raw([{ text: '시' }]), ctx());
     expect(result?.picks).toHaveLength(0);
     expect(result?.dropped.malformed).toBe(1);
   });
 
   it('이미 마킹된 용어와 중복 추천을 거른다', () => {
     const result = parseConceptPicks(
-      raw([{ text: '갈래', reason: 'x' }, { text: '화자', reason: 'y' }, { text: '화자', reason: 'z' }]),
+      raw([{ text: '갈래' }, { text: '화자' }, { text: '화자' }]),
       ctx({ existing: ['갈래'] }),
     );
     expect(result?.picks.map((p) => p.text)).toEqual(['화자']);
@@ -53,7 +49,7 @@ describe('parseConceptPicks', () => {
   it('상한을 넘는 추천은 잘라 낸다 — 스키마의 maxItems 를 믿지 않는다', () => {
     const words = Array.from({ length: CONCEPT_PICK_MAX_COUNT + 1 }, (_, i) => `용어${i}`);
     const result = parseConceptPicks(
-      raw(words.map((text) => ({ text, reason: '' }))),
+      raw(words.map((text) => ({ text }))),
       ctx({ plain: words.join(' ') }),
     );
     expect(result?.picks).toHaveLength(CONCEPT_PICK_MAX_COUNT);
@@ -67,36 +63,34 @@ describe('parseConceptPicks', () => {
 
   it('자리 힌트를 그대로 받는다 — 표에서 골랐으면 그 행이 온다', () => {
     const result = parseConceptPicks(
-      raw([{ text: '서정시', reason: 'x', context: '| 갈래 | 서정시 |' }]), ctx(),
+      raw([{ text: '서정시', context: '| 갈래 | 서정시 |' }]), ctx(),
     );
     expect(result?.picks[0].context).toBe('| 갈래 | 서정시 |');
   });
 
   it('공백·구분 기호가 달라도 힌트를 받아들인다 — 모델은 표 기호를 빠뜨린다', () => {
     const result = parseConceptPicks(
-      raw([{ text: '서정시', reason: 'x', context: '갈래  서정시' }]), ctx(),
+      raw([{ text: '서정시', context: '갈래  서정시' }]), ctx(),
     );
     expect(result?.picks[0].context).toBe('갈래  서정시');
   });
 
   it('쓸 수 없는 힌트는 비우되 추천은 살린다 — 힌트가 없으면 표를 먼저 보면 된다', () => {
     const notInText = parseConceptPicks(
-      raw([{ text: '서정시', reason: 'x', context: '본문에 없는 구절 서정시' }]), ctx(),
+      raw([{ text: '서정시', context: '본문에 없는 구절 서정시' }]), ctx(),
     );
     expect(notInText?.picks).toHaveLength(1);
     expect(notInText?.picks[0].context).toBe('');
 
     // 용어를 안 담은 구절은 자리를 가리키지 못한다
     const noText = parseConceptPicks(
-      raw([{ text: '서정시', reason: 'x', context: '화자는 어머니를' }]), ctx(),
+      raw([{ text: '서정시', context: '화자는 어머니를' }]), ctx(),
     );
     expect(noText?.picks[0].context).toBe('');
   });
 
-  it('근거가 없거나 길면 잘라서 받는다 — 용어까지 버리지는 않는다', () => {
-    const long = '나'.repeat(300);
-    const result = parseConceptPicks(raw([{ text: '화자', reason: long }, { text: '갈래' }]), ctx());
-    expect(result?.picks[0].reason.length).toBeLessThanOrEqual(120);
-    expect(result?.picks[1]).toEqual({ text: '갈래', reason: '', context: '' });
+  it('모르는 필드가 와도 용어를 버리지 않는다 — 근거 한 줄은 이제 받지 않는다', () => {
+    const result = parseConceptPicks(raw([{ text: '화자', reason: '옛 스키마의 잔재' }]), ctx());
+    expect(result?.picks).toEqual([{ text: '화자', context: '' }]);
   });
 });

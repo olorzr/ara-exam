@@ -1,5 +1,5 @@
 import {
-  CONCEPT_PICK_CONTEXT_MAX, CONCEPT_PICK_MAX_COUNT, CONCEPT_PICK_REASON_MAX,
+  CONCEPT_PICK_CONTEXT_MAX, CONCEPT_PICK_MAX_COUNT,
   CONCEPT_PICK_TEXT_MAX, CONCEPT_PICK_TEXT_MIN,
 } from './constants';
 import { foldLoose } from './fold';
@@ -116,9 +116,6 @@ export function parseConceptPicks(
     seen.add(text);
     picks.push({
       text,
-      reason: typeof row.reason === 'string'
-        ? row.reason.trim().slice(0, CONCEPT_PICK_REASON_MAX)
-        : '',
       context: cleanContext(typeof row.context === 'string' ? row.context : '', text, ctx.plain),
     });
   }

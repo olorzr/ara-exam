@@ -31,7 +31,7 @@ describe('conceptPickEmptyNotice', () => {
 
   it('골라 놓고 하나도 못 붙였으면 "못 찾았다" 고 하지 않는다 — 자리를 못 찾은 것뿐이다', () => {
     const notice = conceptPickEmptyNotice(
-      result({ picks: [{ text: '갈래', reason: '', context: '' }] }), false,
+      result({ picks: [{ text: '갈래', context: '' }] }), false,
     );
     expect(notice.level).toBe('warning');
     expect(notice.text).toContain('붙이지 못했어요');
