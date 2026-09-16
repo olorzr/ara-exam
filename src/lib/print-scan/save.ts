@@ -2,7 +2,9 @@ import { supabase } from '@/lib/supabase';
 import { createSchoolMaterial, ensureSchoolMirror } from '@/lib/category-master';
 import { buildConceptSheetPayload } from '@/lib/concept-sheet-form';
 import { removeProblemFiles } from '@/lib/problem-bank/storage';
-import type { PrintBundle, PrintBundleStatus, PrintOcrMeta, PrintWordsMeta } from '@/types/print-scan';
+import type {
+  PrintBundle, PrintBundleStatus, PrintOcrMeta, PrintQaItem, PrintQaMeta, PrintWordsMeta,
+} from '@/types/print-scan';
 import { bundleSheetCategory, type PrintBundleDraftRow } from './bundle-plan';
 import { printScanPdfPath } from './storage-paths';
 
@@ -63,6 +65,10 @@ export async function updateBundle(
     ocr_meta?: PrintOcrMeta;
     /** 단어 등록 영수증. `ocr_meta` 와 따로 둔다 — 다시 읽기가 ocr_meta 를 통째로 덮어쓴다 */
     words_meta?: PrintWordsMeta;
+    /** 문답 목록. `words_meta` 와 같은 까닭으로 `ocr_meta` 와 따로 둔다 */
+    qa_items?: PrintQaItem[];
+    /** 문답 나누기 영수증 */
+    qa_meta?: PrintQaMeta;
     page_paths?: string[];
   },
 ): Promise<void> {

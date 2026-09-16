@@ -139,7 +139,7 @@ describe('useQuizReferences — 본문 읽기', () => {
 
 describe('useQuizReferences — 빼기와 다시 찾기', () => {
   const signals = {
-    title: '봄봄', author: '', excludePassageId: null,
+    title: '봄봄', author: '', excludePassageId: null, excludeSheetId: null,
     unitPath: [], textbook: '', grade: '', schoolName: '', year: '',
   };
   /** 자동 찾기가 a 를 고르게 한다 */

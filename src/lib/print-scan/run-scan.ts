@@ -92,6 +92,9 @@ function toBundle(row: SavedRow, pagePaths: Map<number, string>): PrintBundle {
     ocr_html: '',
     ocr_meta: {},
     words_meta: {},
+    // 문답은 읽기가 끝난 뒤 목록·시험지 화면에서 따로 나눈다(읽기와 같은 턴에 묶지 않는다)
+    qa_items: [],
+    qa_meta: {},
     user_id: '',
     updated_by: null,
     created_at: now,

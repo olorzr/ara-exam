@@ -1,4 +1,6 @@
+import { printLabelOf } from '@/lib/problem-bank/work-candidates';
 import { normalizeWorkTitle } from '@/lib/problem-bank/work-title';
+import type { PrintBundle } from '@/types/print-scan';
 import { QUIZ_MATCH_TITLE_MIN } from './constants';
 import type { PickedPassageMeta, QuizMatchSignals } from './types';
 
@@ -17,7 +19,7 @@ export interface SignalDraft {
 }
 
 const EMPTY_SIGNALS: QuizMatchSignals = {
-  title: '', author: '', excludePassageId: null,
+  title: '', author: '', excludePassageId: null, excludeSheetId: null,
   unitPath: [], textbook: '', grade: '', schoolName: '', year: '',
 };
 
@@ -62,6 +64,46 @@ export function signalsFromDraft(
   };
 }
 
+/** 학교 프린트에서 신호를 뽑을 때 필요한 것만 */
+export interface BundleSignalInput {
+  bundle: Pick<PrintBundle, 'name' | 'school_name' | 'grade' | 'year' | 'qa_meta'>;
+  /** 그 묶음이 딸린 스캔 제목 — 프린트 이름의 앞머리라 벗겨야 작품명이 남는다 */
+  scanTitle: string;
+  /** 이 묶음으로 만든 시험지 id — **후보에서 뺀다**(자기 자신이 붙으면 안 된다) */
+  sheetId: string | null;
+}
+
+/**
+ * 학교 프린트 문답에 붙일 자료를 찾을 신호를 만든다.
+ *
+ * 작품명이 둘 중 하나에서 온다:
+ *  ① **프린트 이름**('2026 광희중학교 중2 2학기 중간 홍길동전' 의 '홍길동전') — 선생님이
+ *     직접 친 값이라 가장 믿을 만하다.
+ *  ② 프린트에 **인쇄돼 있던** 작품명(`qa_meta.work`) — 이름에 작품이 없을 때의 단서다.
+ *     ⚠️ 본문을 보고 알아낸 이름은 여기 들어오지 않는다(`prompt-split.ts` 가 막는다) —
+ *     그런 이름을 쓰면 비슷한 다른 작품의 개념지가 근거 자료로 붙는다.
+ *
+ * 단원(`textbook`/`unitPath`)은 **없다.** 학교 프린트는 교과서 단원에 매이지 않아
+ * 그 축이 아예 비어 있다 — 대신 학교·학년·학년도가 강한 신호다.
+ * @param input - 묶음·스캔 제목·그 묶음의 시험지 id
+ * @returns 찾기 신호
+ */
+export function signalsFromBundle(input: BundleSignalInput): QuizMatchSignals {
+  const { bundle } = input;
+  const fromName = printLabelOf(bundle.name, input.scanTitle);
+  const work = bundle.qa_meta?.work;
+  return {
+    ...EMPTY_SIGNALS,
+    title: matchName(fromName, QUIZ_MATCH_TITLE_MIN)
+      || matchName(work?.title ?? '', QUIZ_MATCH_TITLE_MIN),
+    author: matchName(work?.author ?? '', QUIZ_MATCH_TITLE_MIN),
+    excludeSheetId: input.sheetId,
+    grade: bundle.grade,
+    schoolName: bundle.school_name,
+    year: bundle.year,
+  };
+}
+
 /**
  * 찾아볼 만한 신호가 하나라도 있는가.
  *
@@ -86,7 +128,7 @@ export function hasMatchSignals(signals: QuizMatchSignals): boolean {
  */
 export function signalsKey(signals: QuizMatchSignals): string {
   return JSON.stringify([
-    signals.title, signals.author, signals.excludePassageId,
+    signals.title, signals.author, signals.excludePassageId, signals.excludeSheetId,
     signals.unitPath, signals.textbook, signals.grade, signals.schoolName, signals.year,
   ]);
 }

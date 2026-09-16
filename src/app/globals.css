@@ -5,6 +5,7 @@
 @import "shadcn/tailwind.css";
 @import "../styles/print-a4.css";
 @import "../styles/problem-paper.css";
+@import "../styles/print-qa.css";
 
 /* ── 옛한글 글꼴 — 네이버 나눔 옛한글(SIL OFL 1.1, public/fonts 자체 호스팅) ──────────────
    Pretendard 에는 첫가끝 조합형 자모가 없어 중세국어가 깨진 네모로 나온다. 세 얼굴을 둔다:

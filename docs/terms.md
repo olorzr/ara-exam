@@ -109,6 +109,32 @@
 - 코드에서의 사용: `PrintBundle.include_handwriting`, `buildPrintOcrPrompt` 의 손글씨 블록
 - 관련 파일: `src/lib/print-scan/prompt.ts`
 
+## 문답 시험지 (print QA)
+- 정의: 학교 프린트에 **이미 적혀 있는** 물음과 답을 문항으로 갈라 둔 것(`print_bundles.qa_items`). 광희중처럼 선생님이 `N. 물음 … 답: 정답` 꼴로 만든 프린트가 대상이다
+- 같은 묶음의 **빈칸 시험지**(개념지)와 **다른 것**이다 — 둘은 같은 원문(`ocr_html`)에서 나오고 서로를 덮지 않는다. 화면도 다르다(`/print-sheets/[id]` vs `/print-sheets/[id]/qa`)
+- 인쇄물 셋: **문제지**(답 없이 답 쓰는 줄) · **교사용**(문제 밑에 답) · **답지**(번호와 답, 근거 포함)
+- ⚠️ 번호는 **프린트에 인쇄된 번호를 그대로** 찍는다(`numberPrintQaItems`). 새로 1번부터 매기지 않는다 — 선생님도 학생도 원본과 나란히 놓고 본다. 대신 문항을 빼면 번호가 빈다(감수한 값)
+- ⚠️ 물음·답이 원문에 글자 그대로 없으면: **물음은 남기고 '원문과 달라요' 로 짚고**, **답은 비운다.** 문항이 통째로 사라지는 쪽이 더 나쁘고, 지어낸 답이 '인쇄된 답' 으로 들어가면 검증 없이 교사용에 찍힌다
+- ⚠️ `ocr_html` 이 다시 읽혀 바뀌면 **지우지 않고 알린다**(`qa_meta.sourceHash` ↔ `isQaStale`) — 손으로 고친 답과 모범답안이 거기 들어 있다
+- 코드에서의 사용: `PrintQaItem`, `qa_items`, `qa_meta`, `runPrintQaSplit`, `numberPrintQaItems`, `usePrintQa`
+- 관련 파일: `src/lib/print-qa/`, `src/components/print-qa/`, `sql/31_print_bundle_qa.sql`
+
+## 답 출처 (answerSource)
+- 정의: 그 문항의 답이 **어디서 왔는가**. `printed`(프린트에 인쇄돼 있던 답) · `handwritten`(학생 손글씨) · `ai`(AI 모범답안) · `teacher`(선생님이 직접 씀) · `none`(아직 없음)
+- 왜 가르나: 믿을 만한 정도가 전혀 다르다. 모범답안 **기본 대상은 `none`·`handwritten`** 이고, `ai` 답은 교사용·답지에 **출처와 근거를 함께** 찍어 선생님이 확인하게 한다
+- 손글씨 판정은 `include_handwriting` 을 켜고 읽은 묶음의 **`<em>` 자리**로만 한다(`handwriting.ts`) — 모델에게 묻지 않는다. 끄고 읽었으면 손글씨는 아예 안 옮겨져 `none` 이 된다
+- 손으로 고친 답은 `teacher` 가 되고 **근거를 함께 버린다**(`editAnswer`) — 답이 바뀌었는데 옛 근거가 남으면 거짓 근거가 된다
+- 코드에서의 사용: `PrintQaAnswerSource`, `defaultAnswerTargets`, `answerTag`
+- 관련 파일: `src/lib/print-qa/{items,print-format,handwriting}.ts`
+
+## 모범답안 (model answer)
+- 정의: 답이 비어 있거나 학생 필기뿐인 문항에 AI 가 **개념지·작품 전문·기출 지문·다른 프린트**를 근거로 지어 주는 답
+- 참고자료는 `lib/quiz-references` 가 찾는다 — 신호는 **프린트 이름의 작품 부분 → 프린트에 인쇄된 작품명**(`qa_meta.work`) 순이고, 학교·학년·학년도가 함께 쓰인다. ⚠️ **자기 시험지는 후보에서 뺀다**(`excludeSheetId`)
+- ⚠️ **근거를 못 찾아도 답은 버리지 않는다**(O,X·단답형과 다른 대접). 서술형은 자료를 종합해 쓰는 것이 보통이라 버리면 빈 문항만 남는다 — 대신 `evidenceSource: null` 로 두고 화면·교사용에 **'근거 없음'** 을 반드시 찍는다
+- 근거를 찾는 차례는 **프린트 본문 → 참고자료** 다. 양쪽에 있으면 프린트로 적는다(선생님이 손에 든 것이 그 프린트다)
+- 코드에서의 사용: `runPrintQaAnswers`, `parsePrintQaAnswers`, `applyGeneratedAnswers`, `qa_meta.references`
+- 관련 파일: `src/lib/print-qa/{prompt-answers,parse-answers,run-answers}.ts`
+
 ## AI 추천 빈칸 (concept pick)
 - 정의: 개념지 본문에서 빈칸으로 낼 용어를 AI 가 골라 **곧바로 마킹**하는 기능. 붙인 낱말을 칩으로 보여 주고 개별·전체 되돌리기가 있다. 개념지와 프린트 시험지 **양쪽**에서 쓴다(같은 편집기)
 - ⚠️ 추천은 **띄어쓰기 없는 한 어절**이어야 한다. `extractMarks` 가 마킹 구간을 공백으로 쪼개 세므로, 구절을 고르면 빈칸이 여러 개가 되고 마킹 수(= 문항 수 = 합격 기준의 분모)가 부풀어 학원 성적까지 어긋난다

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { hasMatchSignals, signalsFromDraft, signalsKey } from './signals';
+import type { PrintBundle } from '@/types/print-scan';
+import { hasMatchSignals, signalsFromBundle, signalsFromDraft, signalsKey } from './signals';
 import type { PickedPassageMeta } from './types';
 
 const picked: PickedPassageMeta = {
@@ -62,5 +63,62 @@ describe('signalsKey', () => {
     const a = signalsFromDraft({ title: '봄봄', author: '' }, null);
     const b = signalsFromDraft({ title: '동백꽃', author: '' }, null);
     expect(signalsKey(a)).not.toBe(signalsKey(b));
+  });
+
+  it('자기 시험지 id 가 다르면 다른 신호다 — 빠뜨리면 다시 찾기가 건너뛴다', () => {
+    const base = signalsFromDraft({ title: '봄봄', author: '' }, null);
+    expect(signalsKey({ ...base, excludeSheetId: 'a' }))
+      .not.toBe(signalsKey({ ...base, excludeSheetId: 'b' }));
+  });
+});
+
+/** 학교 프린트 묶음 — 문답 시험지가 자료를 찾을 때 쓰는 신호의 출처다 */
+const bundle = (over: Partial<PrintBundle> = {}) => ({
+  name: '2026 광희중학교 중2 2학기 중간 홍길동전',
+  school_name: '광희중학교',
+  grade: '중2',
+  year: '2026',
+  qa_meta: {},
+  ...over,
+}) as Pick<PrintBundle, 'name' | 'school_name' | 'grade' | 'year' | 'qa_meta'>;
+
+describe('signalsFromBundle', () => {
+  it('프린트 이름에서 작품을 떼어 신호로 쓴다 — 선생님이 직접 친 값이라 가장 믿을 만하다', () => {
+    const signals = signalsFromBundle({
+      bundle: bundle(), scanTitle: '2026 광희중학교 중2 2학기 중간', sheetId: 's1',
+    });
+    expect(signals.title).toBe('홍길동전');
+    expect(signals).toMatchObject({ schoolName: '광희중학교', grade: '중2', year: '2026' });
+  });
+
+  it('이름에 작품이 없으면 프린트에 인쇄돼 있던 작품을 쓴다', () => {
+    const signals = signalsFromBundle({
+      bundle: bundle({ qa_meta: { work: { title: '동백꽃', author: '김유정' } } }),
+      scanTitle: '2026 광희중학교 중2 2학기 중간 홍길동전',
+      sheetId: null,
+    });
+    expect(signals.title).toBe('동백꽃');
+    expect(signals.author).toBe('김유정');
+  });
+
+  it('⚠️ 자기 시험지는 후보에서 빼도록 id 를 싣는다 — 안 그러면 스스로 붙는다', () => {
+    expect(signalsFromBundle({ bundle: bundle(), scanTitle: '', sheetId: 'sheet-1' }).excludeSheetId)
+      .toBe('sheet-1');
+  });
+
+  it('학교 프린트는 교과서 단원 축이 없다 — 대신 학교·학년·학년도가 신호다', () => {
+    const signals = signalsFromBundle({ bundle: bundle(), scanTitle: '', sheetId: null });
+    expect(signals.textbook).toBe('');
+    expect(signals.unitPath).toEqual([]);
+  });
+
+  it('작품을 못 찾아도 학교만 있으면 찾아볼 만하다', () => {
+    const signals = signalsFromBundle({
+      bundle: bundle({ name: '2026 광희중학교 중2 2학기 중간' }),
+      scanTitle: '2026 광희중학교 중2 2학기 중간',
+      sheetId: null,
+    });
+    expect(signals.title).toBe('');
+    expect(hasMatchSignals(signals)).toBe(true);
   });
 });

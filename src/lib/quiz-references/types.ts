@@ -93,6 +93,14 @@ export interface QuizMatchSignals {
   title: string;
   author: string;
   excludePassageId: string | null;
+  /**
+   * 후보에서 뺄 개념지·프린트 시험지 id.
+   *
+   * 학교 프린트의 문답에 모범답안을 만들 때 쓴다 — 안 빼면 **그 프린트 자신**이
+   * '같은 학교 · 제목에 …' 으로 걸려 자동으로 붙는다. 자기 본문은 이미 프롬프트에
+   * 통째로 실려 있어 두 번 싣는 셈이고, 답이 비어 있는 그 글이 근거 자료로 둔갑한다.
+   */
+  excludeSheetId: string | null;
   unitPath: string[];
   textbook: string;
   grade: string;

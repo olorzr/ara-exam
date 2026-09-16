@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { BookA, FileText, RefreshCw, Trash2, Wand2 } from 'lucide-react';
+import { BookA, FileText, ListChecks, RefreshCw, Trash2, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { qaChip } from '@/lib/print-qa';
 import { bundleWarnings, isStalledReading } from '@/lib/print-scan/reading-state';
 import { registeredWordCount, wordsChip } from '@/lib/print-words';
 import type { PrintBundleRow as BundleRow } from '@/types/print-scan';
@@ -18,8 +19,8 @@ interface PrintBundleRowProps {
   onDelete: (bundle: BundleRow) => void;
 }
 
-/** 단어 칩 색 — '확인 필요'(호박색)와 겹치지 않게 고른다 */
-const WORDS_CHIP_CLASS: Record<'ok' | 'muted' | 'error', string> = {
+/** 칩 색 — '확인 필요'(호박색)와 겹치지 않게 고른다. 단어·문답 칩이 함께 쓴다 */
+const CHIP_CLASS: Record<'ok' | 'muted' | 'error', string> = {
   ok: 'bg-emerald-100 text-emerald-800',
   muted: 'bg-gray-100 text-gray-600',
   error: 'bg-red-100 text-red-700',
@@ -48,6 +49,9 @@ export default function PrintBundleRow({
   // ⚠️ 단어 칩은 '확인 필요' 와 **따로** 둔다 — 그쪽은 "시험지 본문을 확인하라" 는 뜻이라
   //    단어 얘기를 섞으면 개수가 부풀고 무엇을 보라는 것인지 흐려진다
   const words = wordsChip(bundle.words_meta);
+  // ⚠️ 문답 칩도 **따로** 둔다 — 셋(읽기 경고·단어·문답)은 다음에 할 일이 전혀 달라서
+  //    (원본 대조 / 단어 관리 / 문답 손보기) 한 칩에 뭉치면 무엇을 보라는 것인지 흐려진다
+  const qa = qaChip(bundle.qa_items, bundle.qa_meta);
   const categoryId = bundle.words_meta?.categoryId;
   const wordsHref = registeredWordCount(bundle.words_meta) > 0 && categoryId
     ? `/words?categoryId=${encodeURIComponent(categoryId)}`
@@ -85,18 +89,27 @@ export default function PrintBundleRow({
               <Link
                 href={wordsHref}
                 title={`${words.title}\n눌러서 단어 관리에서 확인`}
-                className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-medium underline-offset-2 hover:underline ${WORDS_CHIP_CLASS[words.tone]}`}
+                className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-medium underline-offset-2 hover:underline ${CHIP_CLASS[words.tone]}`}
               >
                 {words.label}
               </Link>
             ) : (
               <span
-                className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-medium ${WORDS_CHIP_CLASS[words.tone]}`}
+                className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-medium ${CHIP_CLASS[words.tone]}`}
                 title={words.title}
               >
                 {words.label}
               </span>
             )
+          )}
+          {qa && (
+            <Link
+              href={`/print-sheets/${bundle.id}/qa`}
+              title={`${qa.title}\n눌러서 문답 시험지 열기`}
+              className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-medium underline-offset-2 hover:underline ${CHIP_CLASS[qa.tone]}`}
+            >
+              {qa.label}
+            </Link>
           )}
         </div>
         <p className="truncate text-xs text-gray-500">
@@ -120,6 +133,19 @@ export default function PrintBundleRow({
           <BookA className="mr-1 h-3.5 w-3.5" />
           {bundle.words_meta?.status === 'done' ? '단어 다시 등록' : '단어 등록'}
         </Button>
+      )}
+
+      {/*
+        문답 프린트('N. 물음 … 답: 정답')를 문제지·교사용·답지로 뽑는 길.
+        빈칸 시험지와 **다른 화면**이고 같은 원문에서 나온다 — 읽어 둔 원문만 있으면 언제든 연다
+      */}
+      {hasOcrText && (
+        <Link href={`/print-sheets/${bundle.id}/qa`}>
+          <Button type="button" size="sm" variant="outline" disabled={busy}>
+            <ListChecks className="mr-1 h-3.5 w-3.5" />
+            문답 시험지
+          </Button>
+        </Link>
       )}
 
       {bundle.sheetId ? (

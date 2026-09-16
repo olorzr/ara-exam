@@ -209,5 +209,14 @@ export async function fetchReferenceCandidates(
     if (result.status === 'fulfilled') hits.push(...result.value);
     else failures += 1;
   }
-  return { hits, failures };
+  // ⚠️ **자기 자신은 뺀다.** 학교 프린트의 문답에 자료를 붙일 때, 그 프린트로 만든 시험지가
+  //    '같은 학교'·'제목에 …' 으로 걸려 스스로 붙는다 — 본문은 이미 프롬프트에 통째로
+  //    실려 있어 두 번 싣는 셈이고, 답이 비어 있는 그 글이 근거 자료로 둔갑한다.
+  //    조회마다 빼지 않고 여기서 한 번에 거르는 까닭: 개념지를 긁는 조회가 넷이라
+  //    한 곳만 빠뜨려도 조용히 되살아난다
+  const excluded = signals.excludeSheetId;
+  return {
+    hits: excluded ? hits.filter((hit) => hit.candidate.id !== excluded) : hits,
+    failures,
+  };
 }

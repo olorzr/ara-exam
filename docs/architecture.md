@@ -84,6 +84,16 @@ src/
 - ⚠️ `registerBundleWords` 는 **절대 던지지 않는다.** 시험지는 이미 저장돼 있어, 던지면 `runBundle` 의 catch 가 멀쩡한 묶음을 '실패' 로 되돌린다. 무슨 일이 있었는지는 `words_meta` 영수증과 `onWarnings` 로만 말한다
 - 주요 파일: `src/lib/print-words/{constants,schema,prompt,parse,run,register,summary}.ts`, `src/hooks/usePrintWordsRegister.ts`
 
+### lib/print-qa (학교 프린트 문답 시험지 + 모범답안)
+- 역할: 읽어 둔 프린트 본문(`ocr_html`)을 **물음·답으로 가르고**(AI 한 턴), 답이 없거나 학생 필기뿐인 문항에 **모범답안**을 만든다(AI 또 한 턴). 결과로 **문제지 · 교사용(문제 밑에 답) · 답지** 세 인쇄물을 뽑는다
+- 의존: `lib/ai/codex`, `lib/concept-pick`(`htmlToPlainText`·`fold`), `lib/passage-quiz`(`QuizReferenceText`·`splitPassageBlocks`), `lib/quiz-references`(화면이 자료를 찾아 넘긴다)
+- ⚠️ **`lib/print-scan` 을 값으로 import 하지 않는다**(타입만). 그 배럴이 `run.ts` 를 다시 내보내 순환이 된다 — 저장은 훅(`usePrintQa`)이 `print-scan/save` 의 `updateBundle` 로 한다(`print-words` 와 같은 규약)
+- ⚠️ 두 턴의 **성질이 다르다**: 나누기는 *옮겨 적기*라 프린트 읽기와 같은 모델·노력(`PRINT_OCR_*_PREFERENCE`)을 쓰고, 모범답안은 *글짓기*라 선생님이 고른 모델을 그대로 쓴다
+- ⚠️ 손글씨 판정은 **모델에게 묻지 않는다** — OCR 이 남긴 `<em>` 자리로 기계가 가린다(`handwriting.ts`). 앞글(`lead`)도 묻지 않고 원문에서 잘라 온다(`lead.ts`)
+- ⚠️ **모양을 정하는 곳은 하나다**: 번호 꼴은 `label.ts`, 답 표시 꼴은 `marks.ts` — 알아보는 쪽과 지켜 주는 쪽이 같은 글자 목록을 본다
+- ⚠️ **답을 가리는 일은 두 파일이 나눠 맡는다**: `redact-scan.ts` 가 *어디에* 답이 있는지 찾고(인용·그림은 건드리지 않는다), `redact.ts` 가 *무엇을* 지울지 정한다. 가리지 못한 것은 지우지 않고 `RedactResult.uncertain` 으로 돌려주면 파서가 `dropped.answerInQuestion` 으로 세어 선생님에게 알린다
+- 주요 파일: `src/lib/print-qa/{constants,schema,prompt-split,prompt-answers,parse-split,parse-place,parse-answers,place,label,marks,lead,redact,redact-cut,redact-scan,handwriting,items,print-format,summary,source-hash,notice,run-split,run-answers}.ts`, `src/hooks/usePrintQa.ts`, `src/components/print-qa/`, `src/app/(main)/print-sheets/[bundleId]/qa/page.tsx`, `sql/31_print_bundle_qa.sql`
+
 ### lib/external-category (외부지문 년도·학년)
 - 역할: 년도/학년 Select 옵션 생성과 `'미지정'` ↔ `''` 변환을 한 곳에 모은다
 - 의존: `lib/constants`, `lib/kst-year`

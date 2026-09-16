@@ -15,7 +15,8 @@
  *    ① 이 타입 ② `flags.ts` 의 `isFeatureEnabled` ③ `/api/ai/status` 의 OFF·응답
  *    ④ `useAiEnabled.ts` 의 `AiEnabled.features` 와 OFF ⑤ `ocrStillEnabled` 호출부
  */
-export type AiFeature = 'problem_ocr' | 'print_ocr' | 'concept_pick' | 'passage_quiz';
+export type AiFeature =
+  | 'problem_ocr' | 'print_ocr' | 'concept_pick' | 'passage_quiz' | 'print_qa';
 
 /** 생성 주체. 현재는 선생님 PC 의 codex 한 가지뿐. */
 export type ProviderKind = 'codex_app_server';

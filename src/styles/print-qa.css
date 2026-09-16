@@ -1,0 +1,88 @@
+/*
+ * 학교 프린트 **문답 시험지**의 인쇄 스타일 (문제지 · 교사용 · 답지).
+ *
+ * `problem-paper.css` 에서 떼어 둔 까닭: 그 파일이 이미 300줄을 훌쩍 넘겨 더 얹을 자리가 없고,
+ * 문답은 기출 문제지와 **다른 문서 종류**다. 공통 조각(`.pb-sheet`·`.pb-q`·`.pb-quiz-evidence`)은
+ * 그대로 빌려 쓰므로 이 파일은 **문답에만 있는 것**만 담는다.
+ */
+/*
+ * 물음 앞에 있던 지문·지시문. 지문 상자(`pb-passage-part`)와 달리 테두리를 두르지 않는다 —
+ * 프린트에는 지시문·표 설명처럼 지문이 아닌 글도 섞여 있어, 전부 상자에 넣으면
+ * 인쇄물이 상자투성이가 된다. 왼쪽 띠 하나로 '여기부터 앞글' 만 알린다.
+ */
+.pb-qa-lead {
+  border-left: 2px solid #B8EDE8;
+  padding-left: 8px;
+  margin: 0;
+}
+/* 앞글도 문단마다 블록으로 쪼개진다(한 쪽을 넘어가도 축소되지 않게) — 여백은 양 끝에만 */
+.pb-qa-lead--first { margin-top: 2px; }
+.pb-qa-lead--last { margin-bottom: 5px; }
+.pb-qa-lead--gap { padding-top: 6pt; }
+
+/*
+ * 교사용의 답 줄. 문제지와 **같은 문항 블록 안**에 둔다 —
+ * 따로 블록으로 내보내면 쪽이 갈릴 때 물음과 답이 다른 장에 찍힌다.
+ */
+.pb-qa-answer {
+  margin: 3px 0 0 20px;
+  padding: 3px 7px;
+  background: #F0FAF9;
+  border-radius: 4px;
+  font-size: 10pt;
+  color: #1f2937;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.pb-qa-answer--missing {
+  background: #FEF3C7;
+  color: #92400e;
+}
+.pb-qa-answer__label {
+  font-weight: 800;
+  color: #2F8F86;
+  margin-right: 4px;
+}
+
+/* 답이 어디서 왔는가 — AI 가 만든 답은 반드시 그렇게 밝힌다(선생님이 확인해야 한다) */
+.pb-qa-tag {
+  margin-left: 5px;
+  font-size: 8.5pt;
+  font-weight: 600;
+  color: #6b7280;
+  white-space: nowrap;
+}
+.pb-qa-tag--check { color: #b45309; }
+
+/* 답지의 한 줄 — 서술형이라 5개씩 늘어놓는 정답표 격자가 맞지 않는다 */
+.pb-qa-key {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 4px 7px;
+  border-radius: 4px;
+  break-inside: avoid;
+}
+.pb-qa-key--band { background: #F0FAF9; }
+.pb-qa-key__num {
+  font-size: 11pt;
+  font-weight: 800;
+  color: #5BBFB7;
+  min-width: 26px;
+}
+.pb-qa-key__value {
+  flex: 1;
+  font-size: 10pt;
+  color: #1f2937;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/*
+ * 물음의 줄바꿈을 지킨다 — ①②③ 보기가 줄마다 인쇄돼 있으면 한 줄로 붙는 순간 읽을 수 없다.
+ * (`PrintQaItem.question` 은 '평문, 줄바꿈 유지' 계약이다)
+ */
+.pb-qa-question {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

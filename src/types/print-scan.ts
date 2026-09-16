@@ -62,6 +62,98 @@ export interface PrintWordsMeta {
   ranAt?: string;
 }
 
+/**
+ * 문답 시험지에서 **답이 어디서 왔는가**.
+ *
+ * 인쇄물마다 다르게 다뤄야 해서 하나로 뭉뚱그릴 수 없다 — 선생님이 인쇄해 둔 답과
+ * 학생이 연필로 적은 답은 믿을 만한 정도가 전혀 다르고(그래서 모범답안 대상이 갈린다),
+ * AI 가 만든 답은 교사용에 **근거와 함께** 찍어야 선생님이 확인하고 고칠 수 있다.
+ */
+export type PrintQaAnswerSource = 'printed' | 'handwritten' | 'ai' | 'teacher' | 'none';
+
+/** 문답 한 개 — 문제지·교사용·답지 세 인쇄물이 이것 하나를 쓴다 */
+export interface PrintQaItem {
+  /** 화면·편집에서 쓰는 안정된 id (저장된다 — 고칠 때 자리를 잃지 않아야 한다) */
+  id: string;
+  /** 프린트에 인쇄된 번호('3'·'3-1'·'(2)'). 없으면 '' */
+  label: string;
+  /**
+   * 이 물음 **앞에** 놓여 있던 지문·지시문. 없으면 ''.
+   *
+   * 모델에게 묻지 않고 원문에서 **잘라 온다**(`parse-split.ts`) — 물어서 받으면 그 글이
+   * 원문에 있는지 다시 대조해야 하고, 길어서 잘려 오기 일쑤다.
+   */
+  lead: string;
+  /** 물음 (평문, 줄바꿈 유지) */
+  question: string;
+  /** 인쇄할 답. 없으면 '' */
+  answer: string;
+  answerSource: PrintQaAnswerSource;
+  /**
+   * 학생이 손으로 적어 둔 답 원문.
+   *
+   * ⚠️ 모범답안으로 덮어써도 **남긴다** — 아이가 무엇이라고 썼는지가 사라지면
+   *    선생님이 무엇을 고쳐 줘야 하는지 알 수 없다.
+   */
+  studentAnswer: string;
+  /** AI 답의 근거 구절 (자료에 글자 그대로 있는 말). 없으면 '' */
+  evidence: string;
+  /**
+   * 근거를 찾은 곳. `''` 는 이 프린트, 그 밖은 참고자료 이름.
+   * **`null` 은 '어디에도 없다'** — 화면·교사용이 '근거 없음' 으로 알린다.
+   */
+  evidenceSource: string | null;
+  /** 물음이 원문에 글자 그대로 있었는가. false 면 화면이 '확인 필요' 로 짚어 준다 */
+  verified: boolean;
+  /**
+   * 이 앞글을 **문제지에 실어도 된다고 사람이 확인했는가**.
+   *
+   * ⚠️ 기본은 `false` 다. 문항 사이·앞의 글이 '지문' 인지 '아직 안 옮긴 답' 인지는
+   *    글자만으로 가릴 수 없다는 것이 열 번의 리뷰로 확인됐다 — 규칙을 조이면 지문이 사라지고
+   *    풀면 답이 샌다. 그래서 **기계가 고르지 않는다**: 뽑아 둔 글을 편집 화면에 보여 주고,
+   *    선생님이 한 번 눌러야 학생 문제지에 실린다. 교사용·답지는 그와 무관하게 늘 보여 준다.
+   */
+  leadApproved: boolean;
+}
+
+/**
+ * 문답 나누기 영수증.
+ *
+ * ⚠️ `ocr_meta` 에 합치지 않는다 — '다시 읽기' 는 `ocr_meta` 를 통째로 덮어쓰는데
+ *    문답은 그 뒤에도 살아 있어야 한다(선생님이 손본 답을 말없이 버리지 않는다).
+ */
+export interface PrintQaMeta {
+  /** 마지막 나누기의 결과 */
+  status?: 'done' | 'failed';
+  /**
+   * 나눌 때 본 `ocr_html` 의 해시.
+   *
+   * 다시 읽어 본문이 바뀌면 이 값이 어긋난다 — 그때 문답을 **지우지 않고 알린다**
+   * (`isQaStale`). 지우면 손으로 고친 답이 말없이 사라진다.
+   */
+  sourceHash?: string;
+  /**
+   * 프린트에 **인쇄돼 있던** 작품명·지은이. 인쇄돼 있지 않으면 빈 값이다.
+   *
+   * 모범답안의 참고자료를 찾는 신호다 — 프린트 이름에 작품이 없을 때 이것이 유일한 단서다.
+   */
+  work?: { title: string; author: string };
+  model?: string | null;
+  effort?: string | null;
+  /** 사람이 확인해야 하는 것들 */
+  warnings?: string[];
+  /**
+   * 모범답안을 만들 때 함께 읽은 자료 이름들.
+   *
+   * ⚠️ 그때의 목록을 **굳혀 둔다** — 만든 뒤에도 자료를 빼고 더할 수 있어서, 인쇄가 지금
+   *    목록을 보면 "쓰지도 않은 자료 이름 + 옛 자료로 만든 답" 이 한 장에 찍힌다.
+   */
+  references?: string[];
+  /** 마지막으로 모범답안을 만든 시각 */
+  answeredAt?: string;
+  ranAt?: string;
+}
+
 /** 업로드한 스캔 PDF 1건 */
 export interface PrintScan {
   id: string;
@@ -105,6 +197,10 @@ export interface PrintBundle {
   ocr_meta: PrintOcrMeta;
   /** 단어 등록 영수증. 한 번도 안 돌렸으면 빈 객체다 */
   words_meta: PrintWordsMeta;
+  /** 문답으로 나눈 결과. 한 번도 안 나눴으면 빈 배열이다 */
+  qa_items: PrintQaItem[];
+  /** 문답 나누기 영수증. 한 번도 안 나눴으면 빈 객체다 */
+  qa_meta: PrintQaMeta;
   status: PrintBundleStatus;
   user_id: string;
   updated_by: string | null;
