@@ -1371,3 +1371,111 @@ describe('parsePrintQaSplit — 코덱스 33R 회귀', () => {
     )?.items[0].lead).toBe('지문이다.');
   });
 });
+
+describe('parsePrintQaSplit — 코덱스 35R 회귀', () => {
+  const from = (plain: string) => ({ plain, handwritten: [], seed: 't' });
+
+  it('⚠️ 부호·소수점이 붙은 값에서 숫자만 답으로 집지 않는다 (블로킹)', () => {
+    const minus = '1. 다음 수의 절댓값을 구하시오.\n-3';
+    const first = parsePrintQaSplit(
+      raw([{ label: '1', question: '다음 수의 절댓값을 구하시오.', answer: '3' }]),
+      from(minus),
+    );
+    expect(first?.items[0].lead).toBe('-3');
+    // 모델이 풀어 버린 답이라 비우고 센다 — 값은 그대로 남는다
+    expect(first?.items[0].answer).toBe('');
+    expect(first?.dropped.answerNotInText).toBe(1);
+
+    const decimal = '1. 다음 수의 절댓값을 구하시오.\n3.5';
+    expect(parsePrintQaSplit(
+      raw([{ label: '1', question: '다음 수의 절댓값을 구하시오.', answer: '3' }]),
+      from(decimal),
+    )?.items[0].lead).toBe('3.5');
+  });
+
+  it('⚠️ 문장 끝 숫자 뒤의 번호도 알아본다 — 소수점은 붙어 있다 (블로킹)', () => {
+    const plain = '주어진 수는 3. 1. 절댓값은? 답: 3\n주어진 수는 2. 2. 절댓값은? 답: 2';
+    const result = parsePrintQaSplit(
+      raw([
+        { label: '1', question: '절댓값은?', answer: '3' },
+        { label: '1', question: '절댓값은?', answer: '3' },
+        { label: '2', question: '절댓값은?', answer: '2' },
+      ]),
+      from(plain),
+    );
+    expect(result?.items.map((item) => [item.label, item.answer]))
+      .toEqual([['1', '3'], ['2', '2']]);
+  });
+});
+
+describe('parsePrintQaSplit — 코덱스 36R 회귀', () => {
+  const from = (plain: string) => ({ plain, handwritten: [], seed: 't' });
+
+  it('⚠️ 앞자리 없는 소수(`.5`)도 한 값이다 (블로킹)', () => {
+    const plain = '1. 다음 수를 소수로 쓰시오.\n.5';
+    const result = parsePrintQaSplit(
+      raw([{ label: '1', question: '다음 수를 소수로 쓰시오.', answer: '5' }]),
+      from(plain),
+    );
+    expect(result?.items[0].lead).toBe('.5');
+    expect(result?.items[0].answer).toBe('');
+    expect(result?.dropped.answerNotInText).toBe(1);
+  });
+
+  it('⚠️ 목록으로 인쇄된 번호도 앞글에서 뗀다 (블로킹)', () => {
+    const plain = '- 1. 갈래는? 답: 소설';
+    expect(parsePrintQaSplit(
+      raw([{ label: '1', question: '갈래는?', answer: '소설' }]),
+      from(plain),
+    )?.items[0].lead).toBe('');
+  });
+});
+
+describe('parsePrintQaSplit — 코덱스 37R 회귀', () => {
+  const from = (plain: string) => ({ plain, handwritten: [], seed: 't' });
+
+  it('⚠️ 부호가 붙은 소수(`-.5`)도 한 값이다 (블로킹)', () => {
+    const plain = '1. 다음 수의 절댓값을 구하시오.\n-.5';
+    const result = parsePrintQaSplit(
+      raw([{ label: '1', question: '다음 수의 절댓값을 구하시오.', answer: '.5' }]),
+      from(plain),
+    );
+    expect(result?.items[0].lead).toBe('-.5');
+    expect(result?.items[0].answer).toBe('');
+    expect(result?.dropped.answerNotInText).toBe(1);
+  });
+
+  it('⚠️ 전각 칸 구분자로 짠 표의 번호도 앞글에서 뗀다 (블로킹)', () => {
+    const plain = '｜ 1. 갈래는? ｜ 답: 소설 ｜';
+    expect(parsePrintQaSplit(
+      raw([{ label: '1', question: '갈래는?', answer: '소설' }]),
+      from(plain),
+    )?.items[0].lead).toBe('');
+  });
+});
+
+describe('parsePrintQaSplit — 코덱스 38R 회귀', () => {
+  const from = (plain: string) => ({ plain, handwritten: [], seed: 't' });
+
+  it('⚠️ 앞줄의 아포스트로피가 인용 짝을 뒤집지 않는다 (블로킹)', () => {
+    const plain = "1. 다음 표기를 읽으시오.\nDon't stop.\n'답:'\n소설";
+    expect(parsePrintQaSplit(
+      raw([{ label: '1', question: '다음 표기를 읽으시오.', answer: '소설' }]),
+      from(plain),
+    )?.items[0].lead).toBe("Don't stop.\n'답:'");
+  });
+
+  it('⚠️ 직선 따옴표로 끝난 문장 뒤의 번호도 지켜 준다 (블로킹)', () => {
+    const plain = '"첫 지문이다." 1. 갈래는? 답: 소설\n"둘째 지문이다." 2. 갈래는? 답: 시';
+    const result = parsePrintQaSplit(
+      raw([
+        { label: '1', question: '갈래는?', answer: '소설' },
+        { label: '1', question: '갈래는?', answer: '소설' },
+        { label: '2', question: '갈래는?', answer: '시' },
+      ]),
+      from(plain),
+    );
+    expect(result?.items.map((item) => [item.label, item.answer]))
+      .toEqual([['1', '소설'], ['2', '시']]);
+  });
+});

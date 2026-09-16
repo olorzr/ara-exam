@@ -586,3 +586,53 @@ describe('redactAnswerInQuestion — 코덱스 34R', () => {
       .toBe('이 글의 갈래는 (　　　)이다.');
   });
 });
+
+describe('redactAnswerInQuestion — 코덱스 35R', () => {
+  it('⚠️ 느낌표로 끝나는 지시문도 지시문이다 (블로킹)', () => {
+    const q = '갈래는?\n답: 한 단어로 쓰시오!';
+    expect(redact(q, '')).toBe(q);
+    expect(uncertain(q, '')).toBe(true);
+  });
+});
+
+describe('redactAnswerInQuestion — 코덱스 36R', () => {
+  const inside = { answerInsideQuestion: true };
+
+  it('⚠️ 표 한 행에 놓인 선택지도 지우지 않는다 (블로킹)', () => {
+    const q = '다음 중 알맞은 것을 고르시오.\n| ① (소설) |\n| ② (시) |';
+    expect(redact(q, '소설', inside)).toBe(q);
+    expect(uncertain(q, '소설', inside)).toBe(true);
+  });
+
+  it('⚠️ 여러 줄에 걸친 괄호도 빈칸 줄을 지킨다 (블로킹)', () => {
+    const q = '다음 빈칸을 채우시오. ____ (\n소설\n)';
+    expect(redact(q, '소설', inside)).toBe(q);
+    expect(uncertain(q, '소설', inside)).toBe(true);
+  });
+
+  it('멀쩡한 괄호 속 답은 그대로 빈칸으로 바꾼다', () => {
+    expect(redact('이 글의 갈래는 (소설)이다.', '소설', inside))
+      .toBe('이 글의 갈래는 (　　　)이다.');
+  });
+});
+
+describe('redactAnswerInQuestion — 코덱스 37R', () => {
+  const inside = { answerInsideQuestion: true };
+
+  it('⚠️ 칸이 나뉜 표의 선택지도 지우지 않는다 (블로킹)', () => {
+    const q = '갈래를 고르시오.\n| ① | (소설) |\n| ② | (시) |';
+    expect(redact(q, '소설', inside)).toBe(q);
+    expect(uncertain(q, '소설', inside)).toBe(true);
+  });
+});
+
+describe('redactAnswerInQuestion — 코덱스 38R', () => {
+  const inside = { answerInsideQuestion: true };
+
+  it('⚠️ 번호에 공백이 껴도 선택지 줄은 지우지 않는다 (블로킹)', () => {
+    const spaced = '알맞은 갈래를 고르시오.\n( 1 ) (소설)\n( 2 ) (시)';
+    expect(redact(spaced, '소설', inside)).toBe(spaced);
+    const worded = '알맞은 갈래를 고르시오.\n문 1) (소설)\n문 2) (시)';
+    expect(redact(worded, '소설', inside)).toBe(worded);
+  });
+});

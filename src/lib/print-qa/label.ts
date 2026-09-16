@@ -47,7 +47,7 @@ const DIGITS = /\d+/g;
  * 실제 번호는 `11. `·`(1) `·`문 2) ` 처럼 길어야 여남은 글자다. 넉넉히 잡으면 글 한복판의
  * 연도(`이 작품은 1930년대에 …`)가 번호로 걸린다.
  */
-const LABEL_PREFIX_MAX = 12;
+export const LABEL_PREFIX_MAX = 12;
 
 /** 번호를 견줄 자리 — 시작 자리만 쓴다 */
 interface LabelSpan {
@@ -99,11 +99,25 @@ export function matchesLabel(prefix: string, label: string): boolean {
   return core !== '' && want !== '' && core.endsWith(want);
 }
 
-/** 앞 문장이 끝난 자리 — 번호는 그 뒤에 온다 (글머리·줄머리도 그 자리로 본다) */
-const SENTENCE_END = /(?:^|[.。?!？！)\]”’」』·\n])\s*$/;
+/**
+ * 앞 문장이 끝난 자리 — 번호는 그 뒤에 온다 (글머리·줄머리도 그 자리로 본다).
+ *
+ * ⚠️ **직선 따옴표도 넣는다**(코덱스 38R). `"첫 지문이다." 1. 갈래는?` 의 번호를 못 알아보면
+ *    그 자리를 지켜 주지 못해 **중복 응답이 집어 가고 진짜 문항이 사라진다**.
+ */
+const SENTENCE_END = /(?:^|[.。?!？！)\]”’"'」』·\n])\s*$/;
 
-/** 숫자에 붙은 점으로 끝나는가 — 소수점이지 문장 끝이 아니다 */
-const DECIMAL_END = /\d\.\s*$/;
+/**
+ * 숫자에 붙은 점으로 끝나는가 — 소수점이지 문장 끝이 아니다.
+ *
+ * ⚠️ **뒤에 공백이 있으면 소수점이 아니다**(코덱스 35R). `주어진 수는 3. 1. 절댓값은?` 의
+ *    `3. ` 까지 소수점으로 보면 뒤따르는 **번호를 못 알아보고**, 그 자리를 중복 응답이
+ *    집어 가 진짜 문항이 사라진다. 소수점은 `3.1` 처럼 바로 붙는다.
+ */
+const DECIMAL_END = /\d\.$/;
+
+/** 줄머리의 목록 표시만 남은 앞글 — 번호와 함께 걷는다(코덱스 36R) */
+const LIST_BULLET_END = /((?:^|\n)[ \t]*)[-*•][ \t]*$/;
 
 /**
  * 글 끝에 **같은 줄로 붙은 이 문항의 번호**를 뗀다.
@@ -139,7 +153,9 @@ function labelHeadAt(text: string, ok: (token: string) => boolean): string | nul
     const token = text.slice(text.length - len);
     if (token.trimStart() !== token) continue;
     if (!ok(token.trim())) continue;
-    const head = text.slice(0, text.length - len);
+    // ⚠️ **목록 표시(`- `)도 번호 앞자리다**(코덱스 36R). `<li>` 가 만든 `- 1.` 을 못 떼면
+    //    **원본 번호가 앞글에 남아 우리가 찍는 번호와 나란히 인쇄된다**
+    const head = text.slice(0, text.length - len).replace(LIST_BULLET_END, '$1');
     // ⚠️ **소수점은 문장 끝이 아니다**(코덱스 34R). `3.1.` 의 `1.` 을 번호로 보면
     //    **주어진 값의 소수 부분이 깎인다**
     if (SENTENCE_END.test(head) && !DECIMAL_END.test(head)) return head;

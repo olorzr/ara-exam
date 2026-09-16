@@ -29,8 +29,10 @@ const HEADING_MARK = /^#{1,6}[ \t]+/gm;
  * 평문의 표 한 행 — `| 칸 | 칸 |`.
  *
  * 줄 앞의 공백을 허용한다 — 행 한가운데서 잘린 ` |` 같은 조각도 걷어내야 한다.
+ * ⚠️ **전각 칸 구분자(`｜`)도 본다**(코덱스 37R). 번호 자리 판정은 둘 다 알아보는데 여기만
+ *    반각을 고집하면 그 표의 **원본 번호가 앞글에 남아 두 번 인쇄된다**.
  */
-const TABLE_ROW = /^[ \t]*\|.*$/gm;
+const TABLE_ROW = /^[ \t]*[|｜].*$/gm;
 
 
 /**
@@ -59,7 +61,7 @@ export function stripTrailingLabel(text: string, label: string): string {
 export function stripPlainMarkers(text: string): string {
   return text
     .replace(TABLE_ROW, (line) => line
-      .split('|')
+      .split(/[|｜]/)
       .map((cell) => cell.trim())
       .filter(Boolean)
       .join(' · '))

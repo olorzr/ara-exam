@@ -1,5 +1,5 @@
 import { foldStrict, foldWithMap } from '@/lib/concept-pick/fold';
-import { LABEL_ONLY } from './label';
+import { LABEL_ONLY, LABEL_PREFIX_MAX } from './label';
 
 /**
  * 물음 안에서 **무엇이 어디에 있는지** 훑는 일 (순수 함수).
@@ -35,8 +35,13 @@ export const BLANK_SLOT = /[_]{2,}|[-–—]{2,}|[(（][ \t　]*[)）]|[(（][_\
 /** 줄머리의 목록·표 칸 표시 — 번호 앞에 붙는다 */
 const LIST_MARK = /^[ \t]*(?:[-*•]\s*|[|｜]\s*)/;
 
-/** 줄 끝에 붙는 구두점만 남았는가 — `① 은유.` 의 마침표까지 선택지다(코덱스 18R) */
-const TRAILING_PUNCT = /^[.,。、·;:：；！!?？…\s]*$/;
+/**
+ * 줄 끝에 붙는 구두점만 남았는가 — `① 은유.` 의 마침표까지 선택지다(코덱스 18R).
+ *
+ * ⚠️ **표 칸 경계도 줄 끝이다**(코덱스 36R). `| ① (소설) |` 의 닫는 `|` 때문에 '줄 전체' 로
+ *    안 보이면 그 **선택지가 빈칸이 된다**.
+ */
+const TRAILING_PUNCT = /^[.,。、·;:：；！!?？…|｜\s]*$/;
 
 /**
  * 인용으로 묶인 구간들을 찾는다.
@@ -109,11 +114,48 @@ export function linesAround(text: string, span: TextSpan): string[] {
 function coversWholeLine(text: string, span: TextSpan): boolean {
   const lineStart = text.lastIndexOf('\n', Math.max(span.start - 1, 0)) + 1;
   const lineEnd = text.indexOf('\n', span.end);
-  const before = text.slice(lineStart, span.start).replace(LIST_MARK, '').trim();
   const after = text.slice(span.end, lineEnd < 0 ? text.length : lineEnd);
-  // ⚠️ **번호가 붙은 줄도 줄 하나다**(코덱스 17R). `① 은유` 를 빈칸으로 바꾸면 고를 것이
-  //    사라지는데, 앞머리의 `①` 때문에 '줄 전체' 로 안 보여 그대로 지워졌다
-  return (before === '' || LABEL_ONLY.test(before)) && TRAILING_PUNCT.test(after);
+  return markedPrefix(text.slice(lineStart, span.start)) && TRAILING_PUNCT.test(after);
+}
+
+/**
+ * 앞머리 **맨 앞에 붙은 번호 한 덩이**의 길이.
+ * @param prefix - 앞머리
+ * @returns 번호 길이. 번호가 아니면 0
+ */
+function labelHeadLength(prefix: string): number {
+  for (let len = Math.min(LABEL_PREFIX_MAX, prefix.length); len >= 1; len -= 1) {
+    const token = prefix.slice(0, len);
+    if (token.trimEnd() !== token) continue;
+    if (LABEL_ONLY.test(token.trim())) return len;
+  }
+  return 0;
+}
+
+/**
+ * 앞머리가 **표시와 번호뿐인가** — 그 뒤부터가 줄의 알맹이다.
+ *
+ * ⚠️ **한 번만 벗기면 모자란다**(코덱스 17R·37R). `① 은유` 의 번호 때문에, 칸이 나뉜 표
+ *    (`| ① | (소설) |`)에서는 칸 표시와 번호가 번갈아 나와서, 한 겹만 벗기면 '줄 전체' 로
+ *    안 보여 **그 선택지가 빈칸이 된다**. 표시와 번호를 번갈아 벗기며 끝까지 본다.
+ * @param prefix - 줄머리부터 답 앞까지의 글
+ * @returns 표시·번호뿐이면 true
+ */
+function markedPrefix(prefix: string): boolean {
+  let out = prefix.trim();
+  for (;;) {
+    if (out === '') return true;
+    const bare = out.replace(LIST_MARK, '').trim();
+    if (bare !== out) {
+      out = bare;
+      continue;
+    }
+    // ⚠️ **번호에 공백이 낄 수 있다**(코덱스 38R). 첫 낱말만 보면 `( 1 ) (소설)` 에서
+    //    `(` 만 보고 번호를 못 알아봐 **그 선택지가 빈칸이 된다** — 긴 덩이부터 본다
+    const len = labelHeadLength(out);
+    if (len === 0) return false;
+    out = out.slice(len).trim();
+  }
 }
 
 /**
@@ -143,6 +185,9 @@ export function parenAround(text: string, span: TextSpan): TextSpan | null {
  */
 const WORD_CHAR = /[\w가-힣\u3131-\u318E\u1100-\u11FF\uA960-\uA97F\uD7B0-\uD7FF]/;
 
+/** 숫자 앞의 부호 — `-3` 의 `3` 은 홀로 선 값이 아니다 */
+const NUMBER_SIGN = /[-−–+]/;
+
 /**
  * 그 자리가 **낱말 경계에 서 있는가**.
  *
@@ -157,8 +202,17 @@ const WORD_CHAR = /[\w가-힣\u3131-\u318E\u1100-\u11FF\uA960-\uA97F\uD7B0-\uD7F
 export function standsAlone(text: string, span: TextSpan): boolean {
   const before = text[span.start - 1];
   const after = text[span.end];
-  return (before === undefined || !WORD_CHAR.test(before))
-    && (after === undefined || !WORD_CHAR.test(after));
+  if (before !== undefined && WORD_CHAR.test(before)) return false;
+  if (after !== undefined && WORD_CHAR.test(after)) return false;
+  // ⚠️ **숫자는 부호·소수점까지가 한 값이다**(코덱스 35R). `-3`·`3.5` 에서 `3` 만 답으로
+  //    집으면 그 자리를 답으로 삼아 **문제에 주어진 값이 깨진 채 남는다**(`.5`·`-`)
+  const body = text.slice(span.start, span.end);
+  // ⚠️ 앞자리 없는 소수(`.5`)도, 부호가 붙은 소수(`-.5`)도 한 값이다(코덱스 36R·37R) —
+  //    점으로 시작하는 답까지 봐야 `-.5` 에서 `.5` 가 새지 않는다
+  if (/^\.?\d/.test(body) && before !== undefined
+    && (NUMBER_SIGN.test(before) || before === '.')) return false;
+  if (/\d$/.test(body) && after === '.' && /\d/.test(text[span.end + 1] ?? '')) return false;
+  return true;
 }
 
 /**
@@ -224,15 +278,17 @@ function outerParens(text: string, span: TextSpan): TextSpan {
  */
 export function answerSpan(question: string, answer: string): TextSpan | null {
   const quoted = quotedRanges(question);
-  const hits = answerOccurrences(question, answer).filter((span) => (
-    !insideQuoted(quoted, span.start)
-    && !linesAround(question, span).some(isDiagramLine)
-    // ⚠️ 빈칸이 있는 줄은 **아직 안 쓴 답**이다(코덱스 17R) — 자르는 쪽과 같은 것을 본다
-    && !linesAround(question, span).some((line) => BLANK_SLOT.test(line))
-    // ⚠️ **괄호까지 넓혀 놓고 본다**(코덱스 23R). 안쪽 낱말만 보면 `(소설)` 이 혼자 놓인
-    //    **선택지 줄**이 '줄 전체' 로 안 보여 그대로 빈칸이 된다
-    && !coversWholeLine(question, outerParens(question, span))
-  ));
+  const hits = answerOccurrences(question, answer).filter((span) => {
+    // ⚠️ **괄호까지 넓혀 놓고 모든 보호를 건다**(코덱스 23R·36R). 안쪽 낱말의 줄만 보면
+    //    `(소설)` 이 혼자 놓인 **선택지 줄**이 '줄 전체' 로 안 보이고, 여러 줄에 걸친 괄호
+    //    (`____ (\n소설\n)`)에서는 **빈칸이 있는 줄을 지나쳐** 그 안내를 지운다
+    const outer = outerParens(question, span);
+    const lines = linesAround(question, outer);
+    return !insideQuoted(quoted, span.start)
+      && !lines.some(isDiagramLine)
+      && !lines.some((line) => BLANK_SLOT.test(line))
+      && !coversWholeLine(question, outer);
+  });
   // ⚠️⚠️ **괄호에 채워 넣은 답만 빈칸으로 바꾼다**(코덱스 22R — 앞선 '그 밖에는 뒤쪽 자리'
   //    규칙을 뒤집음). 괄호가 없는 낱말이 답인지 **고를 말**인지는 글자로 가릴 수 없어서,
   //    `다음 중 표현법을 고르시오. 은유, 직유` 의 선택지가 빈칸이 됐다. 우리가 지우는 것은

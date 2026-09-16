@@ -60,7 +60,10 @@ function openTail(text: string): string {
     const ch = out[out.length - 1];
     if (ch === undefined) return out;
     const symmetric = ch === '"' || ch === "'";
-    const odd = symmetric && out.split(ch).length % 2 === 0;
+    // ⚠️ **짝은 그 줄에서만 센다**(코덱스 38R). 글 전체로 세면 앞줄의 아포스트로피(`Don't`)
+    //    하나가 짝을 뒤집어, **인용된 자료의 닫는 따옴표**를 여는 것으로 보고 걷어낸다
+    const line = out.slice(out.lastIndexOf('\n') + 1);
+    const odd = symmetric && line.split(ch).length % 2 === 0;
     if (!OPEN_MARKS.includes(ch) && !odd) return out;
     out = out.slice(0, -1).replace(/\s+$/, '');
   }
