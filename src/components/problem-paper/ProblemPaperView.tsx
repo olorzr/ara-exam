@@ -37,7 +37,7 @@ export default function ProblemPaperView({
 }: ProblemPaperViewProps) {
   const blocks = useMemo(
     () => renderPaperBlocks({
-      blocks: buildPaperBlocks(items),
+      blocks: buildPaperBlocks(items, showAnswers),
       settings: paper.settings,
       imageUrls,
       showAnswers,

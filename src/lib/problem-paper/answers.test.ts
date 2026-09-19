@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  buildAnswerRows, correctChoiceIndex, explanationEntries, formatAnswer, MISSING_ANSWER_LABEL,
+  buildAnswerRows, correctChoiceIndex, EXPLANATION_INLINE_MAX_CHARS, explanationEntries,
+  explanationHtml, explanationTextLength, formatAnswer, MISSING_ANSWER_LABEL, splitsExplanation,
 } from './answers';
 import type { PaperItemSnapshot } from '@/types/problem-bank';
 
@@ -88,5 +89,54 @@ describe('explanationEntries', () => {
   it('해설 키가 없는 옛 스냅샷도 견딘다', () => {
     const legacy = { ...snap(), explanation_html: undefined } as unknown as PaperItemSnapshot;
     expect(explanationEntries([legacy])).toEqual([]);
+  });
+});
+
+describe('splitsExplanation', () => {
+  /**
+   * ⚠️ 인쇄 블록은 쪼갤 수 없어서 한 쪽에 못 담으면 **통째로 축소**돼 찍힌다. 해설은
+   *    길이에 상한이 없으므로(해설지를 통째로 읽어 온 문항이 있다) 긴 것을 문항 블록에
+   *    담으면 문항·선지·답까지 깨알같이 줄어든다(코덱스 정지 리뷰).
+   */
+  it('긴 해설은 따로 흘려 보낸다', () => {
+    expect(splitsExplanation(`<p>${'가'.repeat(EXPLANATION_INLINE_MAX_CHARS + 1)}</p>`)).toBe(true);
+  });
+
+  it('짧은 해설은 문항 블록에 붙인다 — 쪽 경계에서 떨어지지 않게', () => {
+    expect(splitsExplanation('<p>주제는 그리움이다.</p>')).toBe(false);
+    expect(splitsExplanation('')).toBe(false);
+  });
+
+  /** 태그가 길이를 부풀리면 짧은 해설이 공연히 갈린다 */
+  it('길이는 태그를 걷고 센다', () => {
+    const tagged = `<p><strong>${'가'.repeat(10)}</strong></p>`;
+    expect(explanationTextLength(tagged)).toBe(10);
+  });
+});
+
+describe('explanationHtml', () => {
+  /**
+   * ⚠️ 스냅샷은 jsonb 라 DB 를 직접 건드린 값이 섞일 수 있다. 정화가 통째로 지우는
+   *    태그만 든 해설을 **날글자로** 재면 '길다' 고 판정해 갈라낸 뒤 그릴 것이 없어진다
+   *    — 해설이 통째로 사라지는 경로였다(코덱스 정지 리뷰 2R).
+   */
+  it('정화가 지울 것만 들었으면 빈 문자열', () => {
+    expect(explanationHtml(`<script>${'a'.repeat(500)}</script>`)).toBe('');
+    expect(explanationHtml(undefined)).toBe('');
+    expect(explanationHtml('   ')).toBe('');
+  });
+
+  it('그런 해설은 갈라내지도 않는다', () => {
+    expect(splitsExplanation(`<script>${'a'.repeat(500)}</script>`)).toBe(false);
+  });
+
+  it('멀쩡한 해설은 정화해 돌려준다', () => {
+    expect(explanationHtml('<p>주제는 <strong>그리움</strong>이다.</p>'))
+      .toContain('<strong>그리움</strong>');
+  });
+
+  /** 글자가 없어도 그림·표만 든 해설은 실을 것이 있다 */
+  it('글자 없이 표만 든 해설도 싣는다', () => {
+    expect(explanationHtml('<table><tr><td></td></tr></table>')).not.toBe('');
   });
 });

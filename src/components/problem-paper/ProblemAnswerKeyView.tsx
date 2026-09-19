@@ -3,7 +3,6 @@
 import { useMemo, type ReactNode } from 'react';
 import { A4Document, CompactPageHeader } from '@/components/print';
 import ExamPrintHeader from '@/components/exam/ExamPrintHeader';
-import { sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import {
   buildAnswerRows, explanationEntries, MISSING_ANSWER_LABEL,
 } from '@/lib/problem-paper/answers';
@@ -75,8 +74,8 @@ export default function ProblemAnswerKeyView({ paper, items }: ProblemAnswerKeyV
             <div className="pb-key-exp__body">
               <span className="pb-key-exp__answer">정답 {entry.answer}</span>
               <div
-                // 저장할 때 이미 걸렀지만 스냅샷은 jsonb 라 DB 를 직접 건드린 값이 섞일 수 있다
-                dangerouslySetInnerHTML={{ __html: sanitizeProblemHTML(entry.explanation_html) }}
+                // `explanationEntries` 가 정화한 값만 담아 준다 — 여기서 또 하지 않는다
+                dangerouslySetInnerHTML={{ __html: entry.explanation_html }}
               />
             </div>
           </div>

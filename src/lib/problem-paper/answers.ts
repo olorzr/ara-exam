@@ -1,4 +1,5 @@
 import { choiceGlyph } from '@/lib/problem-bank/choices';
+import { sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import type { PaperItemSnapshot, QuestionType } from '@/types/problem-bank';
 
 /**
@@ -70,6 +71,53 @@ export function buildAnswerRows(items: readonly PaperItemSnapshot[]): AnswerRow[
   }));
 }
 
+/**
+ * 교사용에서 해설을 **문항 블록 안에 둘 수 있는** 최대 길이(평문 기준).
+ *
+ * ⚠️ 인쇄 엔진의 블록 하나는 **쪽을 넘겨 쪼갤 수 없는 최소 단위**라, 한 쪽에 못 담으면
+ *    통째로 `transform: scale()` 로 줄여 찍는다. 해설은 길이에 상한이 없어서(해설지를
+ *    통째로 읽어 온 문항이 있다) 그대로 두면 **문항·선지·답까지 깨알같이 줄어든다.**
+ *    이 길이를 넘으면 해설을 문단 단위 블록으로 갈라 흘려 보낸다(지문과 같은 규약).
+ *    넉넉히 잡는다 — 갈리면 쪽 경계에서 문항과 떨어질 수 있으니 웬만하면 붙여 둔다.
+ */
+export const EXPLANATION_INLINE_MAX_CHARS = 400;
+
+/**
+ * 인쇄에 실제로 나갈 해설 HTML.
+ *
+ * ⚠️ 길이를 재고 '실을지' 를 정하는 일은 **정화한 뒤**에 해야 한다. 스냅샷은 jsonb 라
+ *    DB 를 직접 건드린 값이 섞일 수 있는데, 정화가 통째로 지우는 태그(`<script>`)로만
+ *    이뤄진 해설을 날글자로 재면 **길다고 판정해 놓고 그릴 것은 없는** 상태가 된다
+ *    (코덱스 정지 리뷰 2R).
+ * @param html - 저장된 해설 HTML
+ * @returns 정화한 HTML (실을 것이 없으면 빈 문자열)
+ */
+export function explanationHtml(html: string | undefined): string {
+  const clean = sanitizeProblemHTML(html ?? '').trim();
+  return explanationTextLength(clean) > 0 || /<(img|figure|table|hr)\b/i.test(clean) ? clean : '';
+}
+
+/**
+ * 해설의 평문 길이 — 태그를 걷고 공백을 접어 센다.
+ * @param html - 해설 HTML
+ * @returns 글자 수
+ */
+export function explanationTextLength(html: string): number {
+  return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().length;
+}
+
+/**
+ * 이 해설을 **따로 흘려 보내야** 하는가.
+ *
+ * ⚠️ 블록을 만드는 쪽(`blocks.ts`)과 그리는 쪽(`PaperPrintBlocks`)이 **같은 함수**로
+ *    판정해야 한다 — 갈리면 해설이 두 번 찍히거나(양쪽 다 그림) 아예 사라진다(양쪽 다 건너뜀).
+ * @param html - 해설 HTML
+ * @returns 따로 내보내야 하면 true
+ */
+export function splitsExplanation(html: string | undefined): boolean {
+  return explanationTextLength(explanationHtml(html)) > EXPLANATION_INLINE_MAX_CHARS;
+}
+
 /** 답지에 싣는 해설 한 덩어리 */
 export interface ExplanationEntry {
   /** 문제지에서의 자리 (빠른 정답 격자와 같은 번호) */
@@ -90,7 +138,8 @@ export interface ExplanationEntry {
 export function explanationEntries(items: readonly PaperItemSnapshot[]): ExplanationEntry[] {
   const out: ExplanationEntry[] = [];
   items.forEach((item, i) => {
-    const html = item.explanation_html?.trim() ?? '';
+    // ⚠️ 정화 **뒤**에 본다 — 지워질 태그만 든 해설은 '해설' 띠만 불러내고 빈 줄을 찍는다
+    const html = explanationHtml(item.explanation_html);
     if (!html) return;
     out.push({
       number: i + 1,

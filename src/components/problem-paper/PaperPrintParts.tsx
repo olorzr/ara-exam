@@ -1,8 +1,7 @@
 'use client';
 
-import { sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import { sourceLabel } from '@/lib/problem-bank/source-label';
-import { formatAnswer } from '@/lib/problem-paper/answers';
+import { explanationHtml, formatAnswer, splitsExplanation } from '@/lib/problem-paper/answers';
 import type { PaperItemSnapshot } from '@/types/problem-bank';
 
 /**
@@ -58,13 +57,20 @@ export function SourceLine({ source }: { source: PaperItemSnapshot['source'] }) 
 /**
  * 교사용에서 문항 바로 밑에 붙는 답과 해설.
  *
- * ⚠️ 이것은 **문항과 같은 블록 안**에 있어야 한다(`.pb-q`). 따로 블록으로 내보내면
+ * ⚠️ **답 줄은** 문항과 같은 블록 안에 있어야 한다(`.pb-q`). 따로 블록으로 내보내면
  *    쪽이나 단이 갈릴 때 물음과 답이 다른 장에 찍혀, 채점하며 장을 넘겨야 한다
  *    (학교 프린트 문답의 교사용과 같은 규약).
+ * ⚠️ **해설은 짧을 때만** 여기 붙인다. 해설은 길이에 상한이 없어서, 긴 것을 이 블록에
+ *    담으면 한 쪽을 넘기는 순간 인쇄 엔진이 **문항·선지·답까지 통째로 축소**해 찍는다
+ *    (코덱스 정지 리뷰). 긴 해설은 `blocks.ts` 가 문단 단위 블록으로 갈라 흘려 보낸다 —
+ *    **판정은 두 곳이 같은 `splitsExplanation`** 을 쓴다(갈리면 두 번 찍히거나 사라진다).
  */
 export function TeacherAnswer({ snapshot }: { snapshot: PaperItemSnapshot }) {
   const answer = formatAnswer(snapshot.question_type, snapshot.answer);
-  const explanation = snapshot.explanation_html?.trim() ?? '';
+  // ⚠️ 판정도 그릴 것도 **정화한 값** 기준이다 — 날글자로 재면 지워질 태그만 든 해설을
+  //    '길다' 고 보고 갈라낸 뒤 그릴 것이 없어진다(코덱스 정지 리뷰 2R)
+  const explanation = splitsExplanation(snapshot.explanation_html)
+    ? '' : explanationHtml(snapshot.explanation_html);
 
   return (
     <>
@@ -75,8 +81,8 @@ export function TeacherAnswer({ snapshot }: { snapshot: PaperItemSnapshot }) {
       {explanation && (
         <div
           className="pb-q__explanation"
-          // 저장할 때 이미 걸렀지만 스냅샷은 jsonb 라 DB 를 직접 건드린 값이 섞일 수 있다
-          dangerouslySetInnerHTML={{ __html: sanitizeProblemHTML(explanation) }}
+          // `explanationHtml` 이 이미 정화했다 — 여기서 또 하지 않는다
+          dangerouslySetInnerHTML={{ __html: explanation }}
         />
       )}
     </>

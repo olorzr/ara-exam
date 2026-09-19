@@ -302,6 +302,21 @@
 }
 .pb-q__explanation p { margin: 0 0 2pt; }
 
+/*
+ * 갈라 낸 해설 조각 — 긴 해설은 문항 블록에 담을 수 없어 따로 흘려 보낸다
+ * (담으면 한 쪽을 넘기는 순간 문항까지 통째로 축소돼 찍힌다).
+ * 문항 블록 안의 해설과 **같은 들여쓰기**라 갈렸다는 것이 눈에 띄지 않는다.
+ */
+.pb-q__explanation--part { break-inside: avoid; }
+.pb-q__explanation--last { padding-bottom: 6px; }
+/* 첫 조각의 번호 — 쪽이 갈려 문항과 떨어져도 어느 문항의 해설인지 알 수 있게 */
+.pb-q__explanation-label {
+  display: block;
+  font-weight: 700;
+  color: #2F8F86;
+  margin-bottom: 1pt;
+}
+
 /* ── 정답표 ───────────────────────────────────────── */
 
 .pb-answer-row {

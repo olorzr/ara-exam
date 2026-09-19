@@ -2,6 +2,7 @@ import { splitHtmlBlocks } from '@/lib/print/split-html-blocks';
 import { soleFigureIndex, unplacedFigures } from '@/lib/problem-bank/figure-render';
 import { sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import { hasYetHangul } from '@/lib/yet-hangul';
+import { explanationHtml, splitsExplanation } from './answers';
 import { trimEdgeEmptyParagraphs } from './html-trim';
 import type { PaperItemSnapshot } from '@/types/problem-bank';
 import { groupRangeLabel, groupsOf, type PaperItem } from './compose';
@@ -42,6 +43,20 @@ export type PaperBlock =
   /** 지문 본문 제자리에 끼울 그림 한 장 — 문단 조각들 사이에 낀다 */
   | { kind: 'passage-figure'; key: string; path: string; label: string }
   | { kind: 'problem'; key: string; number: number; snapshot: PaperItemSnapshot }
+  /**
+   * 교사용에서 **따로 흘려 보내는** 해설 조각.
+   *
+   * 짧은 해설은 문항 블록 안에 둔다(쪽 경계에서 떨어지지 않게). 길면 그럴 수 없다 —
+   * 블록은 쪼갤 수 없어서 한 쪽을 넘기는 순간 문항까지 통째로 축소돼 찍힌다.
+   */
+  | {
+    kind: 'explanation-part';
+    key: string;
+    number: number;
+    html: string;
+    first: boolean;
+    last: boolean;
+  }
   | {
     kind: 'problem-image';
     key: string;
@@ -69,7 +84,9 @@ function passageHeaderText(range: string): string {
  * @param items - 문제지 항목 (order_index 순서)
  * @returns 순서대로의 블록 목록
  */
-export function buildPaperBlocks(items: readonly PaperItemSnapshot[]): PaperBlock[] {
+export function buildPaperBlocks(
+  items: readonly PaperItemSnapshot[], showAnswers = false,
+): PaperBlock[] {
   const paperItems: PaperItem[] = items.map((item, index) => ({
     problemId: String(index),
     passageId: item.passage?.id ?? null,
@@ -162,10 +179,30 @@ export function buildPaperBlocks(items: readonly PaperItemSnapshot[]): PaperBloc
           path: snapshot.image_path,
           snapshot,
         });
-        continue;
+      } else {
+        blocks.push({ kind: 'problem', key: `q-${i}`, number, snapshot });
       }
 
-      blocks.push({ kind: 'problem', key: `q-${i}`, number, snapshot });
+      // 긴 해설은 문단 단위로 갈라 흘려 보낸다 — 문항 블록에 두면 한 쪽을 넘기는 순간
+      // 문항·선지·답까지 통째로 축소돼 찍힌다(코덱스 정지 리뷰).
+      // ⚠️ 그리는 쪽도 **같은 `splitsExplanation`** 으로 판정한다 — 갈리면 해설이
+      //    두 번 찍히거나 아예 사라진다
+      if (showAnswers && splitsExplanation(snapshot.explanation_html)) {
+        const clean = explanationHtml(snapshot.explanation_html);
+        // ⚠️ `splitHtmlBlocks` 는 **최상위 요소**만 돌려준다 — 태그로 감싸이지 않은 날글자는
+        //    자식 요소가 없어 빈 배열이 된다. 그대로 두면 문항 블록도 건너뛴 참이라
+        //    **해설이 통째로 사라진다**(코덱스 정지 리뷰 2R). 못 쪼개면 통째로 한 조각이다
+        const split = trimEdgeEmptyParagraphs(splitHtmlBlocks(clean));
+        const parts = split.length > 0 ? split : [clean];
+        parts.forEach((html, part) => blocks.push({
+          kind: 'explanation-part',
+          key: `qe-${i}-${part}`,
+          number,
+          html,
+          first: part === 0,
+          last: part === parts.length - 1,
+        }));
+      }
     }
   }
 

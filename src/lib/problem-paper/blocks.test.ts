@@ -295,3 +295,50 @@ describe('renumberedPrintConfirmMessage', () => {
     expect(renumberedPrintConfirmMessage(many)).toContain('외 2개');
   });
 });
+
+describe('buildPaperBlocks — 교사용 해설', () => {
+  const long = `<p>${'가'.repeat(500)}</p><p>둘째 문단</p>`;
+
+  it('문제지(교사용 아님)에는 해설 블록이 없다', () => {
+    const blocks = buildPaperBlocks([snap({ explanation_html: long })]);
+    expect(blocks.some((b) => b.kind === 'explanation-part')).toBe(false);
+  });
+
+  /**
+   * ⚠️ 문항 블록은 쪼갤 수 없어서 긴 해설을 담으면 한 쪽을 넘기는 순간
+   *    문항·선지·답까지 통째로 축소돼 찍힌다(코덱스 정지 리뷰).
+   */
+  it('교사용의 긴 해설은 문단 단위 블록으로 갈라 흘려 보낸다', () => {
+    const blocks = buildPaperBlocks([snap({ explanation_html: long })], true);
+    const parts = blocks.filter((b) => b.kind === 'explanation-part');
+    expect(parts.length).toBeGreaterThan(1);
+    expect(parts[0]).toMatchObject({ number: 1, first: true, last: false });
+    expect(parts.at(-1)).toMatchObject({ last: true });
+  });
+
+  it('짧은 해설은 갈라내지 않는다 — 문항 블록 안에 남는다', () => {
+    const blocks = buildPaperBlocks([snap({ explanation_html: '<p>짧은 까닭</p>' })], true);
+    expect(blocks.some((b) => b.kind === 'explanation-part')).toBe(false);
+  });
+
+  /**
+   * ⚠️ `splitHtmlBlocks` 는 **최상위 요소**만 돌려주므로 태그로 감싸이지 않은 날글자는
+   *    빈 배열이 된다. 그대로 두면 문항 블록도 해설을 건너뛴 참이라 **통째로 사라진다**
+   *    (코덱스 정지 리뷰 2R).
+   */
+  it('태그 없이 적힌 긴 해설도 잃지 않는다 — 못 쪼개면 통째로 한 조각', () => {
+    const bare = '가'.repeat(500);
+    const parts = buildPaperBlocks([snap({ explanation_html: bare })], true)
+      .filter((b) => b.kind === 'explanation-part');
+    expect(parts).toHaveLength(1);
+    expect(parts[0]).toMatchObject({ first: true, last: true });
+  });
+
+  it('그림 문항의 긴 해설도 갈라 낸다', () => {
+    const blocks = buildPaperBlocks(
+      [snap({ render_mode: 'image', image_path: 'p/x.jpg', explanation_html: long })], true,
+    );
+    expect(blocks[0].kind).toBe('problem-image');
+    expect(blocks.some((b) => b.kind === 'explanation-part')).toBe(true);
+  });
+});

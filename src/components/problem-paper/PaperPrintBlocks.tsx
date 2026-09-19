@@ -90,6 +90,24 @@ export function renderPaperBlocks({
           </div>
         );
 
+      case 'explanation-part':
+        return (
+          <div
+            key={block.key}
+            className={`pb-q__explanation pb-q__explanation--part${
+              block.first ? ' pb-q__explanation--first' : ''
+            }${block.last ? ' pb-q__explanation--last' : ''}`}
+          >
+            {/* 갈라 낸 해설은 문항과 다른 장에 찍힐 수 있다 — 첫 조각에 번호를 달아
+                떨어져 나가도 어느 문항의 해설인지 알 수 있게 한다 */}
+            {block.first && (
+              <span className="pb-q__explanation-label">{block.number}번 해설</span>
+            )}
+            {/* 정화는 blocks.ts 가 이미 했다(쪼개기 전에 한 번) */}
+            <div dangerouslySetInnerHTML={{ __html: block.html }} />
+          </div>
+        );
+
       case 'problem':
         return (
           <ProblemBlock
