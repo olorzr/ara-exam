@@ -3,7 +3,8 @@ import type { AreaTreeNode } from './area-tree';
 /**
  * 문법 분류 트리 (순수 함수 + 코드 상수 마스터).
  *
- * 체계는 수능 문법 교재 목차(6개 대분류 / 100개 핵심 개념)를 그대로 옮긴 것이다.
+ * 체계는 수능 문법 교재 목차(6개 대분류 / 100개 핵심 개념)를 그대로 옮기고, 중학 기출에서
+ * 꾸준히 나오는데 목차에 없는 개념을 더한 것이다(`남북한 언어`).
  *
  * ⚠️ **마스터를 DB 에 두지 않았다.** 수능 문법 체계는 학문적으로 고정이라 관리 화면과
  *    마스터 표를 만들 이유가 없다. 항목을 고치려면 이 파일을 고쳐 배포한다.
@@ -12,7 +13,7 @@ import type { AreaTreeNode } from './area-tree';
  *    문항에 한 개만 붙지만(`{문학,현대시}`), 수능 문법 문항은 개념 두셋을 걸친다.
  *    그래서 여기서는 경로를 `' > '` 로 이어 붙인 **문자열**을 원소로 담는다:
  *    `{"단어 > 품사 > 명사","문장 > 문법 요소 > 피동 표현"}`.
- *    그 결과 상위 검색이 `@>` 로 안 되므로 `grammarPathsUnder` 가 잎을 펼치고 `&&` 로 찾는다.
+ *    그 결과 상위 검색이 `@>` 로 안 되므로 `grammarPathsUnder` 가 가지를 펼치고 `&&` 로 찾는다.
  *
  * ⚠️ 태깅은 마스터 id 가 아니라 **이름 경로 스냅샷**이다(area_path·unit_path 와 같은 규약) —
  *    이 파일에서 이름을 바꿔도 이미 태깅한 문항은 그대로다.
@@ -54,7 +55,7 @@ const GRAMMAR_AREA_NAMES = ['언어', '문법', '어휘/어법', '언어와 매�
 type GrammarSource = Record<string, Record<string, string[]> | string[]>;
 
 /**
- * 수능 문법 100개 핵심 개념.
+ * 수능 문법 100개 핵심 개념 + 중학 기출에서 더한 것.
  *
  * ⚠️ **선언 순서가 곧 화면 순서다.** 이름순으로 정렬하지 않는다 — 9품사(명사·대명사·수사…)나
  *    음운 변동처럼 학교문법이 가르치는 순서가 따로 있고, 선생님이 그 순서로 찾는다.
@@ -74,7 +75,9 @@ const GRAMMAR_SOURCE: GrammarSource = {
       '국어사전 활용',
       '단어의 의미 변화',
     ],
-    '어휘 체계와 양상': ['고유어·한자어·외래어', '표준어·방언', '유행어·은어·전문어'],
+    // '남북한 언어' 는 교재 목차에 없다 — 중3 '통일 시대의 우리말' 단원이 기출에 꾸준히
+    // 나오는데(62문항) '표준어·방언' 에 섞어 두니 지역 방언 문항과 구별이 안 됐다.
+    '어휘 체계와 양상': ['고유어·한자어·외래어', '표준어·방언', '유행어·은어·전문어', '남북한 언어'],
   },
   문장: {
     '문장 성분': [
@@ -164,12 +167,12 @@ export function parseGrammarPath(value: string): string[] {
   return value.split('>').map((s) => s.trim()).filter(Boolean);
 }
 
-/** 트리를 훑어 잎 경로를 모은다 (선언 순서) */
-function collectLeaves(nodes: AreaTreeNode[], prefix: string[], out: string[][]): void {
+/** 트리를 훑어 **잎과 중간 마디를 모두** 모은다 (선언 순서) */
+function collectDescendants(nodes: AreaTreeNode[], prefix: string[], out: string[][]): void {
   for (const node of nodes) {
     const path = [...prefix, node.name];
-    if (node.children.length === 0) out.push(path);
-    else collectLeaves(node.children, path, out);
+    out.push(path);
+    collectDescendants(node.children, path, out);
   }
 }
 
@@ -202,41 +205,48 @@ const GRAMMAR_ORDER: Map<string, number> = (() => {
 /**
  * 마스터의 모든 경로(중간 마디 포함)를 목차 순서로.
  *
- * 아카이브 필터·트리의 선택지가 여기서 나온다. **패싯(태깅된 잎)이 아니라 마스터**인
+ * 아카이브 필터·트리의 선택지가 여기서 나온다. **패싯(태깅된 경로)이 아니라 마스터**인
  * 이유는 grammar-browse-tree.ts 에 적어 두었다 — 한 줄로는, 태그가 0건이면 패싯도 0건이라
  * 고를 칸 자체가 안 생겨 태깅을 시작할 길이 없었다.
  */
 export const GRAMMAR_ALL_PATHS: readonly string[] = [...GRAMMAR_ORDER.keys()];
 
 /**
- * 이 가지 아래의 **잎 경로 전부** — 상위 검색이 쓴다.
+ * 고른 경로와 **그 아래 경로 전부** — 상위 검색이 쓴다.
  *
  * 저장값이 경로 문자열이라 `@>`(contains) 로는 정확 일치만 걸린다. '품사' 를 고르면
- * 그 아래 9개를 전부 나열해 `&&`(overlaps) 로 찾는다.
+ * 그 아래를 전부 나열해 `&&`(overlaps) 로 찾는다.
+ *
+ * ⚠️ **잎만 펴면 안 된다 — 고른 마디 자신과 중간 마디도 넣는다.** `GrammarTagPicker` 는
+ *    부분 경로도 그대로 담아서(`canAdd` 가 경로 길이를 보지 않는다) `'단어 > 품사'` 처럼
+ *    **중간 마디로 태깅된 문항이 실제로 있다**('품사 분류 기준' 처럼 잎 하나로 못 좁히는
+ *    종합 문항). 잎만 나열하면 '품사' 로 걸러도 그 문항들이 통째로 안 나온다.
  *
  * ⚠️ 트리에 없는 경로는 **그 경로 자체**를 돌려준다(빈 배열이 아니다). 마스터에서 뺀
  *    항목으로 태깅된 옛 문항이 필터에서 통째로 사라지면 안 된다 — 정확 일치로라도 찾게 둔다.
  * @param path - 고른 경로 (['단어','품사'])
- * @returns 검색에 넣을 경로 문자열 목록
+ * @returns 검색에 넣을 경로 문자열 목록 (고른 마디가 맨 앞, 나머지는 목차 순서)
  */
 export function grammarPathsUnder(path: string[]): string[] {
   const clean = path.filter(Boolean);
   if (clean.length === 0) return [];
 
+  const self = formatGrammarPath(clean);
   const node = nodeAt(clean);
-  if (!node) return [formatGrammarPath(clean)];
-  if (node.children.length === 0) return [formatGrammarPath(clean)];
+  if (!node || node.children.length === 0) return [self];
 
-  const leaves: string[][] = [];
-  collectLeaves(node.children, clean, leaves);
-  return leaves.map(formatGrammarPath);
+  const under: string[][] = [];
+  collectDescendants(node.children, clean, under);
+  return [self, ...under.map(formatGrammarPath)];
 }
 
 /**
- * 잎 경로들의 **조상까지 펼친다** — 필터 선택지가 쓴다.
+ * 저장된 경로들의 **조상까지 펼친다** — 필터 선택지가 쓴다.
  *
- * 패싯은 문항이 실제로 들고 있는 값(잎)만 모으는데, 그것만 선택지로 두면 '품사 전체' 를
+ * 패싯은 문항이 실제로 들고 있는 값만 모으는데, 그것만 선택지로 두면 '품사 전체' 를
  * 고를 수가 없다. `'단어 > 품사 > 명사'` 하나에서 `'단어'`·`'단어 > 품사'` 도 만들어 준다.
+ * (저장값은 잎이 대부분이지만 `'단어 > 품사'` 같은 중간 마디도 섞여 있다 — 그 경우
+ *  자기 자신과 `'단어'` 가 나온다.)
  * @param paths - 저장된 경로 문자열들
  * @returns 중복 없는 경로 목록 (교재 목차 순서, 마스터에 없는 것은 뒤로)
  */

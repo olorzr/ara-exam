@@ -55,6 +55,14 @@ describe('문법 마스터 무결성', () => {
       '명사', '대명사', '수사', '관형사', '부사', '조사', '감탄사', '동사', '형용사',
     ]);
   });
+
+  it("'남북한 언어' 가 '표준어·방언' 과 따로 있다", () => {
+    // 교재 목차에는 없지만 중3 '통일 시대의 우리말' 기출이 62문항이라 잎을 따로 뒀다.
+    // 한데 묶으면 지역 방언 문항과 남북한 어휘 문항이 같은 칸에서 섞여 나온다
+    expect(optionsAt(GRAMMAR_TREE, ['단어', '어휘 체계와 양상'])).toEqual([
+      '고유어·한자어·외래어', '표준어·방언', '유행어·은어·전문어', '남북한 언어',
+    ]);
+  });
 });
 
 describe('경로 왕복', () => {
@@ -74,30 +82,42 @@ describe('경로 왕복', () => {
 });
 
 describe('grammarPathsUnder — 상위 검색이 쓴다', () => {
-  it('중분류를 고르면 그 아래 잎을 전부 편다', () => {
-    const leaves = grammarPathsUnder(['단어', '품사']);
-    expect(leaves).toHaveLength(9);
-    expect(leaves).toContain('단어 > 품사 > 명사');
-    expect(leaves).toContain('단어 > 품사 > 형용사');
+  it('중분류를 고르면 자기 자신과 그 아래 잎을 전부 편다', () => {
+    const under = grammarPathsUnder(['단어', '품사']);
+    expect(under).toHaveLength(10);
+    expect(under[0]).toBe('단어 > 품사');
+    expect(under).toContain('단어 > 품사 > 명사');
+    expect(under).toContain('단어 > 품사 > 형용사');
+  });
+
+  it('중간 마디로 태깅한 문항도 찾을 수 있게 중간 마디를 넣는다', () => {
+    // 피커가 부분 경로를 허용해 '단어 > 품사' 로 태깅된 종합 문항이 실제로 있다.
+    // 잎만 펴면 '단어' 로 걸러도 그 문항이 안 나온다
+    const under = grammarPathsUnder(['단어']);
+    expect(under).toContain('단어');
+    expect(under).toContain('단어 > 품사');
+    expect(under).toContain('단어 > 품사 > 명사');
   });
 
   it('대분류를 고르면 그 가지 전체를 편다', () => {
-    // 저장값은 잎뿐이라 중간 마디는 나오면 안 된다
-    const leaves = grammarPathsUnder(['문장']);
-    expect(leaves).toHaveLength(30);
-    expect(leaves).toContain('문장 > 문법 요소 > 피동 표현');
-    expect(leaves).not.toContain('문장 > 문법 요소');
+    const under = grammarPathsUnder(['문장']);
+    // 자기 자신 1 + 중분류 4 + 잎 30
+    expect(under).toHaveLength(35);
+    expect(under[0]).toBe('문장');
+    expect(under).toContain('문장 > 문법 요소 > 피동 표현');
+    expect(under).toContain('문장 > 문법 요소');
   });
 
   it('잎을 고르면 자기 하나다', () => {
     expect(grammarPathsUnder(['단어', '품사', '명사'])).toEqual(['단어 > 품사 > 명사']);
   });
 
-  it('두 단계에서 끝나는 가지도 잎을 준다', () => {
+  it('두 단계에서 끝나는 가지는 자기와 잎을 준다', () => {
     // 담화는 중분류가 없다 — 대분류 바로 아래가 잎이다
-    const leaves = grammarPathsUnder(['담화']);
-    expect(leaves).toHaveLength(5);
-    expect(leaves).toContain('담화 > 담화의 맥락');
+    const under = grammarPathsUnder(['담화']);
+    expect(under).toHaveLength(6);
+    expect(under[0]).toBe('담화');
+    expect(under).toContain('담화 > 담화의 맥락');
   });
 
   it('마스터에 없는 경로는 그 경로 자체로 찾는다', () => {

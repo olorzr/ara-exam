@@ -137,7 +137,7 @@ export interface ProblemQuery {
   unit_path?: string[];
   /**
    * 문법 분류 — **찾을 경로 문자열들**(하나라도 걸리면 통과, `&&`).
-   * 상위를 골랐을 때 그 아래 잎으로 펴는 일은 `filters.ts` 가 이미 끝내고 넘긴다.
+   * 상위를 골랐을 때 그 마디와 아래 경로로 펴는 일은 `filters.ts` 가 이미 끝내고 넘긴다.
    */
   grammar_paths?: string[];
   /** 작품명. 이 조건이 걸리면 목록이 **지문 순서**로 정렬된다 */
@@ -219,8 +219,8 @@ export async function fetchProblemPage(query: ProblemQuery): Promise<ProblemPage
   if (query.grammar_paths && query.grammar_paths.length > 0) {
     // ⚠️ 여기만 `contains` 가 아니라 **`overlaps`** 다. 이 컬럼은 원소 하나가 경로 하나라
     //    (`'단어 > 품사 > 명사'`) 문항에 여러 개가 붙는다 — `@>` 는 "준 것을 **전부** 가진 행"
-    //    이라 두 태그를 넘기면 둘 다 붙은 문항만 나온다. 상위 검색은 잎을 나열해 찾는 것이라
-    //    "하나라도 걸리면" 이 맞다(grammar-tree.ts 의 grammarPathsUnder).
+    //    이라 두 태그를 넘기면 둘 다 붙은 문항만 나온다. 상위 검색은 고른 마디와 그 아래
+    //    경로를 나열해 찾는 것이라 "하나라도 걸리면" 이 맞다(grammar-tree.ts 의 grammarPathsUnder).
     request = request.overlaps('grammar_paths', query.grammar_paths);
   }
   if (query.search?.trim()) {

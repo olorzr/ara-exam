@@ -184,7 +184,7 @@ function ArchiveContent() {
         toast.info('선택이 바뀌어 멈췄어요. 다시 눌러 주세요.');
         return;
       }
-      // 고른 경로 **하나만** 붙인다 — 아래 잎으로 펴는 것은 찾을 때 하는 일이다
+      // 고른 경로 **하나만** 붙인다 — 아래 경로로 펴는 것은 찾을 때 하는 일이다
       const changed = await addGrammarPaths(ids, [label]);
       if (!aliveRef.current) return;
 

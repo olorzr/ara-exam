@@ -145,8 +145,9 @@ export default function ProblemCard({
           {problem.work_title && <span>· {problem.work_title}</span>}
           {problem.unit_path.length > 0 && <span>· {unitPathLabel(problem.unit_path)}</span>}
           {problem.area_path.length > 0 && <span>· {areaPathLabel(problem.area_path)}</span>}
-          {/* 문법은 여러 개가 붙으므로 **잎 이름만** 칩으로 낸다 — 전체 경로를 다 쓰면
-              카드 한 줄이 경로 세 벌로 가득 찬다. 전체는 title 로 확인한다 */}
+          {/* 문법은 여러 개가 붙으므로 경로의 **마지막 마디만** 칩으로 낸다 — 전체 경로를
+              다 쓰면 카드 한 줄이 경로 세 벌로 가득 찬다. 전체는 title 로 확인한다.
+              중간 마디로 태깅된 문항('단어 > 품사')이면 '품사' 가 나온다 */}
           {problem.grammar_paths.map((path) => (
             <span
               key={path}

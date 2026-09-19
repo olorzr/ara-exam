@@ -25,7 +25,7 @@ export interface ProblemFilters {
   /**
    * 문법 분류에서 **고른 한 경로** (['단어','품사']).
    * ⚠️ 저장 컬럼(`grammar_paths`)은 경로를 여러 개 담지만, 필터는 한 번에 하나만 고른다 —
-   *    고른 가지 아래 잎으로 펴는 일은 `toProblemQuery` 가 한다.
+   *    고른 마디와 그 아래 경로 전부로 펴는 일은 `toProblemQuery` 가 한다.
    */
   grammar_path: string[];
   /** 작품명 (`problems.work_title`). 자유 텍스트라 '미지정만' 을 쓰지 않는다 */
@@ -153,8 +153,8 @@ export function toProblemQuery(filters: ProblemFilters): ProblemQuery {
     ...axisEntry('textbook', filters.textbook),
     ...(filters.area_path.length > 0 ? { area_path: filters.area_path } : {}),
     ...(filters.unit_path.length > 0 ? { unit_path: filters.unit_path } : {}),
-    // 고른 가지 아래의 **잎 경로 전부**로 편다 — 저장값이 경로 문자열이라 배열 포함(@>)으로는
-    // 상위 검색이 안 되고, 잎을 나열해 겹침(&&)으로 찾아야 한다
+    // 고른 마디와 **그 아래 경로 전부**(중간 마디 포함)로 편다 — 저장값이 경로 문자열이라
+    // 배열 포함(@>)으로는 상위 검색이 안 되고, 나열해 겹침(&&)으로 찾아야 한다
     ...(filters.grammar_path.length > 0
       ? { grammar_paths: grammarPathsUnder(filters.grammar_path) } : {}),
     // 작품명은 자유 텍스트다 — '미지정만' 을 허용하면 그런 이름의 작품과 겹친다

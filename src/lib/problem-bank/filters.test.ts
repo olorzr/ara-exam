@@ -82,13 +82,13 @@ describe('toProblemQuery', () => {
     expect(toProblemQuery({ ...EMPTY_FILTERS, area_path: ['문학'] }).area_path).toEqual(['문학']);
   });
 
-  it('문법은 고른 가지 아래 잎으로 펴서 넘긴다', () => {
-    // 저장값이 경로 문자열이라 '단어 > 품사' 로는 아무것도 안 걸린다 — 잎을 나열해야 한다
+  it('문법은 고른 가지를 자기 자신까지 펴서 넘긴다', () => {
+    // 저장값이 경로 문자열이라 '단어 > 품사' 하나로는 그 아래 잎이 안 걸린다 — 나열해야 한다
     const q = toProblemQuery({ ...EMPTY_FILTERS, grammar_path: ['단어', '품사'] });
-    expect(q.grammar_paths).toHaveLength(9);
+    expect(q.grammar_paths).toHaveLength(10);
     expect(q.grammar_paths).toContain('단어 > 품사 > 명사');
-    // 고른 값 자체(중간 마디)는 저장되지 않는 값이라 조건에 넣지 않는다
-    expect(q.grammar_paths).not.toContain('단어 > 품사');
+    // 고른 마디 자체도 넣는다 — 피커가 부분 경로를 허용해 '단어 > 품사' 로 태깅된 문항이 있다
+    expect(q.grammar_paths).toContain('단어 > 품사');
   });
 
   it('문법 잎을 고르면 그 하나만 조건이 된다', () => {

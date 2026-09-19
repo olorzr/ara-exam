@@ -20,7 +20,7 @@ function findByName(nodes: FacetTreeNode<string[]>[], name: string) {
 
 describe('buildGrammarBrowseTree', () => {
   /**
-   * 이 테스트가 고정하는 것: 트리는 **마스터**로 만든다. 예전처럼 패싯(태깅된 잎)으로
+   * 이 테스트가 고정하는 것: 트리는 **마스터**로 만든다. 예전처럼 패싯(태깅된 경로)으로
    * 만들면 태그가 0건일 때 트리가 통째로 비어 태깅을 시작할 길이 없었다.
    */
   it('태그가 하나도 없어도 마스터 전체가 나온다', () => {
