@@ -265,6 +265,16 @@ node /Users/ara/Projects/Ara-system/scripts/post-update.js "<HTML>"
 - [2026-09-04] 표 재분할은 한 패스에 **표 하나**만 쪼갠다(상한 32). 표가 많은 개념지는 그만큼 재측정이 돈다 — 렌더가 몇 프레임 늦을 뿐 내용에는 영향이 없다. 페이지 끝에 걸린 조각이 측정 오차로 다시 밀리면 **1행짜리 조각(+반복된 제목 행)** 이 남을 수 있다(내용 유실 없음, 외관 문제)
 
 ## Architecture Decisions
+- [2026-09-19] **문제지 조합에도 아카이브의 왼쪽 트리를 붙였다 — 패널은 한 벌이고, 탭은 언마운트하지 않는다**([ArchiveSidePanel.tsx](src/components/problem-bank/ArchiveSidePanel.tsx), [papers/new/page.tsx](src/app/(main)/problems/papers/new/page.tsx)). 제보는 "문제지 조합도 문제 아카이브처럼 옆에 목록이 나오면 좋겠다 — 그래야 바로바로 뽑아쓰기 좋다" 였다. 되돌리지 말아야 할 판단들:
+  - **패널을 새로 만들지 않았다.** 두 화면이 같은 `useProblemArchive` 훅을 쓰고 있어서 `ArchiveSidePanel` 을 그대로 꽂으면 끝이다. 트리가 다른 축을 비우는 규약(`SCHOOL_AXES_CLEARED` 등)도 패널 안에 있어 함께 따라온다. 사본을 만들었다면 그 규약이 언젠가 한쪽만 고쳐진다
+    - `onChange` 로 넘기는 것은 **화면마다 다르다**: 아카이브는 조건이 바뀌면 선택을 비워야 해서 `patch` 를 한 겹 감싸 넘기고, 조합 화면은 선택 모드가 없어 `archive.patch` 를 그대로 넘긴다
+  - **조합 화면의 세 칸은 `xl`(1280px)부터다**(아카이브는 `lg`). 앱 사이드바(`w-60`, 240px)와 트리 칸(260px)을 뺀 자리에서 `lg` 로 가르면 목록·캔버스가 각 220px 안팎이 되어 카드(썸네일 64px + 손잡이 + 담기 버튼)가 접힌다. 그 아래 폭에서는 트리가 위로 쌓인다
+  - ⚠️ **탭을 옮겨 다녀도 패널을 언마운트하지 않는다**(`keepMounted`, 코덱스 1R). 패널마다 '방금 누른 잎'(`picked`)을 지역 state 로 들고 있어서, 언마운트하면 탭을 다녀온 것만으로 **고른 폴더의 강조가 사라진다** — 목록은 그대로인데 어디를 눌러 이 목록이 됐는지 화면에서 알 수 없어진다. 교과서 탭은 `getAllSelectableCategories`(표 6개)를 다시 조회하기까지 한다
+  - ⚠️ **늦추는 것은 패널 칸이 아니라 안쪽 트리다**(`seen`, 코덱스 2R·4R). 넷을 다 미리 마운트하면 학교·작품·문법 링크로 들어온 사람이 쓰지도 않을 교과서 트리의 조회를 치르고(2R), 반대로 `TabsContent` **칸 자체**를 `seen` 으로 빼면 아직 안 연 탭에 이어 줄 패널이 없어 `aria-controls` 가 생기지 않는다(4R). 칸 넷은 언제나 그리고 그 안의 트리만 늦춘다
+  - ⚠️ **패널은 반드시 `Tabs` 안의 `TabsContent` 다**(코덱스 3R). 밖에 `<div hidden>` 으로 두면 탭과 패널이 ARIA 로 이어지지 않아 스크린리더에서 이 탭이 무엇을 여는지 알 수 없다
+  - ⚠️ **감춘 형제가 있는 자리에 `space-y-*` 를 쓰지 말 것**(코덱스 2R). **Tailwind v4 의 `space-y-*` 는 `:not(:last-child)` 에 여백을 준다** — v3 의 `:not([hidden]) ~ :not([hidden])` 이 아니다. 그래서 감춘 패널에도 여백이 붙어 **마지막 탭만 아래 여백이 없어진다**. `flex flex-col gap-*` 은 `display:none` 을 계산에서 뺀다(여기서는 `Tabs` 루트가 이미 그 모양이라 바깥 래퍼를 없앴다)
+  - **폴더 노드에 `aria-expanded` 를 붙였다**([FacetTree.tsx](src/components/problem-bank/FacetTree.tsx), [CategoryTree.tsx](src/components/words/CategoryTree.tsx), 코덱스 1R). 화살표 아이콘은 눈으로만 보이는 표시라 접힘·펼침을 알릴 길이 그것뿐이다. 두 트리가 **같은 규약**이다 — 한쪽만 고치지 말 것
+  - **받아들인 한계**: 아카이브에서 걸어 둔 조건은 '+ 문제지 만들기' 로 넘어가지 않는다(조합 화면은 늘 빈 조건으로 열린다). 넘기려면 `filtersToQueryString` → `filtersFromParams` + Suspense 경계가 필요하다 — 아카이브 화면이 이미 하는 일이라 붙이는 길은 열려 있다
 - [2026-09-16] **프린트 읽기 정확도 — 꼼꼼한 모드로 부르고, 1단 쪽은 위아래로 가른다**([ocrPref.ts](src/lib/ai/ocrPref.ts), [rowDetect.ts](src/lib/pdf/rowDetect.ts), [read-bundle.ts](src/lib/print-scan/read-bundle.ts)). 제보는 "시 한 편(가난한 사랑 노래)을 스캔해 읽혔더니 전사가 엉망" 이었다. 되돌리지 말아야 할 판단들:
   - ⚠️ **원인 하나는 우리가 아무것도 안 보낸 것이었다.** 선생님이 설정에서 모델을 고르지 않으면 `generateDraft` 가 `model`·`effort` 를 **아예 안 실어** 선생님 PC `~/.codex/config.toml` 의 기본값으로 돌았다(이 맥은 `model_reasoning_effort = "low"`). 게다가 `ocr_meta.model` 이 null 이라 **무엇으로 읽었는지 사후에 알 길도 없었다**. 이제 본문 읽기 턴은 [resolveOcrPref](src/lib/ai/ocrPref.ts) 가 정한 모델·노력을 **늘 싣고 `ocr_meta` 에 남긴다**
   - ⚠️ **모델 id 를 노력과 **함께** 보내야 한다.** `sanitizeOverride`(generateDraft.ts)는 노력이 유효한지 **모델의 지원 목록으로** 판정하는데, 모델을 안 보내면 기본 모델이 무엇인지 몰라 **노력을 통째로 버린다** — 노력만 보내는 것은 아무것도 안 보내는 것과 같다

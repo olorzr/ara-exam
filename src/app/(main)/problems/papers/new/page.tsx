@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import ArchiveSidePanel from '@/components/problem-bank/ArchiveSidePanel';
 import ProblemCard from '@/components/problem-bank/ProblemCard';
 import ProblemDetailDialog from '@/components/problem-bank/ProblemDetailDialog';
 import ProblemFilterBar from '@/components/problem-bank/ProblemFilterBar';
@@ -21,6 +22,9 @@ import { groupsOf } from '@/lib/problem-paper/compose';
  *
  * 왼쪽 아카이브에서 오른쪽 캔버스로 **끌어다 놓는다**. 순서도 끌어서 바꾼다.
  * 마우스가 없거나 키보드만 쓰는 경우를 위해 담기(＋)·위·아래 버튼도 항상 함께 둔다.
+ *
+ * 맨 왼쪽 트리는 아카이브(`/problems/archive`)와 **같은 패널**(`ArchiveSidePanel`)이다 —
+ * 단원·학교·작품·문법 폴더를 눌러 목록을 좁힌 뒤 그 자리에서 바로 담는다.
  */
 export default function PaperComposePage() {
   const router = useRouter();
@@ -78,137 +82,155 @@ export default function PaperComposePage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">🧩 문제지 조합</h1>
         <p className="mt-1 text-sm text-gray-500">
-          왼쪽에서 문항을 끌어다 오른쪽에 놓으세요. 같은 지문의 문항은 자동으로 붙습니다.
+          왼쪽 트리에서 단원·학교·작품·문법을 고르고, 문항을 끌어다 오른쪽에 놓으세요. 같은 지문의 문항은 자동으로 붙습니다.
         </p>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="space-y-3">
-          <ProblemFilterBar
+      {/* 세 칸은 xl(1280px)부터 — 앱 사이드바(w-60, 240px)와 트리 칸(260px)을 뺀 자리에
+          아카이브처럼 lg 에서 가르면 목록·캔버스가 각 220px 안팎이 되어
+          카드(썸네일·손잡이·담기)가 접힌다.
+          그 아래 폭에서는 트리가 위로 쌓인다(아카이브가 lg 미만에서 하는 것과 같다) */}
+      <div className="grid gap-4 xl:grid-cols-[260px_minmax(0,1fr)]">
+        <div className="xl:sticky xl:top-4 xl:self-start">
+          {/* 아카이브는 조건이 바뀔 때 선택을 비우려고 patch 를 한 겹 감싸 넘기지만, 이 화면에는
+              선택 모드가 없어 그 래퍼가 필요 없다 — 위쪽 필터 줄과 같이 archive.patch 를 그대로 넘긴다 */}
+          <ArchiveSidePanel
             filters={archive.filters}
-            facets={archive.facets}
-            areaFacets={archive.areaFacets}
-            unitFacets={archive.unitFacets}
-            workFacets={archive.workFacets}
-            total={archive.total}
+            schoolExams={archive.facets.schoolExams}
+            works={archive.workFacets}
+            grammarCounts={archive.grammarCounts}
             onChange={archive.patch}
-            onReset={archive.reset}
           />
-
-          <div className="max-h-[70vh] space-y-2 overflow-y-auto pr-1">
-            {archive.loading ? (
-              <div className="flex justify-center py-12">
-                <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-primary" />
-              </div>
-            ) : archive.rows.length === 0 ? (
-              <p className="py-12 text-center text-sm text-gray-500">조건에 맞는 문항이 없어요.</p>
-            ) : (
-              archive.rows.map((row) => (
-                <ProblemCard
-                  key={row.id}
-                  problem={row}
-                  thumbnailUrl={thumbnails.urls.get(row.image_path) ?? null}
-                  added={paper.added.has(row.id)}
-                  showEditLink={false}
-                  onOpen={() => setOpenId(row.id)}
-                  onAdd={() => paper.add(row)}
-                  dragHandlers={{
-                    ...drag.handlers,
-                    onPointerDown: (e) => {
-                      setSource({ kind: 'add', row });
-                      drag.handlers.onPointerDown(e);
-                    },
-                  }}
-                />
-              ))
-            )}
-          </div>
-
-          {/* 목록은 60개씩 끊어 온다 — 넘기는 버튼이 없으면 그 뒤 문항은 담을 수가 없다 */}
-          {archive.pageCount > 1 && (
-            <div className="flex items-center justify-center gap-2">
-              <Button
-                type="button" variant="outline" size="sm"
-                onClick={() => archive.patch({ page: archive.filters.page - 1 })}
-                disabled={archive.filters.page <= 0}
-              >
-                이전
-              </Button>
-              <span className="text-sm text-gray-500">
-                {archive.filters.page + 1} / {archive.pageCount}
-              </span>
-              <Button
-                type="button" variant="outline" size="sm"
-                onClick={() => archive.patch({ page: archive.filters.page + 1 })}
-                disabled={archive.filters.page >= archive.pageCount - 1}
-              >
-                다음
-              </Button>
-            </div>
-          )}
         </div>
 
-        <div className="space-y-3">
-          <PaperToolbar
-            title={paper.title}
-            settings={paper.settings}
-            count={paper.items.length}
-            saving={paper.saving}
-            longestPassageChars={longestPassageChars}
-            onTitle={paper.setTitle}
-            onSettings={(patch) => paper.setSettings({ ...paper.settings, ...patch })}
-            onShuffle={paper.shuffle}
-            onClear={paper.clear}
-            onSave={handleSave}
-          />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="space-y-3">
+            <ProblemFilterBar
+              filters={archive.filters}
+              facets={archive.facets}
+              areaFacets={archive.areaFacets}
+              unitFacets={archive.unitFacets}
+              workFacets={archive.workFacets}
+              total={archive.total}
+              onChange={archive.patch}
+              onReset={archive.reset}
+            />
 
-          <div
-            ref={canvasRef}
-            className={`max-h-[70vh] space-y-2 overflow-y-auto rounded-lg border-2 border-dashed p-3 transition ${
-              drag.dragging ? 'border-primary bg-primary/5' : 'border-gray-200'
-            }`}
-          >
-            {paper.items.length === 0 ? (
-              <Card>
-                <CardContent className="py-12 text-center text-sm text-gray-500">
-                  왼쪽에서 문항을 끌어다 놓거나 ＋ 를 누르세요.
-                </CardContent>
-              </Card>
-            ) : (
-              paper.items.map((item, index) => (
-                <div key={item.problemId}>
-                  {preview === index && <div className="h-1 rounded bg-primary" />}
-                  <CanvasItem
-                    row={rowFor(item.problemId)}
-                    number={index + 1}
-                    groupStart={groupStarts.has(index)}
-                    onRemove={() => paper.remove(item.problemId)}
-                    onMoveUp={() => paper.move(index, index - 1)}
-                    onMoveDown={() => paper.move(index, index + 2)}
-                    onMoveGroupUp={groupIndexOf.get(index) === 0 ? undefined : () => {
-                      const gi = groupIndexOf.get(index);
-                      if (gi !== undefined) paper.moveWholeGroup(gi, gi - 1);
-                    }}
-                    onMoveGroupDown={
-                      groupIndexOf.get(index) === groups.length - 1 ? undefined : () => {
-                        const gi = groupIndexOf.get(index);
-                        if (gi !== undefined) paper.moveWholeGroup(gi, gi + 1);
-                      }
-                    }
+            <div className="max-h-[70vh] space-y-2 overflow-y-auto pr-1">
+              {archive.loading ? (
+                <div className="flex justify-center py-12">
+                  <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-primary" />
+                </div>
+              ) : archive.rows.length === 0 ? (
+                <p className="py-12 text-center text-sm text-gray-500">조건에 맞는 문항이 없어요.</p>
+              ) : (
+                archive.rows.map((row) => (
+                  <ProblemCard
+                    key={row.id}
+                    problem={row}
+                    thumbnailUrl={thumbnails.urls.get(row.image_path) ?? null}
+                    added={paper.added.has(row.id)}
+                    showEditLink={false}
+                    onOpen={() => setOpenId(row.id)}
+                    onAdd={() => paper.add(row)}
                     dragHandlers={{
                       ...drag.handlers,
                       onPointerDown: (e) => {
-                        setSource({ kind: 'move', from: index });
+                        setSource({ kind: 'add', row });
                         drag.handlers.onPointerDown(e);
                       },
                     }}
                   />
-                </div>
-              ))
+                ))
+              )}
+            </div>
+
+            {/* 목록은 60개씩 끊어 온다 — 넘기는 버튼이 없으면 그 뒤 문항은 담을 수가 없다 */}
+            {archive.pageCount > 1 && (
+              <div className="flex items-center justify-center gap-2">
+                <Button
+                  type="button" variant="outline" size="sm"
+                  onClick={() => archive.patch({ page: archive.filters.page - 1 })}
+                  disabled={archive.filters.page <= 0}
+                >
+                  이전
+                </Button>
+                <span className="text-sm text-gray-500">
+                  {archive.filters.page + 1} / {archive.pageCount}
+                </span>
+                <Button
+                  type="button" variant="outline" size="sm"
+                  onClick={() => archive.patch({ page: archive.filters.page + 1 })}
+                  disabled={archive.filters.page >= archive.pageCount - 1}
+                >
+                  다음
+                </Button>
+              </div>
             )}
-            {preview === paper.items.length && paper.items.length > 0 && (
-              <div className="h-1 rounded bg-primary" />
-            )}
+          </div>
+
+          <div className="space-y-3">
+            <PaperToolbar
+              title={paper.title}
+              settings={paper.settings}
+              count={paper.items.length}
+              saving={paper.saving}
+              longestPassageChars={longestPassageChars}
+              onTitle={paper.setTitle}
+              onSettings={(patch) => paper.setSettings({ ...paper.settings, ...patch })}
+              onShuffle={paper.shuffle}
+              onClear={paper.clear}
+              onSave={handleSave}
+            />
+
+            <div
+              ref={canvasRef}
+              className={`max-h-[70vh] space-y-2 overflow-y-auto rounded-lg border-2 border-dashed p-3 transition ${
+                drag.dragging ? 'border-primary bg-primary/5' : 'border-gray-200'
+              }`}
+            >
+              {paper.items.length === 0 ? (
+                <Card>
+                  <CardContent className="py-12 text-center text-sm text-gray-500">
+                    왼쪽에서 문항을 끌어다 놓거나 ＋ 를 누르세요.
+                  </CardContent>
+                </Card>
+              ) : (
+                paper.items.map((item, index) => (
+                  <div key={item.problemId}>
+                    {preview === index && <div className="h-1 rounded bg-primary" />}
+                    <CanvasItem
+                      row={rowFor(item.problemId)}
+                      number={index + 1}
+                      groupStart={groupStarts.has(index)}
+                      onRemove={() => paper.remove(item.problemId)}
+                      onMoveUp={() => paper.move(index, index - 1)}
+                      onMoveDown={() => paper.move(index, index + 2)}
+                      onMoveGroupUp={groupIndexOf.get(index) === 0 ? undefined : () => {
+                        const gi = groupIndexOf.get(index);
+                        if (gi !== undefined) paper.moveWholeGroup(gi, gi - 1);
+                      }}
+                      onMoveGroupDown={
+                        groupIndexOf.get(index) === groups.length - 1 ? undefined : () => {
+                          const gi = groupIndexOf.get(index);
+                          if (gi !== undefined) paper.moveWholeGroup(gi, gi + 1);
+                        }
+                      }
+                      dragHandlers={{
+                        ...drag.handlers,
+                        onPointerDown: (e) => {
+                          setSource({ kind: 'move', from: index });
+                          drag.handlers.onPointerDown(e);
+                        },
+                      }}
+                    />
+                  </div>
+                ))
+              )}
+              {preview === paper.items.length && paper.items.length > 0 && (
+                <div className="h-1 rounded bg-primary" />
+              )}
+            </div>
           </div>
         </div>
       </div>

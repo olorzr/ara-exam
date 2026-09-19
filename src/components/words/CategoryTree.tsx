@@ -88,6 +88,8 @@ function TreeNodeItem({
       <div
         role="button"
         tabIndex={0}
+        // 폴더는 접힘·펼침을 알린다(FacetTree 와 같은 규약) — 화살표는 눈으로만 보이는 표시다
+        aria-expanded={!isLeaf ? expanded : undefined}
         className={`flex items-center gap-1.5 w-full px-2 py-1.5 rounded-md text-sm transition-colors text-left cursor-pointer ${
           isSelected ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-gray-50'
         }`}

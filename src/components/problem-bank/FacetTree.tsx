@@ -76,6 +76,9 @@ function FacetTreeItem<T>({
       <div
         role="button"
         tabIndex={0}
+        // 폴더는 접힘·펼침을 알린다 — 화살표 아이콘은 눈으로만 보이는 표시라
+        // 스크린리더 사용자는 지금이 접힌 상태인지 알 길이 없다
+        aria-expanded={node.children.length > 0 ? expanded : undefined}
         className={`flex w-full cursor-pointer items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-sm transition-colors ${
           isSelected ? 'bg-primary/10 font-medium text-primary' : 'hover:bg-gray-50'
         }`}

@@ -382,12 +382,12 @@
 - 관련 파일: src/lib/problem-ocr/answer-key-input.ts, src/lib/problem-ocr/answer-key-upload.ts, src/lib/problem-ocr/run-answer-key.ts, sql/19_problem_bank_answer_key.sql
 
 ## 학교 기출 트리 (school exam tree)
-- 정의: 아카이브 왼쪽에서 **학교 › 학년도 › 학년 › 학기·시험** 으로 훑는 폴더. `source_type='내신기출'` 출처만 나오고, 마스터가 아니라 실제로 읽어 둔 출처(패싯)로 만든다
+- 정의: 아카이브·문제지 조합 왼쪽에서 **학교 › 학년도 › 학년 › 학기·시험** 으로 훑는 폴더. `source_type='내신기출'` 출처만 나오고, 마스터가 아니라 실제로 읽어 둔 출처(패싯)로 만든다
 - 코드에서의 사용: `SchoolExamFacet`, `buildSchoolExamTree`, `SourceFacets.schoolExams`
-- 관련 파일: src/lib/problem-bank/school-exam-tree.ts, src/components/problem-bank/SchoolExamTreePanel.tsx, src/components/problem-bank/ArchiveSidePanel.tsx
+- 관련 파일: src/lib/problem-bank/school-exam-tree.ts, src/components/problem-bank/SchoolExamTreePanel.tsx, src/components/problem-bank/ArchiveSidePanel.tsx, src/app/(main)/problems/papers/new/page.tsx
 
 ## 문법 트리 (grammar browse tree)
-- 정의: 아카이브 왼쪽에서 **대분류 › 중분류 › 개념** 으로 훑는 폴더. 다른 세 트리와 달리
+- 정의: 아카이브·문제지 조합 왼쪽에서 **대분류 › 중분류 › 개념** 으로 훑는 폴더. 다른 세 트리와 달리
   **마스터(`GRAMMAR_TREE`) 전체**를 그리고 개념마다 문항 수를 얹는다 — 아직 한 문항도 없는
   개념도 흐리게(`dimmed`) 보이고, 고를 수는 있다
 - ⚠️ 마스터로 만드는 까닭: 문법 태그는 업로드가 아니라 **나중에 손으로** 붙는 것이라,
@@ -396,7 +396,7 @@
   교과서 단원 트리가 이미 쓰는 방식이라 `FacetTree` 의 클릭 규약은 그대로 둔다
 - 코드에서의 사용: `buildGrammarBrowseTree`, `grammarFilterPatch`, `grammarNodeKey`,
   `grammarSelectOptions`, `GRAMMAR_SELF_LEAF`, `GRAMMAR_ALL_PATHS`
-- 관련 파일: src/lib/problem-bank/grammar-browse-tree.ts, src/components/problem-bank/GrammarTreePanel.tsx, src/components/problem-bank/ArchiveSidePanel.tsx
+- 관련 파일: src/lib/problem-bank/grammar-browse-tree.ts, src/components/problem-bank/GrammarTreePanel.tsx, src/components/problem-bank/ArchiveSidePanel.tsx, src/app/(main)/problems/papers/new/page.tsx
 
 ## 문법 개념 건수 (GrammarFacet)
 - 정의: 문법 경로마다 붙는 **문항 수**. 트리 라벨의 `(5)` 가 이것이다
