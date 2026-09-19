@@ -1005,6 +1005,24 @@ describe('문항 작품을 지문과 대조한다 — 묶음을 다 합친 뒤�
     expect(said(res)).not.toContain('다르게 냈어요');
   });
 
+  it('한 칸에 이어 적은 추정 작품의 경고가 병합까지 살아남는다 — 걷어내기에 걸리면 안 된다', () => {
+    const res = mergeOcrDrafts([batch([passage({
+      ref: 'P1',
+      works: [
+        { label: '가', title: '먼 후일', author: '김소월' },
+        { label: '가', title: '독은 아름답다', author: '김소월' },
+      ],
+    })], [1], [
+      { ref: 'P1', kind: 'passage', page: 1, keep: 'work', about: { work: '먼 후일', label: '가' },
+        message: '작품명을 본문으로 알아봤어요((가) 먼 후일). 맞는지 확인해 주세요.' },
+      { ref: 'P1', kind: 'passage', page: 1, keep: 'work',
+        about: { work: '독은 아름답다', label: '가' },
+        message: '작품명을 본문으로 알아봤어요((가) 독은 아름답다). 맞는지 확인해 주세요.' },
+    ])], { newId });
+    expect(said(res)).toContain('먼 후일');
+    expect(said(res)).toContain('독은 아름답다');
+  });
+
   it('지문 전체를 묻는 문항(빈 목록)은 건드리지 않는다', () => {
     const res = mergeOcrDrafts([batch([
       passage({ ref: 'P1', works: WORKS }),

@@ -4,7 +4,9 @@ import {
   formatGrammarPath, GRAMMAR_DEPTH_MAX, GRAMMAR_TREE, normalizeGrammarPaths,
 } from '@/lib/problem-bank/grammar-tree';
 import { UNIT_DEPTH_MAX } from '@/lib/problem-bank/unit-tree';
-import { normalizePassageWorks, normalizeWorkLabel } from '@/lib/problem-bank/work-title';
+import {
+  normalizePassageWorks, normalizeWorkLabel, splitWorkTitles, WORKS_MAX,
+} from '@/lib/problem-bank/work-title';
 import { normalizeOcrPassageHtml, normalizeOcrStemHtml } from './normalize-html';
 import type { PassageWork, QuestionType } from '@/types/problem-bank';
 import {
@@ -122,27 +124,33 @@ function parseWorks(
 
   for (const entry of rows) {
     if (!isRecord(entry)) continue;
-    const title = normalizeWork(nullableStr(entry.title, 120));
-    if (!title) continue;
-    const work: PassageWork = {
-      label: normalizeWorkLabel(str(entry.label, 8)),
-      title,
-      author: normalizeWork(nullableStr(entry.author, 60)) ?? '',
-    };
     // ⚠️ **'printed' 라고 말했을 때만** 인쇄된 것으로 친다(코덱스 리뷰 3R). null·빠뜨림·
     //    모르는 값을 인쇄로 넘기면, 제목은 있는데 출처가 없는 응답이 **경고 없이** 인쇄된
     //    이름으로 확정된다 — 문턱을 내린 대가로 얻어야 할 안전장치가 그 자리에서 사라진다
     const source = entry.title_source === 'printed' || entry.title_source === 'inferred'
       ? entry.title_source
       : null;
-    // ⚠️ **알아본 작품명은 우리가 짚는다** — 모델에게 경고까지 적으라고 하면 적을 때도 있고
-    //    안 적을 때도 있어, 인쇄된 이름과 알아낸 이름을 화면에서 구별할 수 없다(코덱스 리뷰 2R)
-    pushWorkSourceWarning(warnings, at, work, source);
-    out.push(work);
+    const label = normalizeWorkLabel(str(entry.label, 8));
+    const author = normalizeWork(nullableStr(entry.author, 60)) ?? '';
+
+    // ⚠️ **쪼개기가 경고보다 먼저다**(코덱스 stop 리뷰). 모델이 한 칸에 `'먼 후일 · 독은
+    //    아름답다'` 로 이어 적어 오면 저장되는 것은 **쪼갠 두 편**인데, 경고를 이어 붙은
+    //    이름으로 만들면 그 이름이 최종 목록에 없어 `dropStaleWarnings` 가 통째로 버린다 —
+    //    확인 안 된 추정 작품 두 편이 **아무 표시 없이** 들어간다.
+    //    쪼개기·중복 제거·상한은 `normalizePassageWorks` 와 **같은 규칙**이어야 한다
+    for (const title of splitWorkTitles(str(entry.title, 120))) {
+      if (out.length >= WORKS_MAX) break;
+      if (out.some((w) => w.title === title)) continue;
+      const work: PassageWork = { label, title, author };
+      // ⚠️ **알아본 작품명은 우리가 짚는다** — 모델에게 경고까지 적으라고 하면 적을 때도 있고
+      //    안 적을 때도 있어, 인쇄된 이름과 알아낸 이름을 화면에서 구별할 수 없다(코덱스 리뷰 2R)
+      pushWorkSourceWarning(warnings, at, work, source);
+      out.push(work);
+    }
   }
 
-  // 같은 제목이 두 번 오거나 한 칸에 두 편을 이어 적었으면 여기서 정리한다
-  // (DB 의 `exam.normalize_works` 와 같은 규칙 — 한쪽만 다르면 저장값이 갈라진다)
+  // 표기를 한 번 더 맞춘다(DB 의 `exam.normalize_works` 와 같은 규칙 — 한쪽만 다르면 저장값이
+  // 갈라진다). 위에서 같은 규칙으로 걸렀으므로 여기서 더 걸러지는 것은 없어야 한다
   return normalizePassageWorks(out);
 }
 

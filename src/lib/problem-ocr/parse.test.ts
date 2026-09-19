@@ -548,6 +548,18 @@ describe('작품 목록(works)', () => {
     expect(draft.items[0].works.map((w) => w.title)).toEqual(['먼 후일', '독은 아름답다']);
   });
 
+  it('⚠️ 이어 적어 온 **추정** 작품은 쪼갠 편마다 짚는다 — 안 그러면 확인 없이 들어간다', () => {
+    const draft = parseOcrDraft(json([passage({
+      works: [work({
+        title: '먼 후일 · 독은 아름답다', author: '김소월', title_source: 'inferred',
+      })],
+    })]), ctx)!;
+    const hits = draft.warnings.filter((w) => w.message.includes('본문으로 알아봤어요'));
+    expect(hits).toHaveLength(2);
+    // 경고가 **최종 목록에 있는 이름**을 가리켜야 병합의 `dropStaleWarnings` 가 안 버린다
+    expect(hits.map((w) => w.about?.work)).toEqual(['먼 후일', '독은 아름답다']);
+  });
+
   it('제목이 없는 원소는 버린다 — 지은이만으로는 어느 폴더에도 놓을 수 없다', () => {
     const draft = parseOcrDraft(json([passage({
       works: [work({ title: null, author: '김유정' }), work()],
