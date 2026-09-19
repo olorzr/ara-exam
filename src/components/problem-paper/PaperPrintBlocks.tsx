@@ -4,16 +4,21 @@ import type { ReactNode } from 'react';
 import { sanitizeInlineHTML, sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import { choiceGlyph } from '@/lib/problem-bank/choices';
 import { renderFiguresInHtml, unplacedFigures } from '@/lib/problem-bank/figure-render';
+import { correctChoiceIndex } from '@/lib/problem-paper/answers';
 import type { PaperBlock } from '@/lib/problem-paper/blocks';
 import { stripTrailingEmptyParagraphs } from '@/lib/problem-paper/html-trim';
 import { hasYetHangul } from '@/lib/yet-hangul';
 import type { PaperItemSnapshot, PaperSettings } from '@/types/problem-bank';
+import { PrintImage, SourceLine, TeacherAnswer } from './PaperPrintParts';
 
 /**
  * 인쇄 블록을 실제 React 노드로 그린다.
  *
  * 블록 목록을 만드는 일(무엇을 어떤 단위로 쪼갤지)은 순수 함수(`blocks.ts`)가 하고,
  * 여기서는 그리기만 한다 — 그래야 쪼개기 규칙을 테스트로 고정할 수 있다.
+ *
+ * 문제지와 **교사용은 같은 렌더러**다(`showAnswers` 하나로 갈린다) — 두 벌로 두면
+ * 문항 모양이 언젠가 한쪽만 고쳐져, 선생님이 든 종이와 학생이 든 종이가 달라진다.
  */
 
 interface RenderArgs {
@@ -21,14 +26,21 @@ interface RenderArgs {
   settings: PaperSettings;
   /** Storage 경로 → 서명 URL */
   imageUrls: Map<string, string>;
+  /**
+   * 교사용인가 — 정답 선지에 표시를 하고 문항 밑에 답·해설을 붙인다.
+   * 학생이 쓸 답 줄은 그리지 않는다(선생님 종이에는 쓸 일이 없다).
+   */
+  showAnswers?: boolean;
 }
 
 /**
  * 블록을 A4Document 가 받는 ReactNode 배열로 바꾼다.
- * @param args - 블록·설정·이미지 URL
+ * @param args - 블록·설정·이미지 URL·교사용 여부
  * @returns 블록 순서 그대로의 노드 배열
  */
-export function renderPaperBlocks({ blocks, settings, imageUrls }: RenderArgs): ReactNode[] {
+export function renderPaperBlocks({
+  blocks, settings, imageUrls, showAnswers = false,
+}: RenderArgs): ReactNode[] {
   return blocks.map((block) => {
     switch (block.kind) {
       case 'passage-header':
@@ -66,12 +78,15 @@ export function renderPaperBlocks({ blocks, settings, imageUrls }: RenderArgs): 
       case 'problem-image':
         return (
           <div key={block.key} className="pb-q">
+            {/* 출처 표시는 글 문항과 같아야 한다 — 그림 문항만 빠지면 표기가 들쭉날쭉해진다 */}
+            {settings.showSource && <SourceLine source={block.snapshot.source} />}
             <div className="pb-q__head">
               <span className="q-num q-num--mint">{String(block.number).padStart(2, '0')}</span>
             </div>
             <PrintImage path={block.path} urls={imageUrls} alt={`${block.number}번 문항`} />
-            {/* 출처 표시는 글 문항과 같아야 한다 — 그림 문항만 빠지면 표기가 들쭉날쭉해진다 */}
-            {settings.showSource && <SourceLine source={block.source} />}
+            {/* 이미지 문항의 정답·해설도 교사용에는 있어야 한다 — 글로 옮기지 못했을 뿐
+                채점은 똑같이 한다. 빠지면 그 문항만 답을 따로 찾게 된다 */}
+            {showAnswers && <TeacherAnswer snapshot={block.snapshot} />}
           </div>
         );
 
@@ -83,6 +98,7 @@ export function renderPaperBlocks({ blocks, settings, imageUrls }: RenderArgs): 
             snapshot={block.snapshot}
             settings={settings}
             imageUrls={imageUrls}
+            showAnswers={showAnswers}
           />
         );
 
@@ -92,37 +108,12 @@ export function renderPaperBlocks({ blocks, settings, imageUrls }: RenderArgs): 
   });
 }
 
-/**
- * 이미지 한 장.
- *
- * ⚠️ URL 이 없을 때 **빈 자리**를 두면 안 된다. 이미지로 출제한 문항은 그 이미지가
- *    본문 전체라, 조용히 비워 두면 문항이 통째로 빠진 시험지가 인쇄된다.
- *    눈에 보이는 자리표시자를 두고, 인쇄 자체는 호출부(문제지 화면)가 막는다.
- */
-function PrintImage({ path, urls, alt }: { path: string; urls: Map<string, string>; alt: string }) {
-  const src = urls.get(path);
-  if (!src) {
-    return (
-      <div
-        style={{
-          border: '1px dashed #b45309', color: '#b45309', fontSize: '9pt',
-          padding: '16px 8px', textAlign: 'center',
-        }}
-      >
-        이미지를 불러오지 못했어요 ({alt})
-      </div>
-    );
-  }
-  // 서명 URL 이라 next/image 로 다룰 수 없고, 인쇄에서는 지연 로딩이 치명적이다
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt={alt} />;
-}
-
 interface ProblemBlockProps {
   number: number;
   snapshot: PaperItemSnapshot;
   settings: PaperSettings;
   imageUrls: Map<string, string>;
+  showAnswers: boolean;
 }
 
 /**
@@ -153,14 +144,18 @@ function StemWithFigures({
   );
 }
 
-/** 문항 하나 — 발문·선지·삽화가 한 블록이다(갈리면 읽을 수 없다) */
-function ProblemBlock({ number, snapshot, settings, imageUrls }: ProblemBlockProps) {
+/** 문항 하나 — 출처·발문·선지·삽화(교사용이면 답까지)가 한 블록이다(갈리면 읽을 수 없다) */
+function ProblemBlock({ number, snapshot, settings, imageUrls, showAnswers }: ProblemBlockProps) {
   const objective = snapshot.question_type === '객관식' && snapshot.choices.length > 0;
   // 발문·선지의 옛한글은 **고딕**이다(지문만 명조 — CLAUDE.md 2026-09-15)
   const yetHangul = hasYetHangul([snapshot.stem_html, ...snapshot.choices].join(''));
+  // 교사용에서 표시할 정답 선지. 객관식이 아니면 null 이라 아무 선지도 안 걸린다
+  const answerIndex = showAnswers ? correctChoiceIndex(snapshot.question_type, snapshot.answer) : null;
 
   return (
     <div className={`pb-q${yetHangul ? ' yet-hangul' : ''}`}>
+      {settings.showSource && <SourceLine source={snapshot.source} />}
+
       <div className="pb-q__head">
         <span className="q-num q-num--mint">{String(number).padStart(2, '0')}</span>
         <div className="pb-q__stem">
@@ -176,36 +171,28 @@ function ProblemBlock({ number, snapshot, settings, imageUrls }: ProblemBlockPro
 
       {objective ? (
         <div className="pb-q__choices">
-          {snapshot.choices.map((choice, i) => (
-            <span key={i} className="pb-q__choice">
-              <span className="pb-q__choice-glyph">{choiceGlyph(i)}</span>
-              <span dangerouslySetInnerHTML={{ __html: sanitizeInlineHTML(choice) }} />
-            </span>
-          ))}
+          {snapshot.choices.map((choice, i) => {
+            const isAnswer = answerIndex === i;
+            return (
+              <span key={i} className={`pb-q__choice${isAnswer ? ' pb-q__choice--answer' : ''}`}>
+                <span className="pb-q__choice-glyph">{choiceGlyph(i)}</span>
+                <span dangerouslySetInnerHTML={{ __html: sanitizeInlineHTML(choice) }} />
+                {/* 색만으로 알리지 않는다 — 흑백으로 뽑으면 바탕색이 거의 사라진다 */}
+                {isAnswer && <span className="pb-q__choice-answer-mark">정답</span>}
+              </span>
+            );
+          })}
         </div>
-      ) : (
+      ) : !showAnswers && (
         <div className="pb-q__lines">
-          {/* 서술형은 쓸 자리가 더 필요하다 */}
+          {/* 서술형은 쓸 자리가 더 필요하다. 교사용에는 그리지 않는다 — 쓸 사람이 없다 */}
           {Array.from({ length: snapshot.question_type === '서술형' ? 4 : 2 }, (_, i) => (
             <div key={i} className="pb-q__line" />
           ))}
         </div>
       )}
 
-      {settings.showSource && <SourceLine source={snapshot.source} />}
+      {showAnswers && <TeacherAnswer snapshot={snapshot} />}
     </div>
-  );
-}
-
-/** 문항 아래에 붙는 출처 한 줄 — 글 문항·그림 문항이 같은 모양을 쓴다 */
-function SourceLine({ source }: { source: PaperItemSnapshot['source'] }) {
-  const text = [source.year, source.school_name || source.publisher, source.exam_type]
-    .filter(Boolean)
-    .join(' ');
-  if (!text) return null;
-  return (
-    <p className="pb-q__meta" style={{ paddingLeft: 20, marginTop: 2 }}>
-      {text}
-    </p>
   );
 }

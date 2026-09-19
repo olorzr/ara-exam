@@ -1,9 +1,12 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { A4Document, CompactPageHeader } from '@/components/print';
 import ExamPrintHeader from '@/components/exam/ExamPrintHeader';
-import { buildAnswerRows, MISSING_ANSWER_LABEL } from '@/lib/problem-paper/blocks';
+import { sanitizeProblemHTML } from '@/lib/sanitize-problem';
+import {
+  buildAnswerRows, explanationEntries, MISSING_ANSWER_LABEL,
+} from '@/lib/problem-paper/answers';
 import type { PaperItemSnapshot, ProblemPaper } from '@/types/problem-bank';
 
 /** 한 줄에 담을 문항 수 — 답안지와 같은 규약(줄 하나가 인쇄 블록 하나) */
@@ -15,23 +18,29 @@ interface ProblemAnswerKeyViewProps {
 }
 
 /**
- * 정답표.
+ * 답지 — **빠른 정답이 먼저**, 그 아래 해설.
+ *
+ * 차례가 규약이다(2026-09-20, 사용자 결정): 채점은 거의 언제나 번호와 답만 있으면 되고
+ * 해설은 틀린 문항을 짚을 때에야 편다. 해설을 위에 두면 채점할 때마다 답을 찾아 몇 쪽을
+ * 넘겨야 한다.
  *
  * 정답이 비어 있으면 빈칸이 아니라 **'미입력'** 이라고 찍는다 —
  * 빈칸으로 두면 인쇄물에서 "정답이 없는 문항"과 "인쇄가 빠진 것"을 구분할 수 없다.
  */
 export default function ProblemAnswerKeyView({ paper, items }: ProblemAnswerKeyViewProps) {
-  const title = `${paper.title} - 정답표`;
+  const title = `${paper.title} - 답지`;
   const rows = useMemo(() => buildAnswerRows(items), [items]);
+  const explanations = useMemo(() => explanationEntries(items), [items]);
 
   const blocks = useMemo(() => {
-    const out = [];
+    const out: ReactNode[] = [];
+
     for (let i = 0; i < rows.length; i += ITEMS_PER_ROW) {
       const chunk = rows.slice(i, i + ITEMS_PER_ROW);
       const band = Math.floor(i / ITEMS_PER_ROW) % 2 === 1;
       out.push(
         // 줄무늬는 nth-child 가 아니라 줄 인덱스로 준다 — 쪽이 갈리면 nth-child 는 리셋된다
-        <div key={i} className={`pb-answer-row${band ? ' pb-answer-row--band' : ''}`}>
+        <div key={`row-${i}`} className={`pb-answer-row${band ? ' pb-answer-row--band' : ''}`}>
           {chunk.map((row) => (
             <div key={row.number} className="pb-answer-cell">
               <span className="pb-answer-num">{row.number}</span>
@@ -47,8 +56,36 @@ export default function ProblemAnswerKeyView({ paper, items }: ProblemAnswerKeyV
         </div>,
       );
     }
+
+    // ⚠️ 해설이 하나도 없으면 제목 줄도 내지 않는다 — 기출은 해설이 안 달린 문항이 흔해서,
+    //    빈 '해설' 띠만 찍히면 "해설이 인쇄에서 빠졌나" 로 읽힌다
+    explanations.forEach((entry, i) => {
+      out.push(
+        // 해설 한 덩어리가 한 블록 — 번호·정답·본문이 갈리면 어느 문항 것인지 알 수 없다.
+        // ⚠️ '해설' 제목은 **첫 해설과 같은 블록**이다. 따로 내보내면 쪽·단 끝에 제목만
+        //    혼자 남을 수 있는데, 그러면 다음 장 첫머리에 제목 없이 해설이 시작된다
+        <div key={`exp-${entry.number}`}>
+          {i === 0 && (
+            <div className="section-bar section-bar--mint">
+              <span>해설</span>
+            </div>
+          )}
+          <div className="pb-key-exp">
+            <span className="pb-answer-num">{entry.number}</span>
+            <div className="pb-key-exp__body">
+              <span className="pb-key-exp__answer">정답 {entry.answer}</span>
+              <div
+                // 저장할 때 이미 걸렀지만 스냅샷은 jsonb 라 DB 를 직접 건드린 값이 섞일 수 있다
+                dangerouslySetInnerHTML={{ __html: sanitizeProblemHTML(entry.explanation_html) }}
+              />
+            </div>
+          </div>
+        </div>,
+      );
+    });
+
     return out;
-  }, [rows]);
+  }, [rows, explanations]);
 
   return (
     <A4Document
@@ -57,10 +94,10 @@ export default function ProblemAnswerKeyView({ paper, items }: ProblemAnswerKeyV
       className="pb-sheet"
       firstPageHeader={
         <>
-          {/* 머리글 출처 줄은 문제지 3종이 함께 뺐다(ProblemPaperView 참고) */}
+          {/* 머리글 출처 줄은 기출 인쇄물 넷이 함께 뺐다(ProblemPaperView 참고) */}
           <ExamPrintHeader title={title} />
           <div className="section-bar section-bar--mint mb-2">
-            <span>전체 {items.length}문항</span>
+            <span>빠른 정답 · 전체 {items.length}문항</span>
           </div>
         </>
       }

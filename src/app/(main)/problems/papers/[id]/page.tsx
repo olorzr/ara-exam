@@ -19,12 +19,14 @@ import {
 import { normalizePaperSettings } from '@/lib/problem-paper/settings';
 import type { PaperItemSnapshot, ProblemPaper } from '@/types/problem-bank';
 
-type ViewMode = 'paper' | 'key' | 'sheet';
+type ViewMode = 'paper' | 'teacher' | 'key' | 'sheet';
 
 const VIEW_LABELS: { mode: ViewMode; label: string }[] = [
   { mode: 'paper', label: '문제지' },
-  { mode: 'key', label: '정답표' },
-  { mode: 'sheet', label: '답안지' },
+  { mode: 'teacher', label: '교사용' },
+  { mode: 'key', label: '답지' },
+  // 학생이 답을 옮겨 적는 종이. '답지' 와 헷갈리지 않게 OMR 을 앞에 붙인다
+  { mode: 'sheet', label: 'OMR 답안지' },
 ];
 
 /**
@@ -40,6 +42,14 @@ export default function ProblemPaperViewPage() {
   const [items, setItems] = useState<PaperItemSnapshot[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [mode, setMode] = useState<ViewMode>('paper');
+  /**
+   * 문항 본문을 인쇄하는 모드인가.
+   *
+   * ⚠️ 교사용도 **같은 본문**이라 이미지 문항과 원본 번호가 그대로 실린다 — 이미지 준비
+   *    잠금·깨진 이미지 안내·번호 어긋남 확인이 문제지에만 걸리면, 교사용으로 뽑을 때
+   *    그 모든 경고를 조용히 건너뛴다.
+   */
+  const printsProblems = mode === 'paper' || mode === 'teacher';
 
   // 이미지는 **페이지가 들고 있는다** — 아직 안 왔거나 실패했는지를 알아야 인쇄를 막는다.
   // 이미지로 출제한 문항은 그 이미지가 본문 전체라, 조용히 비워 인쇄하면
@@ -75,7 +85,7 @@ export default function ProblemPaperViewPage() {
    * 확인하면 안내를 인쇄물에서 빼고(위 효과가) 이어서 인쇄한다.
    */
   const handlePrint = () => {
-    const ask = mode === 'paper' && !renumberAcked
+    const ask = printsProblems && !renumberAcked
       ? renumberedPrintConfirmMessage(renumbered) : null;
     if (!ask) { window.print(); return; }
     if (!window.confirm(ask)) return;
@@ -154,17 +164,17 @@ export default function ProblemPaperViewPage() {
           <Button
             type="button" size="sm"
             onClick={handlePrint}
-            disabled={mode === 'paper' && imagesBlocked}
+            disabled={printsProblems && imagesBlocked}
           >
             <Printer className="h-3.5 w-3.5" />
             <span className="ml-1">
-              {mode === 'paper' && (images.loading || ready.loading) ? '이미지 준비 중…' : '인쇄'}
+              {printsProblems && (images.loading || ready.loading) ? '이미지 준비 중…' : '인쇄'}
             </span>
           </Button>
         </div>
       </div>
 
-      {mode === 'paper' && brokenCount > 0 && (
+      {printsProblems && brokenCount > 0 && (
         <div
           className="flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
           data-no-print
@@ -179,7 +189,7 @@ export default function ProblemPaperViewPage() {
         </div>
       )}
 
-      {mode === 'paper' && renumbered.length > 0 && (
+      {printsProblems && renumbered.length > 0 && (
         // ⚠️ 확인 전에는 `data-no-print` 를 붙이지 않는다 — Cmd/Ctrl+P 로 바로 뽑아도
         //    이 안내가 함께 찍혀야 번호가 어긋난 사실이 조용히 넘어가지 않는다
         <div
@@ -204,7 +214,13 @@ export default function ProblemPaperViewPage() {
         </div>
       )}
 
-      {mode === 'paper' && <ProblemPaperView paper={paper} items={items} imageUrls={images.urls} />}
+      {/* 문제지와 교사용은 같은 컴포넌트다 — 모드마다 따로 마운트되므로 A4Document 가 새로 잰다 */}
+      {printsProblems && (
+        <ProblemPaperView
+          paper={paper} items={items} imageUrls={images.urls}
+          showAnswers={mode === 'teacher'}
+        />
+      )}
       {mode === 'key' && <ProblemAnswerKeyView paper={paper} items={items} />}
       {mode === 'sheet' && <ProblemAnswerSheetView paper={paper} items={items} />}
     </div>

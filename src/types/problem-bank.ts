@@ -272,6 +272,13 @@ export interface PaperSourceSnapshot {
   school_name: string;
   year: string;
   grade: string;
+  /**
+   * 학기.
+   *
+   * ⚠️ **옵셔널이다** — sql/35(2026-09-20) 전에 만든 문제지의 스냅샷에는 이 키가 없다.
+   *    스냅샷은 불변이라 옛 문제지는 앞으로도 학기 없이 인쇄된다.
+   */
+  semester?: string;
   exam_type: string;
   publisher: string;
 }

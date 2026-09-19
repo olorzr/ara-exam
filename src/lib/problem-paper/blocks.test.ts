@@ -67,15 +67,26 @@ describe('buildPaperBlocks', () => {
     expect(blocks[0]).toMatchObject({ kind: 'problem-image', number: 1 });
   });
 
-  it('이미지 문항도 출처 스냅샷을 들고 간다 — 출처 표시가 그림 문항만 빠지면 안 된다', () => {
-    const blocks = build([snap({ render_mode: 'image', image_path: 'p/x.jpg' })]);
+  /**
+   * ⚠️ 출처만이 아니라 **스냅샷 통째로** 들고 간다. 출처 표시가 그림 문항만 빠지면 표기가
+   *    들쭉날쭉해지고, **교사용**은 그림 문항에도 정답·해설을 찍어야 한다(글로 옮기지
+   *    못했을 뿐 채점은 똑같이 한다).
+   */
+  it('이미지 문항은 스냅샷을 통째로 들고 간다 — 출처도 정답·해설도 그리로 간다', () => {
+    const blocks = build([snap({
+      render_mode: 'image', image_path: 'p/x.jpg', answer: '4', explanation_html: '<p>까닭</p>',
+    })]);
     expect(blocks[0]).toMatchObject({
       kind: 'problem-image',
-      source: expect.objectContaining({ school_name: '상현중' }),
+      snapshot: expect.objectContaining({
+        answer: '4',
+        explanation_html: '<p>까닭</p>',
+        source: expect.objectContaining({ school_name: '상현중' }),
+      }),
     });
   });
 
-  it('이미지 문항 블록에 배점을 싣지 않는다 — 인쇄에서 배점을 쓰지 않는다', () => {
+  it('이미지 문항 블록 자체에는 배점을 싣지 않는다 — 인쇄에서 배점을 쓰지 않는다', () => {
     const blocks = build([snap({ render_mode: 'image', image_path: 'p/x.jpg', score: 4 })]);
     expect(blocks[0]).not.toHaveProperty('score');
   });

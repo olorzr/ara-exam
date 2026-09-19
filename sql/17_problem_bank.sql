@@ -376,9 +376,10 @@ GRANT ALL ON exam.problem_sources, exam.passages, exam.problems,
 -- SECURITY DEFINER 라 잠긴 RLS 를 우회해 INSERT 한다. 우회하는 만큼 도메인 검사를
 -- **함수 본문에서 직접** 한다(정책이 안 걸리므로). owner 는 postgres 여야 한다.
 -- ⚠️ [2026-09-19] **여기의 `exam.create_problem_paper` 정의는 더 이상 정식이 아니다.**
---    `showSource` 화이트리스트 기본값이 sql/34_problem_paper_show_source_default.sql 에서
---    '숨김' → '표시' 로 바뀌었다. 이 파일을 **단독으로 다시 돌리면 그 기본값이 조용히
---    되돌아간다** — 되돌렸다면 sql/34 를 다시 적용할 것. 번호 순서(…→23→34)로 적용하면 괜찮다.
+--    그 뒤로 `showSource` 화이트리스트 기본값(sql/34)과 출처 스냅샷의 학기(sql/35)가 더해졌다.
+--    이 파일을 **단독으로 다시 돌리면 그 둘이 조용히 되돌아간다** — 되돌렸다면
+--    **sql/35 를 다시 적용할 것**(그 파일이 지금의 정식 정의다). 번호 순서(…→23→34→35)로
+--    적용하면 괜찮다. ⚠️ sql/34 만 다시 돌리면 학기가 빠진다.
 
 CREATE OR REPLACE FUNCTION exam.create_problem_paper(
   p_title       TEXT,

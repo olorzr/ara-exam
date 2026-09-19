@@ -47,8 +47,13 @@ export type PaperBlock =
     key: string;
     number: number;
     path: string;
-    /** 출처 표시가 켜졌을 때 찍을 스냅샷 — 글 문항과 같은 줄이 나가야 한다 */
-    source: PaperItemSnapshot['source'];
+    /**
+     * 이 문항의 스냅샷.
+     *
+     * ⚠️ 출처만 들고 있으면 안 된다 — **교사용**은 그림 문항에도 정답·해설을 찍는다.
+     *    글로 옮기지 못했을 뿐 채점은 똑같이 하므로, 빠지면 그 문항만 답을 따로 찾게 된다.
+     */
+    snapshot: PaperItemSnapshot;
   };
 
 /** 지문 머리글 문구 — 국어 시험지의 관용 표현 */
@@ -155,7 +160,7 @@ export function buildPaperBlocks(items: readonly PaperItemSnapshot[]): PaperBloc
           key: `qi-${i}`,
           number,
           path: snapshot.image_path,
-          source: snapshot.source,
+          snapshot,
         });
         continue;
       }
@@ -184,29 +189,15 @@ export function imagePathsOf(items: readonly PaperItemSnapshot[]): string[] {
   return [...paths];
 }
 
-/** 정답표 한 줄 */
-export interface AnswerRow {
-  number: number;
-  /** 미입력이면 '미입력' — 빈칸으로 두면 인쇄물에서 누락과 구분되지 않는다 */
-  answer: string;
-  question_type: PaperItemSnapshot['question_type'];
-}
-
-/** 정답이 비었을 때 정답표에 찍는 문구 */
-export const MISSING_ANSWER_LABEL = '미입력';
-
-/**
- * 정답표 줄을 만든다.
- * @param items - 문제지 항목
- * @returns 번호 순서대로의 줄
+/*
+ * 정답·해설 표기는 [answers.ts](./answers.ts) 로 옮겼다 — 교사용·답지가 함께 쓰면서
+ * '인쇄 블록을 나누는 일' 과 섞이지 않게 갈랐다. 이미 이 파일에서 가져다 쓰는 곳이
+ * 있으므로 이름은 여기서도 그대로 내보낸다.
  */
-export function buildAnswerRows(items: readonly PaperItemSnapshot[]): AnswerRow[] {
-  return items.map((item, i) => ({
-    number: i + 1,
-    answer: item.answer.trim() || MISSING_ANSWER_LABEL,
-    question_type: item.question_type,
-  }));
-}
+export {
+  buildAnswerRows, explanationEntries, formatAnswer, MISSING_ANSWER_LABEL,
+  type AnswerRow, type ExplanationEntry,
+} from './answers';
 
 /**
  * 이미지로 출제한 문항 중 **인쇄 번호와 원본 번호가 다른** 것들.

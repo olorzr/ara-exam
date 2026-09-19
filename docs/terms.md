@@ -264,8 +264,35 @@
 
 ## 문제지 (ProblemPaper)
 - 정의: 아카이브 문항을 골라 조합한 인쇄물. 본문은 만든 시점의 **스냅샷**이라 원본이 바뀌어도 변하지 않는다
+- 한 장은 **1~200문항**이다(RPC 가 강제하고 앱의 `PAPER_MAX_ITEMS` 가 그 거울이다)
 - 코드에서의 사용: `ProblemPaper`, `problem_papers` / `problem_paper_items`, RPC `create_problem_paper`
-- 관련 파일: src/lib/problem-paper/compose.ts, sql/17_problem_bank.sql
+- 관련 파일: src/lib/problem-paper/compose.ts, sql/17_problem_bank.sql, sql/35_problem_paper_source_semester.sql
+
+## 교사용 (teacher sheet)
+- 정의: 문항 **바로 밑에** 정답과 해설이 붙은 문제지. 객관식은 정답 선지에 표시가 붙고,
+  학생이 쓸 답 줄과 이름·점수란은 빠진다. 문제지와 **같은 컴포넌트**가 그린다
+- 코드에서의 사용: `ProblemPaperView showAnswers`, `renderPaperBlocks({ showAnswers })`, `ViewMode 'teacher'`
+- 관련 파일: src/components/problem-paper/PaperPrintParts.tsx, src/components/problem-paper/PaperPrintBlocks.tsx
+
+## 답지 (answer key)
+- 정의: **빠른 정답**(번호·정답을 5개씩 늘어놓은 격자)이 먼저 오고 그 아래 **해설**이 붙는
+  인쇄물. 2026-09-20 전에는 '정답표' 라 불렀고 해설이 없었다. 해설이 달린 문항이 하나도
+  없으면 빠른 정답만 인쇄한다
+- 코드에서의 사용: `ProblemAnswerKeyView`, `explanationEntries`, `ViewMode 'key'`
+- 관련 파일: src/components/problem-paper/ProblemAnswerKeyView.tsx, src/lib/problem-paper/answers.ts
+
+## OMR 답안지 (answer sheet)
+- 정의: 학생이 답을 옮겨 적는 종이(객관식은 ①~⑤ 동그라미, 그 밖에는 줄). 답이 **없다** —
+  '답지' 와 헷갈리지 않게 2026-09-20 부터 이름 앞에 OMR 을 붙인다
+- 코드에서의 사용: `ProblemAnswerSheetView`, `ViewMode 'sheet'`
+- 관련 파일: src/components/problem-paper/ProblemAnswerSheetView.tsx
+
+## 폴더 전체 담기 (bulk add)
+- 정의: 문제지 조합 화면에서 **지금 조건에 걸린 문항 전부**를 한 번에 담는 것. 화면에 60개만
+  보여도 조건에 걸린 것을 다시 조회해 담는다. 200문항을 넘는 폴더는 **일부만 담지 않고 막는다**
+  (잘라 담으면 지문에 딸린 문항이 중간에서 끊긴다)
+- 코드에서의 사용: `usePaperBulkAdd.addFolder`, `fetchProblemsForBulkAdd`, `folderTooBigMessage`
+- 관련 파일: src/hooks/usePaperBulkAdd.ts, src/lib/problem-paper/bulk-add.ts, src/components/problem-paper/PaperPickBar.tsx
 
 ## 교과서 (textbook)
 - 정의: 그 기출이 다루는 교과서. 값은 카테고리 관리의 **출판사 이름 스냅샷**(`exam.publishers.name`)이다
