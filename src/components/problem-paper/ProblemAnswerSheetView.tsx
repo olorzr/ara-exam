@@ -53,9 +53,9 @@ export default function ProblemAnswerSheetView({ paper, items }: ProblemAnswerSh
       columns={1}
       className="pb-sheet"
       firstPageHeader={
+        // 머리글 출처 줄은 문제지 3종이 함께 뺐다(ProblemPaperView 참고)
         <ExamPrintHeader
           title={title}
-          sourceLabels={paper.source_labels}
           showScoreRow
           totalCount={items.length}
         />

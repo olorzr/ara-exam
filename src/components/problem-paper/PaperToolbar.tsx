@@ -56,13 +56,15 @@ export default function PaperToolbar({
           ))}
         </div>
 
+        {/* 출처는 기본 표시라 체크박스는 '숨기기' 다. 저장 키는 `showSource` 그대로이고
+            뒤집는 곳은 여기 하나뿐이다 — 렌더러·RPC·옛 문제지는 그 키를 그대로 본다 */}
         <label className="flex items-center gap-1.5 text-gray-600">
           <input
-            type="checkbox" checked={settings.showSource}
-            onChange={(e) => onSettings({ showSource: e.target.checked })}
+            type="checkbox" checked={!settings.showSource}
+            onChange={(e) => onSettings({ showSource: !e.target.checked })}
             className="h-4 w-4 accent-[color:var(--primary)]"
           />
-          출처 표시
+          출처 숨기기
         </label>
 
         <div className="ml-auto flex items-center gap-1">

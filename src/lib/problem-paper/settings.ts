@@ -12,11 +12,14 @@ import type { PaperSettings } from '@/types/problem-bank';
  * 기본값 — 2단이 A4 를 가장 덜 쓴다.
  * `showScore` 는 더 이상 쓰지 않는다(배점을 인쇄하지 않는다). RPC 화이트리스트가
  * 이 키를 계속 조립하므로 자리만 남기고 false 로 둔다.
+ * `showSource` 는 **기본 표시**다(2026-09-19, 사용자 결정) — 문항마다 출처를 찍는 것이
+ * 보통이고 숨기는 쪽이 선택이다. 키 이름은 저장된 문제지·RPC 화이트리스트가 쓰는
+ * `showSource` 그대로 두고, 툴바가 '출처 숨기기' 로 뒤집어 보여 준다.
  */
 export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
   columns: 2,
   showScore: false,
-  showSource: false,
+  showSource: true,
 };
 
 /**
@@ -31,7 +34,11 @@ export function normalizePaperSettings(raw: unknown): PaperSettings {
     columns: value.columns === 1 ? 1 : 2,
     // 옛 문제지에 true 로 저장돼 있어도 인쇄에는 쓰지 않는다(렌더러가 보지 않는다)
     showScore: value.showScore === true,
-    showSource: value.showSource === true,
+    // 저장된 불리언이 이긴다 — 기본이 '표시' 로 바뀌었어도 출처 없이 만든 옛 문제지는
+    // 그대로 출처 없이 인쇄돼야 한다. 없거나 이상한 값일 때만 기본으로 채운다
+    showSource: typeof value.showSource === 'boolean'
+      ? value.showSource
+      : DEFAULT_PAPER_SETTINGS.showSource,
   };
 }
 

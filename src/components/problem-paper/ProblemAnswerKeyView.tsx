@@ -57,7 +57,8 @@ export default function ProblemAnswerKeyView({ paper, items }: ProblemAnswerKeyV
       className="pb-sheet"
       firstPageHeader={
         <>
-          <ExamPrintHeader title={title} sourceLabels={paper.source_labels} />
+          {/* 머리글 출처 줄은 문제지 3종이 함께 뺐다(ProblemPaperView 참고) */}
+          <ExamPrintHeader title={title} />
           <div className="section-bar section-bar--mint mb-2">
             <span>전체 {items.length}문항</span>
           </div>

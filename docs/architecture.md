@@ -433,6 +433,15 @@ src/
 - 주요 파일: compose.ts, dnd.ts, blocks.ts, html-trim.ts, settings.ts, shuffle-groups.ts
 - 배점은 인쇄하지 않는다(2026-09-08). `PaperSettings.showScore` 키는 RPC 화이트리스트
   호환용으로만 남아 있고 렌더러는 보지 않는다
+- 출처는 **기본으로 찍는다**(2026-09-19). `DEFAULT_PAPER_SETTINGS.showSource` 가 true 이고
+  툴바 체크박스는 **'출처 숨기기'** 라 뜻이 뒤집혀 있다 — 뒤집는 곳은 `PaperToolbar` 하나뿐이고
+  저장 키·렌더러·RPC 화이트리스트는 계속 `showSource`(표시) 다. `normalizePaperSettings` 는
+  저장된 불리언을 그대로 존중한다(출처 없이 만든 옛 문제지를 기본값으로 덮지 않는다).
+  **RPC 화이트리스트의 기본값도 같다**(sql/34 — `jsonb_typeof` 로 **불리언일 때만** 그 값을 쓰고
+  나머지는 표시. 검증은 `sql/verify_problem_paper_settings.sql`).
+  화면 기본과 서버 기본이 갈리면 키를 빠뜨린 직접 호출이 화면과 반대로 저장된다
+- 인쇄물 **머리글에는 출처를 모아 찍지 않는다**(문제지·정답표·답안지 셋 다). `source_labels` 는
+  계속 저장하지만 쓰는 곳은 문제지 **목록 화면**뿐이다
 
 ### 인쇄
 

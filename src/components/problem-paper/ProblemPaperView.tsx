@@ -41,9 +41,9 @@ export default function ProblemPaperView({ paper, items, imageUrls }: ProblemPap
       columns={paper.settings.columns}
       className="pb-sheet"
       firstPageHeader={
+        // 머리글에 출처를 모아 찍지 않는다 — 출처는 문항마다 그 자리에 있다(`showSource`)
         <ExamPrintHeader
           title={paper.title}
-          sourceLabels={paper.source_labels}
           showScoreRow
           totalCount={items.length}
         />

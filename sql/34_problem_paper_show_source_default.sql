@@ -1,42 +1,29 @@
--- ============================================================
--- 23. 기출 문제 은행 — 본문 제자리에 끼우는 그림
--- ============================================================
--- 그림은 발문·지문의 **원래 있던 자리**에 들어가야 한다. 표 위에 있던 그래프가 선지
--- 아래로 밀려 나오면 문항이 안 읽힌다. 지금까지는 그림이 있으면 **문항을 통째로**
--- 이미지로 출제했는데, 그러면 글이 아니라 사진이 되어 편집도 검색도 재조판도 안 된다.
+-- ---------------------------------------------------------------
+-- 34. 문제지 기본 설정 — 출처는 기본으로 찍는다
+-- ---------------------------------------------------------------
+-- 화면 기본값(`DEFAULT_PAPER_SETTINGS.showSource`)이 2026-09-19 에 **표시**로 바뀌었는데
+-- RPC 화이트리스트의 폴백만 '숨김' 으로 남아 있었다. 앱(`usePaperComposer.save`)은 늘
+-- 전체 settings 를 실어 보내므로 앱 경로의 동작은 이미 맞지만, **키를 빠뜨린 직접 호출**은
+-- 서버 기본값을 따르게 되어 화면이 말하는 기본과 갈린다. 두 기본값은 같아야 한다.
 --
--- 본문 HTML 에는 URL 없는 자리표시자 `<figure data-figure="1"></figure>` 만 둔다
--- (`<img>` 는 여전히 금지 — 서명 URL 은 만료돼 본문에 굳힐 수 없다). 숫자는
--- `figure_paths` 배열의 1-based 순번이고, 그리는 쪽이 그 자리에서 이미지를 끼운다.
+-- ⚠️ **이 파일이 `exam.create_problem_paper` 의 정식 정의다**(sql/17 → sql/23 → 여기).
+--    sql/23 을 나중에 단독으로 다시 돌리면 이 기본값이 조용히 되돌아간다 —
+--    그 파일 머리에 경고를 적어 두었다. 함수를 고칠 일이 생기면 **번호가 가장 큰 정의**를
+--    고치고, 옛 파일에는 포인터만 남길 것(`create_exam_with_words` 와 같은 규약).
 --
--- `problems.figure_paths` 는 sql/17 부터 있었지만 **아무도 채우지 않았다.** 이제 채운다.
--- `passages` 에는 없었으므로 여기서 더한다.
+-- 바뀐 **실행 로직**은 `v_settings` 조립의 `showSource` 분기 하나뿐이다(그 밖에는 설명 주석만
+-- 늘었고, 주석을 걷어 내면 sql/23 본문과 해시가 같다 — 기계로 대조했다).
+-- 멱등: CREATE OR REPLACE 라 다시 돌려도 안전하다.
 --
--- 스키마는 모든 문장에 `exam.` 을 명시한다 (SQL Editor 가 문마다 다른 백엔드로 보낼 수 있다).
+-- 적용: node /Users/ara/Projects/Ara-system/scripts/run-sql.js sql/34_problem_paper_show_source_default.sql
 
--- ---------------------------------------------
--- 1. 지문에도 그림 배열
--- ---------------------------------------------
-ALTER TABLE exam.passages
-  ADD COLUMN IF NOT EXISTS figure_paths TEXT[] NOT NULL DEFAULT '{}';
-
-COMMENT ON COLUMN exam.passages.figure_paths IS
-  '본문 제자리에 끼울 그림들(Storage 경로, 1-based). html 의 <figure data-figure="n"> 과 순번으로 짝을 이룬다. 못 만든 자리는 빈 문자열 — 압축하면 번호가 어긋난다';
-COMMENT ON COLUMN exam.problems.figure_paths IS
-  '본문 제자리에 끼울 그림들(Storage 경로, 1-based). stem_html 의 <figure data-figure="n"> 과 순번으로 짝을 이룬다';
-
--- ---------------------------------------------
--- 2. 문제지 스냅샷에 지문 그림을 싣는다
--- ---------------------------------------------
--- ⚠️ 스냅샷에 안 실으면 **문제지에서만 그림이 사라진다.** 아카이브 화면은 원본 행을 읽어
---    멀쩡해 보이는데 인쇄물에는 빈칸이 나오는, 가장 알아채기 어려운 종류의 결함이다.
---    이미 만들어 둔 문제지의 스냅샷에는 이 키가 없으므로 앱이 `?? []` 로 받는다.
--- sql/17 의 함수를 그대로 옮기고 지문 스냅샷 한 덩어리만 늘렸다.
-
--- ⚠️ [2026-09-19] **여기의 `exam.create_problem_paper` 정의는 더 이상 정식이 아니다.**
---    `showSource` 화이트리스트 기본값이 sql/34_problem_paper_show_source_default.sql 에서
---    '숨김' → '표시' 로 바뀌었다. 이 파일을 **단독으로 다시 돌리면 그 기본값이 조용히
---    되돌아간다** — 되돌렸다면 sql/34 를 다시 적용할 것. 번호 순서(…→23→34)로 적용하면 괜찮다.
+DO $guard$
+BEGIN
+  IF to_regnamespace('exam') IS NULL THEN
+    RAISE EXCEPTION 'exam 스키마가 없다 — 이 마이그레이션은 공유 프로젝트(ara-system) 전용이다';
+  END IF;
+END
+$guard$;
 
 CREATE OR REPLACE FUNCTION exam.create_problem_paper(
   p_title       TEXT,
@@ -109,7 +96,17 @@ BEGIN
   v_settings := jsonb_build_object(
     'columns',    CASE WHEN p_settings ->> 'columns' = '1' THEN 1 ELSE 2 END,
     'showScore',  CASE WHEN p_settings ->> 'showScore'  = 'false' THEN false ELSE true END,
-    'showSource', CASE WHEN p_settings ->> 'showSource' = 'true'  THEN true  ELSE false END
+    -- 2026-09-19: 기본이 **표시**다. 앱은 늘 키를 실어 보내므로 이 폴백에 닿는 것은
+    -- 키를 빠뜨린 직접 호출뿐이고, 그때도 화면 기본값과 같아야 한다.
+    -- ⚠️ **불리언일 때만 그 값을 쓴다**(`jsonb_typeof`, 코덱스 3R). `->>` 로 글자만 견주면
+    --    JSON **문자열** `"false"` 까지 숨김이 되는데, 앱의 `normalizePaperSettings` 는
+    --    불리언이 아닌 값을 전부 기본(표시)으로 친다 — 그 둘은 1:1 거울이어야 한다.
+    --    (`showScore` 는 옛 모양 그대로 둔다 — 렌더러가 보지 않는 죽은 키다)
+    'showSource', CASE
+                    WHEN jsonb_typeof(p_settings -> 'showSource') = 'boolean'
+                      THEN (p_settings -> 'showSource')::boolean
+                    ELSE true
+                  END
   );
 
   INSERT INTO exam.problem_papers (title, settings, total_questions, source_labels, user_id)
@@ -185,16 +182,19 @@ $$;
 REVOKE ALL ON FUNCTION exam.create_problem_paper(TEXT, UUID[], JSONB) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION exam.create_problem_paper(TEXT, UUID[], JSONB) TO authenticated, service_role;
 
--- PostgREST 스키마 캐시 갱신 — 없으면 배포 직후 새 컬럼이 PGRST204 로 거부된다
 NOTIFY pgrst, 'reload schema';
 
--- ---------------------------------------------
--- 확인 쿼리 (적용 뒤 직접 돌려 볼 것)
--- ---------------------------------------------
--- 컬럼이 생겼는지:
---   SELECT column_name, data_type FROM information_schema.columns
---    WHERE table_schema = 'exam' AND table_name = 'passages' AND column_name = 'figure_paths';
---
--- 새 문제지의 지문 스냅샷에 키가 들어가는지 (문제지를 하나 만든 뒤):
---   SELECT snapshot->'passage'->'figure_paths'
---     FROM exam.problem_paper_items ORDER BY created_at DESC LIMIT 1;
+DO $verify$
+DECLARE
+  v_src TEXT;
+BEGIN
+  SELECT pg_get_functiondef(p.oid) INTO v_src
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'exam' AND p.proname = 'create_problem_paper';
+
+  IF position('jsonb_typeof(p_settings -> ''showSource'') = ''boolean''' IN v_src) = 0 THEN
+    RAISE EXCEPTION '화이트리스트가 새 기본값으로 안 바뀌었다';
+  END IF;
+  RAISE NOTICE 'create_problem_paper: showSource 는 불리언일 때만 그 값, 아니면 표시(true)';
+END
+$verify$;

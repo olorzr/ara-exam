@@ -175,7 +175,8 @@ CREATE TABLE IF NOT EXISTS exam.problem_papers (
   title           TEXT NOT NULL CHECK (btrim(title) <> ''),
   -- {columns:1|2, showScore:bool, showSource:bool} — RPC 가 화이트리스트로 재조립한다
   settings        JSONB NOT NULL DEFAULT '{}'::jsonb,
-  -- 인쇄 머리말의 출처 줄('2025 중2 상현중 중간')
+  -- 이 문제지가 담은 출처들('2025 중2 상현중 중간'). ⚠️ [2026-09-19] **인쇄 머리말에는
+  -- 더 이상 찍지 않는다**(출처는 문항마다 그 자리에 찍는다) — 쓰는 곳은 문제지 목록 화면뿐이다
   source_labels   TEXT[] NOT NULL DEFAULT '{}',
   total_questions INT NOT NULL DEFAULT 0 CHECK (total_questions >= 0),
   user_id         UUID NOT NULL,
@@ -374,6 +375,11 @@ GRANT ALL ON exam.problem_sources, exam.passages, exam.problems,
 -- ---------------------------------------------
 -- SECURITY DEFINER 라 잠긴 RLS 를 우회해 INSERT 한다. 우회하는 만큼 도메인 검사를
 -- **함수 본문에서 직접** 한다(정책이 안 걸리므로). owner 는 postgres 여야 한다.
+-- ⚠️ [2026-09-19] **여기의 `exam.create_problem_paper` 정의는 더 이상 정식이 아니다.**
+--    `showSource` 화이트리스트 기본값이 sql/34_problem_paper_show_source_default.sql 에서
+--    '숨김' → '표시' 로 바뀌었다. 이 파일을 **단독으로 다시 돌리면 그 기본값이 조용히
+--    되돌아간다** — 되돌렸다면 sql/34 를 다시 적용할 것. 번호 순서(…→23→34)로 적용하면 괜찮다.
+
 CREATE OR REPLACE FUNCTION exam.create_problem_paper(
   p_title       TEXT,
   p_problem_ids UUID[],
