@@ -1,8 +1,8 @@
 import { supabase } from '@/lib/supabase';
 import { sanitizeInlineHTML, sanitizeProblemHTML } from '@/lib/sanitize-problem';
-import { normalizeWorkTitle } from '@/lib/problem-bank/work-title';
+import { normalizePassageWorks, normalizeWorkTitles } from '@/lib/problem-bank/work-title';
 import { normalizeGrammarPaths } from './grammar-tree';
-import type { Bbox, Problem, RenderMode } from '@/types/problem-bank';
+import type { Bbox, PassageWork, Problem, RenderMode } from '@/types/problem-bank';
 
 /**
  * 검수·편집에서 쓰는 쓰기.
@@ -12,6 +12,10 @@ import type { Bbox, Problem, RenderMode } from '@/types/problem-bank';
  *    **0행이면 충돌**로 알린다. 조용히 덮어쓰면 남의 검수가 사라진다.
  *
  * ⚠️ 저장 직전에 다시 정화한다. 편집기가 이미 정화했더라도 화면을 우회한 값이 올 수 있다.
+ *
+ * ⚠️ **파생 컬럼은 보내지 않는다**(`work_title`·지문의 `title`/`author`, sql/33). DB 트리거가
+ *    작품 목록에서 만든다 — 보내면 목록과 문자열 가운데 어느 쪽이 참인지 알 수 없어진다.
+ *    대신 저장이 끝나면 **트리거가 만든 값을 그대로 돌려받아** 화면을 맞춘다(`.select`).
  */
 
 /** 저장이 남의 수정과 부딪혔을 때 */
@@ -34,7 +38,11 @@ export interface ProblemPatch {
   unit_path?: string[];
   /** 문법 분류 경로 문자열 목록 (여러 개). 지문에는 이 축이 없다 */
   grammar_paths?: string[];
-  work_title?: string;
+  /**
+   * 이 문항이 좁혀 묻는 작품들. **빈 배열이면 '지문 전체'** 이고 트리거가 채운다.
+   * 파생 문자열(`work_title`)은 보내지 않는다.
+   */
+  work_titles?: string[];
   render_mode?: RenderMode;
   bbox?: Bbox | null;
   image_path?: string;
@@ -44,27 +52,36 @@ export interface ProblemPatch {
   number?: number | null;
 }
 
+/** 저장 뒤 DB 가 확정한 값 — 파생 컬럼을 화면이 짐작하지 않게 그대로 돌려준다 */
+export interface SavedProblem {
+  updated_at: string;
+  work_titles: string[];
+  work_title: string;
+}
+
 /**
  * 문항을 저장한다(낙관적 동시성).
  * @param id - 문항 id
  * @param loadedUpdatedAt - 화면이 읽어 온 시점의 updated_at
  * @param patch - 바꿀 값
- * @returns 새 updated_at (연속 저장에 쓴다)
+ * @returns 새 updated_at 과 트리거가 확정한 작품 값
  * @throws ConflictError - 그 사이 남이 고쳤을 때
  */
 export async function updateProblem(
   id: string,
   loadedUpdatedAt: string,
   patch: ProblemPatch,
-): Promise<string> {
+): Promise<SavedProblem> {
   const payload: Record<string, unknown> = { ...patch };
   if (patch.stem_html !== undefined) payload.stem_html = sanitizeProblemHTML(patch.stem_html);
   if (patch.explanation_html !== undefined) {
     payload.explanation_html = sanitizeProblemHTML(patch.explanation_html);
   }
   if (patch.choices !== undefined) payload.choices = patch.choices.map(sanitizeInlineHTML);
-  if (patch.work_title !== undefined) payload.work_title = normalizeWorkTitle(patch.work_title);
   // 중복·빈 값을 걷어내고 상한까지 자른다 — 넘치면 DB CHECK 가 저장을 통째로 거부한다
+  if (patch.work_titles !== undefined) {
+    payload.work_titles = normalizeWorkTitles(patch.work_titles);
+  }
   if (patch.grammar_paths !== undefined) {
     payload.grammar_paths = normalizeGrammarPaths(patch.grammar_paths);
   }
@@ -74,17 +91,22 @@ export async function updateProblem(
     .update(payload)
     .eq('id', id)
     .eq('updated_at', loadedUpdatedAt)
-    .select('updated_at');
+    // ⚠️ 파생 컬럼까지 받아 온다. 화면이 보낸 값으로 state 를 맞추면, 빈 목록을 보내
+    //    **지문에서 물려받은** 경우에 화면만 비어 보인다(다음 저장에서 되살아난다)
+    .select('updated_at, work_titles, work_title');
   if (error) throw error;
   if (!data || data.length === 0) throw new ConflictError();
-  return (data[0] as { updated_at: string }).updated_at;
+  return data[0] as unknown as SavedProblem;
 }
 
 /** 지문에서 사람이 고칠 수 있는 값 */
 export interface PassagePatch {
   label?: string;
-  title?: string;
-  author?: string;
+  /**
+   * 이 지문에 실린 작품들. `title`/`author` 는 **파생 컬럼이라 보내지 않는다**(sql/33).
+   * 바꾸면 딸린 문항의 작품명까지 트리거가 함께 옮긴다.
+   */
+  works?: PassageWork[];
   html?: string;
   area_path?: string[];
   /** 교과서 단원 이름 경로 [대단원, 소단원] */
@@ -96,35 +118,43 @@ export interface PassagePatch {
   figure_paths?: string[];
 }
 
+/** 저장 뒤 DB 가 확정한 지문 값 */
+export interface SavedPassage {
+  updated_at: string;
+  works: PassageWork[];
+  title: string;
+  author: string;
+}
+
 /**
  * 지문을 저장한다(낙관적 동시성).
  * @param id - 지문 id
  * @param loadedUpdatedAt - 화면이 읽어 온 시점의 updated_at
  * @param patch - 바꿀 값
- * @returns 새 updated_at
+ * @returns 새 updated_at 과 트리거가 확정한 작품 값
  * @throws ConflictError - 그 사이 남이 고쳤을 때
  */
 export async function updatePassage(
   id: string,
   loadedUpdatedAt: string,
   patch: PassagePatch,
-): Promise<string> {
+): Promise<SavedPassage> {
   const payload: Record<string, unknown> = { ...patch };
   if (patch.html !== undefined) payload.html = sanitizeProblemHTML(patch.html);
   // ⚠️ 지은이도 함께 다듬는다 — 작품 트리가 지은이로 폴더를 나누므로, 한쪽만 다듬으면
   //    '김유정' 과 '김유정 ' 이 두 폴더가 된다
-  if (patch.title !== undefined) payload.title = normalizeWorkTitle(patch.title);
-  if (patch.author !== undefined) payload.author = normalizeWorkTitle(patch.author);
+  if (patch.works !== undefined) payload.works = normalizePassageWorks(patch.works);
 
   const { data, error } = await supabase
     .from('passages')
     .update(payload)
     .eq('id', id)
     .eq('updated_at', loadedUpdatedAt)
-    .select('updated_at');
+    // 파생 문자열까지 받아 온다 — 화면 머리글이 트리거가 만든 값과 어긋나면 안 된다
+    .select('updated_at, works, title, author');
   if (error) throw error;
   if (!data || data.length === 0) throw new ConflictError();
-  return (data[0] as { updated_at: string }).updated_at;
+  return data[0] as unknown as SavedPassage;
 }
 
 /**

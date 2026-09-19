@@ -1,4 +1,5 @@
 import { normalizeGrammarPaths } from '@/lib/problem-bank/grammar-tree';
+import { normalizePassageWorks } from '@/lib/problem-bank/work-title';
 import {
   MAX_FIGURES, reconcileFigurePlaceholders, shiftFigurePlaceholders,
 } from '@/lib/problem-bank/figure-placeholders';
@@ -14,8 +15,12 @@ import type { FigureRegion, PassageDraft, ProblemDraft } from './merge';
  * 값도, 먼저 읽은 값도 나중 묶음이 되돌리지 못한다.
  */
 
-/** 병합 중에만 쓰는 상태 — 조각을 따로 들고 있다가 끝에 합친다 */
-export interface PassageWork {
+/**
+ * 병합 중에만 쓰는 **지문 하나의 작업 단위** — 조각을 따로 들고 있다가 끝에 합친다.
+ *
+ * ⚠️ 작품(`PassageWork`, types/problem-bank.ts)과 이름이 헷갈리지 않게 `Build` 로 둔다.
+ */
+export interface PassageBuild {
   draft: PassageDraft;
   fragments: string[];
   /**
@@ -31,7 +36,7 @@ export interface PassageWork {
 
 /** 중복 판정 키가 가리키는 자리 — 어느 지문의 몇 번째 조각인가 */
 export interface FragmentRef {
-  work: PassageWork;
+  work: PassageBuild;
   index: number;
   /**
    * **가리키기만 하는 자리**인가.
@@ -101,7 +106,7 @@ export type ContainmentVerdict =
  * @param item - 붙이려는 조각
  * @returns 판정
  */
-export function alreadyContains(work: PassageWork, item: OcrItem): ContainmentVerdict {
+export function alreadyContains(work: PassageBuild, item: OcrItem): ContainmentVerdict {
   const text = textOf(item.html);
   if (!text) return item.figures.length === 0 ? 'duplicate' : 'new';
 
@@ -119,13 +124,12 @@ export function alreadyContains(work: PassageWork, item: OcrItem): ContainmentVe
   return whole ? 'duplicate' : 'partial';
 }
 
-export function toPassage(item: OcrItem, id: string): PassageWork {
+export function toPassage(item: OcrItem, id: string): PassageBuild {
   return {
     draft: {
       id,
       label: item.label ?? '',
-      title: item.title ?? '',
-      author: item.author ?? '',
+      works: item.works,
       html: item.html,
       page_no: item.page,
       box: item.box,
@@ -147,7 +151,7 @@ export function toPassage(item: OcrItem, id: string): PassageWork {
  * @param work - 합칠 지문
  * @returns 이어 붙인 본문, 조각 순서대로의 그림, 상한에 걸려 버린 그림 수
  */
-export function joinFragments(work: PassageWork): {
+export function joinFragments(work: PassageBuild): {
   html: string;
   figures: FigureRegion[];
   droppedFigures: number;
@@ -188,7 +192,7 @@ export function toProblem(item: OcrItem, id: string, passageId: string | null): 
     answer: item.answer,
     // OCR 은 배점을 읽지 않는다 — 컬럼을 지키려고 자리만 채운다
     score: null,
-    work_title: item.work_title ?? '',
+    work_titles: item.works.map((w) => w.title),
     area_path: item.area_path,
     unit_path: item.unit_path,
     grammar_paths: item.grammar_paths,
@@ -207,7 +211,7 @@ export function toProblem(item: OcrItem, id: string, passageId: string | null): 
  * @param work - 붙일 대상 지문
  * @param item - 이어지는 조각
  */
-export function appendFragment(work: PassageWork, item: OcrItem): void {
+export function appendFragment(work: PassageBuild, item: OcrItem): void {
   // ⚠️ 번호를 **여기서 밀지 않는다.** 조각은 모델이 낸 그대로 들고 있다가 합칠 때 한 번만
   //    민다(joinFragments) — 그래야 갈아 끼우기와 밀기가 서로 어긋나지 않는다
   work.fragments.push(item.html);
@@ -225,7 +229,7 @@ export function appendFragment(work: PassageWork, item: OcrItem): void {
  * @param index - 갈아 끼울 조각 자리
  * @param item - 더 온전한 판
  */
-export function replaceFragment(work: PassageWork, index: number, item: OcrItem): void {
+export function replaceFragment(work: PassageBuild, index: number, item: OcrItem): void {
   work.fragments[index] = item.html;
   work.figures[index] = item.figures.map(toRegion);
   // 이 조각이 마지막이었다면 '아직 이어지는가' 도 새 값으로 바꾼다
@@ -246,8 +250,11 @@ export function fillPassageGaps(draft: PassageDraft, item: OcrItem): void {
   //    **시작 쪽 이미지 하나로** 인쇄돼 뒷부분이 통째로 사라진다
   draft.pageSpan = Math.max(1, draft.lastPage - draft.page_no + 1);
   if (!draft.label && item.label) draft.label = item.label;
-  if (!draft.title && item.title) draft.title = item.title;
-  if (!draft.author && item.author) draft.author = item.author;
+  // ⚠️ 작품만 **합집합**이다(merge.ts 의 PassageDraft 주석 참조) — 쪽을 넘어가는 (가)(나)
+  //    지문은 조각마다 한 편씩만 보인다. 표기가 같은 편은 `normalizePassageWorks` 가 접는다
+  if (item.works.length > 0) {
+    draft.works = normalizePassageWorks([...draft.works, ...item.works]);
+  }
   // ⚠️ 좌표는 **같은 쪽에서 읽은 것만** 받는다. box 와 page_no 는 짝이라(크롭이 둘을 함께
   //    쓴다) 이어지는 쪽의 좌표를 첫 쪽에 붙이면 엉뚱한 자리를 잘라 낸다(코덱스 리뷰 2R)
   if (!draft.box && item.box && item.page === draft.page_no) draft.box = item.box;
@@ -273,7 +280,10 @@ export function fillGaps(target: ProblemDraft, item: OcrItem): void {
     target.answer = item.answer;
     target.question_type = item.question_type;
   }
-  if (!target.work_title && item.work_title) target.work_title = item.work_title;
+  // 문항은 **빈 칸만 채운다** — 묶음마다 다른 편을 냈다면 합칠 조각이 아니라 갈린 의견이다
+  if (target.work_titles.length === 0 && item.works.length > 0) {
+    target.work_titles = item.works.map((w) => w.title);
+  }
   if (target.area_path.length === 0 && item.area_path.length > 0) target.area_path = item.area_path;
   if (target.unit_path.length === 0 && item.unit_path.length > 0) target.unit_path = item.unit_path;
   // ⚠️ 문법만 **합집합**이다. 나머지 축은 경로 하나라 '비어 있을 때만 채운다' 가 맞지만,

@@ -114,3 +114,12 @@ export const OCR_SPLIT_COLUMNS = true;
  * 사람이 검수에서 더 붙일 수는 있다 — 그쪽 상한은 `MAX_FIGURES`(figure-placeholders.ts).
  */
 export const OCR_MAX_FIGURES_PER_ITEM = 3;
+
+/**
+ * 한 항목에서 받아들일 작품 수.
+ *
+ * `(가)~(마)` 다섯 편이 실린 시조 묶음 지문이 실제로 있다. DB 의 상한(6, sql/33)보다
+ * 하나 적게 두는 이유는 모델이 지문 안의 인용까지 작품으로 내는 것을 막으려는 것이고,
+ * 사람이 검수에서 여섯 번째를 더할 자리는 남겨 둔다.
+ */
+export const OCR_MAX_WORKS_PER_ITEM = 5;

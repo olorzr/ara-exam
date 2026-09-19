@@ -12,10 +12,10 @@ const TREE: AreaTreeNode[] = [
 function item(over: Record<string, unknown> = {}) {
   return {
     kind: 'problem', ref: 'Q1', page: 1, box: null, passage_ref: null, number: 1,
-    label: null, title: null, author: null, title_source: null, html: '',
+    label: null, works: [], html: '',
     continued: false, continues: false,
     question_type: '객관식', stem_html: '<p>물음</p>', choices: ['가', '나', '다', '라', '마'],
-    answer: '1', has_figure: false, figures: [], work_title: null, area_path: [], unit_path: [],
+    answer: '1', has_figure: false, figures: [], area_path: [], unit_path: [],
     grammar_paths: [],
     ...over,
   };
@@ -518,15 +518,61 @@ describe('parseOcrDraft — 옛한글', () => {
   });
 });
 
+describe('작품 목록(works)', () => {
+  const passage = (over: Record<string, unknown> = {}) => item({
+    kind: 'passage', ref: 'P1', html: '<p>지문</p>', stem_html: '', choices: [], answer: null,
+    number: null, ...over,
+  });
+  /** 작품 한 편 — 출처까지 붙인 모델 응답 모양 */
+  const work = (over: Record<string, unknown> = {}) => ({
+    label: null, title: '동백꽃', author: '김유정', title_source: 'printed', ...over,
+  });
+
+  it('작품을 낱개로 받는다 — (가)(나) 표시는 괄호를 벗겨 label 에 남긴다', () => {
+    const draft = parseOcrDraft(json([passage({
+      works: [
+        work({ label: '(가)', title: '「진달래꽃」', author: '김소월' }),
+        work({ label: '나', title: '엄마 걱정', author: '기형도' }),
+      ],
+    })]), ctx)!;
+    expect(draft.items[0].works).toEqual([
+      { label: '가', title: '진달래꽃', author: '김소월' },
+      { label: '나', title: '엄마 걱정', author: '기형도' },
+    ]);
+  });
+
+  it('한 칸에 이어 적어 와도 쪼갠다 — 그대로 두면 그 이름의 가짜 작품이 쌓인다', () => {
+    const draft = parseOcrDraft(json([passage({
+      works: [work({ title: '먼 후일 · 독은 아름답다', author: '김소월' })],
+    })]), ctx)!;
+    expect(draft.items[0].works.map((w) => w.title)).toEqual(['먼 후일', '독은 아름답다']);
+  });
+
+  it('제목이 없는 원소는 버린다 — 지은이만으로는 어느 폴더에도 놓을 수 없다', () => {
+    const draft = parseOcrDraft(json([passage({
+      works: [work({ title: null, author: '김유정' }), work()],
+    })]), ctx)!;
+    expect(draft.items[0].works).toEqual([{ label: '', title: '동백꽃', author: '김유정' }]);
+  });
+
+  it('같은 제목이 두 번 오면 하나로 접는다', () => {
+    const draft = parseOcrDraft(json([passage({ works: [work(), work({ author: '' })] })]), ctx)!;
+    expect(draft.items[0].works).toHaveLength(1);
+  });
+});
+
 describe('작품명 출처(title_source)', () => {
   const passage = (over: Record<string, unknown> = {}) => item({
     kind: 'passage', ref: 'P1', html: '<p>지문</p>', stem_html: '', choices: [], answer: null,
     number: null, ...over,
   });
+  const work = (over: Record<string, unknown> = {}) => ({
+    label: null, title: '동백꽃', author: null, title_source: null, ...over,
+  });
 
   it('본문으로 알아본 작품명은 확인하라고 짚는다 — 인쇄된 이름과 구별돼야 한다', () => {
     const draft = parseOcrDraft(
-      json([passage({ title: '동백꽃', title_source: 'inferred' })]),
+      json([passage({ works: [work({ title_source: 'inferred' })] })]),
       ctx,
     )!;
     expect(said(draft.warnings)).toContain('본문으로 알아봤어요');
@@ -535,30 +581,45 @@ describe('작품명 출처(title_source)', () => {
 
   it('인쇄된 작품명은 짚지 않는다 — 경고가 흔해지면 아무도 안 읽는다', () => {
     const draft = parseOcrDraft(
-      json([passage({ title: '동백꽃', title_source: 'printed' })]),
+      json([passage({ works: [work({ title_source: 'printed' })] })]),
       ctx,
     )!;
     expect(said(draft.warnings)).not.toContain('본문으로 알아봤어요');
   });
 
+  it('작품이 여럿이면 **편마다** 짚고 어느 편인지 밝힌다', () => {
+    const draft = parseOcrDraft(json([passage({
+      works: [
+        work({ label: '가', title: '진달래꽃', title_source: 'printed' }),
+        work({ label: '나', title: '엄마 걱정', title_source: 'inferred' }),
+      ],
+    })]), ctx)!;
+    const hits = draft.warnings.filter((w) => w.message.includes('본문으로 알아봤어요'));
+    expect(hits).toHaveLength(1);
+    expect(hits[0].message).toContain('(나) 엄마 걱정');
+  });
+
   it("출처를 안 밝히면 '알 수 없어요' 로 짚는다 — 말없이 인쇄된 것으로 치면 안전장치가 사라진다", () => {
     // null (스키마가 허용하는 값이라 실제로 올 수 있다)
-    const nulled = parseOcrDraft(json([passage({ title: '동백꽃', title_source: null })]), ctx)!;
+    const nulled = parseOcrDraft(json([passage({ works: [work()] })]), ctx)!;
     expect(said(nulled.warnings)).toContain('인쇄된 것인지 알 수 없어요');
 
     // 키 자체가 없는 응답 — fixture 가 null 을 채우므로 **지워서** 검사한다
-    const bare = passage({ title: '동백꽃' });
+    const bare = work();
     delete (bare as Record<string, unknown>).title_source;
-    expect(said(parseOcrDraft(json([bare]), ctx)!.warnings)).toContain('인쇄된 것인지 알 수 없어요');
+    expect(said(parseOcrDraft(json([passage({ works: [bare] })]), ctx)!.warnings))
+      .toContain('인쇄된 것인지 알 수 없어요');
 
     // 모르는 값
-    const wrong = parseOcrDraft(json([passage({ title: '동백꽃', title_source: '추정' })]), ctx)!;
+    const wrong = parseOcrDraft(json([passage({ works: [work({ title_source: '추정' })] })]), ctx)!;
     expect(said(wrong.warnings)).toContain('인쇄된 것인지 알 수 없어요');
   });
 
   it('참조가 끝내 안 풀려 단독이 된 문항도 짚는다 — 참조가 있다고 건너뛰면 영영 안 짚는다', () => {
     const draft = parseOcrDraft(
-      json([item({ ref: 'Q7', passage_ref: 'P9', number: 7, work_title: '동백꽃', title_source: 'inferred' })]),
+      json([item({
+        ref: 'Q7', passage_ref: 'P9', number: 7, works: [work({ title_source: 'inferred' })],
+      })]),
       ctx,
     )!;
     expect(said(draft.warnings)).toContain('딸린 지문을 이 묶음에서 못 찾아');
@@ -571,10 +632,7 @@ describe('작품명 출처(title_source)', () => {
 
   it('참조가 딸린 지문은 두 번 짚지 않는다 — 모델이 실수해도 경고 자리를 헛되이 먹지 않는다', () => {
     const draft = parseOcrDraft(
-      // work_title 까지 있어야 가드가 없을 때 두 번 담긴다 — 없으면 고치기 전에도 통과한다
-      json([passage({
-        ref: 'P1', passage_ref: 'P9', title: '동백꽃', work_title: '동백꽃', title_source: 'inferred',
-      })]),
+      json([passage({ ref: 'P1', passage_ref: 'P9', works: [work({ title_source: 'inferred' })] })]),
       ctx,
     )!;
     expect(draft.warnings.filter((w) => w.message.includes('본문으로 알아봤어요'))).toHaveLength(1);
@@ -582,24 +640,46 @@ describe('작품명 출처(title_source)', () => {
 
   it('지문 없는 단독 문항의 작품명도 짚는다 — 물려받을 지문이 없다', () => {
     const draft = parseOcrDraft(
-      json([item({ work_title: '동백꽃', passage_ref: null, title_source: 'inferred' })]),
+      json([item({ passage_ref: null, works: [work({ title_source: 'inferred' })] })]),
       ctx,
     )!;
     expect(said(draft.warnings)).toContain('본문으로 알아봤어요');
   });
 
   it('제목이 없으면 짚을 것도 없다', () => {
-    const draft = parseOcrDraft(json([passage({ title: null, title_source: 'inferred' })]), ctx)!;
+    const draft = parseOcrDraft(
+      json([passage({ works: [work({ title: null, title_source: 'inferred' })] })]),
+      ctx,
+    )!;
     expect(said(draft.warnings)).not.toContain('본문으로 알아봤어요');
   });
 
-  it('지문에 딸린 문항에는 붙이지 않는다 — 같은 말이 문항 수만큼 늘어난다', () => {
+  it('지문 전체를 묻는 문항에는 붙이지 않는다 — 같은 말이 문항 수만큼 늘어난다', () => {
     const draft = parseOcrDraft(json([
-      passage({ ref: 'P1', title: '동백꽃', title_source: 'inferred' }),
-      item({ ref: 'Q1', passage_ref: 'P1', work_title: '동백꽃', title_source: 'inferred' }),
+      passage({ ref: 'P1', works: [work({ title_source: 'inferred' })] }),
+      item({ ref: 'Q1', passage_ref: 'P1', works: [] }),
     ]), ctx)!;
     const hits = draft.warnings.filter((w) => w.message.includes('본문으로 알아봤어요'));
     expect(hits).toHaveLength(1);
     expect(hits[0].kind).toBe('passage');
+  });
+
+  it('한 편을 콕 집은 문항은 **따로** 짚는다 — 그 좁힘은 문항이 따로 한 주장이다', () => {
+    const draft = parseOcrDraft(json([
+      passage({
+        ref: 'P1',
+        works: [
+          work({ label: '가', title: '진달래꽃', title_source: 'printed' }),
+          work({ label: '나', title: '엄마 걱정', title_source: 'printed' }),
+        ],
+      }),
+      item({
+        ref: 'Q1', passage_ref: 'P1',
+        works: [work({ label: '나', title: '엄마 걱정', title_source: 'inferred' })],
+      }),
+    ]), ctx)!;
+    const hits = draft.warnings.filter((w) => w.message.includes('본문으로 알아봤어요'));
+    expect(hits).toHaveLength(1);
+    expect(hits[0]).toMatchObject({ ref: 'Q1', kind: 'problem' });
   });
 });

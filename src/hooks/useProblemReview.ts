@@ -13,7 +13,23 @@ import {
 } from '@/lib/problem-bank/mutations';
 import { countTaggedUnits, setSourceTextbook } from '@/lib/problem-bank/mutations-source';
 import { sourcePagePath } from '@/lib/problem-bank/storage-paths';
-import type { Passage, Problem, ProblemSource } from '@/types/problem-bank';
+import { joinWorkTitles, normalizePassageWorks } from '@/lib/problem-bank/work-title';
+import type { Passage, PassageWork, Problem, ProblemSource } from '@/types/problem-bank';
+
+/**
+ * 딸린 문항까지 움직이는 변경인가 — **작품명 목록이 달라졌을 때만** 그렇다.
+ *
+ * ⚠️ 지은이·구분 표시까지 견주면 안 된다(코덱스 리뷰). DB 전파 트리거는 제목 목록이 같으면
+ *    문항을 **한 행도 건드리지 않는데**, 화면이 '바뀌었다' 고 보면 멀쩡한 문항 카드를 전부
+ *    다시 읽고 마운트해 **저장하지 않은 발문이 사라진다.**
+ * ⚠️ 보낼 값은 다듬어진 뒤 저장되므로 여기서도 다듬어 견준다 — 아니면 `(가)` → `가` 같은
+ *    표기 차이만으로 '바뀌었다' 가 된다.
+ */
+function workTitlesDiffer(next: readonly PassageWork[], prev: readonly PassageWork[]): boolean {
+  const titles = (works: readonly PassageWork[]) =>
+    joinWorkTitles(normalizePassageWorks(works).map((w) => w.title));
+  return titles(next) !== titles(prev);
+}
 
 /**
  * 검수 화면의 상태.
@@ -76,11 +92,13 @@ export function useProblemReview(sourceId: string) {
     const target = problems.find((p) => p.id === id);
     if (!target) return null;
     try {
-      const updatedAt = await updateProblem(id, target.updated_at, patch);
+      // ⚠️ 작품은 **DB 가 확정한 값**을 쓴다(`saved` 가 patch 뒤에 온다). 빈 목록을 보내
+      //    지문에서 물려받은 경우, 보낸 값으로 맞추면 화면만 비어 보인다
+      const saved = await updateProblem(id, target.updated_at, patch);
       setProblems((list) => list.map((p) => (
-        p.id === id ? { ...p, ...patch, updated_at: updatedAt } as Problem : p
+        p.id === id ? { ...p, ...patch, ...saved } as Problem : p
       )));
-      return updatedAt;
+      return saved.updated_at;
     } catch (e) {
       reportError(e);
       return null;
@@ -90,13 +108,13 @@ export function useProblemReview(sourceId: string) {
   /**
    * 지문을 저장한다.
    *
-   * ⚠️ **작품명을 바꾸면 딸린 문항까지 움직인다.** DB 트리거(`passages_sync_work_title`)가
-   *    같은 트랜잭션에서 그 문항들의 `work_title` 을 따라 바꾸고, 그 UPDATE 가
+   * ⚠️ **작품명을 바꾸면 딸린 문항까지 움직인다.** DB 트리거(`passages_sync_work_titles`)가
+   *    같은 트랜잭션에서 그 문항들의 `work_titles` 를 따라 바꾸고, 그 UPDATE 가
    *    `updated_at` 트리거를 건드린다. 화면이 옛 버전을 들고 있으면 이후 그 문항의
    *    저장·검수가 **아무도 안 고쳤는데 충돌로 튕긴다** — 지문 삭제(removePassage)와
    *    똑같은 이유다. 그래서 문항을 다시 읽고 카드도 다시 마운트한다.
    *
-   * ⚠️ 다시 마운트하는 것은 **그 지문에 딸린 문항뿐**이다(`itemSeq`). 화면 전체를
+   * ⚠️ 다시 마운트하는 것은 **값이 실제로 바뀐 문항뿐**이다(`itemSeq`). 화면 전체를
    *    다시 마운트하면 상관없는 문항에서 고치던 내용까지 사라지고, `busy` 로 카드를
    *    걷어 내면 **조회가 실패했을 때도** 입력이 날아간다(코덱스 리뷰 2R).
    * ⚠️ 그리고 **딸린 문항의 행만** 새 값으로 갈아 끼운다. 조회해 온 목록을 통째로 덮으면
@@ -111,14 +129,15 @@ export function useProblemReview(sourceId: string) {
   const savePassage = useCallback(async (id: string, patch: PassagePatch): Promise<boolean> => {
     const target = passages.find((p) => p.id === id);
     if (!target) return false;
-    const titleChanged = patch.title !== undefined && patch.title !== target.title;
+    const titlesChanged = patch.works !== undefined
+      && workTitlesDiffer(patch.works, target.works ?? []);
     try {
-      const updatedAt = await updatePassage(id, target.updated_at, patch);
+      const saved = await updatePassage(id, target.updated_at, patch);
       setPassages((list) => list.map((p) => (
-        p.id === id ? { ...p, ...patch, updated_at: updatedAt } as Passage : p
+        p.id === id ? { ...p, ...patch, ...saved } as Passage : p
       )));
 
-      if (titleChanged) {
+      if (titlesChanged) {
         // 트리거는 이 UPDATE 와 한 트랜잭션이라, 응답을 받은 시점에는 이미 반영돼 있다
         let fresh: Problem[];
         try {
@@ -126,13 +145,21 @@ export function useProblemReview(sourceId: string) {
         } catch {
           // 작품명은 이미 저장됐고 딸린 문항의 버전도 서버에서 올라갔다. 화면만 못 따라온
           // 상태라 그 문항의 다음 저장이 충돌로 튕긴다 — 무엇을 해야 하는지 정확히 알린다
-          toast.error('작품명은 저장했지만 딸린 문항을 다시 읽지 못했어요. 새로고침해 주세요.');
+          toast.error('작품은 저장했지만 딸린 문항을 다시 읽지 못했어요. 새로고침해 주세요.');
           return true;
         }
 
         const byId = new Map(fresh.map((p) => [p.id, p]));
-        const affected = fresh.filter((p) => p.passage_id === id).map((p) => p.id);
-        // 딸린 문항만 갈아 끼운다(위 주석 참조)
+        // ⚠️ **실제로 바뀐 문항만** 갈아 끼우고 다시 마운트한다(코덱스 리뷰 2R). DB 전파
+        //    트리거는 작품명이 달라진 행만 UPDATE 하므로, 딸린 문항이라는 이유로 전부
+        //    다시 마운트하면 **아무것도 안 바뀐 카드에서 고치던 발문이 사라진다.**
+        //    바뀐 행은 `updated_at` 이 올라가 있어 그것으로 가른다
+        const affected = problems
+          .filter((p) => p.passage_id === id
+            && byId.has(p.id)
+            && byId.get(p.id)!.updated_at !== p.updated_at)
+          .map((p) => p.id);
+        if (affected.length === 0) return true;
         setProblems((list) => list.map((p) => (
           affected.includes(p.id) ? byId.get(p.id) ?? p : p
         )));
@@ -143,7 +170,8 @@ export function useProblemReview(sourceId: string) {
       reportError(e);
       return false;
     }
-  }, [passages, sourceId, bumpItems]);
+    // `problems` 는 **저장 전** 버전을 견주는 데 쓴다 — 무엇이 실제로 바뀌었는지 가르는 기준이다
+  }, [passages, problems, sourceId, bumpItems]);
 
   /**
    * 검수 완료 표시를 켜고 끈다.

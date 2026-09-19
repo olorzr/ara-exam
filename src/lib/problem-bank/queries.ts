@@ -11,8 +11,8 @@ import type { Passage, Problem, ProblemSource } from '@/types/problem-bank';
 /** 목록에 필요한 컬럼만 — 본문 HTML 은 무겁다 */
 const PROBLEM_LIST_COLUMNS =
   'id, source_id, passage_id, number, question_type, stem_html, choices, answer, '
-  + 'area_path, unit_path, grammar_paths, work_title, page_no, image_path, render_mode, '
-  + 'status, created_at';
+  + 'area_path, unit_path, grammar_paths, work_titles, work_title, page_no, image_path, '
+  + 'render_mode, status, created_at';
 
 /** 한 화면에 보여 줄 문항 수 */
 export const PROBLEM_PAGE_SIZE = 60;
@@ -140,7 +140,11 @@ export interface ProblemQuery {
    * 상위를 골랐을 때 그 마디와 아래 경로로 펴는 일은 `filters.ts` 가 이미 끝내고 넘긴다.
    */
   grammar_paths?: string[];
-  /** 작품명. 이 조건이 걸리면 목록이 **지문 순서**로 정렬된다 */
+  /**
+   * 작품명 **한 편**. 이 조건이 걸리면 목록이 **지문 순서**로 정렬된다.
+   * ⚠️ 문항은 작품을 여럿 들 수 있어(`work_titles`) **배열 포함**으로 찾는다 —
+   *    `(가)(나)` 를 함께 묻는 문항도 두 작품 어느 쪽으로 훑어도 나온다.
+   */
   work_title?: string;
   /** 발문·선지·작품명 평문 검색 */
   search?: string;
@@ -206,7 +210,10 @@ export async function fetchProblemPage(query: ProblemQuery): Promise<ProblemPage
   if (query.exam_type !== undefined) request = request.eq('source.exam_type', query.exam_type);
   if (query.textbook !== undefined) request = request.eq('source.textbook', query.textbook);
   // ⚠️ 참거짓이 아니라 undefined 로 가른다 — filters.ts 의 규약(빈 문자열은 '미지정만')
-  if (query.work_title !== undefined) request = request.eq('work_title', query.work_title);
+  // ⚠️ `.eq('work_title', …)` 이 아니다(sql/33). 파생 문자열로 걸면 `(가)(나)` 지문의 문항이
+  //    `'먼 후일 · 독은 아름답다'` 로만 걸려 '먼 후일' 을 골랐을 때 하나도 안 나온다.
+  //    빈 문자열('미지정만')은 이 축에 없다 — filters.ts 가 자유 텍스트라 막아 둔다
+  if (query.work_title) request = request.contains('work_titles', [query.work_title]);
   if (query.verifiedOnly) request = request.eq('status', '검수완료');
   if (query.area_path && query.area_path.length > 0) {
     // 배열 포함 — '문학' 으로 찾으면 '문학 > 현대시' 문항도 걸린다

@@ -274,6 +274,7 @@ function ArchiveContent() {
             onOpen={setOpenId}
             // 작품을 고른 동안만 지문별로 묶는다 — 그때만 '어느 대목인가' 가 뜻이 있다
             groupByPassage={Boolean(archive.filters.work_title)}
+            workTitle={archive.filters.work_title}
           />
 
           {archive.pageCount > 1 && (

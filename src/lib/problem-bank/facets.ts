@@ -1,6 +1,8 @@
 import { supabase } from '@/lib/supabase';
 import { expandGrammarAncestors } from './grammar-tree';
 import { tallyGrammarCounts } from './grammar-counts';
+import { collectWorkAuthors, tallyWorkCounts, toWorkFacets } from './work-counts';
+import type { PassageWork } from '@/types/problem-bank';
 import {
   SCHOOL_EXAM_SOURCE_TYPE, schoolExamKey, type SchoolExamFacet,
 } from './school-exam-tree';
@@ -129,7 +131,7 @@ async function collectPathFacets(column: 'area_path' | 'unit_path'): Promise<str
 
 /** 아카이브에 실제로 있는 작품 하나 */
 export interface WorkFacet {
-  /** `problems.work_title` (표준 표기) */
+  /** `problems.work_titles` 의 한 원소 (표준 표기) */
   title: string;
   /** 지은이 — 지문에서 가져온다. 모르면 '' */
   author: string;
@@ -143,65 +145,51 @@ export interface WorkFacet {
  * 개수를 함께 세는 이유: 트리에 '동백꽃 (12)' 로 보여야 어느 작품이 문제 은행에 두툼하게
  * 쌓였는지 한눈에 보인다.
  *
- * 지은이는 `problems` 에 없다 — 지문(`passages.title`/`author`)에서 같은 제목을 찾아
- * 붙인다. 폴더를 지은이로 나누기 때문이다. 같은 제목에 지은이가 여럿이면(표기가 갈렸거나
- * 동명이작) **가장 많이 쓰인 이름**을 고른다.
+ * ⚠️ **작품명은 문항마다 여러 개다**(`work_titles`, sql/33). `(가)(나)` 지문의 문항은 두 작품
+ *    아래에 함께 걸린다 — 파생 문자열(`work_title`)로 세면 `'먼 후일 · 독은 아름답다'` 라는
+ *    **가짜 작품 하나**가 트리에 생기고 한 편만 골라서는 그 문항이 안 나온다.
+ *
+ * 지은이는 `problems` 에 없다 — 지문(`passages.works`)에서 같은 제목을 찾아 붙인다.
+ * 폴더를 지은이로 나누기 때문이다. 세는 규칙은 `work-counts.ts` 에 있다.
  * @returns 작품 목록 (제목 한글 사전순)
  */
 export async function fetchWorkFacets(): Promise<WorkFacet[]> {
-  const counts = new Map<string, number>();
+  const rows: string[][] = [];
   for (let from = 0; from < FACET_MAX_ROWS; from += FACET_CHUNK) {
     const { data, error } = await supabase
       .from('problems')
-      .select('work_title')
-      .neq('work_title', '')
+      .select('work_titles')
+      .not('work_titles', 'eq', '{}')
       .order('id')
       .range(from, from + FACET_CHUNK - 1);
     // 선택지를 못 만들어도 목록은 봐야 한다 — 여기까지 모은 것만 돌려준다
     if (error) break;
-    const rows = (data ?? []) as { work_title: string }[];
-    for (const row of rows) {
-      const title = row.work_title;
-      if (!title) continue;
-      counts.set(title, (counts.get(title) ?? 0) + 1);
-    }
-    if (rows.length < FACET_CHUNK) break;
+    const page = (data ?? []) as unknown as { work_titles: string[] | null }[];
+    for (const row of page) rows.push(row.work_titles ?? []);
+    if (page.length < FACET_CHUNK) break;
   }
-  if (counts.size === 0) return [];
 
-  const authors = await collectPassageAuthors();
-  return [...counts.entries()]
-    .map(([title, count]) => ({ title, author: authors.get(title) ?? '', count }))
-    .sort((a, b) => a.title.localeCompare(b.title, 'ko'));
+  const counts = tallyWorkCounts(rows);
+  if (counts.size === 0) return [];
+  return toWorkFacets(counts, await collectPassageAuthors());
 }
 
-/** 지문에서 제목 → 지은이를 모은다 (가장 많이 쓰인 이름을 고른다) */
+/** 지문의 작품에서 제목 → 지은이를 모은다 (가장 많이 쓰인 이름을 고른다) */
 async function collectPassageAuthors(): Promise<Map<string, string>> {
-  const tally = new Map<string, Map<string, number>>();
+  const rows: PassageWork[][] = [];
   for (let from = 0; from < FACET_MAX_ROWS; from += FACET_CHUNK) {
     const { data, error } = await supabase
       .from('passages')
-      .select('title, author')
-      .neq('title', '')
-      .neq('author', '')
+      .select('works')
+      .not('works', 'eq', '[]')
       .order('id')
       .range(from, from + FACET_CHUNK - 1);
     if (error) break;
-    const rows = (data ?? []) as { title: string; author: string }[];
-    for (const row of rows) {
-      const byAuthor = tally.get(row.title) ?? new Map<string, number>();
-      byAuthor.set(row.author, (byAuthor.get(row.author) ?? 0) + 1);
-      tally.set(row.title, byAuthor);
-    }
-    if (rows.length < FACET_CHUNK) break;
+    const page = (data ?? []) as unknown as { works: PassageWork[] | null }[];
+    for (const row of page) rows.push(row.works ?? []);
+    if (page.length < FACET_CHUNK) break;
   }
-
-  const out = new Map<string, string>();
-  for (const [title, byAuthor] of tally) {
-    const best = [...byAuthor.entries()].sort((a, b) => b[1] - a[1])[0];
-    if (best) out.set(title, best[0]);
-  }
-  return out;
+  return collectWorkAuthors(rows);
 }
 
 /**

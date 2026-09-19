@@ -96,14 +96,39 @@ export interface ProblemSource {
   updated_at: string;
 }
 
+/**
+ * 지문에 실린 작품 한 편.
+ *
+ * `(가) 진달래꽃 – 김소월 / (나) 엄마 걱정 – 기형도` 처럼 한 지문에 여러 편이 실리므로
+ * **작품은 낱개**다(sql/33). 작품 트리·필터·참고자료 찾기가 전부 이 낱개를 본다.
+ */
+export interface PassageWork {
+  /** 시험지의 구분 표시 — 괄호 없이 '가'·'나'. 없으면 '' */
+  label: string;
+  /** 작품명 / 글 제목 (표준 표기) */
+  title: string;
+  /** 지은이. 모르면 '' */
+  author: string;
+}
+
 /** 여러 문항이 공유하는 지문 */
 export interface Passage {
   id: string;
   source_id: string;
   /** 시험지에 인쇄된 머리글 범위 ('[1~3]') */
   label: string;
-  /** 작품명 / 글 제목 */
+  /**
+   * 이 지문에 실린 작품들 — **작품 축의 원본**이다(sql/33).
+   * (가)(나) 지문이면 두 편이 들어 있다.
+   */
+  works: PassageWork[];
+  /**
+   * 작품명 파생 문자열 (`works` 의 제목을 ' · ' 로 이은 값).
+   * ⚠️ **DB 트리거가 채운다 — 앱에서 보내지 말 것**(`search_text` 와 같은 계약).
+   *    읽기 전용으로는 계속 쓴다(인쇄 라벨·지문 고르기·참고자료 신호).
+   */
   title: string;
+  /** 지은이 파생 문자열 (중복 없이 ' · ' 로 이은 값). 트리거가 채운다 */
   author: string;
   html: string;
   page_no: number;
@@ -160,6 +185,22 @@ export interface Problem {
    *    붙지만, 수능 문법 문항은 개념 두셋을 걸친다. 마스터는 코드 상수(grammar-tree.ts).
    */
   grammar_paths: string[];
+  /**
+   * 이 문항이 묻는 작품명들 — **작품 축의 원본**이다(sql/33).
+   *
+   * ⚠️ **비워 보내면 '이 지문 전체'** 라는 뜻이고, DB 트리거가 그 자리에서 딸린 지문의
+   *    작품 목록으로 채운다. 그래서 저장된 값은 늘 명시적이다.
+   *    `(나)의 화자는` 처럼 한 편만 묻는 문항은 그 한 편만 들고 있고, 지문 쪽 작품명이
+   *    바뀌어도 그 좁힘은 보존된다.
+   * ⚠️ 지문에 작품이 **새로 붙을 때** 따라가는 것은 작품이 **두 편 이상**이던 지문에서
+   *    전체를 묻던 문항뿐이다 — 한 편뿐이던 지문에서는 '전체' 와 '좁힘' 이 구별되지 않아,
+   *    따라가게 두면 한 편만 묻던 문항이 말없이 넓어진다(sql/33).
+   */
+  work_titles: string[];
+  /**
+   * `work_titles` 를 ' · ' 로 이은 파생 문자열.
+   * ⚠️ **DB 트리거가 채운다 — 앱에서 보내지 말 것.** 검색 평문·인쇄 스냅샷이 이 값을 쓴다.
+   */
   work_title: string;
   tags: string[];
   page_no: number;
@@ -211,6 +252,7 @@ export interface ProblemPaper {
 export interface PaperPassageSnapshot {
   id: string;
   label: string;
+  /** 작품명 파생 문자열. ⚠️ 스냅샷은 굳은 값이라 **여러 편이면 ' · ' 로 이어져 있다** */
   title: string;
   author: string;
   html: string;

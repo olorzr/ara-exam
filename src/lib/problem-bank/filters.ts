@@ -28,7 +28,11 @@ export interface ProblemFilters {
    *    고른 마디와 그 아래 경로 전부로 펴는 일은 `toProblemQuery` 가 한다.
    */
   grammar_path: string[];
-  /** 작품명 (`problems.work_title`). 자유 텍스트라 '미지정만' 을 쓰지 않는다 */
+  /**
+   * 작품명 **한 편**. 자유 텍스트라 '미지정만' 을 쓰지 않는다.
+   * ⚠️ 축 이름은 단수 그대로지만 조회는 `problems.work_titles` 배열 포함이다(sql/33) —
+   *    `(가)(나)` 를 함께 묻는 문항도 두 작품 어느 쪽으로 훑어도 나온다.
+   */
   work_title: string;
   search: string;
   verifiedOnly: boolean;

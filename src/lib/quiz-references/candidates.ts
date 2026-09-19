@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { escapeIlike } from '@/lib/problem-bank/queries';
+import { splitWorkTitles } from '@/lib/problem-bank/work-title';
 import { searchPassagesByTitle, type PassagePickRow } from '@/lib/problem-bank/passage-search';
 import { searchReferenceTexts } from '@/lib/reference-texts/queries';
 import type { ReferenceTextListItem } from '@/types/reference-text';
@@ -121,13 +122,17 @@ export async function fetchReferenceCandidates(
 ): Promise<CandidateResult> {
   const jobs: (() => Promise<CandidateHit[]>)[] = [];
 
-  if (signals.title) {
-    const pattern = `%${escapeIlike(signals.title)}%`;
+  // ⚠️ **작품마다 따로 찾는다**(sql/33). `(가)(나)` 지문을 불러오면 작품명 칸이
+  //    '먼 후일 · 독은 아름답다' 처럼 이어 붙은 값인데, 그대로 `ilike` 하면 그런 이름의
+  //    자료는 없어 **하나도 안 걸린다** — 두 작품의 개념지가 다 있는데도 그렇다.
+  //    같은 자료가 두 작품으로 걸려 와도 `rankReferenceCandidates` 가 신호를 한 번만 센다
+  for (const title of splitWorkTitles(signals.title)) {
+    const pattern = `%${escapeIlike(title)}%`;
 
     jobs.push(async () => {
       const { data, error } = await sheetQuery().ilike('title', pattern);
       if (error) throw error;
-      return sheetHits((data ?? []) as SheetRow[], 'title', `제목에 '${signals.title}'`);
+      return sheetHits((data ?? []) as SheetRow[], 'title', `제목에 '${title}'`);
     });
 
     // 본문에 작품명이 나오는 개념지 — 제목이 '1단원 정리' 인 개념지가 이 길로 걸린다.
@@ -135,30 +140,26 @@ export async function fetchReferenceCandidates(
     jobs.push(async () => {
       const { data, error } = await sheetQuery().ilike('editor_html', pattern);
       if (error) throw error;
-      return sheetHits((data ?? []) as SheetRow[], 'body', `본문에 '${signals.title}'`);
+      return sheetHits((data ?? []) as SheetRow[], 'body', `본문에 '${title}'`);
     });
 
     jobs.push(async () => {
-      const rows = await searchReferenceTexts(
-        signals.title, 'title', QUIZ_REFERENCE_CANDIDATE_LIMIT,
-      );
-      return textHits(rows, 'title', `제목에 '${signals.title}'`);
+      const rows = await searchReferenceTexts(title, 'title', QUIZ_REFERENCE_CANDIDATE_LIMIT);
+      return textHits(rows, 'title', `제목에 '${title}'`);
     });
 
     jobs.push(async () => {
       const rows = await searchPassagesByTitle(
-        signals.title, signals.excludePassageId, QUIZ_REFERENCE_CANDIDATE_LIMIT,
+        title, signals.excludePassageId, QUIZ_REFERENCE_CANDIDATE_LIMIT,
       );
-      return passageHits(rows, `제목에 '${signals.title}'`);
+      return passageHits(rows, `제목에 '${title}'`);
     });
   }
 
-  if (signals.author) {
+  for (const author of splitWorkTitles(signals.author)) {
     jobs.push(async () => {
-      const rows = await searchReferenceTexts(
-        signals.author, 'author', QUIZ_REFERENCE_CANDIDATE_LIMIT,
-      );
-      return textHits(rows, 'author', `지은이 '${signals.author}'`);
+      const rows = await searchReferenceTexts(author, 'author', QUIZ_REFERENCE_CANDIDATE_LIMIT);
+      return textHits(rows, 'author', `지은이 '${author}'`);
     });
   }
 

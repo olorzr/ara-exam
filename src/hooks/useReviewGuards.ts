@@ -1,6 +1,12 @@
 'use client';
 
 import { useCallback } from 'react';
+import { joinWorkTitles, normalizePassageWorks } from '@/lib/problem-bank/work-title';
+import type { PassageWork } from '@/types/problem-bank';
+
+/** 딸린 문항까지 움직이는 변경인가 — 제목 목록만 본다(useProblemReview 와 같은 규칙) */
+const titlesOf = (works: readonly PassageWork[]) =>
+  joinWorkTitles(normalizePassageWorks(works).map((w) => w.title));
 import type { useProblemReview } from './useProblemReview';
 
 /**
@@ -13,7 +19,7 @@ import type { useProblemReview } from './useProblemReview';
  * 셋의 규칙이 서로 다르다:
  *  - **지문 삭제** — 딸린 문항을 다시 읽으므로 다른 카드가 다 날아간다. 지우는 카드
  *    자신은 어차피 없어지므로 셈에서 뺀다.
- *  - **지문 저장** — 작품명을 바꿀 때만, 그리고 **그 지문에 딸린 문항**만 날아간다.
+ *  - **지문 저장** — 작품**명**을 바꿀 때만, 그리고 **그 지문에 딸린 문항**만 날아간다.
  *    개수를 부풀려 겁주지 않는다.
  *  - **지문 합치기** — 문항이 지문을 옮겨 가고 한 지문이 사라진다. 좁힐 수 없다.
  */
@@ -52,8 +58,9 @@ export function useReviewGuards(
     patch: Parameters<typeof savePassage>[1],
   ) => {
     const passage = passages.find((p) => p.id === passageId);
-    const titleChanged = patch.title !== undefined && passage && patch.title !== passage.title;
-    if (titleChanged) {
+    const titlesChanged = patch.works !== undefined && passage
+      && titlesOf(patch.works) !== titlesOf(passage.works ?? []);
+    if (titlesChanged) {
       // 실제로 영향받는 것은 **이 지문에 딸린 문항**뿐이다 — 개수를 부풀려 겁주지 않는다
       const affected = problems
         .filter((p) => p.passage_id === passageId && dirtyIds.has(p.id));

@@ -113,12 +113,24 @@ describe('buildProblemOcrPrompt', () => {
 
   it('작품명·지은이를 읽으라고 한다 — 스키마에만 있고 설명이 없으면 모델이 비워 둔다', () => {
     expect(prompt).toContain('[작품]');
+    expect(prompt).toContain('works');
     expect(prompt).toContain('title');
     expect(prompt).toContain('author');
-    expect(prompt).toContain('work_title');
     // 감싸는 기호를 벗겨야 같은 작품이 여러 갈래로 쌓이지 않는다
     expect(prompt).toContain('「동백꽃」');
     expect(prompt).toContain('지어내지 않는다');
+  });
+
+  it('여러 편이면 **원소를 나눠** 내라고 한다 — 이어 적으면 가짜 작품 하나가 쌓인다', () => {
+    expect(prompt).toContain('한 칸에 두 편을 이어 적지 않는다');
+    expect(prompt).toContain('원소를 두 개');
+    // (가)(나) 표시를 label 로 받아야 화면에서 어느 편인지 짚을 수 있다
+    expect(prompt).toContain('label 에 괄호 없이 적는다');
+  });
+
+  it('문항은 좁혀 물을 때만 작품을 적게 한다 — 기본은 지문에서 물려받는다', () => {
+    expect(prompt).toContain('문항의 works 는 거의 언제나 빈 목록');
+    expect(prompt).toContain('한 편만 콕 집어 물을 때만');
   });
 
   it('인쇄되지 않은 문학 작품도 알아본 대로 적게 한다 — 옛 문턱에서는 늘 비어 있었다', () => {

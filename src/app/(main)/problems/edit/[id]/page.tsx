@@ -10,9 +10,10 @@ import { useSourceTrees } from '@/hooks/useSourceTrees';
 import {
   ConflictError, deleteProblem, setProblemVerified, updateProblem, type ProblemPatch,
 } from '@/lib/problem-bank/mutations';
+import { fetchPassagesByIds } from '@/lib/problem-bank/detail-queries';
 import { fetchProblem, fetchSource } from '@/lib/problem-bank/queries';
 import { sourceLabel } from '@/lib/problem-bank/source-label';
-import type { Problem, ProblemSource } from '@/types/problem-bank';
+import type { PassageWork, Problem, ProblemSource } from '@/types/problem-bank';
 
 /**
  * 문항 한 개 편집 (`/problems/edit/[id]`).
@@ -25,6 +26,11 @@ export default function ProblemEditPage() {
 
   const [problem, setProblem] = useState<Problem | null>(null);
   const [source, setSource] = useState<ProblemSource | null>(null);
+  /**
+   * 딸린 지문에 실린 작품들 — 이 문항이 **어느 편을 묻는지** 체크로 고르게 한다.
+   * 못 읽으면 빈 배열이고, 그때 카드는 작품명 자유 입력으로 떨어진다(거짓 목록을 보이지 않는다).
+   */
+  const [passageWorks, setPassageWorks] = useState<PassageWork[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   const { areaTree, unitTree } = useSourceTrees(source);
@@ -39,6 +45,11 @@ export default function ProblemEditPage() {
         if (row) {
           const src = await fetchSource(row.source_id);
           if (alive) setSource(src);
+          if (row.passage_id) {
+            // 지문을 못 읽어도 편집은 막지 않는다 — 작품 칸만 자유 입력이 된다
+            const [passage] = await fetchPassagesByIds([row.passage_id]).catch(() => []);
+            if (alive && passage) setPassageWorks(passage.works ?? []);
+          }
         }
       } catch (e) {
         if (alive) toast.error(e instanceof Error ? e.message : '불러오지 못했어요.');
@@ -57,10 +68,11 @@ export default function ProblemEditPage() {
   const save = async (patch: ProblemPatch): Promise<string | null> => {
     if (!problem) return null;
     try {
-      const updatedAt = await updateProblem(problem.id, problem.updated_at, patch);
-      setProblem({ ...problem, ...patch, updated_at: updatedAt } as Problem);
+      // 작품은 DB 가 확정한 값으로 맞춘다(빈 목록을 보내면 지문에서 물려받는다)
+      const saved = await updateProblem(problem.id, problem.updated_at, patch);
+      setProblem({ ...problem, ...patch, ...saved } as Problem);
       toast.success('저장했어요.');
-      return updatedAt;
+      return saved.updated_at;
     } catch (e) {
       toast.error(e instanceof ConflictError ? e.message : '저장하지 못했어요.');
       return null;
@@ -102,6 +114,7 @@ export default function ProblemEditPage() {
       <ProblemEditorCard
         key={problem.id}
         problem={problem}
+        passageWorks={passageWorks}
         areaTree={areaTree}
         unitTree={unitTree}
         selected

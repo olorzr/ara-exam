@@ -92,8 +92,9 @@ export async function insertPassages(
     id: p.id,
     source_id: sourceId,
     label: p.label,
-    title: p.title,
-    author: p.author,
+    // ⚠️ `title`/`author` 는 **보내지 않는다** — DB 트리거가 이 목록에서 만든다(sql/33).
+    //    보내면 파생 문자열이 목록보다 먼저 굳어 둘이 어긋난다(`search_text` 와 같은 계약)
+    works: p.works,
     html: p.html,
     page_no: p.page_no,
     bbox: p.box ? { column: p.box.column, top: p.box.top, bottom: p.box.bottom } : null,
@@ -141,7 +142,9 @@ export async function insertProblems(
     area_path: p.area_path,
     unit_path: p.unit_path,
     grammar_paths: p.grammar_paths,
-    work_title: p.work_title,
+    // 빈 배열이면 '지문 전체' — 트리거가 딸린 지문의 작품으로 채운다(sql/33).
+    // `work_title` 파생 문자열도 트리거가 만든다
+    work_titles: p.work_titles,
     page_no: p.page_no,
     bbox: p.box ? { column: p.box.column, top: p.box.top, bottom: p.box.bottom } : null,
     image_path: imagePaths.get(p.id) ?? '',

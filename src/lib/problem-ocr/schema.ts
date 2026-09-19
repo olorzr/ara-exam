@@ -1,6 +1,7 @@
-import type { QuestionType } from '@/types/problem-bank';
+import type { PassageWork, QuestionType } from '@/types/problem-bank';
 import {
   OCR_HTML_MAX, OCR_MAX_FIGURES_PER_ITEM, OCR_MAX_ITEMS_PER_BATCH, OCR_MAX_WARNINGS,
+  OCR_MAX_WORKS_PER_ITEM,
 } from './constants';
 import type { DraftWarning } from './warnings';
 
@@ -43,6 +44,30 @@ export interface OcrFigure extends OcrBox {
   page: number;
 }
 
+/**
+ * 모델이 읽어 낸 작품 한 편.
+ *
+ * ⚠️ 예전에는 `title`·`author` 한 쌍이었고, 여러 편이 실린 지문은 `' · '` 로 **이어 적게**
+ *    했다(~2026-09-19). 그러면 작품 트리에 그 이름의 가짜 작품이 생기고 한 편만 골라서는
+ *    그 문항이 안 나온다 — 그래서 **낱개 목록**으로 바꿨다(sql/33).
+ */
+export interface OcrWork {
+  /** 시험지의 구분 표시 — 괄호 없이 '가'·'나'. 한 편뿐이면 '' */
+  label: string | null;
+  /** 작품명·글 제목 */
+  title: string | null;
+  author: string | null;
+  /**
+   * 그 작품명을 **어디서 얻었는가** — 시험지에 인쇄돼 있었으면 `'printed'`,
+   * 본문을 보고 알아봤으면 `'inferred'`. 모르면 null.
+   *
+   * ⚠️ 이 필드가 **'확인해 주세요' 경고의 근거**다(파서가 만든다). 없으면 모델이 경고를
+   *    적어 주기를 바라는 수밖에 없는데, 그러면 알아낸 이름과 인쇄된 이름을 화면에서
+   *    구별할 수 없다(코덱스 리뷰 2R).
+   */
+  title_source: 'printed' | 'inferred' | null;
+}
+
 /** 모델이 읽어 낸 항목 하나 (지문 또는 문항) */
 export interface OcrItem {
   kind: 'passage' | 'problem';
@@ -57,18 +82,18 @@ export interface OcrItem {
   number: number | null;
   /** 지문 머리글 범위 ('[1~3]') */
   label: string | null;
-  /** 작품명·글 제목 */
-  title: string | null;
-  author: string | null;
   /**
-   * 그 작품명을 **어디서 얻었는가** — 시험지에 인쇄돼 있었으면 `'printed'`,
-   * 본문을 보고 알아봤으면 `'inferred'`. 제목이 없으면 null.
+   * 이 항목의 작품들.
    *
-   * ⚠️ 이 필드가 **'확인해 주세요' 경고의 근거**다(파서가 만든다). 없으면 모델이 경고를
-   *    적어 주기를 바라는 수밖에 없는데, 그러면 알아낸 이름과 인쇄된 이름을 화면에서
-   *    구별할 수 없다(코덱스 리뷰 2R).
+   * ⚠️ **지문과 문항의 뜻이 다르다.** 지문은 실린 작품을 **전부** 담고, 문항은 딸린 지문의
+   *    작품 가운데 **그 문항이 좁혀 묻는 것만** 담는다(전부를 묻거나 모르면 빈 배열).
+   *    지문 없는 단독 문항은 알아본 작품을 담는다.
+   *
+   * ⚠️ **JSON 스키마와 모양이 다르다**(`grammar_paths` 와 같은 사정). 모델에게는 원소마다
+   *    `title_source` 를 함께 받지만, 그 값은 `parse.ts` 가 '확인해 주세요' 경고를 만드는 데
+   *    쓰고 **버린다** — 저장할 값이 아니다. 이 타입은 **다듬은 뒤**의 모양이다.
    */
-  title_source: 'printed' | 'inferred' | null;
+  works: PassageWork[];
   /** 지문 본문 HTML */
   html: string;
   /** 앞 쪽에서 이어진 지문(머리글이 없다) */
@@ -92,7 +117,6 @@ export interface OcrItem {
    * (figures[0] 이 1번).
    */
   figures: OcrFigure[];
-  work_title: string | null;
   /** 영역 세트 트리의 이름 경로. 해당 없으면 빈 배열 */
   area_path: string[];
   /** 교과서 단원 트리의 이름 경로 [대단원, 소단원]. 해당 없으면 빈 배열 */
@@ -149,9 +173,9 @@ export const PROBLEM_OCR_SCHEMA = {
         type: 'object',
         additionalProperties: false,
         required: [
-          'kind', 'ref', 'page', 'box', 'passage_ref', 'number', 'label', 'title', 'author',
-          'title_source', 'html', 'continued', 'continues', 'question_type', 'stem_html', 'choices',
-          'answer', 'has_figure', 'figures', 'work_title', 'area_path', 'unit_path',
+          'kind', 'ref', 'page', 'box', 'passage_ref', 'number', 'label', 'works',
+          'html', 'continued', 'continues', 'question_type', 'stem_html', 'choices',
+          'answer', 'has_figure', 'figures', 'area_path', 'unit_path',
           'grammar_paths',
         ],
         properties: {
@@ -171,9 +195,22 @@ export const PROBLEM_OCR_SCHEMA = {
           passage_ref: { ...nullableString, maxLength: 16 },
           number: { ...nullableInteger, minimum: 1 },
           label: { ...nullableString, maxLength: 40 },
-          title: { ...nullableString, maxLength: 120 },
-          author: { ...nullableString, maxLength: 60 },
-          title_source: { type: ['string', 'null'], enum: ['printed', 'inferred', null] },
+          // 작품은 **낱개**다 — (가)(나) 지문이면 원소 둘. 한 지문에 다섯 편까지 본 적 있다
+          works: {
+            type: 'array',
+            maxItems: OCR_MAX_WORKS_PER_ITEM,
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['label', 'title', 'author', 'title_source'],
+              properties: {
+                label: { ...nullableString, maxLength: 4 },
+                title: { ...nullableString, maxLength: 120 },
+                author: { ...nullableString, maxLength: 60 },
+                title_source: { type: ['string', 'null'], enum: ['printed', 'inferred', null] },
+              },
+            },
+          },
           html: { type: 'string', maxLength: OCR_HTML_MAX },
           continued: { type: 'boolean' },
           continues: { type: 'boolean' },
@@ -203,7 +240,6 @@ export const PROBLEM_OCR_SCHEMA = {
               },
             },
           },
-          work_title: { ...nullableString, maxLength: 120 },
           // 빈 배열이 "해당 없음"이다 — nullable 배열은 엄격 모드에서 다루기 번거롭다
           area_path: {
             type: 'array',

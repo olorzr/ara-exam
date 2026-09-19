@@ -41,9 +41,9 @@ export function yetHangulPages(items: readonly OcrItem[]): number[] {
 export function notationWarning(item: OcrItem): DraftWarning | null {
   if (!textsOf(item).some(hasUnconvertedNotation)) return null;
   const { ref, kind, page, number } = item;
-  // ⚠️ `critical` — 상한이 차도 버리지 않는다(코덱스 리뷰). 못 바꾼 표기는 **틀린 글자가
+  // ⚠️ `keep: 'always'` — 상한이 차도 버리지 않는다(코덱스 리뷰). 못 바꾼 표기는 **틀린 글자가
   //    그대로 인쇄되는** 자리라, 경고가 잘리면 검수 카드에 아무 표시 없이 남는다
-  return { ref, kind, page, number, critical: true, message: UNCONVERTED_NOTATION_WARNING };
+  return { ref, kind, page, number, keep: 'always', message: UNCONVERTED_NOTATION_WARNING };
 }
 
 /**
@@ -54,6 +54,6 @@ export function notationWarning(item: OcrItem): DraftWarning | null {
 export function yetHangulPageWarnings(items: readonly OcrItem[]): DraftWarning[] {
   // 대조 검증을 건너뛴 쪽이라 사람 눈이 유일한 안전망이다 — 상한에 밀리면 안 된다
   return yetHangulPages(items).map((page) => ({
-    page, critical: true, message: yetHangulPageWarning(page),
+    page, keep: 'always', message: yetHangulPageWarning(page),
   }));
 }

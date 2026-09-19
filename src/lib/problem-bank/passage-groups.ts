@@ -50,3 +50,41 @@ export function groupRowsByPassage<T extends { passage_id: string | null }>(
   if (orphans.length > 0) groups.push({ passageId: null, rows: orphans });
   return groups;
 }
+
+/** 고른 작품만 묻는 문항과, 다른 작품까지 함께 묻는 문항 */
+export interface WorkSpanSplit<T> {
+  /** 고른 작품 하나만 묻는 문항들 */
+  only: T[];
+  /** 고른 작품을 **다른 작품과 함께** 묻는 문항들 */
+  shared: T[];
+}
+
+/**
+ * 묶음 안의 문항을 **엮인 작품 수**로 가른다 (순수 함수).
+ *
+ * `(가) 진달래꽃 / (나) 엄마 걱정` 지문에서 `(가)와 (나)의 공통점은?` 같은 문항은 두 작품을
+ * 함께 묻는다. '진달래꽃' 으로 훑을 때 그런 문항이 나머지와 섞여 있으면, 진달래꽃 하나만
+ * 가르치는 자리에 쓸 수 없는 문항을 골라 담게 된다 — 그래서 따로 세워 준다.
+ *
+ * ⚠️ 고른 작품이 없으면(작품 조건이 아닐 때) 가르지 않는다 — 기준이 없으면 '함께 묻는' 이
+ *    무슨 뜻인지 정할 수 없다.
+ * @param rows - 한 지문 묶음의 문항들
+ * @param workTitle - 지금 훑고 있는 작품명
+ * @returns 가른 두 묶음 (등장 순서는 그대로)
+ */
+export function splitByWorkSpan<T extends { work_titles?: string[] | null }>(
+  rows: readonly T[],
+  workTitle: string,
+): WorkSpanSplit<T> {
+  if (!workTitle) return { only: [...rows], shared: [] };
+  const only: T[] = [];
+  const shared: T[] = [];
+  for (const row of rows) {
+    const titles = row.work_titles ?? [];
+    // 고른 작품 말고 다른 작품이 붙어 있으면 '함께 묻는' 문항이다.
+    // 작품명이 아예 없는 문항(지문에 작품이 없다)은 가를 근거가 없어 그대로 둔다
+    if (titles.length > 1 && titles.includes(workTitle)) shared.push(row);
+    else only.push(row);
+  }
+  return { only, shared };
+}

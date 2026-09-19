@@ -4,14 +4,15 @@ import { useEffect, useState } from 'react';
 import { ArrowUpToLine, Image as ImageIcon, Trash2, Type } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import ProblemHtmlEditor from '@/components/problem-editor/ProblemHtmlEditor';
+import PassageWorksEditor from './PassageWorksEditor';
 import PassageContinueButton from './PassageContinueButton';
 import FigureStrip from './FigureStrip';
 import { useFigureEditor } from '@/hooks/useFigureEditor';
 import { useTrackedState } from '@/hooks/useTrackedState';
-import type { Bbox } from '@/types/problem-bank';
+import { normalizePassageWorks, worksKey } from '@/lib/problem-bank/work-title';
+import type { Bbox, PassageWork } from '@/types/problem-bank';
 import AreaPathPicker from './AreaPathPicker';
 import type { AreaTreeNode } from '@/lib/problem-bank/area-tree';
 import { UNIT_DEPTH_LABELS } from '@/lib/problem-bank/unit-tree';
@@ -71,8 +72,8 @@ export default function PassageEditorCard({
   // 값과 함께 최신 ref 를 든다 — 그림을 붙이는 동안 친 글을 잃지 않으려면
   // 다 올린 **뒤에** 본문을 읽어야 한다
   const [html, setHtml, bodyRef] = useTrackedState(passage.html);
-  const [title, setTitle] = useState(passage.title);
-  const [author, setAuthor] = useState(passage.author);
+  // 값과 함께 최신 ref 를 든다 — 저장이 도는 동안 고친 줄을 잃지 않으려면 그때의 값과 견줘야 한다
+  const [works, setWorks, worksRef] = useTrackedState<PassageWork[]>(passage.works ?? []);
   const [area, setArea] = useState<string[]>(passage.area_path);
   const [unit, setUnit] = useState<string[]>(passage.unit_path);
   const [figurePaths, setFigurePaths, pathsRef] = useTrackedState<string[]>(
@@ -119,8 +120,9 @@ export default function PassageEditorCard({
 
   /** 저장하지 않은 수정이 있는가 — 문항 카드와 같은 이유로 화면에 알린다 */
   const dirty = html !== passage.html
-    || title !== passage.title
-    || author !== passage.author
+    // ⚠️ **다듬은 뒤로** 견준다. DB 에는 다듬은 값이 들어 있어서(「동백꽃」 → 동백꽃),
+    //    친 그대로 견주면 저장이 끝나자마자 '저장 안 됨' 배지가 그대로 남는다
+    || worksKey(normalizePassageWorks(works)) !== worksKey(passage.works ?? [])
     // ⚠️ 그림 경로와 밀린 출제 방식도 센다. 그림을 뺐는데 저장이 실패하면 화면에서만
     //    사라진 채 '저장 안 됨' 표시가 안 떠, 검수를 마친 뒤 되살아난다
     || backToText
@@ -138,14 +140,21 @@ export default function PassageEditorCard({
     //    눌러 고칠 길이 이것뿐이다(자리표시자만 남고 경로가 안 들어간 상태를 푼다)
     // 보낼 때의 값을 붙잡아 둔다 — 저장이 도는 동안 이어 읽기가 표시를 새로 켤 수 있다
     const sending = backToText;
+    // 보낼 때의 작품 목록을 붙잡아 둔다 — 저장이 도는 동안 줄을 더 고쳤을 수 있다
+    const sentWorks = worksRef.current;
+    const tidyWorks = normalizePassageWorks(sentWorks);
     const ok = await onSave({
-      html, title, author, area_path: area, unit_path: unit, figure_paths: figurePaths,
+      html, works: tidyWorks, area_path: area, unit_path: unit, figure_paths: figurePaths,
       // 이어 읽어 붙였으면 글로 되돌린다 — 잘라 둔 이미지는 시작 쪽만 담고 있다
       ...(sending ? { render_mode: 'text' as const } : {}),
     });
     // ⚠️ **성공했고 실제로 보냈을 때만** 내린다. 실패했는데 내리면 다시 눌러도 이미지
     //    출제인 채로 남아 되찾은 글이 영영 인쇄물에 안 나간다
     if (ok && sending) setBackToText(false);
+    // 다듬은 값으로 칸을 맞춘다 — '(가)' 로 친 것이 DB 에는 '가' 로 들어가므로,
+    // 그냥 두면 저장했는데도 화면이 계속 '저장 안 됨' 이라고 말한다.
+    // ⚠️ 저장이 도는 사이 더 고쳤으면 **그대로 둔다** — 화면을 덮으면 그때 친 것이 사라진다
+    if (ok && worksKey(worksRef.current) === worksKey(sentWorks)) setWorks(tidyWorks);
     setSaving(false);
   };
 
@@ -245,18 +254,7 @@ export default function PassageEditorCard({
       )}
 
       <div className="space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs text-gray-500">작품명</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} className="h-8 text-sm" />
-            {/* 트리거가 딸린 문항의 작품명까지 함께 바꾼다 — 모르고 고치면 놀란다 */}
-            <p className="text-[11px] text-gray-400">딸린 문항의 작품명도 함께 바뀝니다</p>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs text-gray-500">지은이</Label>
-            <Input value={author} onChange={(e) => setAuthor(e.target.value)} className="h-8 text-sm" />
-          </div>
-        </div>
+        <PassageWorksEditor works={works} onChange={setWorks} />
 
         <div className="space-y-1">
           <Label className="text-xs text-gray-500">본문</Label>

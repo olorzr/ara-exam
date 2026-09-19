@@ -130,6 +130,8 @@ export default function ReviewCardList({
             // 옛 입력이 남은 채 새 토큰으로 저장되면 남의 수정을 덮어쓴다
             key={`${problem.id}:${mountKey(problem.id)}`}
             problem={problem}
+            // 딸린 지문의 작품을 넘겨 '어느 편을 묻는가' 를 체크로 고르게 한다
+            passageWorks={passages.find((p) => p.id === problem.passage_id)?.works}
             areaTree={areaTree}
             unitTree={unitTree}
             issues={issues.get(problem.id)}

@@ -1,15 +1,15 @@
-import type { QuestionType } from '@/types/problem-bank';
+import type { PassageWork, QuestionType } from '@/types/problem-bank';
 import { OCR_MAX_MERGED_WARNINGS } from './constants';
 import type { OcrBox, OcrDraft } from './schema';
 import {
-  capWarnings, itemTargetLabel, resolveDraftWarning, warningKey,
+  capWarnings, dropStaleWarnings, itemTargetLabel, resolveDraftWarning, warningKey,
   type OcrWarning, type OcrWarningTarget,
 } from './warnings';
 import { passageKeyIn, problemKeyIn, textOf } from './merge-keys';
 import {
   alreadyContains, appendFragment, fillGaps, fillPassageGaps, joinFragments,
   replaceFragment, toPassage, toProblem,
-  type FragmentRef, type PassageWork,
+  type FragmentRef, type PassageBuild,
 } from './merge-fill';
 
 /**
@@ -28,6 +28,18 @@ import {
  *    유형이 바뀌면 정답의 의미가 달라지기 때문이다('1' 은 객관식에서만 선지 번호다).
  */
 
+/**
+ * 작품 목록을 **차례와 상관없이** 견줄 열쇠.
+ *
+ * 겹쳐 읽은 묶음이 같은 두 편을 `(가)(나)` 와 `(나)(가)` 순으로 낼 수 있는데, 그것은
+ * 같은 말이다 — 차례로 견주면 정상적인 겹쳐 읽기가 '다르게 냈다' 로 보인다(코덱스 리뷰 6R).
+ * @param titles - 작품명 목록
+ * @returns 비교용 문자열
+ */
+function workSetKey(titles: readonly string[]): string {
+  return [...new Set(titles)].sort().join('\u0000');
+}
+
 /** 잘라 낼 그림 하나 — 어느 쪽의 어느 자리인가 */
 export interface FigureRegion {
   page: number;
@@ -38,8 +50,14 @@ export interface FigureRegion {
 export interface PassageDraft {
   id: string;
   label: string;
-  title: string;
-  author: string;
+  /**
+   * 이 지문에 실린 작품들.
+   *
+   * ⚠️ 이 축만 **합집합**으로 합친다(`grammar_paths` 와 같은 사정) — (가)(나) 지문이
+   *    쪽을 넘어가면 앞 조각은 (가)만, 뒷 조각은 (나)만 보인다. '비어 있을 때만 채운다' 를
+   *    그대로 쓰면 뒤에서 알아본 편이 통째로 버려진다.
+   */
+  works: PassageWork[];
   /**
    * 이어 붙인 본문.
    *
@@ -84,7 +102,13 @@ export interface ProblemDraft {
    *    타입에만 남겨 둔 자리다.
    */
   score: number | null;
-  work_title: string;
+  /**
+   * 이 문항이 좁혀 묻는 작품들. **빈 배열이면 '지문 전체'** 이고 DB 트리거가 채운다(sql/33).
+   *
+   * ⚠️ 지문과 달리 **합집합이 아니다** — 묶음마다 다른 한 편을 냈다면 그것은 합쳐야 할
+   *    조각이 아니라 **의견이 갈린 것**이라, 문항의 규칙대로 먼저 온 것이 이긴다.
+   */
+  work_titles: string[];
   area_path: string[];
   /** 교과서 단원 이름 경로 [대단원, 소단원] */
   unit_path: string[];
@@ -131,10 +155,10 @@ export interface MergeOptions {
  *     지문 하나로 떨어져 나가** 문항이 어느 쪽에도 온전히 붙지 않는다.
  *     붙이기 전에 `alreadyContains` 로 중복을 거른다.
  */
-function findOpenPassage(works: PassageWork[], page: number): PassageWork | undefined {
-  let fallback: PassageWork | undefined;
-  for (let i = works.length - 1; i >= 0; i -= 1) {
-    const w = works[i];
+function findOpenPassage(builds: PassageBuild[], page: number): PassageBuild | undefined {
+  let fallback: PassageBuild | undefined;
+  for (let i = builds.length - 1; i >= 0; i -= 1) {
+    const w = builds[i];
     if (w.draft.lastPage !== page - 1) continue;
     if (w.draft.open) return w;
     if (!fallback) fallback = w;
@@ -153,16 +177,35 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
   const warnings: OcrWarning[] = [...(opts.leadingWarnings ?? [])];
   const seenWarnings = new Set(warnings.map(warningKey));
 
-  const works: PassageWork[] = [];
+  const builds: PassageBuild[] = [];
   const problems: ProblemDraft[] = [];
   // 키 → **조각 자리**. 합쳐 둔 지문이 아니라 조각을 가리켜야
   // 겹쳐 읽은 같은 조각끼리 길이를 견줄 수 있다
   const fragmentByKey = new Map<string, FragmentRef>();
   const problemByKey = new Map<string, ProblemDraft>();
+  /**
+   * 문항 id → 모델이 낸 작품 후보들(묶음 순서).
+   *
+   * ⚠️ 문항의 작품은 **먼저 온 것이 이기는데**, 그 값이 딸린 지문에 없는 이름일 수 있다
+   *    (앞 묶음에서 참조를 못 풀어 지문 없이 읽힌 경우가 그렇다). 그때 그냥 걸러 내면
+   *    빈 목록이 되어 '지문 전체' 로 **넓어지고**, 뒤 묶음이 제대로 낸 좁힘이 버려진다.
+   *    후보를 들고 있다가 지문이 확정된 뒤 **맞는 것을 고른다**(코덱스 리뷰 2R)
+   */
+  const workCandidates = new Map<string, string[][]>();
 
   /**
    * 경고를 담는다 — 같은 말이라도 **대상이 다르면 다른 경고**다(문항마다 알려야 한다).
    */
+  /** 이 묶음이 이 문항에 대해 낸 작품 목록을 후보로 담아 둔다 */
+  const rememberWorks = (id: string, item: { works: { title: string }[] }) => {
+    if (item.works.length === 0) return;
+    const titles = item.works.map((w) => w.title);
+    const seen = workCandidates.get(id) ?? [];
+    // ⚠️ **차례는 뜻이 아니다** — `[가, 나]` 와 `[나, 가]` 는 같은 말이다(코덱스 리뷰 5R)
+    if (seen.some((c) => workSetKey(c) === workSetKey(titles))) return;
+    workCandidates.set(id, [...seen, titles]);
+  };
+
   const warn = (warning: OcrWarning) => {
     const key = warningKey(warning);
     if (seenWarnings.has(key)) return;
@@ -245,7 +288,7 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
 
       // 앞 쪽에서 이어지는 조각이면 그 지문에 붙인다
       if (item.continued) {
-        const open = findOpenPassage(works, item.page);
+        const open = findOpenPassage(builds, item.page);
         if (open) {
           // 앞 묶음이 이 지문을 통째로 읽어 뒷부분까지 이미 담았을 수 있다.
           // 그때 또 붙이면 같은 글이 두 번 인쇄된다 — 참조만 잇고 넘어간다
@@ -296,10 +339,10 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
         });
       }
 
-      const work = toPassage(item, newId());
-      works.push(work);
-      fragmentByKey.set(key, { work, index: 0 });
-      refToId.set(item.ref, work.draft.id);
+      const build = toPassage(item, newId());
+      builds.push(build);
+      fragmentByKey.set(key, { work: build, index: 0 });
+      refToId.set(item.ref, build.draft.id);
     }
 
     // 2) 문항
@@ -317,6 +360,7 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
         fillGaps(existing, item);
         // 지문은 나중에야 온전히 보이는 경우가 있다(앞 묶음에서는 잘려 있었다)
         if (!existing.passage_id && passageId) existing.passage_id = passageId;
+        rememberWorks(existing.id, item);
         refToId.set(item.ref, existing.id);
         continue;
       }
@@ -324,6 +368,7 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
       const problem = toProblem(item, newId(), passageId);
       problems.push(problem);
       problemByKey.set(key, problem);
+      rememberWorks(problem.id, item);
       refToId.set(item.ref, problem.id);
     }
 
@@ -333,7 +378,7 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
 
   // 조각을 이제 합친다 — 조각별 비교가 다 끝난 뒤여야 한다.
   // 그림 번호 밀기도 여기서 **한 번만** 한다(joinFragments)
-  const passages = works.map((w) => {
+  const passages = builds.map((w) => {
     const { droppedFigures, ...joined } = joinFragments(w);
     // ⚠️ 상한에 걸려 버린 그림은 **반드시 알린다.** 크롭은 남은 것만 보므로 여기서
     //    말하지 않으면 그 그림이 어디에도 안 나오고 아무 표시도 없다
@@ -351,6 +396,69 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
     }
     return { ...w.draft, ...joined };
   });
+
+  // ⚠️ 문항의 작품은 **지문에 실린 작품 가운데 하나**여야 한다. 모델이 지문에 없는 이름을
+  //    문항에 적으면(본문을 보고 지어낸 경우다) 작품 트리에 그 지문과 무관한 잎이 하나 생기고,
+  //    DB 전파 트리거는 그것을 '사람이 좁혀 적은 값' 으로 보아 **영영 보존한다**.
+  // ⚠️ **파서가 아니라 여기서** 한다(코덱스 리뷰). 묶음 하나의 지문 조각에는 실린 작품이 다
+  //    안 보일 수 있어서(쪽을 넘어가는 (가)(나) 지문), 그때 대조하면 문항이 좁혀 적은 편이
+  //    버려져 **지문 전체를 묻는 문항으로 넓어진다** — 합집합이 확정된 뒤여야 한다.
+  //    지문이 작품을 모르면 대조할 근거가 없어 건너뛴다
+  const worksByPassage = new Map(passages.map((p) => [p.id, p.works.map((w) => w.title)]));
+  for (const problem of problems) {
+    if (!problem.passage_id || problem.work_titles.length === 0) continue;
+    const allowed = worksByPassage.get(problem.passage_id) ?? [];
+    if (allowed.length === 0) continue;
+
+    const at: OcrWarningTarget = {
+      kind: 'problem',
+      id: problem.id,
+      page: problem.page_no,
+      label: itemTargetLabel({ kind: 'problem', page: problem.page_no, number: problem.number }),
+    };
+    /** 다른 묶음이 낸, **지문에 다 있는** 목록들 */
+    const usable = (workCandidates.get(problem.id) ?? [])
+      .filter((c) => c.length > 0 && c.every((t) => allowed.includes(t)));
+
+    const dropped = problem.work_titles.filter((t) => !allowed.includes(t));
+    let told = false;
+    if (dropped.length > 0) {
+      // ⚠️ **살아남은 편이 하나라도 있으면 그것이 답이다**(코덱스 리뷰 4R). 다른 묶음의
+      //    온전한 후보를 먼저 보면, `[A, 엉뚱]` 이 `[A, B]` 로 **넓어져** 두 작품을 묻는
+      //    문항이 된다 — 좁힘은 사람이 되돌리기 어려운 쪽으로 틀리면 안 된다
+      const kept = problem.work_titles.filter((t) => allowed.includes(t));
+      // 하나도 안 남았을 때만 다른 묶음의 목록을 쓴다. 그냥 비우면 '지문 전체' 가 되어
+      // 맞는 좁힘을 두고도 엉뚱하게 넓은 문항이 된다.
+      // ⚠️ 고를 때는 **넓은 쪽**이다(코덱스 리뷰 6R): 너무 좁으면 그 작품으로 훑을 때 문항이
+      //    아예 안 나와 없는 줄 알지만, 너무 넓으면 눈으로 보고 뺄 수 있다.
+      //    `sort` 는 안정 정렬이라 같은 길이면 묶음 차례를 지킨다
+      const widest = [...usable].sort((a, b) => b.length - a.length)[0];
+      problem.work_titles = (kept.length > 0 ? kept : widest) ?? [];
+      warn({
+        // 값이 말없이 달라지는 자리라 상한에 밀리면 안 된다(옛한글 경고에만 자리를 내준다)
+        keep: 'merge',
+        message: `문항에 적힌 작품 '${dropped.join("', '")}' 이 딸린 지문에 없어 뺐어요. `
+          + '검수에서 확인해 주세요.',
+        targets: [at],
+      });
+      told = true;
+    }
+
+    // ⚠️ **묶음마다 다르게 냈으면** 먼저 온 것을 쓰되 그 사실을 알린다(코덱스 리뷰 5R).
+    //    조용히 첫 값을 굳히면, 첫 묶음이 잘못 좁혔을 때 원본과 맞춰 볼 실마리가 어디에도
+    //    남지 않는다 — 문항이 묻는 작품은 눈으로 한 번 보면 알 수 있다.
+    //    이미 '뺐어요' 로 짚었으면 더 말하지 않는다(그 카드는 이미 보러 간다)
+    if (told || problem.work_titles.length === 0) continue;
+    const mineKey = workSetKey(problem.work_titles);
+    const other = usable.find((c) => workSetKey(c) !== mineKey);
+    if (!other) continue;
+    warn({
+      keep: 'merge',
+      message: '겹쳐 읽은 묶음이 묻는 작품을 다르게 냈어요'
+        + `(${problem.work_titles.join(' · ')} / ${other.join(' · ')}). 원본과 맞춰 주세요.`,
+      targets: [at],
+    });
+  }
 
   // 지문이 끝내 안 닫혔으면 뒷부분이 빠졌을 수 있다 — 조용히 넘기지 않는다.
   // 개수만 세지 말고 **어느 지문인지** 짚는다(개수만으로는 찾을 방법이 없다)
@@ -372,5 +480,13 @@ export function mergeOcrDrafts(drafts: DraftWithPages[], opts: MergeOptions = {}
     });
   }
 
-  return { passages, problems, warnings: capWarnings(warnings, OCR_MAX_MERGED_WARNINGS) };
+  // ⚠️ **걷어내기가 상한보다 먼저**다 — 틀린 말을 남기고 맞는 말을 자르면 안 된다
+  return {
+    passages,
+    problems,
+    warnings: capWarnings(
+      dropStaleWarnings(warnings, problems, passages),
+      OCR_MAX_MERGED_WARNINGS,
+    ),
+  };
 }

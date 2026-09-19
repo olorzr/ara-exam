@@ -5,10 +5,10 @@ import type { OcrItem } from './schema';
 function item(over: Partial<OcrItem> = {}): OcrItem {
   return {
     kind: 'problem', ref: 'Q1', page: 1, box: null, passage_ref: null, number: 1,
-    label: null, title: null, author: null, title_source: null, html: '',
+    label: null, works: [], html: '',
     continued: false, continues: false,
     question_type: '객관식', stem_html: '', choices: [], answer: null, has_figure: false,
-    figures: [], work_title: null, area_path: [], unit_path: [], grammar_paths: [],
+    figures: [], area_path: [], unit_path: [], grammar_paths: [],
     ...over,
   };
 }

@@ -142,7 +142,9 @@ export default function ProblemCard({
 
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-500">
           <span>{sourceLabel(problem.source)}</span>
-          {problem.work_title && <span>· {problem.work_title}</span>}
+          {/* ⚠️ 파생 문자열(`work_title`)이 아니라 낱개로 찍는다 — `(가)(나)` 문항을
+              '먼 후일 · 독은 아름답다' 한 덩어리로 보이면 어느 작품 것인지 읽히지 않는다 */}
+          {(problem.work_titles ?? []).map((title) => <span key={title}>· {title}</span>)}
           {problem.unit_path.length > 0 && <span>· {unitPathLabel(problem.unit_path)}</span>}
           {problem.area_path.length > 0 && <span>· {areaPathLabel(problem.area_path)}</span>}
           {/* 문법은 여러 개가 붙으므로 경로의 **마지막 마디만** 칩으로 낸다 — 전체 경로를

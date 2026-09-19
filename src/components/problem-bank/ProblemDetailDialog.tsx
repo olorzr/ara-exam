@@ -10,6 +10,7 @@ import { fetchProblemDetail, type ProblemDetail } from '@/lib/problem-bank/detai
 import { sourceLabel } from '@/lib/problem-bank/source-label';
 import { unitPathLabel } from '@/lib/problem-bank/unit-tree';
 import PassageBodyView from './PassageBodyView';
+import PassageWorksLine from './PassageWorksLine';
 import ProblemBodyView from './ProblemBodyView';
 
 interface ProblemDetailDialogProps {
@@ -103,7 +104,8 @@ function DetailBody({ problemId }: { problemId: string }) {
           <Badge variant="outline">{shown.question_type}</Badge>
           {shown.status === '검수완료' && <Badge className="bg-emerald-500 text-white">검수</Badge>}
           <span>{sourceLabel(source)}</span>
-          {shown.work_title && <span>· {shown.work_title}</span>}
+          {/* 문항이 여러 작품에 걸리면 파생 문자열이 아니라 낱개로 찍는다 */}
+          {(shown.work_titles ?? []).map((title) => <span key={title}>· {title}</span>)}
           {shown.unit_path.length > 0 && <span>· {unitPathLabel(shown.unit_path)}</span>}
           {shown.area_path.length > 0 && <span>· {areaPathLabel(shown.area_path)}</span>}
         </p>
@@ -112,11 +114,8 @@ function DetailBody({ problemId }: { problemId: string }) {
       {passage && (
         <section className="space-y-1.5 rounded-lg border border-gray-200 p-3">
           <p className="flex flex-wrap items-baseline gap-2 text-sm">
-            <span className="font-semibold text-gray-900">
-              {passage.title || passage.label || '지문'}
-            </span>
-            {passage.author && <span className="text-xs text-gray-500">{passage.author}</span>}
-            {passage.title && passage.label && (
+            <PassageWorksLine works={passage.works} fallback={passage.label || '지문'} />
+            {passage.label && passage.works?.length > 0 && (
               <span className="text-xs text-gray-400">{passage.label}</span>
             )}
           </p>

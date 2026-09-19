@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import PassageBodyView from '@/components/problem-bank/PassageBodyView';
+import PassageWorksLine from '@/components/problem-bank/PassageWorksLine';
 import { sourceLabel, type SourceLabelInput } from '@/lib/problem-bank/source-label';
 import type { Passage } from '@/types/problem-bank';
 
@@ -27,6 +28,8 @@ interface PassageGroupCardProps {
   /** 이 묶음 문항들의 출처 (첫 문항 기준) */
   source: SourceLabelInput | null;
   problemCount: number;
+  /** 지금 훑고 있는 작품 — 여러 편 실린 지문에서 그 편을 짚어 준다 */
+  highlightWork?: string;
   /** 이미지 지문의 서명 URL */
   imageUrl?: string | null;
   /** 본문에 끼운 그림들의 서명 URL */
@@ -40,9 +43,12 @@ interface PassageGroupCardProps {
  * 소설 전문이 시험지에 실리는 일은 드물어서 같은 작품이라도 **학교마다 실린 대목이
  * 다르다.** 그래서 작품 하나를 골라도 지문이 여러 개고, 어느 대목인지 보여야 문항을
  * 고를 수 있다. 본문은 기본으로 접어 둔다 — 펼쳐 두면 목록이 아니라 책이 된다.
+ *
+ * 머리에는 **실린 작품을 전부** 적는다 — `(가) 진달래꽃 / (나) 엄마 걱정` 지문을 파생
+ * 문자열 하나로 찍으면 어느 편이 (가)인지, 지금 훑는 작품이 어느 쪽인지 알 수 없다.
  */
 export default function PassageGroupCard({
-  passageId, passage, source, problemCount, imageUrl, figureUrls, children,
+  passageId, passage, source, problemCount, highlightWork, imageUrl, figureUrls, children,
 }: PassageGroupCardProps) {
   const [open, setOpen] = useState(false);
 
@@ -63,12 +69,13 @@ export default function PassageGroupCard({
     <section className="space-y-2 rounded-lg border border-gray-200 bg-gray-50/60 p-3">
       <div className="space-y-1">
         <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
-          <span className="font-semibold text-gray-900">
-            {passage.title || passage.label || '제목 없는 지문'}
-          </span>
-          {passage.author && <span className="text-xs text-gray-500">{passage.author}</span>}
+          <PassageWorksLine
+            works={passage.works}
+            fallback={passage.label || '제목 없는 지문'}
+            highlight={highlightWork}
+          />
           {source && <span className="text-xs text-gray-500">· {sourceLabel(source)}</span>}
-          {passage.label && passage.title && (
+          {passage.label && passage.works?.length > 0 && (
             <span className="text-xs text-gray-400">{passage.label}</span>
           )}
           <Badge variant="outline">문항 {problemCount}</Badge>

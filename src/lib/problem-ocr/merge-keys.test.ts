@@ -5,9 +5,9 @@ import type { OcrItem } from './schema';
 function item(over: Partial<OcrItem> = {}): OcrItem {
   return {
     kind: 'passage', ref: 'P1', page: 1, box: null, passage_ref: null, number: null,
-    label: null, title: null, author: null, title_source: null, html: '<p>지문</p>',
+    label: null, works: [], html: '<p>지문</p>',
     continued: false, continues: false, question_type: '객관식', stem_html: '',
-    choices: [], answer: null, has_figure: false, figures: [], work_title: null,
+    choices: [], answer: null, has_figure: false, figures: [],
     area_path: [], unit_path: [], grammar_paths: [], ...over,
   };
 }

@@ -16,11 +16,12 @@ import { useFigureEditor } from '@/hooks/useFigureEditor';
 import { useTrackedState } from '@/hooks/useTrackedState';
 import type { Bbox } from '@/types/problem-bank';
 import GrammarTagPicker from './GrammarTagPicker';
+import ProblemWorksField from './ProblemWorksField';
 import type { AreaTreeNode } from '@/lib/problem-bank/area-tree';
 import { isGrammarArea } from '@/lib/problem-bank/grammar-tree';
 import { UNIT_DEPTH_LABELS } from '@/lib/problem-bank/unit-tree';
 import type { ProblemPatch } from '@/lib/problem-bank/mutations';
-import type { Problem, QuestionType } from '@/types/problem-bank';
+import type { PassageWork, Problem, QuestionType } from '@/types/problem-bank';
 
 const QUESTION_TYPES: QuestionType[] = ['객관식', '주관식', '서술형'];
 
@@ -43,6 +44,11 @@ function withChoiceAt(choices: readonly string[], index: number, value: string):
 
 interface ProblemEditorCardProps {
   problem: Problem;
+  /**
+   * 딸린 지문에 실린 작품들 — 이 문항이 **어느 편을 묻는지** 체크로 고르게 한다.
+   * 지문이 없거나 아직 못 읽었으면 없다(그때는 작품명을 손으로 적는다).
+   */
+  passageWorks?: PassageWork[];
   areaTree: AreaTreeNode[];
   /** 교과서 단원 트리. 출처에 교과서가 없으면 빈 배열이라 칸이 안 뜬다 */
   unitTree: AreaTreeNode[];
@@ -76,8 +82,8 @@ interface ProblemEditorCardProps {
  *    효과로 되돌리는 대신 key 로 다시 마운트하는 것이 React 권장 방식이다.
  */
 export default function ProblemEditorCard({
-  problem, areaTree, unitTree, selected, onSelect, onSave, onToggleVerified, onDelete, onDirtyChange,
-  issues, figureUrls, onStartCapture, capturing,
+  problem, passageWorks, areaTree, unitTree, selected, onSelect, onSave, onToggleVerified,
+  onDelete, onDirtyChange, issues, figureUrls, onStartCapture, capturing,
 }: ProblemEditorCardProps) {
   // 값과 함께 최신 ref 를 든다 — 그림을 붙이는 동안 친 글을 잃지 않으려면
   // 다 올린 **뒤에** 발문을 읽어야 한다
@@ -88,7 +94,7 @@ export default function ProblemEditorCard({
   const [area, setArea] = useState<string[]>(problem.area_path);
   const [unit, setUnit] = useState<string[]>(problem.unit_path);
   const [grammar, setGrammar] = useState<string[]>(problem.grammar_paths);
-  const [workTitle, setWorkTitle] = useState(problem.work_title);
+  const [workTitles, setWorkTitles] = useState<string[]>(problem.work_titles ?? []);
   const [figurePaths, setFigurePaths, pathsRef] = useTrackedState<string[]>(
     problem.figure_paths,
   );
@@ -126,7 +132,7 @@ export default function ProblemEditorCard({
   const dirty = stem !== problem.stem_html
     || answer !== problem.answer
     || type !== problem.question_type
-    || workTitle !== problem.work_title
+    || workTitles.join('\u0000') !== (problem.work_titles ?? []).join('\u0000')
     || area.join('>') !== problem.area_path.join('>')
     || unit.join('>') !== problem.unit_path.join('>')
     || grammar.join('\u0000') !== problem.grammar_paths.join('\u0000')
@@ -162,7 +168,7 @@ export default function ProblemEditorCard({
       area_path: area,
       unit_path: unit,
       grammar_paths: grammar,
-      work_title: workTitle,
+      work_titles: workTitles,
       // ⚠️ 그림 경로도 함께 — 그림 저장이 실패했을 때 사람이 다시 눌러 고칠 길이다
       figure_paths: figurePaths,
     });
@@ -287,7 +293,7 @@ export default function ProblemEditorCard({
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
             <Label className="text-xs text-gray-500">유형</Label>
             <OptionSelect
@@ -305,14 +311,13 @@ export default function ProblemEditorCard({
               className="h-8 text-sm" placeholder={type === '객관식' ? '1~5' : '답안'}
             />
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs text-gray-500">작품명</Label>
-            <Input
-              value={workTitle} onChange={(e) => setWorkTitle(e.target.value)}
-              className="h-8 text-sm"
-            />
-          </div>
         </div>
+
+        <ProblemWorksField
+          value={workTitles}
+          onChange={setWorkTitles}
+          passageWorks={passageWorks}
+        />
 
         <AreaPathPicker tree={areaTree} value={area} onChange={setArea} />
         <AreaPathPicker

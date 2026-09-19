@@ -10,9 +10,10 @@ beforeEach(() => { seq = 0; });
 function passage(over: Partial<OcrItem> = {}): OcrItem {
   return {
     kind: 'passage', ref: 'P1', page: 1, box: null, passage_ref: null, number: null,
-    label: '[1~3]', title: '소나기', author: '황순원', title_source: 'printed', html: '<p>지문</p>',
+    label: '[1~3]', works: [{ label: '', title: '소나기', author: '황순원' }],
+    html: '<p>지문</p>',
     continued: false, continues: false, question_type: '객관식', stem_html: '',
-    choices: [], answer: null, has_figure: false, figures: [], work_title: null,
+    choices: [], answer: null, has_figure: false, figures: [],
     area_path: [], unit_path: [], grammar_paths: [], ...over,
   };
 }
@@ -20,9 +21,9 @@ function passage(over: Partial<OcrItem> = {}): OcrItem {
 function problem(over: Partial<OcrItem> = {}): OcrItem {
   return {
     kind: 'problem', ref: 'Q1', page: 1, box: null, passage_ref: null, number: 1,
-    label: null, title: null, author: null, title_source: null, html: '', continued: false, continues: false,
+    label: null, works: [], html: '', continued: false, continues: false,
     question_type: '객관식', stem_html: '<p>물음</p>', choices: ['가', '나'],
-    answer: null, has_figure: false, figures: [], work_title: null, area_path: [], unit_path: [],
+    answer: null, has_figure: false, figures: [], area_path: [], unit_path: [],
     grammar_paths: [], ...over,
   };
 }
@@ -80,11 +81,11 @@ describe('mergeOcrDrafts — 겹쳐 읽은 중복', () => {
 
   it('같은 길이의 지문이라도 나중에 알아본 작품·단원은 채운다', () => {
     const res = mergeOcrDrafts([
-      batch([passage({ page: 3, title: '', unit_path: [], area_path: [] })], [1, 2, 3]),
-      batch([passage({ page: 3, title: '소나기', unit_path: ['1. 문학'], area_path: ['문학'] })], [3, 4, 5]),
+      batch([passage({ page: 3, works: [], unit_path: [], area_path: [] })], [1, 2, 3]),
+      batch([passage({ page: 3, unit_path: ['1. 문학'], area_path: ['문학'] })], [3, 4, 5]),
     ], { newId });
     expect(res.passages).toHaveLength(1);
-    expect(res.passages[0].title).toBe('소나기');
+    expect(res.passages[0].works.map((w) => w.title)).toEqual(['소나기']);
     expect(res.passages[0].unit_path).toEqual(['1. 문학']);
     expect(res.passages[0].area_path).toEqual(['문학']);
   });
@@ -106,13 +107,43 @@ describe('mergeOcrDrafts — 겹쳐 읽은 중복', () => {
       batch([passage({ page: 3, label: '[1~3]', continues: true, unit_path: [] })], [3]),
       batch([passage({
         page: 4, label: null, continued: true, html: '<p>뒷부분</p>',
-        title: '소나기', unit_path: ['1. 문학', '(1) 시'],
+        unit_path: ['1. 문학', '(1) 시'],
       })], [4]),
     ], { newId });
     expect(res.passages).toHaveLength(1);
     expect(res.passages[0].unit_path).toEqual(['1. 문학', '(1) 시']);
-    expect(res.passages[0].title).toBe('소나기');
+    expect(res.passages[0].works.map((w) => w.title)).toEqual(['소나기']);
     expect(res.passages[0].pageSpan).toBe(2);
+  });
+
+  it('쪽을 넘어가는 (가)(나) 지문은 조각마다 한 편씩 보인다 — 작품만 합집합이다', () => {
+    const res = mergeOcrDrafts([
+      batch([passage({
+        page: 3, label: '[1~3]', continues: true,
+        works: [{ label: '가', title: '진달래꽃', author: '김소월' }],
+      })], [3]),
+      batch([passage({
+        page: 4, label: null, continued: true, html: '<p>뒷부분</p>',
+        works: [{ label: '나', title: '엄마 걱정', author: '기형도' }],
+      })], [4]),
+    ], { newId });
+    expect(res.passages).toHaveLength(1);
+    expect(res.passages[0].works).toEqual([
+      { label: '가', title: '진달래꽃', author: '김소월' },
+      { label: '나', title: '엄마 걱정', author: '기형도' },
+    ]);
+  });
+
+  it('문항의 작품은 합집합이 아니다 — 묶음마다 다른 편을 냈다면 먼저 온 것이 이긴다', () => {
+    const res = mergeOcrDrafts([
+      batch([problem({
+        page: 3, number: 5, works: [{ label: '나', title: '엄마 걱정', author: '' }],
+      })], [1, 2, 3]),
+      batch([problem({
+        page: 3, number: 5, works: [{ label: '가', title: '진달래꽃', author: '' }],
+      })], [3, 4, 5]),
+    ], { newId });
+    expect(res.problems[0].work_titles).toEqual(['엄마 걱정']);
   });
 
   it('나중 묶음이 빈 단원도 채운다 — 앞 묶음에서는 작품을 못 알아봤을 수 있다', () => {
@@ -805,5 +836,180 @@ describe('mergeOcrDrafts — 쪽을 넘어가는 지문의 그림', () => {
       batch([passage({ ref: 'P1', page: 3, label: null, html: '<p>딴글</p>', figures: [box(0.5, 3)] })], [3]),
     ], { newId });
     expect(res.passages[0].figures).toEqual([]);
+  });
+});
+
+describe('문항 작품을 지문과 대조한다 — 묶음을 다 합친 뒤에', () => {
+  const WORKS = [
+    { label: '가', title: '진달래꽃', author: '김소월' },
+    { label: '나', title: '엄마 걱정', author: '기형도' },
+  ];
+
+  it('지문에 없는 작품은 뺀다 — 그대로 두면 엉뚱한 잎이 생기고 트리거가 영영 보존한다', () => {
+    const res = mergeOcrDrafts([batch([
+      passage({ ref: 'P1', works: WORKS }),
+      problem({
+        ref: 'Q1', passage_ref: 'P1',
+        works: [WORKS[1], { label: '', title: '진달래', author: '' }],
+      }),
+    ], [1])], { newId });
+    expect(res.problems[0].work_titles).toEqual(['엄마 걱정']);
+    expect(said(res)).toContain("'진달래' 이 딸린 지문에 없어");
+  });
+
+  it('⚠️ 쪽을 넘어가 뒤 묶음에서야 보이는 편도 살린다 — 파서에서 대조하면 여기서 넓어졌다', () => {
+    const res = mergeOcrDrafts([
+      // 앞 묶음: 지문은 (가)만 보이는데 문항은 (나)를 묻는다
+      batch([
+        passage({ ref: 'P1', page: 3, label: '[1~3]', continues: true, works: [WORKS[0]] }),
+        problem({ ref: 'Q1', page: 3, number: 1, passage_ref: 'P1', works: [WORKS[1]] }),
+      ], [3]),
+      // 뒤 묶음: 이어지는 조각에서 (나)가 보인다
+      batch([passage({
+        ref: 'P1', page: 4, label: null, continued: true, html: '<p>뒷부분</p>', works: [WORKS[1]],
+      })], [4]),
+    ], { newId });
+    expect(res.passages[0].works.map((w) => w.title)).toEqual(['진달래꽃', '엄마 걱정']);
+    expect(res.problems[0].work_titles).toEqual(['엄마 걱정']);
+    expect(said(res)).not.toContain('딸린 지문에 없어');
+  });
+
+  it('지문이 작품을 모르면 대조하지 않는다 — 대조할 근거가 없다', () => {
+    const res = mergeOcrDrafts([batch([
+      passage({ ref: 'P1', works: [] }),
+      problem({ ref: 'Q1', passage_ref: 'P1', works: [{ label: '', title: '동백꽃', author: '' }] }),
+    ], [1])], { newId });
+    expect(res.problems[0].work_titles).toEqual(['동백꽃']);
+  });
+
+  it('앞 묶음이 엉뚱한 편을 냈어도 뒤 묶음의 맞는 좁힘을 쓴다 — 걸러 내면 지문 전체로 넓어진다', () => {
+    const res = mergeOcrDrafts([
+      // 앞 묶음: 지문 참조가 안 풀려 단독이 되고, 작품도 엉뚱하다
+      batch([problem({
+        ref: 'Q1', page: 3, number: 1, passage_ref: 'P9',
+        works: [{ label: '', title: '엉뚱한작품', author: '' }],
+      })], [3]),
+      // 뒤 묶음: 같은 문항이 지문에 제대로 붙고 (나)만 묻는다고 낸다
+      batch([
+        passage({ ref: 'P1', page: 3, works: WORKS }),
+        problem({ ref: 'Q1', page: 3, number: 1, passage_ref: 'P1', works: [WORKS[1]] }),
+      ], [3]),
+    ], { newId });
+    expect(res.problems).toHaveLength(1);
+    expect(res.problems[0].work_titles).toEqual(['엄마 걱정']);
+  });
+
+  it('뒤집힌 판단은 경고까지 걷어낸다 — 저장될 값과 모순되는 말이 남으면 안 된다', () => {
+    const res = mergeOcrDrafts([
+      // 앞 묶음: 지문을 못 찾고, 작품명도 본문으로 알아봤다고 낸다
+      batch([problem({
+        ref: 'Q1', page: 3, number: 1, passage_ref: 'P9',
+        works: [{ label: '', title: '엉뚱한작품', author: '' }],
+      })], [3], [
+        { ref: 'Q1', kind: 'problem', page: 3, number: 1, about: { unlinked: true },
+          message: '딸린 지문을 이 묶음에서 못 찾아 지문 없이 뒀어요.' },
+        { ref: 'Q1', kind: 'problem', page: 3, number: 1, about: { work: '엉뚱한작품' },
+          message: '작품명을 본문으로 알아봤어요(엉뚱한작품). 맞는지 확인해 주세요.' },
+      ]),
+      // 뒤 묶음: 같은 문항이 지문에 제대로 붙는다
+      batch([
+        passage({ ref: 'P1', page: 3, works: WORKS }),
+        problem({ ref: 'Q1', page: 3, number: 1, passage_ref: 'P1', works: [WORKS[1]] }),
+      ], [3]),
+    ], { newId });
+    expect(said(res)).not.toContain('딸린 지문을 이 묶음에서 못 찾아');
+    // '본문으로 알아봤다' 는 말은 그 작품이 빠졌으니 틀린 말이 됐다 — 걷어낸다.
+    // 다만 **뺐다는 사실**은 남긴다(사람이 원본과 맞춰 볼 자리다)
+    expect(said(res)).not.toContain('본문으로 알아봤어요');
+    expect(said(res)).toContain("'엉뚱한작품' 이 딸린 지문에 없어");
+  });
+
+  it('부분만 맞았으면 맞는 편만 남긴다 — 다른 묶음의 넓은 목록으로 넓히지 않는다', () => {
+    const res = mergeOcrDrafts([
+      batch([
+        passage({ ref: 'P1', page: 3, works: WORKS }),
+        problem({
+          ref: 'Q1', page: 3, number: 1, passage_ref: 'P1',
+          works: [WORKS[0], { label: '', title: '엉뚱한작품', author: '' }],
+        }),
+      ], [3]),
+      batch([
+        passage({ ref: 'P1', page: 3, works: WORKS }),
+        problem({ ref: 'Q1', page: 3, number: 1, passage_ref: 'P1', works: WORKS }),
+      ], [3]),
+    ], { newId });
+    expect(res.problems[0].work_titles).toEqual(['진달래꽃']);
+    expect(said(res)).toContain("'엉뚱한작품' 이 딸린 지문에 없어");
+  });
+
+  it('묶음마다 다른 편을 냈으면 먼저 온 것을 쓰되 **그 사실을 알린다**', () => {
+    const res = mergeOcrDrafts([
+      batch([
+        passage({ ref: 'P1', page: 3, works: WORKS }),
+        problem({ ref: 'Q1', page: 3, number: 1, passage_ref: 'P1', works: [WORKS[0]] }),
+      ], [3]),
+      batch([
+        passage({ ref: 'P1', page: 3, works: WORKS }),
+        problem({ ref: 'Q1', page: 3, number: 1, passage_ref: 'P1', works: [WORKS[1]] }),
+      ], [3]),
+    ], { newId });
+    expect(res.problems[0].work_titles).toEqual(['진달래꽃']);
+    expect(said(res)).toContain('묻는 작품을 다르게 냈어요(진달래꽃 / 엄마 걱정)');
+  });
+
+  it('차례만 다른 목록은 같은 말이다 — 정상적인 겹쳐 읽기에 경고를 띄우지 않는다', () => {
+    const res = mergeOcrDrafts([
+      batch([
+        passage({ ref: 'P1', page: 3, works: WORKS }),
+        problem({ ref: 'Q1', page: 3, number: 1, passage_ref: 'P1', works: WORKS }),
+      ], [3]),
+      batch([
+        passage({ ref: 'P1', page: 3, works: WORKS }),
+        problem({
+          ref: 'Q1', page: 3, number: 1, passage_ref: 'P1', works: [WORKS[1], WORKS[0]],
+        }),
+      ], [3]),
+    ], { newId });
+    expect(said(res)).not.toContain('다르게 냈어요');
+  });
+
+  it('하나도 안 남았으면 다른 묶음의 **넓은** 목록을 쓴다 — 좁으면 그 작품으로 훑을 때 안 나온다', () => {
+    const res = mergeOcrDrafts([
+      batch([problem({
+        ref: 'Q1', page: 3, number: 1, passage_ref: 'P9',
+        works: [{ label: '', title: '엉뚱한작품', author: '' }],
+      })], [3]),
+      batch([
+        passage({ ref: 'P1', page: 3, works: WORKS }),
+        problem({ ref: 'Q1', page: 3, number: 1, passage_ref: 'P1', works: [WORKS[0]] }),
+      ], [3]),
+      batch([
+        passage({ ref: 'P1', page: 3, works: WORKS }),
+        problem({ ref: 'Q1', page: 3, number: 1, passage_ref: 'P1', works: WORKS }),
+      ], [3]),
+    ], { newId });
+    expect(res.problems[0].work_titles).toEqual(['진달래꽃', '엄마 걱정']);
+  });
+
+  it('묶음들이 같은 편을 냈으면 조용히 넘어간다 — 겹쳐 읽기는 정상이다', () => {
+    const res = mergeOcrDrafts([
+      batch([
+        passage({ ref: 'P1', page: 3, works: WORKS }),
+        problem({ ref: 'Q1', page: 3, number: 1, passage_ref: 'P1', works: [WORKS[1]] }),
+      ], [3]),
+      batch([
+        passage({ ref: 'P1', page: 3, works: WORKS }),
+        problem({ ref: 'Q1', page: 3, number: 1, passage_ref: 'P1', works: [WORKS[1]] }),
+      ], [3]),
+    ], { newId });
+    expect(said(res)).not.toContain('다르게 냈어요');
+  });
+
+  it('지문 전체를 묻는 문항(빈 목록)은 건드리지 않는다', () => {
+    const res = mergeOcrDrafts([batch([
+      passage({ ref: 'P1', works: WORKS }),
+      problem({ ref: 'Q1', passage_ref: 'P1', works: [] }),
+    ], [1])], { newId });
+    expect(res.problems[0].work_titles).toEqual([]);
   });
 });

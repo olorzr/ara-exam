@@ -11,14 +11,14 @@ function problem(over: Partial<ProblemDraft> = {}): ProblemDraft {
   return {
     id: id(), passage_id: null, number: 1, question_type: '객관식',
     stem_html: '', choices: [], answer: '1', score: null,
-    work_title: '', area_path: [], unit_path: [], grammar_paths: [],
+    work_titles: [], area_path: [], unit_path: [], grammar_paths: [],
     page_no: 1, box: null, has_figure: false, figures: [], ...over,
   };
 }
 
 function passage(over: Partial<PassageDraft> = {}): PassageDraft {
   return {
-    id: id(), label: '', title: '', author: '', html: '', page_no: 1, box: null,
+    id: id(), label: '', works: [], html: '', page_no: 1, box: null,
     area_path: [], unit_path: [], has_figure: false, figures: [], lastPage: 1, open: false,
     pageSpan: 1, ...over,
   };

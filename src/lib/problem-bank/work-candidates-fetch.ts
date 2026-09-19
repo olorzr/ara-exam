@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { BundleWorkRow, PassageWorkRow } from './work-candidates';
+import type { PassageWork } from '@/types/problem-bank';
 
 /**
  * 작품 후보의 재료를 읽어 온다 (`work-candidates.ts` 의 짝).
@@ -62,26 +63,29 @@ export async function fetchSchoolPassageWorks(schoolId: string): Promise<Passage
   try {
     const { data, error } = await supabase
       .from('passages')
-      .select('title, author, source:problem_sources!inner(school_id, year, grade, semester, exam_type)')
+      .select('works, source:problem_sources!inner(school_id, year, grade, semester, exam_type)')
       .eq('source.school_id', schoolId)
       .eq('source.status', '완료')
-      .neq('title', '')
+      .not('works', 'eq', '[]')
       .order('created_at', { ascending: false })
       .limit(FETCH_LIMIT);
     if (error) return [];
-    return (data ?? []).map((row) => {
+    // ⚠️ 지문 하나가 작품을 여럿 들고 있다(sql/33) — **낱개로 펴서** 후보에 넣는다.
+    //    파생 문자열(`title`)을 쓰면 '먼 후일 · 독은 아름답다' 가 후보 하나로 실려
+    //    모델이 그 이름의 작품이 있는 줄 알고 그대로 베껴 적는다
+    return (data ?? []).flatMap((row) => {
       const r = row as unknown as {
-        title: string; author: string;
+        works: PassageWork[] | null;
         source: { year: string; grade: string; semester: string; exam_type: string } | null;
       };
-      return {
-        title: r.title ?? '',
-        author: r.author ?? '',
+      return (r.works ?? []).map((work) => ({
+        title: work.title ?? '',
+        author: work.author ?? '',
         year: r.source?.year ?? '',
         grade: r.source?.grade ?? '',
         semester: r.source?.semester ?? '',
         examType: r.source?.exam_type ?? '',
-      };
+      }));
     });
   } catch {
     return [];

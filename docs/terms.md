@@ -181,17 +181,32 @@
 - 코드에서의 사용: `Passage`, `passages` 표, 문항의 `passage_id`
 - 관련 파일: src/lib/problem-ocr/merge.ts, src/lib/problem-paper/blocks.ts
 
+## 작품 (PassageWork)
+- 정의: 지문에 실린 글 **한 편** — `{label, title, author}`. `(가) 진달래꽃 – 김소월 / (나) 엄마 걱정 – 기형도` 처럼 한 지문에 여러 편이 실리므로 **지문의 작품은 목록**(`passages.works`)이고, 문항이 묻는 작품도 목록(`problems.work_titles`)이다(sql/33)
+- `label` 은 시험지의 구분 표시를 **괄호 없이** 담는다('가'·'나'). 본문 HTML 의 `<blockquote data-box="가">` 와 같은 표기이고, 인쇄·화면에서 괄호를 다시 붙인다
+- ⚠️ **빈 목록의 뜻이 다르다**: 지문의 `works` 가 비면 '작품이 없는 글'(비문학 발췌)이고, 문항의 `work_titles` 가 비면 **'이 지문 전체'** 여서 트리거가 지문의 작품으로 채운다. 그래서 저장된 문항의 목록은 늘 명시적이다
+- 표기 정규화는 `normalizePassageWorks`·`splitWorkTitles` ↔ DB `exam.normalize_works`·`exam.split_work_titles` **1:1 거울**이다. 한쪽만 바꾸면 앱이 보낸 값과 트리거가 저장한 값이 갈라진다
+- 관련 파일: src/lib/problem-bank/work-title.ts, src/components/problem-review/PassageWorksEditor.tsx, src/components/problem-review/ProblemWorksField.tsx, sql/33_problem_bank_multi_works.sql
+
 ## 작품명 (work title)
-- 정의: 지문에 실린 글의 제목(`passages.title`)과 그 지문에 딸린 문항이 물려받는 값(`problems.work_title`). 아카이브 왼쪽 '작품' 탭의 축이고 검색 평문(`search_text`)에도 들어간다
-- 지은이는 **지문에만** 있다(`passages.author`) — 작품 트리가 `지은이 › 작품` 두 단이라 문항의 지은이는 제목으로 되찾는다(`facets.ts` 의 `collectPassageAuthors`)
+- 정의: 작품 한 편의 제목. 아카이브 왼쪽 '작품' 탭의 축이고, 문항 조회는 `work_titles` 배열 포함(`contains`)으로 건다 — `(가)(나)` 를 함께 묻는 문항이 **두 작품 어느 쪽으로 훑어도** 나온다
+- 지은이는 **지문의 작품에만** 있다 — 작품 트리가 `지은이 › 작품` 두 단이라 문항의 지은이는 제목으로 되찾는다(`work-counts.ts` 의 `collectWorkAuthors`)
 - 표기 정규화는 `normalizeWorkTitle` ↔ DB `exam.normalize_work_title` **1:1 거울**이다 — 감싸는 기호(「」『』〈〉"")만 양끝에서 벗긴다. 한쪽만 바꾸면 같은 작품이 두 폴더로 갈라진다
-- 지문 → 문항 전파는 **DB 트리거**가 한다(sql/20). 사람이 문항에 따로 적은 작품명은 보존된다
-- OCR 은 작품명과 함께 **어디서 얻었는지**(`title_source`: `printed`/`inferred`)를 낸다. `inferred` 면 파서가 '본문으로 알아봤어요' 경고를 만들어 검수 화면에 그 지문을 짚어 준다 — 인쇄된 이름과 알아낸 이름을 구별할 수 있어야 틀렸을 때 고친다
-- 코드에서의 사용: `Passage.title`, `Problem.work_title`, `normalizeWorkTitle`, `buildWorkTree`
-- 관련 파일: src/lib/problem-bank/work-title.ts, src/lib/problem-bank/work-tree.ts, sql/20_problem_bank_works.sql
+- 지문 → 문항 전파는 **DB 트리거**가 한다(sql/33 `passages_sync_work_titles`). 사람이 문항에 좁혀 적은 작품명은 **자리로 이름만** 따라가고 좁힘 자체는 보존된다
+- ⚠️ **새 작품이 붙을 때 따라가는 것은 작품이 두 편 이상이던 지문뿐이다.** 한 편뿐이던 지문에서는 '전체를 묻는다' 와 '그 한 편으로 좁혔다' 가 저장값으로 구별되지 않아, 따라가게 두면 한 편만 묻던 문항이 **말없이 두 편을 묻는 문항이 된다**(없는 사실을 지어내는 쪽이다). 지문을 합칠 때도 같은 까닭으로 묻는 작품이 늘지 않는다 — 새 작품은 검수 화면에서 체크로 붙인다
+- OCR 은 작품마다 **어디서 얻었는지**(`title_source`: `printed`/`inferred`)를 낸다. `inferred` 면 파서가 '본문으로 알아봤어요((나) 엄마 걱정)' 경고를 만들어 검수 화면에 그 편을 짚어 준다
+- ⚠️ 문항이 낸 작품은 **딸린 지문의 작품과 대조**해 없는 이름을 버린다(`parse.ts`). 안 그러면 모델이 지어낸 이름이 트리에 잎으로 남고, 트리거가 '사람이 좁혀 적은 값' 으로 보아 영영 보존한다
+- 코드에서의 사용: `Passage.works`, `Problem.work_titles`, `normalizeWorkTitle`, `buildWorkTree`, `tallyWorkCounts`
+- 관련 파일: src/lib/problem-bank/work-title.ts, src/lib/problem-bank/work-tree.ts, src/lib/problem-bank/work-counts.ts, sql/33_problem_bank_multi_works.sql
+
+## 파생 컬럼 (derived work columns)
+- 정의: `passages.title`/`author` 와 `problems.work_title`. 작품 목록을 `' · '` 로 이어 만든 값이고 **DB 트리거가 채운다**(sql/33)
+- ⚠️ **앱에서 보내지 않는다** — `search_text`(sql/17)·`char_count`(sql/30)와 같은 계약이다. 보내면 목록과 문자열 가운데 어느 쪽이 참인지 알 수 없어진다. `updateProblem`/`updatePassage` 는 저장 뒤 **트리거가 확정한 값을 돌려받아** 화면을 맞춘다
+- 왜 지우지 않았나: 인쇄 스냅샷(sql/23)·검색 평문·지문 고르기·참고자료 신호 등 **문자열을 읽는 곳이 스무 군데**다. 파생으로 남기면 그 전부가 그대로 돈다
+- 트리거가 **표마다 두 벌**인 까닭: 화면이 목록과 옛 문자열을 한 UPDATE 에 함께 보내면, 한 벌짜리 규칙("문자열이 바뀌었으니 목록을 다시 만든다")이 **방금 더한 작품을 지운다**. `aa_works_a_*`(목록이 SET 에 있으면 목록이 이긴다) → `aa_works_b_*`(문자열만 바뀌었을 때의 back-compat) 순서로 가른다
 
 ## 작품 후보 (work candidates)
-- 정의: 기출 업로드 화면의 **'작품' 칸**에 자동으로 채워지는, 그 학교에 **이미 적혀 있는 작품명들**. 출처는 둘이다 — ① 학교 프린트 시험지의 프린트별 이름(`print_bundles.name` 에서 스캔 제목 접두를 벗긴 나머지), ② 같은 학교 기출 지문의 `passages.title`/`author`
+- 정의: 기출 업로드 화면의 **'작품' 칸**에 자동으로 채워지는, 그 학교에 **이미 적혀 있는 작품명들**. 출처는 둘이다 — ① 학교 프린트 시험지의 프린트별 이름(`print_bundles.name` 에서 스캔 제목 접두를 벗긴 나머지), ② 같은 학교 기출 지문의 작품들(`passages.works` 를 **낱개로 펴서** 쓴다 — 이어 붙인 이름을 후보로 주면 모델이 그런 작품이 있는 줄 알고 베껴 적는다)
 - ⚠️ **저장하지 않는다.** OCR 프롬프트의 `작품후보` 로만 실려, 모델이 작품을 알아보고 **그 표기 그대로** 적게 한다(표기가 갈리면 작품 트리가 쪼개진다)
 - 학년이 다른 줄은 후보에서 **뺀다**(작품은 학년마다 통째로 다르다). 학년도·학기·시험은 줄 세우기에만 쓴다
 - 직접 고쳐 적은 값은 힌트가 덮지 않는다(`worksAuto`) — 교과서 자동 채움과 같은 계약이고, **칸을 비우는 것도 직접 고른 값**이다('이 시험지엔 작품 없음'). 자동은 학교·학교급을 바꿀 때 다시 켜진다
