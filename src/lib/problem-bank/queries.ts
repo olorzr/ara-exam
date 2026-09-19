@@ -164,22 +164,34 @@ export function escapeIlike(value: string): string {
   return value.replace(/[\\%_]/g, (m) => `\\${m}`);
 }
 
-/**
- * 아카이브 목록을 한 페이지 가져온다.
- * @param query - 필터
- * @returns 행과 전체 개수
- */
-export async function fetchProblemPage(query: ProblemQuery): Promise<ProblemPage> {
-  const page = Math.max(0, query.page ?? 0);
-  const from = page * PROBLEM_PAGE_SIZE;
+/** 목록을 늘어놓는 순서 */
+type ProblemOrder =
+  /** 최근에 올린 것부터 — 아카이브 기본 */
+  | 'recent'
+  /** 출처 > 지문 > 쪽 > 번호 — 시험지에 실린 차례 그대로 */
+  | 'reading';
 
+/**
+ * 조건에 맞는 문항을 한 구간 읽는다.
+ *
+ * ⚠️ 필터 체인·컬럼 목록·임베드 별칭이 **여기 한 벌**뿐이어야 한다. 조회 함수마다 베끼면
+ *    언젠가 한쪽만 고쳐져 "목록에는 보이는데 담기에는 안 걸리는" 문항이 생긴다.
+ * @param query - 필터
+ * @param order - 늘어놓을 순서
+ * @param from - 첫 행 (0부터)
+ * @param to - 마지막 행 (포함)
+ * @returns 행과 조건에 걸린 전체 개수
+ */
+async function runProblemQuery(
+  query: ProblemQuery, order: ProblemOrder, from: number, to: number,
+): Promise<ProblemPage> {
   let request = supabase
     .from('problems')
     .select(`${PROBLEM_LIST_COLUMNS}, source:problem_sources!inner(*)`, { count: 'exact' });
 
-  if (query.work_title !== undefined) {
-    // 작품으로 볼 때는 **지문 순서**로 늘어놓는다 — 화면이 지문별로 묶어 그리므로
-    // 같은 지문의 문항이 흩어지면 같은 지문 머리가 여러 번 나온다.
+  if (order === 'reading') {
+    // 지문 순서로 늘어놓는다 — 화면이 지문별로 묶어 그리므로 같은 지문의 문항이 흩어지면
+    // 같은 지문 머리가 여러 번 나온다. 문제지에 담을 때도 이 순서라야 지문 묶음이 붙는다.
     // 출처를 먼저 묶는 이유: 같은 작품이라도 학교마다 실린 대목이 다르다
     request = request
       .order('source_id')
@@ -196,7 +208,7 @@ export async function fetchProblemPage(query: ProblemQuery): Promise<ProblemPage
       .order('id', { ascending: false });
   }
 
-  request = request.range(from, from + PROBLEM_PAGE_SIZE - 1);
+  request = request.range(from, to);
 
   // ⚠️ 임베드에 별칭(`source:`)을 주면 필터 경로도 **별칭**을 써야 한다.
   //    `problem_sources.year` 로 쓰면 PostgREST 가 "그런 임베드 없음" 으로 요청을 거부한다.
@@ -209,7 +221,6 @@ export async function fetchProblemPage(query: ProblemQuery): Promise<ProblemPage
   if (query.semester !== undefined) request = request.eq('source.semester', query.semester);
   if (query.exam_type !== undefined) request = request.eq('source.exam_type', query.exam_type);
   if (query.textbook !== undefined) request = request.eq('source.textbook', query.textbook);
-  // ⚠️ 참거짓이 아니라 undefined 로 가른다 — filters.ts 의 규약(빈 문자열은 '미지정만')
   // ⚠️ `.eq('work_title', …)` 이 아니다(sql/33). 파생 문자열로 걸면 `(가)(나)` 지문의 문항이
   //    `'먼 후일 · 독은 아름답다'` 로만 걸려 '먼 후일' 을 골랐을 때 하나도 안 나온다.
   //    빈 문자열('미지정만')은 이 축에 없다 — filters.ts 가 자유 텍스트라 막아 둔다
@@ -242,4 +253,43 @@ export async function fetchProblemPage(query: ProblemQuery): Promise<ProblemPage
     rows: (data ?? []) as unknown as (Problem & { source: ProblemSource })[],
     total: count ?? 0,
   };
+}
+
+/**
+ * 아카이브 목록을 한 페이지 가져온다.
+ * @param query - 필터
+ * @returns 행과 전체 개수
+ */
+export async function fetchProblemPage(query: ProblemQuery): Promise<ProblemPage> {
+  const page = Math.max(0, query.page ?? 0);
+  const from = page * PROBLEM_PAGE_SIZE;
+  // 작품으로 볼 때만 지문 순서다 — 그 화면이 지문별로 묶어 그린다.
+  // ⚠️ 여기는 `!== undefined`, 조건 걸기는 truthy 다(위 `runProblemQuery`). 일부러 다르다 —
+  //    빈 작품명은 거르지 않지만(자유 텍스트 축에 '미지정만' 이 없다) 정렬은 작품 화면의 것을 쓴다
+  const order: ProblemOrder = query.work_title !== undefined ? 'reading' : 'recent';
+  return runProblemQuery(query, order, from, from + PROBLEM_PAGE_SIZE - 1);
+}
+
+/**
+ * 조건에 맞는 문항을 **문제지에 담으려고** 한꺼번에 가져온다.
+ *
+ * 목록 화면과 다른 점 둘:
+ *  - 쪽을 나누지 않는다. 폴더를 통째로 담는 길이라 화면에 보이는 60개가 아니라
+ *    **조건에 걸린 전부**를 받아야 한다.
+ *  - 조건이 무엇이든 늘 **읽는 순서**다. 최근순으로 담으면 같은 지문의 문항이 흩어져
+ *    저장할 때 '같은 지문의 문항이 떨어져 있다' 로 막힌다(RPC 의 연속성 검사).
+ *
+ * ⚠️ `limit` 은 문제지 상한(`PAPER_MAX_ITEMS`, 200)에서 온다 — PostgREST 기본 상한
+ *    1,000 보다 한참 작아 한 번의 요청으로 끝난다. 상한을 넘겨 부르지 말 것.
+ *    돌려주는 `total` 은 **조건에 걸린 전체 개수**라, 받아 온 행보다 클 수 있다
+ *    (부르는 쪽이 그때 담기를 막는다 — 앞에서 잘라 담으면 지문 묶음이 끊긴다).
+ * @param query - 필터
+ * @param limit - 받아 올 최대 행 수
+ * @returns 읽는 순서의 행과 조건에 걸린 전체 개수
+ */
+export async function fetchProblemsForBulkAdd(
+  query: ProblemQuery, limit: number,
+): Promise<ProblemPage> {
+  if (limit < 1) return { rows: [], total: 0 };
+  return runProblemQuery(query, 'reading', 0, limit - 1);
 }

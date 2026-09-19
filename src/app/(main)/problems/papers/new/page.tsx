@@ -10,8 +10,10 @@ import ProblemCard from '@/components/problem-bank/ProblemCard';
 import ProblemDetailDialog from '@/components/problem-bank/ProblemDetailDialog';
 import ProblemFilterBar from '@/components/problem-bank/ProblemFilterBar';
 import CanvasItem from '@/components/problem-paper/CanvasItem';
+import PaperPickBar from '@/components/problem-paper/PaperPickBar';
 import PaperToolbar from '@/components/problem-paper/PaperToolbar';
 import { useListDrag } from '@/hooks/useListDrag';
+import { usePaperBulkAdd } from '@/hooks/usePaperBulkAdd';
 import { usePaperComposer } from '@/hooks/usePaperComposer';
 import { useProblemArchive, type ArchiveRow } from '@/hooks/useProblemArchive';
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls';
@@ -30,6 +32,7 @@ export default function PaperComposePage() {
   const router = useRouter();
   const archive = useProblemArchive();
   const paper = usePaperComposer();
+  const bulk = usePaperBulkAdd(archive, paper);
   const canvasRef = useRef<HTMLDivElement>(null);
 
   /** 지금 끌고 있는 것 — 아카이브에서 새로 담는 중이거나, 캔버스 안에서 옮기는 중 */
@@ -82,7 +85,9 @@ export default function PaperComposePage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">🧩 문제지 조합</h1>
         <p className="mt-1 text-sm text-gray-500">
-          왼쪽 트리에서 단원·학교·작품·문법을 고르고, 문항을 끌어다 오른쪽에 놓으세요. 같은 지문의 문항은 자동으로 붙습니다.
+          왼쪽 트리에서 단원·학교·작품·문법을 고르고, 문항을 끌어다 오른쪽에 놓으세요.
+          고른 폴더를 <strong>통째로 담거나</strong> 체크해서 여럿을 한 번에 담을 수도 있어요.
+          같은 지문의 문항은 자동으로 붙습니다.
         </p>
       </div>
 
@@ -92,14 +97,15 @@ export default function PaperComposePage() {
           그 아래 폭에서는 트리가 위로 쌓인다(아카이브가 lg 미만에서 하는 것과 같다) */}
       <div className="grid gap-4 xl:grid-cols-[260px_minmax(0,1fr)]">
         <div className="xl:sticky xl:top-4 xl:self-start">
-          {/* 아카이브는 조건이 바뀔 때 선택을 비우려고 patch 를 한 겹 감싸 넘기지만, 이 화면에는
-              선택 모드가 없어 그 래퍼가 필요 없다 — 위쪽 필터 줄과 같이 archive.patch 를 그대로 넘긴다 */}
+          {/* ⚠️ 조건을 바꾸는 길은 전부 `bulk.patch` 를 지난다 — 선택을 비우지 않으면
+              다른 폴더의 문항이 선택된 채로 남아 '3개 선택됨' 이 거짓이 된다
+              (아카이브 화면과 같은 규약. 선택 모드가 생기기 전에는 필요 없던 래퍼다) */}
           <ArchiveSidePanel
             filters={archive.filters}
             schoolExams={archive.facets.schoolExams}
             works={archive.workFacets}
             grammarCounts={archive.grammarCounts}
-            onChange={archive.patch}
+            onChange={bulk.patch}
           />
         </div>
 
@@ -112,8 +118,23 @@ export default function PaperComposePage() {
               unitFacets={archive.unitFacets}
               workFacets={archive.workFacets}
               total={archive.total}
-              onChange={archive.patch}
-              onReset={archive.reset}
+              onChange={bulk.patch}
+              onReset={bulk.reset}
+            />
+
+            <PaperPickBar
+              selectMode={bulk.selection.selectMode}
+              count={bulk.selection.count}
+              isAllSelected={bulk.selection.isAllSelected}
+              disabled={archive.loading || archive.rows.length === 0}
+              folderTotal={archive.total}
+              folderEnabled={bulk.folderEnabled}
+              folderBusy={bulk.folderBusy}
+              onEnter={bulk.selection.enter}
+              onExit={bulk.selection.exit}
+              onToggleAll={bulk.selection.toggleAll}
+              onAddSelected={bulk.addSelected}
+              onAddFolder={bulk.addFolder}
             />
 
             <div className="max-h-[70vh] space-y-2 overflow-y-auto pr-1">
@@ -131,9 +152,14 @@ export default function PaperComposePage() {
                     thumbnailUrl={thumbnails.urls.get(row.image_path) ?? null}
                     added={paper.added.has(row.id)}
                     showEditLink={false}
+                    selectMode={bulk.selection.selectMode}
+                    selected={bulk.selection.isSelected(row.id)}
+                    onToggleSelect={() => bulk.selection.toggle(row.id)}
                     onOpen={() => setOpenId(row.id)}
-                    onAdd={() => paper.add(row)}
-                    dragHandlers={{
+                    // ⚠️ 선택 모드에서는 ＋ 와 끌기를 내주지 않는다. 카드 전체가 이미 선택
+                    //    토글이라, 손잡이를 잡으면 끌기와 선택이 같은 포인터를 두고 다툰다
+                    onAdd={bulk.selection.selectMode ? undefined : () => paper.add(row)}
+                    dragHandlers={bulk.selection.selectMode ? undefined : {
                       ...drag.handlers,
                       onPointerDown: (e) => {
                         setSource({ kind: 'add', row });
@@ -150,7 +176,7 @@ export default function PaperComposePage() {
               <div className="flex items-center justify-center gap-2">
                 <Button
                   type="button" variant="outline" size="sm"
-                  onClick={() => archive.patch({ page: archive.filters.page - 1 })}
+                  onClick={() => bulk.patch({ page: archive.filters.page - 1 })}
                   disabled={archive.filters.page <= 0}
                 >
                   이전
@@ -160,7 +186,7 @@ export default function PaperComposePage() {
                 </span>
                 <Button
                   type="button" variant="outline" size="sm"
-                  onClick={() => archive.patch({ page: archive.filters.page + 1 })}
+                  onClick={() => bulk.patch({ page: archive.filters.page + 1 })}
                   disabled={archive.filters.page >= archive.pageCount - 1}
                 >
                   다음
