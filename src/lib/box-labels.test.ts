@@ -40,7 +40,14 @@ describe('isBoxLabel / boxKind', () => {
 
   it('정화기가 쓰는 검증기와 같은 목록이다', () => {
     expect(isBoxLabel('조건')).toBe(true);
-    expect(isBoxLabel('바')).toBe(false);
+    expect(isBoxLabel('카')).toBe(false);
+  });
+
+  it('(바)·(사)도 글 구분이다 — 실제 시험지가 (마)를 넘겨 쓴다', () => {
+    expect(normalizeBoxLabel('(바)')).toBe('바');
+    expect(boxKind('사')).toBe('paren');
+    expect(boxKind('차')).toBe('paren');
+    expect(normalizeBoxLabel('(카)')).toBeNull();
   });
 });
 
@@ -66,6 +73,30 @@ describe('normalizeBoxAttributes', () => {
   it('못 다듬는 값은 속성만 지우고 상자와 내용은 남긴다', () => {
     const out = normalizeBoxAttributes('<blockquote data-box="ⓐ"><p>글</p></blockquote>');
     expect(out).toBe('<blockquote><p>글</p></blockquote>');
+  });
+
+  it('따옴표 없는 값도 다듬는다 — HTML 로는 유효해서 정화기가 그 값을 읽고 지운다', () => {
+    expect(normalizeBoxAttributes('<blockquote data-box=(가)><p>글</p></blockquote>'))
+      .toBe('<blockquote data-box="가"><p>글</p></blockquote>');
+    expect(normalizeBoxAttributes('<blockquote data-box=보기><p>글</p></blockquote>'))
+      .toBe('<blockquote data-box="보기"><p>글</p></blockquote>');
+    // 못 다듬는 값은 따옴표가 있을 때와 같이 속성만 지운다 → 발문이면 기본값(〈보기〉)이 받는다
+    expect(normalizeBoxAttributes('<blockquote data-box=ⓐ><p>글</p></blockquote>'))
+      .toBe('<blockquote><p>글</p></blockquote>');
+  });
+
+  it('빈 값·값 없는 속성은 지운다 — 정화기가 지우기 전에 걷어야 발문 기본값이 받는다(코덱스 4R)', () => {
+    expect(normalizeBoxAttributes('<blockquote data-box=><p>글</p></blockquote>')).toBe('<blockquote><p>글</p></blockquote>');
+    expect(normalizeBoxAttributes('<blockquote data-box=""><p>글</p></blockquote>')).toBe('<blockquote><p>글</p></blockquote>');
+    expect(normalizeBoxAttributes('<blockquote data-box><p>글</p></blockquote>')).toBe('<blockquote><p>글</p></blockquote>');
+    expect(normalizeBoxAttributes('<blockquote data-box = "(나)" class="x"><p>글</p></blockquote>'))
+      .toBe('<blockquote data-box="나" class="x"><p>글</p></blockquote>');
+  });
+
+  it('본문 글자 data-box 는 건드리지 않는다 — 속성은 여는 태그 안에만 있다(코덱스 5R)', () => {
+    const html = '<p>속성 이름은 <code> data-box </code> 이고 data-box= 라고도 쓴다</p><blockquote data-box=(가)><p>글</p></blockquote>';
+    expect(normalizeBoxAttributes(html))
+      .toBe('<p>속성 이름은 <code> data-box </code> 이고 data-box= 라고도 쓴다</p><blockquote data-box="가"><p>글</p></blockquote>');
   });
 
   it('data-box 가 없으면 원문 그대로 (흔한 경우라 빨리 빠진다)', () => {

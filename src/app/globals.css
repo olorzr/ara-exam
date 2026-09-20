@@ -741,7 +741,12 @@
 .pb-editor .ProseMirror blockquote[data-box='나'],
 .pb-editor .ProseMirror blockquote[data-box='다'],
 .pb-editor .ProseMirror blockquote[data-box='라'],
-.pb-editor .ProseMirror blockquote[data-box='마'] {
+.pb-editor .ProseMirror blockquote[data-box='마'],
+.pb-editor .ProseMirror blockquote[data-box='바'],
+.pb-editor .ProseMirror blockquote[data-box='사'],
+.pb-editor .ProseMirror blockquote[data-box='아'],
+.pb-editor .ProseMirror blockquote[data-box='자'],
+.pb-editor .ProseMirror blockquote[data-box='차'] {
   --pb-box-open: '(';
   --pb-box-close: ')';
   border: 0;
@@ -752,7 +757,12 @@
 .pb-editor .ProseMirror blockquote[data-box='나']::before,
 .pb-editor .ProseMirror blockquote[data-box='다']::before,
 .pb-editor .ProseMirror blockquote[data-box='라']::before,
-.pb-editor .ProseMirror blockquote[data-box='마']::before {
+.pb-editor .ProseMirror blockquote[data-box='마']::before,
+.pb-editor .ProseMirror blockquote[data-box='바']::before,
+.pb-editor .ProseMirror blockquote[data-box='사']::before,
+.pb-editor .ProseMirror blockquote[data-box='아']::before,
+.pb-editor .ProseMirror blockquote[data-box='자']::before,
+.pb-editor .ProseMirror blockquote[data-box='차']::before {
   position: static;
   display: block;
   transform: none;

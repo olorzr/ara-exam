@@ -57,10 +57,37 @@ export function normalizeOcrPassageHtml(html: string): string {
 }
 
 /**
- * 발문 다듬기 — 지문과 같고 배점 표기만 더 지운다.
+ * 말머리(`data-box`)가 없는 상자의 여는 태그 — 속성 순서와 무관하게 잡는다.
+ * 태그 이름을 잡아 두는 것은 철자(`<BLOCKQUOTE>`)를 그대로 돌려주기 위해서다 — 여기서 소문자로
+ * 바꿔 쓰면 이 함수가 상자 말머리 말고 다른 것도 고친 셈이 된다(정화기가 나중에 어차피 맞춘다).
+ */
+const BARE_BLOCKQUOTE_RE = /<(blockquote)(?![^>]*\sdata-box\s*=)(\s[^>]*)?>/gi;
+
+/**
+ * 발문 안 **말머리 없는 상자**를 〈보기〉로 삼는다.
+ *
+ * 시험지는 발문 아래 상자에 '〈보기〉' 를 안 찍기도 한다(문법 문항의 예문·대화 상자). 모델은
+ * 그 상자를 `<blockquote>` 로만 내는데, 인쇄 CSS 는 `blockquote[data-box]` 만 상자로 그리므로
+ * **테두리도 말머리도 없이 들여쓰기만 된 글**로 찍혔다(2025 동마중 22·25·28~30번, 2026-09-20).
+ * 발문 안에서 상자로 묶은 것은 곧 〈보기〉다 — 지문은 여기 해당하지 않는다(인용 글일 수 있다).
+ *
+ * ⚠️ `normalizeBoxAttributes` **뒤에** 돌아야 한다. 허용 목록 밖 말머리('활동지')는 그 함수가
+ *    속성째 지워 맨 상자가 되고, 여기서 〈보기〉로 받는다 — 순서를 바꾸면 그 상자만 빠진다.
+ * @param html - 발문 HTML (말머리 다듬기가 끝난 것)
+ * @returns 모든 상자에 말머리가 붙은 HTML
+ */
+export function defaultStemBoxes(html: string): string {
+  // 빠른 탈출도 정규식과 같이 대소문자를 안 가린다 — `<BLOCKQUOTE>` 도 유효한 태그다(코덱스 3R)
+  if (!/<blockquote/i.test(html)) return html;
+  return html.replace(BARE_BLOCKQUOTE_RE, (_m, tag: string, attrs: string | undefined) =>
+    `<${tag} data-box="보기"${attrs ?? ''}>`);
+}
+
+/**
+ * 발문 다듬기 — 지문과 같고, 배점 표기를 지우고, 말머리 없는 상자를 〈보기〉로 삼는다.
  * @param html - 모델이 낸 발문 HTML
  * @returns 정화에 넘길 HTML
  */
 export function normalizeOcrStemHtml(html: string): string {
-  return stripPrintedScore(normalizeOcrPassageHtml(html));
+  return defaultStemBoxes(stripPrintedScore(normalizeOcrPassageHtml(html)));
 }

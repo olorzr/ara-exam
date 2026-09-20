@@ -3,7 +3,7 @@
  *
  * 국어 시험지에는 세 종류가 나온다:
  *  - `〈보기〉`·`〈자료〉`·`〈조건〉` (번호가 붙기도 한다: 〈보기 1〉) — 테두리 상자
- *  - `(가) (나) (다)` — 글을 여러 편 싣고 가르는 표시
+ *  - `(가) (나) (다)` … `(차)` — 글을 여러 편 싣고 가르는 표시
  *  - `[A] [B]` — 지문 안의 한 구간을 가리키는 표시
  *
  * ⚠️ 값은 **괄호 없이 말머리만** 담는다. 괄호는 인쇄 CSS 가 종류에 따라 붙인다
@@ -15,8 +15,14 @@
 /** 테두리 상자로 그리는 말머리 (번호가 붙을 수 있다) */
 const BOX_WORDS = ['보기', '자료', '조건'] as const;
 
-/** (가)~(마) 로 그리는 말머리 */
-const PAREN_LABELS = ['가', '나', '다', '라', '마'] as const;
+/**
+ * (가)~(차) 로 그리는 말머리.
+ *
+ * ⚠️ 처음엔 (마)까지였는데, 실제 시험지가 (바)·(사)까지 쓴다(2023 행당중 편지글, 2021 행당중
+ *    양반전). 목록 밖 값은 정화기가 속성째 지워 **말머리 없는 맨 blockquote** 로 남았다 —
+ *    인쇄물에 '(바)' 머리글이 사라지고 본문만 들여쓰기로 찍혔다(2026-09-20).
+ */
+const PAREN_LABELS = ['가', '나', '다', '라', '마', '바', '사', '아', '자', '차'] as const;
 
 /** [A]~[E] 로 그리는 말머리 */
 const BRACKET_LABELS = ['A', 'B', 'C', 'D', 'E'] as const;
@@ -85,8 +91,26 @@ export function normalizeBoxLabel(raw: string): string | null {
   return isBoxLabel(value) ? value : null;
 }
 
-/** `data-box="…"` 를 찾는다 — 값만 바꾸고 나머지 마크업은 건드리지 않는다 */
-const DATA_BOX_ATTR = /\sdata-box\s*=\s*("([^"]*)"|'([^']*)')/g;
+/**
+ * `data-box="…"` 를 찾는다 — 값만 바꾸고 나머지 마크업은 건드리지 않는다.
+ *
+ * ⚠️ 따옴표 없는 값(`data-box=(가)`)도 잡는다(코덱스 리뷰 2R). HTML 로는 유효한 표기라 정화기가
+ *    값 '(가)' 로 읽고 허용 목록 밖이라며 속성째 지운다 — 여기서 못 잡으면 발문 기본값
+ *    (normalize-html.ts `defaultStemBoxes`)도 "이미 말머리가 있다" 고 보고 지나쳐 상자가 사라진다.
+ *    따옴표 없는 값의 끝은 HTML 규칙대로 공백·`>`·따옴표·`=`·`<`·백틱 앞까지다.
+ * ⚠️ **빈 값(`data-box=`·`data-box=""`)과 값 없는 속성(`data-box`)도 잡는다**(코덱스 리뷰 4R) —
+ *    못 다듬는 값과 같이 속성째 지운다. 안 잡으면 발문 기본값이 "말머리가 있다" 고 보고 지나치고,
+ *    정화기가 빈 값을 지워 결국 맨 상자가 된다. 끝의 lookahead 는 `data-boxes` 같은 딴 속성을 막는다.
+ */
+const DATA_BOX_ATTR = /\sdata-box(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]*)))?(?=[\s/>])/gi;
+
+/**
+ * 여는 태그 — 속성은 **이 안에서만** 다듬는다(코덱스 리뷰 5R).
+ * 문서 전체에 위 정규식을 돌리면 본문 글자 ` data-box ` (예: 속성 이름을 설명하는 <code>)도
+ * 값 없는 속성으로 보고 지운다 — 되돌릴 수 없는 본문 손실이다. 본문에는 원시 `<` 가 없고
+ * 닫는 태그는 `/` 로 시작하므로 `<글자…>` 만 잡으면 속성 자리만 남는다.
+ */
+const OPEN_TAG_RE = /<[a-z][^<>]*>/gi;
 
 /**
  * HTML 안의 모든 `data-box` 값을 허용 말머리로 다듬는다.
@@ -98,11 +122,12 @@ const DATA_BOX_ATTR = /\sdata-box\s*=\s*("([^"]*)"|'([^']*)')/g;
  * @returns 값이 다듬어진 HTML (못 다듬는 값은 속성째 제거)
  */
 export function normalizeBoxAttributes(html: string): string {
-  if (!html.includes('data-box')) return html;
-  return html.replace(DATA_BOX_ATTR, (_match, _quoted, dq, sq) => {
-    const label = normalizeBoxLabel(dq ?? sq ?? '');
-    return label ? ` data-box="${label}"` : '';
-  });
+  if (!/data-box/i.test(html)) return html;
+  return html.replace(OPEN_TAG_RE, (tag) =>
+    tag.replace(DATA_BOX_ATTR, (_match, dq, sq, bare) => {
+      const label = normalizeBoxLabel(dq ?? sq ?? bare ?? '');
+      return label ? ` data-box="${label}"` : '';
+    }));
 }
 
 /** 편집기 '상자·구역' 선택지 — 값은 저장되는 말머리, 라벨은 인쇄 모양 그대로 */
