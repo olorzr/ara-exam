@@ -52,7 +52,9 @@ export default function ProblemPaperView({
     <A4Document
       blocks={blocks}
       columns={paper.settings.columns}
-      className="pb-sheet"
+      // `--paper` 가 문항 사이를 넓힌다(다른 `.pb-sheet` 문서는 그대로). A4Document 가 이 클래스를
+      // 측정 컨테이너와 낱장 양쪽에 붙이므로 넓힌 만큼이 배정에도 들어간다
+      className="pb-sheet pb-sheet--paper"
       firstPageHeader={
         // 머리글에 출처를 모아 찍지 않는다 — 출처는 문항마다 그 자리에 있다(`showSource`)
         // 이름·점수란은 학생 종이에만 — 교사용에 두면 채점표처럼 보인다

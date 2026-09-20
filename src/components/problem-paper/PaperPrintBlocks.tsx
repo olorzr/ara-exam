@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { sanitizeInlineHTML, sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import { choiceGlyph } from '@/lib/problem-bank/choices';
 import { renderFiguresInHtml, unplacedFigures } from '@/lib/problem-bank/figure-render';
-import { correctChoiceIndex } from '@/lib/problem-paper/answers';
+import { correctChoiceIndex, splitsExplanation } from '@/lib/problem-paper/answers';
 import type { PaperBlock } from '@/lib/problem-paper/blocks';
 import { stripTrailingEmptyParagraphs } from '@/lib/problem-paper/html-trim';
 import { hasYetHangul } from '@/lib/yet-hangul';
@@ -77,7 +77,7 @@ export function renderPaperBlocks({
 
       case 'problem-image':
         return (
-          <div key={block.key} className="pb-q">
+          <div key={block.key} className={problemClassName(block.snapshot, showAnswers)}>
             {/* 출처 표시는 글 문항과 같아야 한다 — 그림 문항만 빠지면 표기가 들쭉날쭉해진다 */}
             {settings.showSource && <SourceLine source={block.snapshot.source} />}
             <div className="pb-q__head">
@@ -126,6 +126,27 @@ export function renderPaperBlocks({
   });
 }
 
+/**
+ * 문항 블록의 클래스 — 글 문항과 그림 문항이 **같은 함수**를 쓴다.
+ *
+ * ⚠️ `pb-q--continues` 는 "이 문항의 해설이 따로 흘러간다" 는 뜻이라, 판정을 블록을 만드는
+ *    쪽([blocks.ts](../../lib/problem-paper/blocks.ts))과 **같은 `splitsExplanation`** 으로 해야 한다.
+ *    갈리면 문항 사이 간격이 두 번 들어가거나(해설이 따로 나갔는데 문항이 제 여백을 그대로 짊)
+ *    아예 사라진다(문항이 여백을 줄였는데 해설 조각이 안 나온다).
+ * @param snapshot - 문항 스냅샷
+ * @param showAnswers - 교사용인가 (학생 문제지에는 해설이 아예 안 나간다)
+ * @param yetHangul - 옛한글 문항인가 (발문·선지는 고딕)
+ * @returns 공백으로 이은 클래스 문자열
+ */
+function problemClassName(
+  snapshot: PaperItemSnapshot, showAnswers: boolean, yetHangul = false,
+): string {
+  const classes = ['pb-q'];
+  if (yetHangul) classes.push('yet-hangul');
+  if (showAnswers && splitsExplanation(snapshot.explanation_html)) classes.push('pb-q--continues');
+  return classes.join(' ');
+}
+
 interface ProblemBlockProps {
   number: number;
   snapshot: PaperItemSnapshot;
@@ -171,7 +192,7 @@ function ProblemBlock({ number, snapshot, settings, imageUrls, showAnswers }: Pr
   const answerIndex = showAnswers ? correctChoiceIndex(snapshot.question_type, snapshot.answer) : null;
 
   return (
-    <div className={`pb-q${yetHangul ? ' yet-hangul' : ''}`}>
+    <div className={problemClassName(snapshot, showAnswers, yetHangul)}>
       {settings.showSource && <SourceLine source={snapshot.source} />}
 
       <div className="pb-q__head">
