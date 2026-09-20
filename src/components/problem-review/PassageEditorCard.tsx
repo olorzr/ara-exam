@@ -53,10 +53,18 @@ interface PassageEditorCardProps {
   onMergeIntoPrevious?: () => void;
   /** 본문에 끼운 그림들의 서명 URL */
   figureUrls?: Map<string, string>;
-  /** 원본에서 끌어 잡기를 시작한다 — 페이지가 끝난 영역을 넘겨준다 */
-  onStartCapture?: (handler: (bbox: Bbox, pageUrl: string) => void) => void;
+  /**
+   * 원본에서 끌어 잡기를 시작한다 — 페이지가 끝난 영역을 넘겨준다.
+   * `figureIndex` 를 주면 **그 자리의 그림을 다시 자르는** 모드다.
+   */
+  onStartCapture?: (
+    handler: (bbox: Bbox, pageUrl: string) => void,
+    figureIndex?: number,
+  ) => void;
   /** 지금 이 카드가 영역을 기다리는 중인가 */
   capturing?: boolean;
+  /** 다시 자르려고 기다리는 그림의 순번. 새로 붙이는 중이면 null */
+  capturingFigure?: number | null;
 }
 
 /**
@@ -67,7 +75,7 @@ interface PassageEditorCardProps {
 export default function PassageEditorCard({
   passage, problemCount, areaTree, unitTree, selected, onSelect, onSave, onDelete, onDirtyChange,
   issues, onContinue, continuing, sourcePageCount, onMergeIntoPrevious,
-  figureUrls, onStartCapture, capturing,
+  figureUrls, onStartCapture, capturing, capturingFigure,
 }: PassageEditorCardProps) {
   // 값과 함께 최신 ref 를 든다 — 그림을 붙이는 동안 친 글을 잃지 않으려면
   // 다 올린 **뒤에** 본문을 읽어야 한다
@@ -266,7 +274,19 @@ export default function PassageEditorCard({
           urls={figureUrls ?? new Map()}
           onRemove={figures.remove}
           onStartCapture={onStartCapture ? () => onStartCapture(figures.capture) : undefined}
+          onStartRecapture={onStartCapture
+            ? (index) => {
+              // ⚠️ **누를 때의** 목록을 통째로 닫아 둔다. 기다리는 사이 앞 그림을 빼면
+              //    번호가 당겨져 그 번호가 다른 그림을 가리킨다(코덱스 1R·2R)
+              const expected = [...pathsRef.current];
+              onStartCapture(
+                (bbox, pageUrl) => figures.recapture(index, bbox, pageUrl, expected), index,
+              );
+            }
+            : undefined}
           capturing={capturing}
+          capturingFigure={capturing ? capturingFigure : null}
+          imageMode={passage.render_mode === 'image'}
           busy={figures.busy}
         />
 

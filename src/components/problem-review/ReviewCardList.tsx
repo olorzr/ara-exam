@@ -45,8 +45,14 @@ interface ReviewCardListProps {
   figureUrls?: Map<string, string>;
   /** 어느 카드가 원본에서 영역을 기다리는 중인가 */
   capturingId?: string | null;
-  /** 카드가 '그림 추가' 를 눌렀을 때 — 끝난 영역을 그 카드에 돌려준다 */
-  onStartCapture?: (id: string, handler: (bbox: Bbox, pageUrl: string) => void) => void;
+  /** 그 카드가 **다시 자르려고** 기다리는 그림의 순번. 새로 붙이는 중이면 null */
+  capturingFigure?: number | null;
+  /** 카드가 '그림 추가'·'다시 자르기' 를 눌렀을 때 — 끝난 영역을 그 카드에 돌려준다 */
+  onStartCapture?: (
+    id: string,
+    handler: (bbox: Bbox, pageUrl: string) => void,
+    figureIndex?: number,
+  ) => void;
 }
 
 /**
@@ -59,7 +65,7 @@ export default function ReviewCardList({
   rows, passages, problems, mountKey, areaTree, unitTree, selectedId, issues,
   onSelect, onDirtyChange, savePassage, saveProblem, toggleVerified, deletePassage, deleteProblem,
   continuePassage, continuingId, sourcePageCount, mergePassage,
-  figureUrls, capturingId, onStartCapture,
+  figureUrls, capturingId, capturingFigure, onStartCapture,
 }: ReviewCardListProps) {
   if (rows.length === 0) {
     return (
@@ -115,8 +121,9 @@ export default function ReviewCardList({
                 : undefined}
               figureUrls={figureUrls}
               capturing={capturingId === passage.id}
+              capturingFigure={capturingId === passage.id ? capturingFigure : null}
               onStartCapture={onStartCapture
-                ? (handler) => onStartCapture(passage.id, handler)
+                ? (handler, figureIndex) => onStartCapture(passage.id, handler, figureIndex)
                 : undefined}
             />
           );
@@ -145,8 +152,9 @@ export default function ReviewCardList({
             onDelete={() => deleteProblem(problem.id)}
             figureUrls={figureUrls}
             capturing={capturingId === problem.id}
+            capturingFigure={capturingId === problem.id ? capturingFigure : null}
             onStartCapture={onStartCapture
-              ? (handler) => onStartCapture(problem.id, handler)
+              ? (handler, figureIndex) => onStartCapture(problem.id, handler, figureIndex)
               : undefined}
           />
         );

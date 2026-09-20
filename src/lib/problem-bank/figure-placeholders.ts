@@ -163,3 +163,27 @@ export function removeFigureAt(
   }).join('');
   return { html: nextHtml, paths: nextPaths };
 }
+
+/**
+ * 그림 하나를 **같은 자리에 갈아끼운다** (잘못 잘린 그림을 다시 자를 때).
+ *
+ * ⚠️ 본문을 건드리지 않는다 — 번호가 그대로라 자리표시자도 그대로다. 빼고 다시 붙이는
+ *    길(`removeFigureAt` → 끝에 붙이기)로 고치면 그림이 **맨 뒤로 가고 뒷번호가 당겨져**,
+ *    편집기에서 `그림 n` 칩을 도로 옮겨야 한다.
+ * ⚠️ 옛 파일은 **지우지 않는다**(`dropFigure` 와 같은 규약) — 이미 만든 문제지가 그 경로를
+ *    스냅샷에 들고 있어 지우면 인쇄물에서 그 자리가 빈칸이 된다.
+ * @param paths - 그림 경로들 (1번이 index 0)
+ * @param index - 갈아끼울 그림의 1-based 순번. 빈 자리('')도 채울 수 있다
+ * @param path - 새 그림의 Storage 경로
+ * @returns 그 자리만 바뀐 새 경로 목록
+ */
+export function replaceFigureAt(
+  paths: readonly string[],
+  index: number,
+  path: string,
+): string[] {
+  if (!Number.isInteger(index) || index < 1 || index > paths.length) {
+    throw new Error(`그림 번호가 잘못됐어요: ${index}`);
+  }
+  return paths.map((old, i) => (i === index - 1 ? path : old));
+}

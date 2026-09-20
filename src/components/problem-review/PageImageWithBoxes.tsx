@@ -28,6 +28,15 @@ interface PageImageWithBoxesProps {
   capturing?: boolean;
   /** 끌어 잡기가 끝났을 때. 0~1 정규화 사각형이 온다 */
   onCapture?: (bbox: Bbox) => void;
+  /**
+   * 이 쪽 이미지를 **다시 받아 온다**(서명 URL 재발급). 없으면 실패해도 단추를 안 낸다.
+   */
+  onReloadSrc?: () => void;
+  /**
+   * 잡는 중에 **자리만 알려 줄** 항목. 그 영역을 점선으로 남겨 어느 문항의 그림을
+   * 잡는 중인지 보여 준다 — 단추는 드래그를 먹으므로 그리지 않는다.
+   */
+  highlightId?: string | null;
 }
 
 /**
@@ -37,7 +46,7 @@ interface PageImageWithBoxesProps {
  * 빠뜨린 문장이나 잘못 읽은 글자를 알아챌 수 없다.
  */
 export default function PageImageWithBoxes({
-  src, boxes, selectedId, onSelect, capturing, onCapture,
+  src, boxes, selectedId, onSelect, capturing, onCapture, highlightId, onReloadSrc,
 }: PageImageWithBoxesProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   /** 끌고 있는 중의 사각형 (화면 좌표, wrap 기준) */
@@ -45,12 +54,27 @@ export default function PageImageWithBoxes({
   // 어느 이미지가 실제로 로드됐는지 기억한다. 불리언 + 효과로 되돌리면
   // 쪽을 넘길 때 옛 이미지 크기에 맞춰 영역이 잠깐 어긋난 자리에 그려진다
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
+  // 못 불러온 쪽도 기억한다 — 잡기가 조용히 안 되는 까닭을 말해 줘야 한다(코덱스 리뷰 2R)
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const ready = loadedSrc === src;
+  const failed = failedSrc === src;
 
   if (!src) {
+    // ⚠️ 여기도 다시 받을 길을 낸다(코덱스 리뷰 4R). 처음 서명에 실패하면 주소가 아예
+    //    없어 `<img>` 의 onError 조차 안 나므로, 이 자리에 단추가 없으면 그 쪽은
+    //    **새로고침 말고는** 되살릴 수 없다
     return (
-      <div className="flex h-64 items-center justify-center rounded border border-dashed border-gray-300 text-sm text-gray-400">
-        페이지 이미지가 없어요
+      <div className="flex h-64 flex-col items-center justify-center gap-2 rounded border border-dashed border-gray-300 text-sm text-gray-400">
+        <span>페이지 이미지가 없어요</span>
+        {onReloadSrc && (
+          <button
+            type="button"
+            onClick={onReloadSrc}
+            className="text-primary underline underline-offset-2"
+          >
+            다시 불러오기
+          </button>
+        )}
       </div>
     );
   }
@@ -63,7 +87,10 @@ export default function PageImageWithBoxes({
   };
 
   const startDrag = (e: React.PointerEvent) => {
-    if (!capturing) return;
+    // ⚠️ 그림이 뜨기 전에는 받지 않는다. 쪽을 넘긴 직후에는 `<img>` 가 아직 비어 있어
+    //    감싼 칸이 접혀 있고, 그 좌표로 자르면 **엉뚱한 자리**가 새 쪽에서 잘려 나온다
+    //    (다시 자르기가 쪽을 자동으로 넘기면서 이 창이 실제로 열렸다 — 코덱스 1R)
+    if (!capturing || !ready) return;
     const at = pointAt(e);
     if (!at) return;
     // ⚠️ 기본 동작을 막아야 한다. 안 막으면 브라우저가 **이미지 끌어놓기**를 시작하면서
@@ -96,6 +123,11 @@ export default function PageImageWithBoxes({
     onCapture(pixelRectToBbox(rect, at.w, at.h));
   };
 
+  // 잡는 중에 자리를 알려 줄 영역 — 이 쪽에 없으면(쪽을 넘어가는 지문) 아무것도 안 그린다
+  const hint = capturing && highlightId
+    ? boxes.find((box) => box.id === highlightId)
+    : undefined;
+
   const live = drag && {
     left: Math.min(drag.x0, drag.x1),
     top: Math.min(drag.y0, drag.y1),
@@ -127,7 +159,28 @@ export default function PageImageWithBoxes({
         draggable={false}
         onDragStart={(e) => e.preventDefault()}
         onLoad={() => setLoadedSrc(src)}
+        onError={() => setFailedSrc(src)}
       />
+
+      {/* 잡으라고 해 놓고 아무 일도 안 나면 고장인 줄 안다 */}
+      {(failed || (capturing && !ready)) && (
+        <div className="absolute inset-x-0 top-2 flex justify-center">
+          <span className="flex items-center gap-2 rounded bg-black/70 px-2 py-1 text-[11px] text-white">
+            {failed ? '원본을 불러오지 못했어요.' : '원본을 불러오는 중이에요…'}
+            {/* ⚠️ 서명 URL 은 한 시간이면 만료된다 — 같은 주소를 다시 불러선 못 살린다.
+                부르는 쪽이 **새로 서명해** src 를 갈아 끼운다(코덱스 리뷰 3R) */}
+            {failed && onReloadSrc && (
+              <button
+                type="button"
+                onClick={onReloadSrc}
+                className="underline underline-offset-2"
+              >
+                다시 불러오기
+              </button>
+            )}
+          </span>
+        </div>
+      )}
       {/* 끌어 잡는 중에는 영역 단추를 걷어 낸다 — 겹치면 드래그가 상자에 먹힌다 */}
       {ready && !capturing && boxes.map((box) => {
         const selected = box.id === selectedId;
@@ -157,6 +210,23 @@ export default function PageImageWithBoxes({
           </button>
         );
       })}
+
+      {/* 드래그를 먹지 않게 pointer-events 를 끈다 — 단추로 두면 그림을 못 잡는다 */}
+      {ready && hint && (
+        <div
+          className="pointer-events-none absolute rounded border-2 border-dashed border-primary/60"
+          style={{
+            left: `${hint.bbox.x * 100}%`,
+            top: `${hint.bbox.y * 100}%`,
+            width: `${hint.bbox.w * 100}%`,
+            height: `${hint.bbox.h * 100}%`,
+          }}
+        >
+          <span className="absolute left-0 top-0 rounded-br bg-primary px-1 text-[10px] text-white">
+            {hint.label}
+          </span>
+        </div>
+      )}
 
       {live && (
         <div

@@ -13,6 +13,7 @@ import {
 } from '@/lib/problem-bank/mutations';
 import { countTaggedUnits, setSourceTextbook } from '@/lib/problem-bank/mutations-source';
 import { sourcePagePath } from '@/lib/problem-bank/storage-paths';
+import { signProblemFiles } from '@/lib/problem-bank/storage';
 import { joinWorkTitles, normalizePassageWorks } from '@/lib/problem-bank/work-title';
 import type { Passage, PassageWork, Problem, ProblemSource } from '@/types/problem-bank';
 
@@ -331,10 +332,32 @@ export function useProblemReview(sourceId: string) {
     [pageUrls, sourceId],
   );
 
+  /**
+   * 그 쪽 이미지의 서명 URL 을 **다시 받아 온다.**
+   *
+   * 서명은 한 시간이면 만료되는데(`SIGN_TTL_SECONDS`) 검수는 그보다 오래 걸린다 —
+   * 그때부터 원본이 안 뜨고, 새로고침 말고는 되살릴 길이 없었다. 화면 전체를 다시 읽지
+   * 않고 그 쪽 하나만 새로 서명한다(고치던 입력을 잃지 않는다).
+   * @param page - 쪽 번호
+   * @returns 다시 받았는가
+   */
+  const reloadPageUrl = useCallback(async (page: number): Promise<boolean> => {
+    const path = sourcePagePath(sourceId, page);
+    try {
+      const signed = await signProblemFiles([path]);
+      const url = signed.get(path);
+      if (!url) return false;
+      setPageUrls((prev) => new Map(prev).set(path, url));
+      return true;
+    } catch {
+      return false;
+    }
+  }, [sourceId]);
+
   return {
     source, passages, problems, loading, busy, error, verifiedCount, reloadSeq, mountKey,
     figureUrls: figureImages.urls,
     reload: load, saveProblem, savePassage, toggleVerified, changeTextbook,
-    removeProblem, removePassage, mergePassageInto, pageUrlFor,
+    removeProblem, removePassage, mergePassageInto, pageUrlFor, reloadPageUrl,
   };
 }

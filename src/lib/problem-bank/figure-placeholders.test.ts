@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  figureNumbersIn, reconcileFigurePlaceholders, removeFigureAt,
+  figureNumbersIn, reconcileFigurePlaceholders, removeFigureAt, replaceFigureAt,
   shiftFigurePlaceholders, splitByFigurePlaceholders,
 } from './figure-placeholders';
 
@@ -105,5 +105,29 @@ describe('removeFigureAt', () => {
     const res = removeFigureAt('<p>글</p>', ['a.jpg'], 1);
     expect(res.paths).toEqual([]);
     expect(res.html).toBe('<p>글</p>');
+  });
+});
+
+describe('replaceFigureAt', () => {
+  it('그 자리만 갈아끼운다 — 번호가 그대로라 본문 자리표시자도 그대로다', () => {
+    expect(replaceFigureAt(['a.jpg', 'b.jpg', 'c.jpg'], 2, 'new.jpg'))
+      .toEqual(['a.jpg', 'new.jpg', 'c.jpg']);
+  });
+
+  it("만들지 못한 빈 자리('')도 채울 수 있다 — 그 자리를 되살리는 길이다", () => {
+    expect(replaceFigureAt(['a.jpg', ''], 2, 'new.jpg')).toEqual(['a.jpg', 'new.jpg']);
+  });
+
+  it('입력 배열을 건드리지 않는다 — 부르는 쪽이 옛 값과 견줘 미저장을 판정한다', () => {
+    const paths = ['a.jpg', 'b.jpg'];
+    replaceFigureAt(paths, 1, 'new.jpg');
+    expect(paths).toEqual(['a.jpg', 'b.jpg']);
+  });
+
+  it('없는 번호는 던진다 — 조용히 넘기면 올린 그림이 어디에도 안 붙는다', () => {
+    expect(() => replaceFigureAt(['a.jpg'], 0, 'new.jpg')).toThrow();
+    expect(() => replaceFigureAt(['a.jpg'], 2, 'new.jpg')).toThrow();
+    expect(() => replaceFigureAt([], 1, 'new.jpg')).toThrow();
+    expect(() => replaceFigureAt(['a.jpg'], 1.5, 'new.jpg')).toThrow();
   });
 });

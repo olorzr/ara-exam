@@ -12,6 +12,7 @@ import { useAiEnabled } from '@/hooks/useAiEnabled';
 import { usePassageContinuation } from '@/hooks/usePassageContinuation';
 import { useReviewGuards } from '@/hooks/useReviewGuards';
 import { useSourceDelete } from '@/hooks/useSourceDelete';
+import { useFigureCapture } from '@/hooks/useFigureCapture';
 import { setSourceStatus } from '@/lib/problem-bank/mutations-source';
 import PageImageWithBoxes, { type BoxOverlay } from '@/components/problem-review/PageImageWithBoxes';
 import ReviewCardList, { type ReviewRow } from '@/components/problem-review/ReviewCardList';
@@ -19,7 +20,6 @@ import ReviewHeader from '@/components/problem-review/ReviewHeader';
 import AnswerKeyFiles from '@/components/problem-review/AnswerKeyFiles';
 import OcrProgress from '@/components/problem-ocr/OcrProgress';
 import { toBbox } from '@/lib/problem-bank/bbox';
-import type { Bbox } from '@/types/problem-bank';
 import { issuesByTargetId } from '@/lib/problem-ocr/warnings';
 
 /**
@@ -46,11 +46,6 @@ function ProblemSourceReviewContent() {
    *    알고 그대로 인쇄하게 된다(코덱스 리뷰 14R).
    */
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
-  // 원본에서 영역을 기다리는 카드와, 잡은 영역을 돌려줄 함수. 한 번에 한 카드만
-  // 잡으므로 함수를 그냥 들고 있으면 된다 — 저장은 본문을 아는 카드가 한다
-  const [capture, setCapture] = useState<
-    { id: string; onBbox: (bbox: Bbox, pageUrl: string) => void } | null
-  >(null);
 
   // 화면에 보이는 쪽 목록.
   //
@@ -67,14 +62,36 @@ function ProblemSourceReviewContent() {
 
   // 어디를 보고 있는가(쪽·강조·스크롤)는 훅 하나가 맡는다 — 상자·카드·경고 칩이
   // 서로 다르게 움직이면 "경고를 눌렀는데 다른 쪽이 보이는" 일이 생긴다
+  /** 쪽·항목을 함께 보는 곳이 둘이라(포커스·끌어 잡기) 한 번만 만든다 */
+  const items = useMemo(
+    () => [...review.passages, ...review.problems],
+    [review.passages, review.problems],
+  );
+
   const focus = useReviewFocus({
     pages,
-    items: [...review.passages, ...review.problems],
+    items,
     loading: review.loading,
     // 주소는 처음 한 번만 읽는다 — 이후 선택은 화면이 들고 있다
     wantedItem: useState(() => searchParams.get('item'))[0],
   });
   const { page } = focus;
+
+  // 원본에서 영역을 기다리는 카드와, 잡은 영역을 돌려줄 함수. 한 번에 한 카드만
+  // 잡으므로 함수를 그냥 들고 있으면 된다 — 저장은 본문을 아는 카드가 한다
+  const capture = useFigureCapture({
+    pageOf: useCallback(
+      (id: string) => items.find((item) => item.id === id)?.page_no,
+      [items],
+    ),
+    // 마운트 세대에 **저장 버전까지** 묶는다 — 잡기를 기다리는 사이 그 카드를 저장하면
+    // 들고 있던 저장 함수가 옛 `updated_at` 을 닫아 두고 있어 충돌로 튕긴다(코덱스 1R)
+    versionOf: useCallback((id: string) => {
+      const item = items.find((entry) => entry.id === id);
+      return item ? `${review.mountKey(id)}|${item.updated_at}` : null;
+    }, [items, review]),
+    setPage: focus.setPage,
+  });
 
   const boxes = useMemo<BoxOverlay[]>(() => {
     const out: BoxOverlay[] = [];
@@ -212,12 +229,12 @@ function ProblemSourceReviewContent() {
             ))}
           </div>
           <AnswerKeyFiles paths={source.answer_key_paths ?? []} />
-          {capture && (
+          {capture.banner && (
             <p className="rounded border border-primary bg-primary/5 px-2 py-1 text-xs text-primary">
-              원본에서 그림을 <strong>끌어서</strong> 잡아 주세요. 잡으면 그 카드의 본문 끝에 붙습니다.
+              {capture.banner}
               <button
                 type="button"
-                onClick={() => setCapture(null)}
+                onClick={capture.cancel}
                 className="ml-2 underline underline-offset-2"
               >
                 그만두기
@@ -229,15 +246,16 @@ function ProblemSourceReviewContent() {
             boxes={boxes}
             selectedId={focus.selectedId}
             onSelect={(id) => focus.focusItem(id)}
-            capturing={Boolean(capture)}
+            capturing={Boolean(capture.target)}
+            highlightId={capture.target?.id ?? null}
+            onReloadSrc={() => { void review.reloadPageUrl(page); }}
             onCapture={(bbox) => {
               const url = review.pageUrlFor(page);
               if (!url) {
                 toast.error('이 쪽의 원본 이미지가 없어 그림을 잘라낼 수 없어요.');
                 return;
               }
-              capture?.onBbox(bbox, url);
-              setCapture(null);
+              capture.deliver(bbox, url);
             }}
           />
         </div>
@@ -266,10 +284,9 @@ function ProblemSourceReviewContent() {
             sourcePageCount={source.page_count}
             mergePassage={guards.mergePassage}
             figureUrls={review.figureUrls}
-            capturingId={capture?.id ?? null}
-            onStartCapture={(id, onBbox) => setCapture(
-              (prev) => (prev?.id === id ? null : { id, onBbox }),
-            )}
+            capturingId={capture.target?.id ?? null}
+            capturingFigure={capture.target?.figureIndex ?? null}
+            onStartCapture={capture.start}
           />
         </div>
       </div>

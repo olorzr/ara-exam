@@ -354,7 +354,9 @@
 - 왜 URL 을 안 넣나: 그림은 비공개 버킷에 있어 **만료되는 서명 URL** 로만 열린다.
   만료된 URL 을 본문에 굳히면 인쇄물에서 빈칸이 된다
 - 코드에서의 사용: `splitByFigurePlaceholders`, `reconcileFigurePlaceholders`,
-  `shiftFigurePlaceholders`, `FigurePlaceholderNode`
+  `shiftFigurePlaceholders`, `replaceFigureAt`, `FigurePlaceholderNode`
+- 다시 자르기: 검수에서 그 자리의 그림만 갈아끼운다(`replaceFigureAt` → 번호가 그대로라
+  본문을 건드리지 않는다). 빼고 다시 붙이면 그림이 맨 뒤로 가고 뒷번호가 당겨진다
 - ⚠️ 편집기에 TipTap 노드가 없으면 글자 하나만 고쳐도 자리표시자가 사라진다
 - 관련 파일: src/lib/problem-bank/figure-placeholders.ts,
   src/components/problem-editor/FigurePlaceholderNode.ts
