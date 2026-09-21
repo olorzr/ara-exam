@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { collectWorkAuthors, tallyWorkCounts, toWorkFacets } from './work-counts';
+import {
+  collectWorkAuthors, collectWorkKinds, tallyWorkCounts, toWorkFacets, workKindOfArea,
+} from './work-counts';
 
 describe('tallyWorkCounts', () => {
   it('한 문항이 여러 작품에 걸리면 **양쪽에서** 센다 — 조회가 배열 포함이라 그게 맞다', () => {
@@ -38,15 +40,90 @@ describe('collectWorkAuthors', () => {
   });
 });
 
+describe('workKindOfArea', () => {
+  it("대영역이 '문학' 이면 문학이다", () => {
+    expect(workKindOfArea(['문학', '산문 문학'])).toBe('literary');
+    expect(workKindOfArea(['문학'])).toBe('literary');
+  });
+
+  it('다른 대영역은 비문학이다', () => {
+    expect(workKindOfArea(['독서와 작문', '독서'])).toBe('nonliterary');
+    expect(workKindOfArea(['화법과 언어', '언어'])).toBe('nonliterary');
+  });
+
+  it('영역이 없으면 모르는 것이다 — 비문학이라고 단정하지 않는다', () => {
+    expect(workKindOfArea([])).toBe('unknown');
+    expect(workKindOfArea([''])).toBe('unknown');
+  });
+});
+
+describe('collectWorkKinds', () => {
+  const row = (titles: string[], areaPath: string[]) => ({
+    works: titles.map((title) => ({ label: '', title, author: '' })),
+    area_path: areaPath,
+  });
+
+  it('지문의 영역으로 작품의 갈래를 정한다', () => {
+    const kinds = collectWorkKinds([
+      row(['동백꽃'], ['문학', '산문 문학']),
+      row(['거울 뉴런'], ['독서와 작문', '독서']),
+    ]);
+    expect(kinds.get('동백꽃')).toBe('literary');
+    expect(kinds.get('거울 뉴런')).toBe('nonliterary');
+  });
+
+  it('지은이가 없어도 문학은 문학이다 — 지은이 유무로 가리지 않는다', () => {
+    const kinds = collectWorkKinds([row(['홍길동전'], ['문학', '산문 문학'])]);
+    expect(kinds.get('홍길동전')).toBe('literary');
+  });
+
+  it('지은이가 있어도 비문학은 비문학이다', () => {
+    const kinds = collectWorkKinds([row(['통일 시대의 우리말'], ['화법과 언어', '언어'])]);
+    expect(kinds.get('통일 시대의 우리말')).toBe('nonliterary');
+  });
+
+  it('갈리면 많은 쪽을 따른다', () => {
+    const many = [row(['꽃'], ['문학']), row(['꽃'], ['문학']), row(['꽃'], ['독서와 작문'])];
+    expect(collectWorkKinds(many).get('꽃')).toBe('literary');
+
+    const other = [row(['수영'], ['독서와 작문']), row(['수영'], ['독서와 작문']), row(['수영'], ['문학'])];
+    expect(collectWorkKinds(other).get('수영')).toBe('nonliterary');
+  });
+
+  it('동률이면 문학으로 둔다', () => {
+    const kinds = collectWorkKinds([row(['머리카락'], ['문학']), row(['머리카락'], ['독서와 작문'])]);
+    expect(kinds.get('머리카락')).toBe('literary');
+  });
+
+  it('영역이 없는 지문은 표를 던지지 않는다 — 그 제목은 지도에 없다', () => {
+    expect(collectWorkKinds([row(['모르는 글'], [])].map((r) => r)).size).toBe(0);
+  });
+
+  it('영역 없는 지문이 섞여도 있는 쪽만 센다', () => {
+    const kinds = collectWorkKinds([row(['동백꽃'], []), row(['동백꽃'], ['문학'])]);
+    expect(kinds.get('동백꽃')).toBe('literary');
+  });
+
+  it('제목이 빈 작품은 세지 않는다', () => {
+    expect(collectWorkKinds([row([''], ['문학'])]).size).toBe(0);
+  });
+});
+
 describe('toWorkFacets', () => {
   it('제목 한글 사전순으로 세우고 모르는 지은이는 빈 문자열이다', () => {
     const facets = toWorkFacets(
       new Map([['엄마 걱정', 3], ['진달래꽃', 5]]),
       new Map([['진달래꽃', '김소월']]),
+      new Map([['엄마 걱정', 'literary'], ['진달래꽃', 'literary']]),
     );
     expect(facets).toEqual([
-      { title: '엄마 걱정', author: '', count: 3 },
-      { title: '진달래꽃', author: '김소월', count: 5 },
+      { title: '엄마 걱정', author: '', count: 3, kind: 'literary' },
+      { title: '진달래꽃', author: '김소월', count: 5, kind: 'literary' },
     ]);
+  });
+
+  it('갈래를 못 정한 작품은 unknown 이다 — 트리가 영역 미지정 폴더로 받는다', () => {
+    const facets = toWorkFacets(new Map([['거울 뉴런', 1]]), new Map(), new Map());
+    expect(facets[0].kind).toBe('unknown');
   });
 });

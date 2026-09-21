@@ -271,6 +271,21 @@ node /Users/ara/Projects/Ara-system/scripts/post-update.js "<HTML>"
 - [2026-09-04] 표 재분할은 한 패스에 **표 하나**만 쪼갠다(상한 32). 표가 많은 개념지는 그만큼 재측정이 돈다 — 렌더가 몇 프레임 늦을 뿐 내용에는 영향이 없다. 페이지 끝에 걸린 조각이 측정 오차로 다시 밀리면 **1행짜리 조각(+반복된 제목 행)** 이 남을 수 있다(내용 유실 없음, 외관 문제)
 
 ## Architecture Decisions
+- [2026-09-21] **작품 트리를 문학·비문학으로 가르고, 지은이순·작품명순을 고르게 했다**([work-counts.ts](src/lib/problem-bank/work-counts.ts), [work-tree.ts](src/lib/problem-bank/work-tree.ts), [work-tree-pref.ts](src/lib/problem-bank/work-tree-pref.ts), [WorkTreePanel.tsx](src/components/problem-bank/WorkTreePanel.tsx)). 제보 둘 — "작품명 ㄱ~ㅎ 순으로 고를지 저자명으로 고를지 선택할 수 있으면" / "이게 비문학 지문일 때가 있더라, 문학과 비문학으로 나뉘면 좋겠다". 되돌리지 말아야 할 판단들:
+  - ⚠️⚠️ **갈래는 `passages.area_path` 의 대영역으로 가린다 — 지은이 유무로 가리지 말 것.** 솔깃한 규칙이지만 **양쪽 반례가 다 있다**: 『홍길동전』·『청노루』는 지은이 없이 문학이고, 『통일 시대의 우리말』(권재일)·『왜 속도를 고민해야 하는가?』(김용섭)는 지은이 있는 비문학이다. 운영 확인(2026-09-21) — 지문 487건 중 484건에 `area_path` 가 있고 대영역은 셋뿐이다(`문학` 217·`독서와 작문` 136·`화법과 언어` 131)
+  - ⚠️ **왜 비문학이 작품 트리에 오르는가**: OCR 규칙([prompt-works.ts](src/lib/problem-ocr/prompt-works.ts))이 "비문학은 **인쇄된 제목이 있을 때만** 적는다" 라서 『거울 뉴런』·『정전기』 같은 글도 `works` 에 든다. `docs/terms.md` 의 "works 가 비면 비문학" 은 **절반만 맞는 말**이었다(비면 비문학이지만, 비문학이라고 늘 비지는 않는다) — 그 문장을 고쳤다
+  - ⚠️ **문항이 아니라 지문의 영역으로 센다.** 문항의 `area_path` 는 *그 물음*의 영역이라, 문학 지문에 딸린 문법 문항은 `화법과 언어 > 언어` 로 태깅된다 — 그것으로 세면 **문학 작품이 비문학이 된다**
+  - **동률은 문학, 영역 없는 지문은 표를 안 던진다.** 표가 하나도 없는 작품은 '영역 미지정' 폴더로 간다(운영 5편) — 문학으로 밀어 넣으면 검수에서 영역을 붙일 실마리가 사라진다. 지은이를 '가장 많이 쓰인 이름' 으로 고르는 `collectWorkAuthors` 와 같은 규약이다
+  - ⚠️ **`'문학'` 은 ara-system 영역 마스터(`public.exam_area_nodes`)의 대영역 이름이다**(초·중·고 세트 공통). 마스터에서 이 이름이 바뀌면 여기도 함께 고쳐야 한다 — `grammar-tree.ts` 의 `GRAMMAR_AREA_NAMES` 와 같은 성질의 상수이고, 그쪽은 시드 파일만 보고 목록을 짰다가 **실데이터에서 전부 안 걸린** 전례가 있다
+  - ⚠️ **`toWorkFacets` 의 `kinds` 는 옵셔널이 아니다.** 빠뜨렸을 때 전부 'unknown' 이 되면 트리가 통째로 '영역 미지정' 폴더 하나가 되는데 화면에는 아무 오류도 안 보인다
+  - ⚠️ **지은이 폴더 키에 갈래를 함께 넣는다**(`author:${JSON.stringify([kind, author])}`). 같은 지은이가 문학·비문학에 다 있으면(성석제의 수필과 학생 글) 키가 겹친다. '지은이 미입력' 폴더도 갈래마다 따로 서야 『홍길동전』과 『거울 뉴런』이 한 폴더에 섞이지 않는다
+  - ⚠️ **잎 id 는 정렬과 무관하게 `workKey` 다.** 정렬을 바꿨다고 고른 작품의 강조가 풀리면 어디를 눌러 이 목록이 됐는지 알 수 없어진다(`WorkTreePanel.picked` 와 한 쌍)
+  - **정렬 선택은 주소가 아니라 localStorage 다.** 필터는 '무엇을 보는가' 라 링크로 주고받아야 하지만 정렬은 '어떻게 보는가' 라 사람마다 다르다 — 주소에 실으면 링크를 받은 사람의 취향까지 바꾼다
+  - ⚠️ **읽기는 lazy `useState` 다 — `useSyncExternalStore` 도, 효과도 아니다.** 효과에서 setState 하면 `set-state-in-effect` 에 걸리고, 수화가 어긋날 자리는 **없다**: [(main)/layout.tsx](src/app/(main)/layout.tsx) 가 `useAuth().loading` 동안 스피너·사용자 없으면 `null` 을 그려 **페이지 내용이 서버에서 렌더되지 않는다**(세션이 localStorage 에만 있다). 선례는 [settings/ai/page.tsx](src/app/(main)/settings/ai/page.tsx) 의 포트 선택이다
+  - ⚠️ **테스트 환경의 `window.localStorage` 는 메서드가 없는 빈 객체다**(jsdom 28 + vitest 4). 앱 코드는 try/catch 로 기본값에 떨어지지만, 그대로 두면 테스트가 **'기본값' 만 확인하고 읽기·쓰기 경로를 한 번도 안 지난다** — 두 테스트가 가짜 저장소를 세워 넣는 까닭이다
+  - ⚠️ **잎 라벨의 이음 글자는 `' — '` 다**(`' · '` 아님). 그 가운뎃점은 작품 여럿을 이은 **파생 문자열**(`passages.title`)의 표기라, 겹쳐 쓰면 '두 작품' 과 '작품 하나 + 지은이' 가 같은 모양이 된다
+  - **`FacetTree` 기본 펼침 깊이(2)는 그대로 둔다** — 갈래(0)·지은이(1) 폴더가 펼쳐지고 잎이 보여 예전과 밀도가 같다. 화면 확인은 로그인(네이버웍스)이 막아 컴포넌트 테스트([WorkTreePanel.test.tsx](src/components/problem-bank/WorkTreePanel.test.tsx))로 대신했다
+  - **`@testing-library/user-event` 는 설치하지 않았다**(새 패키지는 사용자 확인 규약). base-ui Select 팝업은 포털 + 포인터 이벤트라 `fireEvent` 로 못 여므로, 컴포넌트 테스트는 **저장된 선택으로 렌더해** 같은 경로를 지난다
 - [2026-09-21] **단어 시험 객관식을 90A OMR 로 자동 채점한다 — 답안지는 그리지 않고 기성 용지를 쓴다**([vocab-payload.ts](src/lib/vocab-payload.ts), [omr-sheet.ts](src/lib/omr-sheet.ts), [exam-choices.ts](src/lib/exam-choices.ts), [sync-to-grades](src/app/api/sync-to-grades/route.ts)). 되돌리지 말아야 할 판단들:
   - **객관식 정답을 성적 시스템에 함께 보낸다.** 그동안 `format:'subjective'` 고정이라 정답표가 주관식(단어) 한 벌이었다. 이제 문항마다 `{answer, mcAnswer, choices}` 를 실어 ara-system 이 두 벌을 보관한다(`answer_key[].dual`). 어느 쪽으로 채점할지는 **채점할 때** 고른다(사용자 결정)
   - ⚠️ **정답표는 `exam-choices` 를 그대로 호출해 만든다**(셔플을 서버에서 다시 구현하지 말 것 — CLAUDE.md:1092 와 같은 근거). 시드는 **`exam_words.id`**(행 PK, `word_id` 아님)이고 문항 인덱스는 **배열 위치**다. 그래서 `sync-to-grades` 의 select 에 **`id` 가 반드시 있어야** 하고, 배열은 화면(`MultipleChoiceView`)과 **같은 순서**여야 한다

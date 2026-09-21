@@ -54,7 +54,7 @@ describe("'미지정' 칸", () => {
   });
 
   it('자유 텍스트 축(학교·교과서·작품)에는 없다', () => {
-    const axes = build({}, { textbooks: ['천재'] }, { workFacets: [{ title: '동백꽃', author: '김유정', count: 1 }] });
+    const axes = build({}, { textbooks: ['천재'] }, { workFacets: [{ title: '동백꽃', author: '김유정', count: 1, kind: 'literary' }] });
 
     for (const key of ['school_name', 'textbook', 'work_title']) {
       expect(values(axis(axes, key)!), key).not.toContain(UNSPECIFIED_AXIS);

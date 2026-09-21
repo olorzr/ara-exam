@@ -184,13 +184,14 @@
 ## 작품 (PassageWork)
 - 정의: 지문에 실린 글 **한 편** — `{label, title, author}`. `(가) 진달래꽃 – 김소월 / (나) 엄마 걱정 – 기형도` 처럼 한 지문에 여러 편이 실리므로 **지문의 작품은 목록**(`passages.works`)이고, 문항이 묻는 작품도 목록(`problems.work_titles`)이다(sql/33)
 - `label` 은 시험지의 구분 표시를 **괄호 없이** 담는다('가'·'나'). 본문 HTML 의 `<blockquote data-box="가">` 와 같은 표기이고, 인쇄·화면에서 괄호를 다시 붙인다
-- ⚠️ **빈 목록의 뜻이 다르다**: 지문의 `works` 가 비면 '작품이 없는 글'(비문학 발췌)이고, 문항의 `work_titles` 가 비면 **'이 지문 전체'** 여서 트리거가 지문의 작품으로 채운다. 그래서 저장된 문항의 목록은 늘 명시적이다
+- ⚠️ **빈 목록의 뜻이 다르다**: 지문의 `works` 가 비면 '제목을 얻지 못한 글' 이고, 문항의 `work_titles` 가 비면 **'이 지문 전체'** 여서 트리거가 지문의 작품으로 채운다. 그래서 저장된 문항의 목록은 늘 명시적이다
+- ⚠️ **비면 비문학이지만, 비문학이라고 늘 비지는 않는다.** OCR 규칙이 '비문학은 인쇄된 제목이 있을 때만 적는다' 라서 『거울 뉴런』·『정전기』 같은 글도 목록에 든다 — 문학/비문학을 가리려면 [작품 갈래](#작품-갈래-workkind)를 볼 것
 - 표기 정규화는 `normalizePassageWorks`·`splitWorkTitles` ↔ DB `exam.normalize_works`·`exam.split_work_titles` **1:1 거울**이다. 한쪽만 바꾸면 앱이 보낸 값과 트리거가 저장한 값이 갈라진다
 - 관련 파일: src/lib/problem-bank/work-title.ts, src/components/problem-review/PassageWorksEditor.tsx, src/components/problem-review/ProblemWorksField.tsx, sql/33_problem_bank_multi_works.sql
 
 ## 작품명 (work title)
 - 정의: 작품 한 편의 제목. 아카이브 왼쪽 '작품' 탭의 축이고, 문항 조회는 `work_titles` 배열 포함(`contains`)으로 건다 — `(가)(나)` 를 함께 묻는 문항이 **두 작품 어느 쪽으로 훑어도** 나온다
-- 지은이는 **지문의 작품에만** 있다 — 작품 트리가 `지은이 › 작품` 두 단이라 문항의 지은이는 제목으로 되찾는다(`work-counts.ts` 의 `collectWorkAuthors`)
+- 지은이는 **지문의 작품에만** 있다 — 작품 트리가 `갈래 › 지은이 › 작품` 이라 문항의 지은이는 제목으로 되찾는다(`work-counts.ts` 의 `collectWorkAuthors`). 갈래도 같은 방식으로 지문에서 되찾는다
 - 표기 정규화는 `normalizeWorkTitle` ↔ DB `exam.normalize_work_title` **1:1 거울**이다 — 감싸는 기호(「」『』〈〉"")만 양끝에서 벗긴다. 한쪽만 바꾸면 같은 작품이 두 폴더로 갈라진다
 - 지문 → 문항 전파는 **DB 트리거**가 한다(sql/33 `passages_sync_work_titles`). 사람이 문항에 좁혀 적은 작품명은 **자리로 이름만** 따라가고 좁힘 자체는 보존된다
 - ⚠️ **새 작품이 붙을 때 따라가는 것은 작품이 두 편 이상이던 지문뿐이다.** 한 편뿐이던 지문에서는 '전체를 묻는다' 와 '그 한 편으로 좁혔다' 가 저장값으로 구별되지 않아, 따라가게 두면 한 편만 묻던 문항이 **말없이 두 편을 묻는 문항이 된다**(없는 사실을 지어내는 쪽이다). 지문을 합칠 때도 같은 까닭으로 묻는 작품이 늘지 않는다 — 새 작품은 검수 화면에서 체크로 붙인다
@@ -198,6 +199,21 @@
 - ⚠️ 문항이 낸 작품은 **딸린 지문의 작품과 대조**해 없는 이름을 버린다(`parse.ts`). 안 그러면 모델이 지어낸 이름이 트리에 잎으로 남고, 트리거가 '사람이 좁혀 적은 값' 으로 보아 영영 보존한다
 - 코드에서의 사용: `Passage.works`, `Problem.work_titles`, `normalizeWorkTitle`, `buildWorkTree`, `tallyWorkCounts`
 - 관련 파일: src/lib/problem-bank/work-title.ts, src/lib/problem-bank/work-tree.ts, src/lib/problem-bank/work-counts.ts, sql/33_problem_bank_multi_works.sql
+
+## 작품 갈래 (WorkKind)
+- 정의: 작품이 **문학**인가 **비문학**인가. 아카이브 왼쪽 '작품' 탭의 1단 폴더이고 `'literary' | 'nonliterary' | 'unknown'` 셋이다
+- ⚠️ **저장하는 값이 아니라 파생값이다.** 그 작품이 실린 **지문의 영역**(`passages.area_path`)에서 정한다 — 대영역이 `'문학'` 이면 문학, 다른 이름(`'독서와 작문'`·`'화법과 언어'`)이면 비문학, 영역이 없으면 `unknown`('영역 미지정' 폴더)
+- ⚠️ **지은이 유무로 가리면 안 된다**: 『홍길동전』은 지은이 없이 문학이고 『통일 시대의 우리말』(권재일)은 지은이 있는 비문학이다
+- ⚠️ **문항이 아니라 지문의 영역으로 센다.** 문항의 영역은 *그 물음*의 영역이라, 문학 지문에 딸린 문법 문항은 `화법과 언어 > 언어` 로 태깅된다
+- 같은 제목이 두 갈래에 걸리면 **많은 쪽**, 동률이면 문학으로 둔다(지은이를 '가장 많이 쓰인 이름' 으로 고르는 것과 같은 규약)
+- 코드에서의 사용: `WorkKind`, `workKindOfArea`, `collectWorkKinds`, `WorkFacet.kind`
+- 관련 파일: src/lib/problem-bank/work-counts.ts, src/lib/problem-bank/work-tree.ts, src/lib/problem-bank/facets.ts
+
+## 작품 트리 정렬 (WorkTreeOrder)
+- 정의: 작품 탭을 **지은이순**(`'author'`, 기본)으로 볼지 **작품명순**(`'title'`)으로 볼지. 작품명순은 갈래 아래에 작품을 평면으로 세우고 `제목 — 지은이 (n)` 로 적는다
+- ⚠️ **주소(필터)에 싣지 않는다.** 필터는 '무엇을 보는가' 라 링크로 주고받지만 정렬은 '어떻게 보는가' 라 사람마다 다르다 — localStorage 에 브라우저별로 남긴다
+- 코드에서의 사용: `WorkTreeOrder`, `isWorkTreeOrder`, `buildWorkTree(facets, order)`, `readWorkTreeOrder`
+- 관련 파일: src/lib/problem-bank/work-tree.ts, src/lib/problem-bank/work-tree-pref.ts, src/components/problem-bank/WorkTreePanel.tsx
 
 ## 파생 컬럼 (derived work columns)
 - 정의: `passages.title`/`author` 와 `problems.work_title`. 작품 목록을 `' · '` 로 이어 만든 값이고 **DB 트리거가 채운다**(sql/33)

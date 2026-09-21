@@ -1,7 +1,10 @@
 import { supabase } from '@/lib/supabase';
 import { expandGrammarAncestors } from './grammar-tree';
 import { tallyGrammarCounts } from './grammar-counts';
-import { collectWorkAuthors, tallyWorkCounts, toWorkFacets } from './work-counts';
+import {
+  collectWorkAuthors, collectWorkKinds, tallyWorkCounts, toWorkFacets,
+  type PassageWorkRow, type WorkKind,
+} from './work-counts';
 import type { PassageWork } from '@/types/problem-bank';
 import {
   SCHOOL_EXAM_SOURCE_TYPE, schoolExamKey, type SchoolExamFacet,
@@ -137,6 +140,8 @@ export interface WorkFacet {
   author: string;
   /** 이 작품으로 태깅된 문항 수 */
   count: number;
+  /** 문학인가 비문학인가 — 지문의 영역(`area_path`)으로 가린다. 모르면 'unknown' */
+  kind: WorkKind;
 }
 
 /**
@@ -149,8 +154,9 @@ export interface WorkFacet {
  *    아래에 함께 걸린다 — 파생 문자열(`work_title`)로 세면 `'먼 후일 · 독은 아름답다'` 라는
  *    **가짜 작품 하나**가 트리에 생기고 한 편만 골라서는 그 문항이 안 나온다.
  *
- * 지은이는 `problems` 에 없다 — 지문(`passages.works`)에서 같은 제목을 찾아 붙인다.
- * 폴더를 지은이로 나누기 때문이다. 세는 규칙은 `work-counts.ts` 에 있다.
+ * 지은이와 갈래(문학/비문학)는 `problems` 에 없다 — 지문(`passages.works`·`area_path`)에서
+ * 같은 제목을 찾아 붙인다. 폴더를 지은이로 나누고 문학·비문학으로 가르기 때문이다.
+ * 세는 규칙은 `work-counts.ts` 에 있다.
  * @returns 작품 목록 (제목 한글 사전순)
  */
 export async function fetchWorkFacets(): Promise<WorkFacet[]> {
@@ -171,25 +177,39 @@ export async function fetchWorkFacets(): Promise<WorkFacet[]> {
 
   const counts = tallyWorkCounts(rows);
   if (counts.size === 0) return [];
-  return toWorkFacets(counts, await collectPassageAuthors());
+  const meta = await collectPassageWorkMeta();
+  return toWorkFacets(counts, meta.authors, meta.kinds);
 }
 
-/** 지문의 작품에서 제목 → 지은이를 모은다 (가장 많이 쓰인 이름을 고른다) */
-async function collectPassageAuthors(): Promise<Map<string, string>> {
-  const rows: PassageWork[][] = [];
+/**
+ * 지문에서 제목 → 지은이와 제목 → 갈래를 **한 번의 조회로** 모은다.
+ *
+ * 둘로 나누면 같은 표를 두 번 긁는다 — 컬럼 하나를 더 고르는 것뿐이라 왕복이 늘지 않는다.
+ * 작품이 없는 지문은 트리와 무관하므로 `works` 조건은 그대로 둔다.
+ */
+async function collectPassageWorkMeta(): Promise<{
+  authors: Map<string, string>;
+  kinds: Map<string, WorkKind>;
+}> {
+  const rows: PassageWorkRow[] = [];
   for (let from = 0; from < FACET_MAX_ROWS; from += FACET_CHUNK) {
     const { data, error } = await supabase
       .from('passages')
-      .select('works')
+      .select('works, area_path')
       .not('works', 'eq', '[]')
       .order('id')
       .range(from, from + FACET_CHUNK - 1);
     if (error) break;
-    const page = (data ?? []) as unknown as { works: PassageWork[] | null }[];
-    for (const row of page) rows.push(row.works ?? []);
+    const page = (data ?? []) as unknown as {
+      works: PassageWork[] | null; area_path: string[] | null;
+    }[];
+    for (const row of page) rows.push({ works: row.works ?? [], area_path: row.area_path ?? [] });
     if (page.length < FACET_CHUNK) break;
   }
-  return collectWorkAuthors(rows);
+  return {
+    authors: collectWorkAuthors(rows.map((r) => r.works)),
+    kinds: collectWorkKinds(rows),
+  };
 }
 
 /**
