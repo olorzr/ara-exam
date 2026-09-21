@@ -185,7 +185,8 @@
 - 정의: 지문에 실린 글 **한 편** — `{label, title, author}`. `(가) 진달래꽃 – 김소월 / (나) 엄마 걱정 – 기형도` 처럼 한 지문에 여러 편이 실리므로 **지문의 작품은 목록**(`passages.works`)이고, 문항이 묻는 작품도 목록(`problems.work_titles`)이다(sql/33)
 - `label` 은 시험지의 구분 표시를 **괄호 없이** 담는다('가'·'나'). 본문 HTML 의 `<blockquote data-box="가">` 와 같은 표기이고, 인쇄·화면에서 괄호를 다시 붙인다
 - ⚠️ **빈 목록의 뜻이 다르다**: 지문의 `works` 가 비면 '제목을 얻지 못한 글' 이고, 문항의 `work_titles` 가 비면 **'이 지문 전체'** 여서 트리거가 지문의 작품으로 채운다. 그래서 저장된 문항의 목록은 늘 명시적이다
-- ⚠️ **비면 비문학이지만, 비문학이라고 늘 비지는 않는다.** OCR 규칙이 '비문학은 인쇄된 제목이 있을 때만 적는다' 라서 『거울 뉴런』·『정전기』 같은 글도 목록에 든다 — 문학/비문학을 가리려면 [작품 갈래](#작품-갈래-workkind)를 볼 것
+- ⚠️ **비면 비문학이지만, 비문학이라고 늘 비지는 않는다.** OCR 규칙이 '비문학은 인쇄된 제목이 있을 때만 적는다' 라서 『거울 뉴런』·『정전기가 겨울로 간 까닭은』 같은 글도 목록에 든다 — 갈래를 가리려면 [작품 갈래](#작품-갈래-workkind)를 볼 것
+- ⚠️ **〈보기〉·〈자료〉 상자 안에만 실린 글은 작품이 아니다.** 그 상자는 문항이 견주려고 딸고 온 참고 자료지 이 시험지가 묻는 작품이 아니다 — 넣으면 작품 트리에 문항 한두 건짜리 잎이 서고, 지은이·갈래를 긁어올 지문이 없어 '영역 미지정 › 지은이 미입력' 으로 떨어진다. `merge.ts` 의 대조는 딸린 지문이 있을 때만 도므로(`passage_id IS NULL` 이면 견줄 지문이 없다) **막는 것은 OCR 프롬프트 규칙 하나뿐**이다(`WORK_RULES`)
 - 표기 정규화는 `normalizePassageWorks`·`splitWorkTitles` ↔ DB `exam.normalize_works`·`exam.split_work_titles` **1:1 거울**이다. 한쪽만 바꾸면 앱이 보낸 값과 트리거가 저장한 값이 갈라진다
 - 관련 파일: src/lib/problem-bank/work-title.ts, src/components/problem-review/PassageWorksEditor.tsx, src/components/problem-review/ProblemWorksField.tsx, sql/33_problem_bank_multi_works.sql
 
@@ -201,11 +202,12 @@
 - 관련 파일: src/lib/problem-bank/work-title.ts, src/lib/problem-bank/work-tree.ts, src/lib/problem-bank/work-counts.ts, sql/33_problem_bank_multi_works.sql
 
 ## 작품 갈래 (WorkKind)
-- 정의: 작품이 **문학**인가 **비문학**인가. 아카이브 왼쪽 '작품' 탭의 1단 폴더이고 `'literary' | 'nonliterary' | 'unknown'` 셋이다
-- ⚠️ **저장하는 값이 아니라 파생값이다.** 그 작품이 실린 **지문의 영역**(`passages.area_path`)에서 정한다 — 대영역이 `'문학'` 이면 문학, 다른 이름(`'독서와 작문'`·`'화법과 언어'`)이면 비문학, 영역이 없으면 `unknown`('영역 미지정' 폴더)
-- ⚠️ **지은이 유무로 가리면 안 된다**: 『홍길동전』은 지은이 없이 문학이고 『통일 시대의 우리말』(권재일)은 지은이 있는 비문학이다
+- 정의: 작품이 **문학**인가 **비문학**인가 **문법**인가. 아카이브 왼쪽 '작품' 탭의 1단 폴더이고 `'literary' | 'nonliterary' | 'grammar' | 'unknown'` 넷이다(폴더 차례도 그 순서다)
+- ⚠️ **저장하는 값이 아니라 파생값이다.** 그 작품이 실린 **지문의 영역**(`passages.area_path`)에서 정한다 — 대영역이 `'문학'` 이면 문학, [문법 영역](#문법-분류-grammar_paths)이면 문법, 다른 이름이면 비문학, 영역이 없으면 `unknown`('영역 미지정' 폴더)
+- ⚠️ **문법은 비문학이 아니다.** 『훈민정음』·『통일 시대의 우리말』은 설명문처럼 생겼지만 묻는 것이 국어 지식이라, 비문학 폴더에 섞이면 독서 지문을 훑을 때 늘 걸리적거린다. 판정은 검수 화면의 문법 칸과 **같은 함수**(`isGrammarArea`)를 쓴다 — 영역 이름을 `work-counts.ts` 에 따로 적으면 두 화면이 서로 다른 글을 문법이라고 부른다
+- ⚠️ **지은이 유무로 가리면 안 된다**: 『홍길동전』은 지은이 없이 문학이고 『왜 속도를 고민해야 하는가?』(김용섭)는 지은이 있는 비문학이다
 - ⚠️ **문항이 아니라 지문의 영역으로 센다.** 문항의 영역은 *그 물음*의 영역이라, 문학 지문에 딸린 문법 문항은 `화법과 언어 > 언어` 로 태깅된다
-- 같은 제목이 두 갈래에 걸리면 **많은 쪽**, 동률이면 문학으로 둔다(지은이를 '가장 많이 쓰인 이름' 으로 고르는 것과 같은 규약)
+- 같은 제목이 여러 갈래에 걸리면 **많은 쪽**, 동률이면 **문학 › 문법 › 비문학** 차례로 고른다(지은이를 '가장 많이 쓰인 이름' 으로 고르는 것과 같은 규약)
 - 코드에서의 사용: `WorkKind`, `workKindOfArea`, `collectWorkKinds`, `WorkFacet.kind`
 - 관련 파일: src/lib/problem-bank/work-counts.ts, src/lib/problem-bank/work-tree.ts, src/lib/problem-bank/facets.ts
 
