@@ -5,14 +5,14 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BookOpen, FileText, PlusCircle, History, Upload, FolderOpen, FolderCog, Lightbulb, ListChecks } from 'lucide-react';
+import { BookOpen, FileText, PlusCircle, History, Upload, FolderOpen, FolderCog, Library, Lightbulb, ListChecks } from 'lucide-react';
 
 /**
  * 대시보드 페이지. 통계 요약과 빠른 실행 메뉴를 표시한다.
  */
 export default function DashboardPage() {
   const { user } = useAuth();
-  const [stats, setStats] = useState({ words: 0, categories: 0, exams: 0, concepts: 0 });
+  const [stats, setStats] = useState({ words: 0, categories: 0, exams: 0, problems: 0 });
 
   useEffect(() => {
     if (!user) return;
@@ -20,17 +20,17 @@ export default function DashboardPage() {
     async function loadStats() {
       // 통계 조회가 실패해도(네트워크 예외 등) 화면이 깨지지 않도록 0 으로 둔다.
       try {
-        const [wordsRes, catsRes, examsRes, conceptsRes] = await Promise.all([
+        const [wordsRes, catsRes, examsRes, problemsRes] = await Promise.all([
           supabase.from('words').select('id', { count: 'exact', head: true }),
           supabase.from('categories').select('id', { count: 'exact', head: true }),
           supabase.from('exams').select('id', { count: 'exact', head: true }),
-          supabase.from('concept_sheets').select('id', { count: 'exact', head: true }),
+          supabase.from('problems').select('id', { count: 'exact', head: true }),
         ]);
         setStats({
           words: wordsRes.count ?? 0,
           categories: catsRes.count ?? 0,
           exams: examsRes.count ?? 0,
-          concepts: conceptsRes.count ?? 0,
+          problems: problemsRes.count ?? 0,
         });
       } catch {
         // 통계는 보조 정보이므로 초기값(0)을 유지한다.
@@ -91,11 +91,11 @@ export default function DashboardPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">💡 개념지</CardTitle>
-            <Lightbulb className="h-5 w-5 text-primary" />
+            <CardTitle className="text-sm font-medium text-gray-500">🗂 총 문제 수</CardTitle>
+            <Library className="h-5 w-5 text-primary" />
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{stats.concepts}</p>
+            <p className="text-3xl font-bold">{stats.problems}</p>
           </CardContent>
         </Card>
       </div>
