@@ -43,6 +43,17 @@ describe('buildWorkTree', () => {
     expect(labels(tree)).toEqual(['문학', '비문학', '영역 미지정']);
   });
 
+  it('문법은 비문학 뒤, 영역 미지정 앞이다', () => {
+    const tree = buildWorkTree([
+      work({ title: '알 수 없는 글', kind: 'unknown' }),
+      work({ title: '훈민정음', author: '', kind: 'grammar' }),
+      work({ title: '거울 뉴런', author: '', kind: 'nonliterary' }),
+      work({ title: '동백꽃' }),
+    ]);
+    expect(labels(tree)).toEqual(['문학', '비문학', '문법', '영역 미지정']);
+    expect(labels(tree[2].children[0].children)).toEqual(['훈민정음 (3)']);
+  });
+
   it('한 작가의 작품을 한 폴더에 모은다', () => {
     const tree = buildWorkTree([work({ title: '동백꽃' }), work({ title: '봄봄', count: 5 })]);
     expect(tree[0].children).toHaveLength(1);

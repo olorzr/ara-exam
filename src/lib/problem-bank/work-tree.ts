@@ -20,13 +20,19 @@ import type { WorkKind } from './work-counts';
 /** 지은이를 모를 때 쓰는 폴더 이름 */
 const UNKNOWN_AUTHOR = '지은이 미입력';
 
-/** 갈래 폴더 순서 — 문학이 먼저다(작품 트리에서 먼저 찾는 것이 문학이다) */
-const KIND_ORDER: readonly WorkKind[] = ['literary', 'nonliterary', 'unknown'];
+/**
+ * 갈래 폴더 순서 — 문학이 먼저다(작품 트리에서 먼저 찾는 것이 문학이다).
+ *
+ * ⚠️ **문법은 비문학 뒤에 둔다.** 이 트리로 찾는 것은 대개 문학이고 그다음이 독서 지문이다 —
+ *    문법은 작품이라기보다 자료라서(『훈민정음』), 문법 문항은 문법 트리로 찾는 길이 따로 있다.
+ */
+const KIND_ORDER: readonly WorkKind[] = ['literary', 'nonliterary', 'grammar', 'unknown'];
 
 /** 갈래 폴더 이름 */
 const KIND_LABEL: Record<WorkKind, string> = {
   literary: '문학',
   nonliterary: '비문학',
+  grammar: '문법',
   unknown: '영역 미지정',
 };
 

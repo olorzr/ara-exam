@@ -48,7 +48,17 @@ describe('workKindOfArea', () => {
 
   it('다른 대영역은 비문학이다', () => {
     expect(workKindOfArea(['독서와 작문', '독서'])).toBe('nonliterary');
-    expect(workKindOfArea(['화법과 언어', '언어'])).toBe('nonliterary');
+    expect(workKindOfArea(['화법과 언어', '화법'])).toBe('nonliterary');
+  });
+
+  it('문법 영역은 비문학이 아니라 문법이다 — 『훈민정음』이 독서 지문에 섞이면 안 된다', () => {
+    expect(workKindOfArea(['화법과 언어', '언어'])).toBe('grammar');
+  });
+
+  it('문법 판정은 검수 화면과 같은 함수를 쓴다 — 영역 이름을 여기 따로 적지 않는다', () => {
+    // isGrammarArea 가 알아보는 이름이면 깊이와 무관하게 문법이다
+    expect(workKindOfArea(['화법과 언어', '언어', '음운'])).toBe('grammar');
+    expect(workKindOfArea(['문학', '산문 문학'])).toBe('literary');
   });
 
   it('영역이 없으면 모르는 것이다 — 비문학이라고 단정하지 않는다', () => {
@@ -78,8 +88,33 @@ describe('collectWorkKinds', () => {
   });
 
   it('지은이가 있어도 비문학은 비문학이다', () => {
-    const kinds = collectWorkKinds([row(['통일 시대의 우리말'], ['화법과 언어', '언어'])]);
-    expect(kinds.get('통일 시대의 우리말')).toBe('nonliterary');
+    const kinds = collectWorkKinds([row(['왜 속도를 고민해야 하는가?'], ['독서와 작문', '독서'])]);
+    expect(kinds.get('왜 속도를 고민해야 하는가?')).toBe('nonliterary');
+  });
+
+  it('문법 지문의 작품은 문법이다', () => {
+    const kinds = collectWorkKinds([row(['훈민정음'], ['화법과 언어', '언어'])]);
+    expect(kinds.get('훈민정음')).toBe('grammar');
+  });
+
+  it('갈래 셋이 섞여도 많은 쪽을 따른다', () => {
+    const kinds = collectWorkKinds([
+      row(['훈민정음'], ['화법과 언어', '언어']),
+      row(['훈민정음'], ['화법과 언어', '언어']),
+      row(['훈민정음'], ['독서와 작문', '독서']),
+    ]);
+    expect(kinds.get('훈민정음')).toBe('grammar');
+  });
+
+  it('동률 우선순위는 문학 › 문법 › 비문학이다', () => {
+    const both = collectWorkKinds([row(['훈민정음'], ['문학']), row(['훈민정음'], ['화법과 언어', '언어'])]);
+    expect(both.get('훈민정음')).toBe('literary');
+
+    const tie = collectWorkKinds([
+      row(['통일 시대의 우리말'], ['화법과 언어', '언어']),
+      row(['통일 시대의 우리말'], ['독서와 작문', '독서']),
+    ]);
+    expect(tie.get('통일 시대의 우리말')).toBe('grammar');
   });
 
   it('갈리면 많은 쪽을 따른다', () => {

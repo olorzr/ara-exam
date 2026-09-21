@@ -1,5 +1,6 @@
 import type { PassageWork } from '@/types/problem-bank';
 import type { WorkFacet } from './facets';
+import { isGrammarArea } from './grammar-tree';
 
 /**
  * 작품별 문항 수 세기 · 갈래 판정 (순수 함수).
@@ -17,7 +18,7 @@ import type { WorkFacet } from './facets';
  *
  * `unknown` 은 '아직 모른다' 이지 '둘 다 아니다' 가 아니다 — 영역을 안 붙인 지문에서만 나온다.
  */
-export type WorkKind = 'literary' | 'nonliterary' | 'unknown';
+export type WorkKind = 'literary' | 'nonliterary' | 'grammar' | 'unknown';
 
 /**
  * 문학을 뜻하는 영역 마스터의 **대영역 이름**.
@@ -28,6 +29,14 @@ export type WorkKind = 'literary' | 'nonliterary' | 'unknown';
  *    `grammar-tree.ts` 의 `GRAMMAR_AREA_NAMES` 와 같은 성질의 상수다.
  */
 const LITERARY_AREA = '문학';
+
+/**
+ * 표가 같을 때 고르는 차례 — 앞엣것이 이긴다.
+ *
+ * ⚠️ `'unknown'` 은 여기 없다. 영역 없는 지문은 표를 던지지 않으므로(`collectWorkKinds`)
+ *    표 계산에 오를 일이 없고, 넣어 두면 '표 0인 unknown' 이 실제 표를 이길 수 있다.
+ */
+const KIND_VOTE_ORDER: readonly WorkKind[] = ['literary', 'grammar', 'nonliterary'];
 
 /** 지문 한 줄에서 갈래를 가리는 데 필요한 것 */
 export interface PassageWorkRow {
@@ -42,13 +51,20 @@ export interface PassageWorkRow {
  * ⚠️ **지은이 유무로 가리면 안 된다.** 『홍길동전』·『청노루』는 지은이 없이 문학이고,
  *    『통일 시대의 우리말』(권재일)·『왜 속도를 고민해야 하는가?』(김용섭)는 지은이 있는
  *    비문학이다 — 운영 데이터에서 양쪽 반례가 다 나온다.
+ * ⚠️ **문법은 비문학이 아니다.** 『훈민정음』·『통일 시대의 우리말』은 설명문처럼 생겼지만
+ *    묻는 것이 국어 지식이라, 비문학 폴더에 섞이면 독서 지문을 훑을 때 늘 걸리적거린다
+ *    (제보 2026-09-22 "훈민정음 같은 경우에는 사실 문법이라서 이걸 비문학 지문에 넣지 않는게
+ *    맞는것 같아"). 판정은 검수 화면의 문법 칸과 **같은 함수**(`isGrammarArea`)를 쓴다 —
+ *    여기에 영역 이름을 따로 적으면 두 화면이 서로 다른 글을 문법이라고 부르게 된다.
  * @param areaPath - 영역 이름 경로 (['문학', '산문 문학'])
- * @returns 대영역이 '문학' 이면 literary, 다른 이름이면 nonliterary, 비었으면 unknown
+ * @returns 대영역이 '문학' 이면 literary, 문법 영역이면 grammar, 다른 이름이면 nonliterary,
+ *          비었으면 unknown
  */
 export function workKindOfArea(areaPath: readonly string[]): WorkKind {
   const top = areaPath[0] ?? '';
   if (!top) return 'unknown';
-  return top === LITERARY_AREA ? 'literary' : 'nonliterary';
+  if (top === LITERARY_AREA) return 'literary';
+  return isGrammarArea([...areaPath]) ? 'grammar' : 'nonliterary';
 }
 
 /**
@@ -57,31 +73,40 @@ export function workKindOfArea(areaPath: readonly string[]): WorkKind {
  * ⚠️ **문항이 아니라 지문의 영역으로 센다.** 문항의 영역은 *그 물음*의 영역이라, 문학 지문에
  *    딸린 문법 문항은 `화법과 언어 > 언어` 로 태깅된다 — 그것으로 세면 문학 작품이 비문학이 된다.
  *
- * 같은 제목이 문학 지문과 비문학 지문에 걸리면 **많은 쪽**을 따르고, 동률이면 문학으로 둔다
+ * 같은 제목이 여러 갈래의 지문에 걸리면 **많은 쪽**을 따른다
  * (지은이를 '가장 많이 쓰인 이름' 으로 고르는 `collectWorkAuthors` 와 같은 규약).
  * 영역이 없는 지문은 **표를 던지지 않는다** — 표가 하나도 없는 제목은 이 지도에 담기지 않고
  * 트리에서 '영역 미지정' 으로 간다.
+ *
+ * ⚠️ **동률 우선순위는 `문학 › 문법 › 비문학`**(`KIND_VOTE_ORDER`). 옛 규약이 "동률은 문학"
+ *    이었던 까닭 그대로다 — 작품 트리에서 가장 낯선 것이 '문학이 비문학 폴더에 있는' 꼴이고,
+ *    그다음이 '문법이 비문학에 섞인' 꼴이다. 갈래를 잘못 말하면 그 작품을 찾을 폴더가
+ *    달라지므로, 되돌리기 쉬운 쪽부터 고른다.
  * @param rows - 지문별 작품 목록과 영역 경로
  * @returns 제목 → 갈래 (판정된 것만)
  */
 export function collectWorkKinds(rows: readonly PassageWorkRow[]): Map<string, WorkKind> {
-  const tally = new Map<string, { literary: number; nonliterary: number }>();
+  const tally = new Map<string, Map<WorkKind, number>>();
   for (const row of rows) {
     const kind = workKindOfArea(row.area_path);
     // 영역을 모르는 지문은 어느 쪽으로도 세지 않는다
     if (kind === 'unknown') continue;
     for (const work of row.works) {
       if (!work.title) continue;
-      const votes = tally.get(work.title) ?? { literary: 0, nonliterary: 0 };
-      votes[kind] += 1;
+      const votes = tally.get(work.title) ?? new Map<WorkKind, number>();
+      votes.set(kind, (votes.get(kind) ?? 0) + 1);
       tally.set(work.title, votes);
     }
   }
 
   const out = new Map<string, WorkKind>();
   for (const [title, votes] of tally) {
-    // 동률은 문학 — 비문학이라고 잘못 말하는 쪽이 작품 트리에서 더 낯설다
-    out.set(title, votes.nonliterary > votes.literary ? 'nonliterary' : 'literary');
+    let best: WorkKind = KIND_VOTE_ORDER[0];
+    for (const kind of KIND_VOTE_ORDER) {
+      // `>` 라서 앞선 갈래가 동률을 이긴다 — 순서가 곧 우선순위다
+      if ((votes.get(kind) ?? 0) > (votes.get(best) ?? 0)) best = kind;
+    }
+    out.set(title, best);
   }
   return out;
 }
