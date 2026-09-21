@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import ArchiveList from '@/components/problem-bank/ArchiveList';
+import ArchivePager from '@/components/problem-bank/ArchivePager';
 import ArchiveSidePanel from '@/components/problem-bank/ArchiveSidePanel';
 import ProblemCard from '@/components/problem-bank/ProblemCard';
 import ProblemDetailDialog from '@/components/problem-bank/ProblemDetailDialog';
@@ -130,6 +132,7 @@ export default function PaperComposePage() {
               folderTotal={archive.total}
               folderEnabled={bulk.folderEnabled}
               folderBusy={bulk.folderBusy}
+              bulkBusy={bulk.bulkBusy}
               onEnter={bulk.selection.enter}
               onExit={bulk.selection.exit}
               onToggleAll={bulk.selection.toggleAll}
@@ -137,15 +140,14 @@ export default function PaperComposePage() {
               onAddFolder={bulk.addFolder}
             />
 
-            <div className="max-h-[70vh] space-y-2 overflow-y-auto pr-1">
-              {archive.loading ? (
-                <div className="flex justify-center py-12">
-                  <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-primary" />
-                </div>
-              ) : archive.rows.length === 0 ? (
-                <p className="py-12 text-center text-sm text-gray-500">조건에 맞는 문항이 없어요.</p>
-              ) : (
-                archive.rows.map((row) => (
+            <div className="max-h-[70vh] overflow-y-auto pr-1">
+              {/* 아카이브와 **같은 목록 부품**이다 — 지문별로 묶어 그리는 규약을
+                  사본으로 두면 언젠가 한쪽만 고쳐진다 */}
+              <ArchiveList
+                rows={archive.rows}
+                loading={archive.loading}
+                workTitle={archive.filters.work_title}
+                renderCard={(row) => (
                   <ProblemCard
                     key={row.id}
                     problem={row}
@@ -167,32 +169,25 @@ export default function PaperComposePage() {
                       },
                     }}
                   />
-                ))
-              )}
+                )}
+                // 선택 모드에서는 묶음 담기도 내주지 않는다 — ＋ 와 같은 규약이다
+                renderGroupAction={bulk.selection.selectMode ? undefined : (group) => (
+                  <PassageAddButton
+                    passageId={group.passageId}
+                    busy={bulk.passageBusy === group.passageId}
+                    disabled={bulk.bulkBusy}
+                    onAdd={bulk.addPassage}
+                  />
+                )}
+              />
             </div>
 
             {/* 목록은 60개씩 끊어 온다 — 넘기는 버튼이 없으면 그 뒤 문항은 담을 수가 없다 */}
-            {archive.pageCount > 1 && (
-              <div className="flex items-center justify-center gap-2">
-                <Button
-                  type="button" variant="outline" size="sm"
-                  onClick={() => bulk.patch({ page: archive.filters.page - 1 })}
-                  disabled={archive.filters.page <= 0}
-                >
-                  이전
-                </Button>
-                <span className="text-sm text-gray-500">
-                  {archive.filters.page + 1} / {archive.pageCount}
-                </span>
-                <Button
-                  type="button" variant="outline" size="sm"
-                  onClick={() => bulk.patch({ page: archive.filters.page + 1 })}
-                  disabled={archive.filters.page >= archive.pageCount - 1}
-                >
-                  다음
-                </Button>
-              </div>
-            )}
+            <ArchivePager
+              page={archive.filters.page}
+              pageCount={archive.pageCount}
+              onPage={(page) => bulk.patch({ page })}
+            />
           </div>
 
           <div className="space-y-3">
@@ -261,7 +256,42 @@ export default function PaperComposePage() {
         </div>
       </div>
 
-      <ProblemDetailDialog problemId={openId} onClose={() => setOpenId(null)} />
+      <ProblemDetailDialog
+        problemId={openId}
+        onClose={() => setOpenId(null)}
+        onAdd={bulk.addRows}
+        addedIds={paper.added}
+      />
     </div>
+  );
+}
+
+/**
+ * 지문 묶음 머리의 '이 지문 담기'.
+ *
+ * 지문에 딸린 문항은 **함께 담아야** 쓸모가 있다 — 문제지는 같은 지문의 문항이 붙어 있어야
+ * 저장되고(`isContiguous`), 하나만 담으면 나머지는 잊힌다.
+ *
+ * ⚠️ 개수를 적지 않는다. 담는 것은 **그 지문의 문항 전부**인데(보이는 행이 아니다) 그 수는
+ *    조회해 봐야 알고, 보이는 수를 적으면 실제로 담기는 수와 어긋난다 — 몇 개가 들어갔는지는
+ *    담은 뒤 토스트가 말해 준다.
+ */
+function PassageAddButton({ passageId, busy, disabled, onAdd }: {
+  passageId: string;
+  busy: boolean;
+  disabled: boolean;
+  onAdd: (passageId: string) => void;
+}) {
+  return (
+    <Button
+      type="button" variant="outline" size="sm" className="text-xs"
+      disabled={disabled}
+      // 목록에 안 보이는 문항까지 담는다는 것을 손끝에도 남긴다 — 머리의 '문항 N' 은
+      // **이 목록에 보이는** 수라 둘이 다를 수 있다
+      title="지금 조건에 안 걸렸거나 다음 쪽에 있는 문항까지, 이 지문의 문항을 모두 담아요."
+      onClick={() => onAdd(passageId)}
+    >
+      {busy ? '담는 중…' : '이 지문 전체 담기'}
+    </Button>
   );
 }

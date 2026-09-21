@@ -11,7 +11,7 @@ import {
   ConflictError, deleteProblem, setProblemVerified, updateProblem, type ProblemPatch,
 } from '@/lib/problem-bank/mutations';
 import { fetchPassagesByIds } from '@/lib/problem-bank/detail-queries';
-import { fetchProblem, fetchSource } from '@/lib/problem-bank/queries';
+import { fetchProblem, fetchSource } from '@/lib/problem-bank/source-queries';
 import { sourceLabel } from '@/lib/problem-bank/source-label';
 import type { PassageWork, Problem, ProblemSource } from '@/types/problem-bank';
 

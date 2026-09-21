@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useReviewMountKeys } from './useReviewMountKeys';
 import { useSignedImageUrls } from './useSignedImageUrls';
 import { toast } from 'sonner';
-import { fetchProblemsOfSource } from '@/lib/problem-bank/queries';
+import { fetchProblemsOfSource } from '@/lib/problem-bank/source-queries';
 import { loadReviewData } from '@/lib/problem-bank/review-data';
 import {
   ConflictError, deletePassage, deleteProblem, mergePassages,

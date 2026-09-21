@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { groupRowsByPassage, splitByWorkSpan } from './passage-groups';
+import { groupByPassageInPlace, groupRowsByPassage, splitByWorkSpan } from './passage-groups';
 
 const row = (id: string, passage_id: string | null, work_titles: string[] = []) =>
   ({ id, passage_id, work_titles });
@@ -15,6 +15,31 @@ describe('groupRowsByPassage', () => {
     const groups = groupRowsByPassage([row('a', null), row('b', 'p1'), row('c', null)]);
     expect(groups.map((g) => g.passageId)).toEqual(['p1', null]);
     expect(groups[1].rows.map((r) => r.id)).toEqual(['a', 'c']);
+  });
+});
+
+describe('groupByPassageInPlace', () => {
+  it('이웃한 같은 지문끼리 묶는다', () => {
+    const groups = groupByPassageInPlace([row('a', 'p1'), row('b', 'p1'), row('c', 'p2')]);
+    expect(groups.map((g) => g.passageId)).toEqual(['p1', 'p2']);
+    expect(groups[0].rows.map((r) => r.id)).toEqual(['a', 'b']);
+  });
+
+  /** ⚠️ 상자를 둘로 두면 같은 지문 머리가 두 번 나오고, 묶음째 담기가 일부만 담는 것처럼 보인다 */
+  it('떨어져 있어도 같은 지문은 처음 나온 자리로 모은다', () => {
+    const groups = groupByPassageInPlace([row('a', 'p1'), row('b', 'p2'), row('c', 'p1')]);
+    expect(groups.map((g) => g.passageId)).toEqual(['p1', 'p2']);
+    expect(groups[0].rows.map((r) => r.id)).toEqual(['a', 'c']);
+  });
+
+  it('지문 없는 문항은 제자리에 한 줄씩 남는다 — 맨 뒤로 모으면 순서가 흐트러진다', () => {
+    const groups = groupByPassageInPlace([row('a', null), row('b', 'p1'), row('c', null)]);
+    expect(groups.map((g) => g.passageId)).toEqual([null, 'p1', null]);
+    expect(groups.map((g) => g.rows.length)).toEqual([1, 1, 1]);
+  });
+
+  it('빈 목록은 빈 묶음이다', () => {
+    expect(groupByPassageInPlace([])).toEqual([]);
   });
 });
 

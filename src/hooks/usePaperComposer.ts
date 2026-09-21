@@ -100,9 +100,15 @@ export function usePaperComposer() {
     return { added: fresh.length, skipped: incoming.length - fresh.length };
   }, [commit]);
 
-  const add = useCallback((row: ArchiveRow, at?: number) => {
-    addMany([row], at);
-  }, [addMany]);
+  /**
+   * 문항 하나를 담는다.
+   * @param row - 담을 행
+   * @param at - 끼워 넣을 자리. 생략하면 맨 뒤
+   * @returns `addMany` 와 같다 — 새로 담은 수와 건너뛴 수, 상한에 막히면 null
+   */
+  const add = useCallback((
+    row: ArchiveRow, at?: number,
+  ): { added: number; skipped: number } | null => addMany([row], at), [addMany]);
 
   // ⚠️ 아래 변경도 **전부** `commit` 을 지난다 — 하나라도 `setItems` 를 직접 부르면
   //    `itemsRef` 가 어긋나 다음 담기가 옛 개수로 상한을 잰다

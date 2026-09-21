@@ -1,32 +1,20 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
 import ArchiveSelectionBar from '@/components/problem-bank/ArchiveSelectionBar';
 import ArchiveSidePanel from '@/components/problem-bank/ArchiveSidePanel';
 import ArchiveList from '@/components/problem-bank/ArchiveList';
+import ArchivePager from '@/components/problem-bank/ArchivePager';
+import ProblemCard from '@/components/problem-bank/ProblemCard';
 import ProblemDetailDialog from '@/components/problem-bank/ProblemDetailDialog';
 import ProblemFilterBar from '@/components/problem-bank/ProblemFilterBar';
 import GrammarBulkTagDialog from '@/components/problem-bank/GrammarBulkTagDialog';
-import { useArchiveSelection } from '@/hooks/useArchiveSelection';
-import { useProblemArchive, type ArchiveRow } from '@/hooks/useProblemArchive';
+import { useArchiveBulkActions } from '@/hooks/useArchiveBulkActions';
+import { useProblemArchive } from '@/hooks/useProblemArchive';
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls';
-import { filtersFromParams, filtersToQueryString, type ProblemFilters } from '@/lib/problem-bank/filters';
-import { formatGrammarPath } from '@/lib/problem-bank/grammar-tree';
-import { countPapersUsing, deleteProblems } from '@/lib/problem-bank/mutations';
-import { addGrammarPaths } from '@/lib/problem-bank/mutations-source';
-import { PROBLEM_PAGE_SIZE } from '@/lib/problem-bank/queries';
-import { bulkDeleteConfirmMessage, pageAfterDelete } from '@/lib/problem-bank/selection';
-
-/**
- * 불러오는 중일 때 선택에 넘길 목록.
- *
- * ⚠️ 렌더마다 `[]` 를 새로 만들면 훅의 메모가 매번 깨진다 — 상수 하나를 재사용한다.
- */
-const NO_ROWS: ArchiveRow[] = [];
+import { filtersFromParams, filtersToQueryString } from '@/lib/problem-bank/filters';
 
 /**
  * 기출 문제 아카이브 (`/problems/archive`).
@@ -41,40 +29,13 @@ function ArchiveContent() {
   // 메모는 언제든 다시 계산될 수 있다는 계약이라 여기 쓰면 안 된다.
   const [initial] = useState(() => filtersFromParams(new URLSearchParams(params.toString())));
   const archive = useProblemArchive(initial);
-  /**
-   * ⚠️ 불러오는 중에는 **보이는 행이 없다**(화면은 스피너다). 옛 쪽의 행을 그대로 넘기면
-   *    '전체 선택 → 삭제' 가 **화면에 없는 이전 쪽 문항을 지운다**(코덱스 리뷰 P1).
-   */
-  const selection = useArchiveSelection(archive.loading ? NO_ROWS : archive.rows);
-  const [deleting, setDeleting] = useState(false);
+  /** 선택·삭제·문법 태깅 — 세대 번호와 생존 표시가 맞물려 있어 한 훅에 모여 있다 */
+  const bulk = useArchiveBulkActions(archive);
+  const { selection, patch, reset } = bulk;
   /** 일괄 문법 태깅 창 */
   const [tagOpen, setTagOpen] = useState(false);
-  const [tagging, setTagging] = useState(false);
   /** 상세 창에 띄운 문항 — 목록의 조건·스크롤·선택을 잃지 않으려고 창으로 연다 */
   const [openId, setOpenId] = useState<string | null>(null);
-  /**
-   * 세대 둘. 지우는 동안 무엇이 바뀌었는지에 따라 할 일이 다르기 때문이다
-   * (usePdfPages 의 genRef 와 같은 규약).
-   *
-   * · `viewSeq` — **조건·쪽**이 바뀌면 올라간다. 삭제 뒤 쪽 보정은 지울 때의 쪽·전체 개수를
-   *   쓰므로, 조건이 바뀌었으면 그 계산을 새 조건에 얹으면 안 된다.
-   * · `targetSeq` — 거기에 **선택**까지 포함한다. 확인창 앞에 문제지 수를 묻는 왕복이 있어,
-   *   그 틈에 체크를 바꾸면 확인창의 개수와 실제로 지울 문항이 어긋난다.
-   */
-  const viewSeq = useRef(0);
-  const targetSeq = useRef(0);
-  /**
-   * 화면이 아직 붙어 있는가 — 물어보는 사이에 다른 메뉴로 떠나면 확인창을 띄우지 않는다.
-   *
-   * ⚠️ 마운트할 때 **반드시 다시 true 로 되돌린다.** 개발 모드(StrictMode)는 마운트 →
-   *    언마운트 → 재마운트를 하는데, 정리에서 false 로만 두면 재마운트 뒤에도 false 로
-   *    남아 **선택 삭제가 통째로 먹통이 된다**(usePdfPages 와 같은 규약).
-   */
-  const aliveRef = useRef(true);
-  useEffect(() => {
-    aliveRef.current = true;
-    return () => { aliveRef.current = false; };
-  }, []);
 
   // 필터가 바뀌면 주소도 따라간다(뒤로 가기로 히스토리를 채우지 않도록 replace)
   useEffect(() => {
@@ -85,122 +46,8 @@ function ArchiveContent() {
     archive.rows.map((r) => r.image_path).filter(Boolean),
   );
 
-  /**
-   * 조건이 바뀌면 선택을 비운다.
-   *
-   * ⚠️ 화면에서 조건을 바꾸는 길은 **전부 이 함수**를 지나야 한다. 선택을 남기면
-   *    다른 쪽·다른 조건의 문항이 선택된 채로 남아, 지울 때 화면에 보이지 않는 것이
-   *    함께 사라질 수 있다(삭제 대상은 한 번 더 걸러내지만 개수 표시가 거짓이 된다).
-   */
-  const patch = useCallback((next: Partial<ProblemFilters>) => {
-    viewSeq.current += 1;
-    targetSeq.current += 1;
-    selection.clear();
-    archive.patch(next);
-  }, [selection, archive]);
-
-  const reset = useCallback(() => {
-    viewSeq.current += 1;
-    targetSeq.current += 1;
-    selection.clear();
-    archive.reset();
-  }, [selection, archive]);
-
-  const toggleOne = useCallback((id: string) => {
-    targetSeq.current += 1;
-    selection.toggle(id);
-  }, [selection]);
-
-  const toggleAll = useCallback(() => {
-    targetSeq.current += 1;
-    selection.toggleAll();
-  }, [selection]);
-
-  const handleBulkDelete = async () => {
-    const ids = selection.selectedVisible;
-    if (ids.length === 0) return;
-
-    const view = viewSeq.current;
-    const target = targetSeq.current;
-    setDeleting(true);
-    try {
-      const papers = await countPapersUsing(ids);
-      // 묻는 사이에 화면을 떠났으면 조용히 그만둔다
-      if (!aliveRef.current) return;
-      // 지울 대상이 바뀌었으면 지우지 않는다 — 확인창의 개수가 거짓이 된다.
-      // 조용히 끝내면 "왜 안 지워지지" 가 되므로 다시 누르라고 알린다
-      if (target !== targetSeq.current) {
-        toast.info('선택이 바뀌어 삭제를 멈췄어요. 다시 눌러 주세요.');
-        return;
-      }
-      if (!window.confirm(bulkDeleteConfirmMessage(ids.length, papers))) return;
-
-      await deleteProblems(ids);
-      toast.success(`${ids.length}개 문항을 지웠어요.`);
-      selection.exit();
-
-      if (!aliveRef.current) return;
-
-      // ⚠️ 여기서 보는 것은 **조건**의 세대다(선택이 아니다). 지우는 사이 체크를 바꿨을 뿐이면
-      //    쪽·전체 개수는 그대로라 보정이 여전히 옳다 — 선택으로 막으면 마지막 쪽을 비우고도
-      //    빈 쪽에 남는다(코덱스 리뷰 4R). 조건이 바뀌었을 때만 보정을 접고,
-      //    그 경우에도 **목록은 반드시 다시 읽는다**(안 그러면 지운 문항이 남아 보인다).
-      if (view !== viewSeq.current) {
-        archive.reload();
-        return;
-      }
-
-      // 마지막 쪽을 통째로 지웠으면 앞 쪽으로 — 빈 목록만 남으면 뭘 봤는지 알 수 없다
-      const next = pageAfterDelete({
-        page: archive.filters.page,
-        pageSize: PROBLEM_PAGE_SIZE,
-        total: archive.total,
-        deleted: ids.length,
-      });
-      if (next !== archive.filters.page) archive.patch({ page: next });
-      else archive.reload();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : '지우지 못했어요.');
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  /**
-   * 고른 문항에 문법 분류를 붙인다.
-   *
-   * 삭제와 같은 세대 검사를 둔다 — 창이 떠 있는 동안은 체크를 못 바꾸지만, 규약을 갈라 두면
-   * 나중에 창을 모달이 아니게 바꿨을 때 조용히 어긋난다.
-   */
   const handleApplyGrammar = async (path: string[]) => {
-    const ids = selection.selectedVisible;
-    const label = formatGrammarPath(path);
-    if (ids.length === 0 || !label) return;
-
-    const target = targetSeq.current;
-    setTagging(true);
-    try {
-      if (target !== targetSeq.current) {
-        toast.info('선택이 바뀌어 멈췄어요. 다시 눌러 주세요.');
-        return;
-      }
-      // 고른 경로 **하나만** 붙인다 — 아래 경로로 펴는 것은 찾을 때 하는 일이다
-      const changed = await addGrammarPaths(ids, [label]);
-      if (!aliveRef.current) return;
-
-      // 이미 붙어 있던 문항은 세지 않는다(RPC 가 실제로 바뀐 행만 돌려준다) —
-      // 개수를 부풀리면 "붙었나?" 하고 다시 누르게 된다
-      toast.success(changed > 0
-        ? `${changed}개 문항에 '${label}' 을 붙였어요.`
-        : '이미 다 붙어 있어요.');
-      setTagOpen(false);
-      selection.exit();
-      archive.reload();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : '붙이지 못했어요.');
-    } finally {
-      setTagging(false);
-    }
+    if (await bulk.applyGrammar(path)) setTagOpen(false);
   };
 
   return (
@@ -256,48 +103,37 @@ function ArchiveContent() {
             count={selection.count}
             isAllSelected={selection.isAllSelected}
             disabled={archive.loading || archive.rows.length === 0}
-            busy={deleting || tagging}
+            busy={bulk.deleting || bulk.tagging}
             onEnter={selection.enter}
             onExit={selection.exit}
-            onToggleAll={toggleAll}
-            onDelete={handleBulkDelete}
+            onToggleAll={bulk.toggleAll}
+            onDelete={bulk.bulkDelete}
             onTagGrammar={() => setTagOpen(true)}
           />
 
           <ArchiveList
             rows={archive.rows}
             loading={archive.loading}
-            thumbnails={thumbnails.urls}
-            selectMode={selection.selectMode}
-            isSelected={selection.isSelected}
-            onToggleSelect={toggleOne}
-            onOpen={setOpenId}
-            // 작품을 고른 동안만 지문별로 묶는다 — 그때만 '어느 대목인가' 가 뜻이 있다
-            groupByPassage={Boolean(archive.filters.work_title)}
+            // 작품을 고른 동안에는 묶음 안에서 '함께 묻는 문항' 까지 갈라 세운다
             workTitle={archive.filters.work_title}
+            renderCard={(row) => (
+              <ProblemCard
+                key={row.id}
+                problem={row}
+                thumbnailUrl={thumbnails.urls.get(row.image_path) ?? null}
+                selectMode={selection.selectMode}
+                selected={selection.isSelected(row.id)}
+                onToggleSelect={() => bulk.toggleOne(row.id)}
+                onOpen={() => setOpenId(row.id)}
+              />
+            )}
           />
 
-          {archive.pageCount > 1 && (
-            <div className="flex items-center justify-center gap-2">
-              <Button
-                type="button" variant="outline" size="sm"
-                onClick={() => patch({ page: archive.filters.page - 1 })}
-                disabled={archive.filters.page <= 0}
-              >
-                이전
-              </Button>
-              <span className="text-sm text-gray-500">
-                {archive.filters.page + 1} / {archive.pageCount}
-              </span>
-              <Button
-                type="button" variant="outline" size="sm"
-                onClick={() => patch({ page: archive.filters.page + 1 })}
-                disabled={archive.filters.page >= archive.pageCount - 1}
-              >
-                다음
-              </Button>
-            </div>
-          )}
+          <ArchivePager
+            page={archive.filters.page}
+            pageCount={archive.pageCount}
+            onPage={(page) => patch({ page })}
+          />
         </div>
       </div>
 
@@ -306,7 +142,7 @@ function ArchiveContent() {
       <GrammarBulkTagDialog
         open={tagOpen}
         count={selection.count}
-        busy={tagging}
+        busy={bulk.tagging}
         onClose={() => setTagOpen(false)}
         onApply={handleApplyGrammar}
       />

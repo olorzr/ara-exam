@@ -16,6 +16,11 @@ interface ExamPrintHeaderProps {
   showScoreRow?: boolean;
   /** 점수란 분모 (총 문항 수) */
   totalCount?: number;
+  /**
+   * 학생이 쓸 90A 답안지 장수. **2 이상일 때만** 표시한다 —
+   * 기성 용지라 장 번호가 인쇄돼 있지 않아 몇 장을 받아야 하는지 시험지가 알려야 한다.
+   */
+  answerSheetCount?: number;
 }
 
 /**
@@ -29,6 +34,7 @@ export default function ExamPrintHeader({
   passPercentage,
   showScoreRow = false,
   totalCount = 0,
+  answerSheetCount = 0,
 }: ExamPrintHeaderProps) {
   const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
   // 아랫줄(출처·합격선)에 그릴 것이 있는가
@@ -60,6 +66,9 @@ export default function ExamPrintHeader({
               <span>
                 날짜 <span className="ml-2 text-gray-800">{today}</span>
               </span>
+              {answerSheetCount > 1 && (
+                <span className="text-gray-800 font-semibold">답안지 {answerSheetCount}장</span>
+              )}
               <span className="ml-auto exam-score-box">
                 <span className="inline-block border-b border-gray-400 w-10 text-center" />
                 <span className="text-gray-800 font-bold"> / {totalCount}개</span>

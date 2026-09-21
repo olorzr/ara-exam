@@ -7,7 +7,7 @@ import type { ProblemSource } from '@/types/problem-bank';
  *
  * `queries.ts` 에서 떼어 낸 이유는 길이도 있지만 규약이 달라서다 — 이쪽은 출처를 지울 수
  * 있게 되면서 **offset 이 움직이는 목록**이 되었고, 그래서 아래 `refetchSources` 같은
- * 다시 읽기 장치가 필요하다. 출처 **한 건**을 읽는 `fetchSource` 는 그대로 `queries.ts`
+ * 다시 읽기 장치가 필요하다. 출처 **한 건**을 읽는 `fetchSource` 는 `source-queries.ts`
  * 에 있다(검수·문항 수정 화면이 쓴다).
  */
 

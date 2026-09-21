@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { Check } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls';
@@ -9,14 +9,24 @@ import { areaPathLabel } from '@/lib/problem-bank/area-tree';
 import { fetchProblemDetail, type ProblemDetail } from '@/lib/problem-bank/detail-queries';
 import { sourceLabel } from '@/lib/problem-bank/source-label';
 import { unitPathLabel } from '@/lib/problem-bank/unit-tree';
+import type { ArchiveRow } from '@/hooks/useProblemArchive';
 import PassageBodyView from './PassageBodyView';
 import PassageWorksLine from './PassageWorksLine';
 import ProblemBodyView from './ProblemBodyView';
+import ProblemDetailActions from './ProblemDetailActions';
 
 interface ProblemDetailDialogProps {
   /** 열 문항 id. null 이면 창이 닫혀 있다 */
   problemId: string | null;
   onClose: () => void;
+  /**
+   * 문제지에 담기 — **문제지 조합 화면만** 넘긴다.
+   * 없으면 담기 단추가 아예 안 나온다(아카이브에는 담을 캔버스가 없다).
+   * @returns 실제로 담았는가 — **false 면 창을 닫지 않는다**(상한에 막혔을 때)
+   */
+  onAdd?: (rows: ArchiveRow[]) => boolean;
+  /** 이미 담긴 문항 id — 단추와 형제 칩에 표시한다 */
+  addedIds?: ReadonlySet<string>;
 }
 
 /**
@@ -28,19 +38,34 @@ interface ProblemDetailDialogProps {
  * 페이지가 아니라 창인 이유: 아카이브의 필터·스크롤·선택을 잃지 않아야 하고,
  * 문제지 조합 화면에서도 담기 전에 같은 방법으로 확인할 수 있어야 한다.
  */
-export default function ProblemDetailDialog({ problemId, onClose }: ProblemDetailDialogProps) {
+export default function ProblemDetailDialog({
+  problemId, onClose, onAdd, addedIds,
+}: ProblemDetailDialogProps) {
   return (
     <Dialog open={problemId !== null} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto">
         {/* 창을 다시 열면 처음부터 읽는다 — key 로 마운트를 갈아 끼우면 옛 문항이 안 남는다 */}
-        {problemId && <DetailBody key={problemId} problemId={problemId} />}
+        {problemId && (
+          <DetailBody
+            key={problemId}
+            problemId={problemId}
+            onClose={onClose}
+            onAdd={onAdd}
+            addedIds={addedIds}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );
 }
 
 /** 실제 내용 — `key={problemId}` 로 마운트되므로 문항이 바뀌면 상태가 저절로 초기화된다 */
-function DetailBody({ problemId }: { problemId: string }) {
+function DetailBody({ problemId, onClose, onAdd, addedIds }: {
+  problemId: string;
+  onClose: () => void;
+  onAdd?: (rows: ArchiveRow[]) => boolean;
+  addedIds?: ReadonlySet<string>;
+}) {
   const [detail, setDetail] = useState<ProblemDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   /** 형제 중 지금 보고 있는 문항 */
@@ -135,14 +160,17 @@ function DetailBody({ problemId }: { problemId: string }) {
               key={sibling.id}
               type="button"
               onClick={() => { setShownId(sibling.id); setShowOriginal(false); }}
-              className={`rounded border px-2 py-0.5 ${
+              className={`flex items-center gap-0.5 rounded border px-2 py-0.5 ${
                 sibling.id === shownId
                   ? 'border-primary bg-primary/10 font-medium text-primary'
                   : 'border-gray-300 hover:bg-gray-50'
               }`}
               aria-current={sibling.id === shownId}
+              // 색·아이콘만으로 알리지 않는다 — 담긴 것인지를 이름으로도 말한다
+              aria-label={`${sibling.number ?? '번호 없는'}번 문항${addedIds?.has(sibling.id) ? ' (담김)' : ''}`}
             >
               {sibling.number ?? '?'}
+              {addedIds?.has(sibling.id) && <Check className="h-3 w-3 shrink-0" />}
             </button>
           ))}
         </div>
@@ -170,17 +198,16 @@ function DetailBody({ problemId }: { problemId: string }) {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-3 border-t border-gray-100 pt-3 text-sm">
-        <Link href={`/problems/edit/${shown.id}`} className="text-primary underline underline-offset-2">
-          문항 편집
-        </Link>
-        <Link
-          href={`/problems/sources/${source.id}?item=${shown.id}`}
-          className="text-primary underline underline-offset-2"
-        >
-          검수 화면에서 보기
-        </Link>
-      </div>
+      <ProblemDetailActions
+        shown={shown}
+        source={source}
+        siblings={siblings}
+        addedIds={addedIds}
+        // 담자마자 창을 닫는다(사용자 결정) — 담은 것은 오른쪽 캔버스에서 바로 보인다.
+        // ⚠️ 다만 **실제로 담겼을 때만** 닫는다 — 상한(200)에 막혀 하나도 안 들었는데
+        //    닫히면 선생님은 오류 토스트만 보고 담긴 줄 알고 넘어간다(코덱스 1R)
+        onAdd={onAdd && ((rows) => { if (onAdd(rows)) onClose(); })}
+      />
     </div>
   );
 }

@@ -70,3 +70,20 @@ export function bulkAddToast(added: number, skipped: number): string {
     ? `${added}문항을 담았어요 (이미 담긴 ${skipped}개는 건너뛰었어요).`
     : `${added}문항을 담았어요.`;
 }
+
+/**
+ * 아직 안 담긴 문항이 몇 개인가.
+ *
+ * 묶음째 담는 단추가 '몇 개를 담을 것인가' 를 적을 때 쓴다 — 전체 개수를 적으면 이미 담긴
+ * 문항까지 세어 `5문항` 이라 해 놓고 실제로는 둘만 들어간다(`insertItems` 가 중복을 걷는다).
+ * 0이면 부르는 쪽이 단추를 '모두 담김' 으로 잠근다.
+ * @param ids - 그 묶음의 문항 id
+ * @param added - 이미 담긴 문항 id
+ * @returns 새로 담길 개수
+ */
+export function countUnadded(
+  ids: readonly string[], added?: ReadonlySet<string>,
+): number {
+  if (!added || added.size === 0) return ids.length;
+  return ids.reduce((n, id) => (added.has(id) ? n : n + 1), 0);
+}

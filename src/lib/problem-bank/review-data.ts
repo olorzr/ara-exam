@@ -1,4 +1,4 @@
-import { fetchPassages, fetchProblemsOfSource, fetchSource } from './queries';
+import { fetchPassages, fetchProblemsOfSource, fetchSource } from './source-queries';
 import { sortByReadingOrder } from './reading-order';
 import { signProblemFiles } from './storage';
 import { sourcePagePath } from './storage-paths';

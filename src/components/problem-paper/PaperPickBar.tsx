@@ -18,7 +18,15 @@ interface PaperPickBarProps {
   folderTotal: number;
   /** 담을 폴더가 정해졌는가 — 조건이 하나도 없으면 '전체' 라 담을 폴더가 아니다 */
   folderEnabled: boolean;
+  /** 폴더 담기가 도는 중인가 — 이 단추의 '담는 중…' 은 그때만이다 */
   folderBusy: boolean;
+  /**
+   * 다른 담기(지문 묶음 담기)가 도는 중인가.
+   *
+   * ⚠️ 잠금은 하나라 그때도 폴더 담기를 누를 수 없다 — 안 잠그면 **눌리는데 아무 일도
+   *    안 일어난다**(코덱스 6R). 다만 '담는 중…' 이라고 말하지는 않는다(이 단추의 일이 아니다).
+   */
+  bulkBusy?: boolean;
   onEnter: () => void;
   onExit: () => void;
   onToggleAll: () => void;
@@ -34,7 +42,7 @@ interface PaperPickBarProps {
  * 선택 모드 밖에 **폴더 통째로 담기**가 함께 있다는 것이다.
  */
 export default function PaperPickBar({
-  selectMode, count, isAllSelected, disabled, folderTotal, folderEnabled, folderBusy,
+  selectMode, count, isAllSelected, disabled, folderTotal, folderEnabled, folderBusy, bulkBusy,
   onEnter, onExit, onToggleAll, onAddSelected, onAddFolder,
 }: PaperPickBarProps) {
   if (!selectMode) {
@@ -47,7 +55,7 @@ export default function PaperPickBar({
         <Button
           type="button" variant="outline" size="sm"
           onClick={onAddFolder}
-          disabled={!folderEnabled || folderBusy}
+          disabled={!folderEnabled || folderBusy || bulkBusy}
           // 조건이 없으면 '전체' 라 담을 폴더가 아니다 — 왜 못 누르는지 손끝에 남긴다
           title={folderEnabled ? undefined : '왼쪽 트리에서 폴더를 고르거나 조건을 걸어 주세요.'}
         >

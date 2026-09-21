@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireSession } from '@/lib/require-session';
 import { resolveSingleDivision } from '@/lib/grade-division';
+import { buildVocabWords } from '@/lib/vocab-payload';
 
 /**
  * ara-system(학원 관리 시스템) 성적 자동 등록 브릿지 — 발신부.
@@ -24,6 +25,8 @@ import { resolveSingleDivision } from '@/lib/grade-division';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 interface ExamWordRow {
+  /** exam_words 행 PK. 객관식 선지 시드라 반드시 함께 읽어야 한다(word_id 아님). */
+  id: string;
   word: string;
   meaning: string;
   order_index: number;
@@ -86,7 +89,7 @@ export async function POST(request: NextRequest) {
 
     const { data: examWords, error: wordsErr } = await supabaseAdmin
       .from('exam_words')
-      .select('word, meaning, order_index')
+      .select('id, word, meaning, order_index')
       .eq('exam_id', examId)
       .order('order_index');
     if (wordsErr) {
@@ -114,6 +117,20 @@ export async function POST(request: NextRequest) {
 
     // 2) ara-system 페이로드 조립.
     //   주관식(뜻 보고 단어 쓰기)이 기본 채점 형태 → answer = 단어(word), type='주관식'.
+    //   여기에 **객관식 정답(보기 번호)과 선지**를 함께 실어 ara-system 이 두 벌을 보관하게 한다.
+    //   어느 쪽으로 채점할지는 시험을 만들 때가 아니라 채점 화면에서 고른다(2026-09-21 사용자 결정).
+    //   ⚠️ 객관식 정답은 DB 에 없고 매번 재계산되므로, 화면과 **같은 배열·같은 순서**를 넘겨야
+    //     인쇄된 시험지와 정답표가 일치한다. buildVocabWords 가 그 전제를 검증하고 어긋나면 던진다.
+    let vocabWords;
+    try {
+      vocabWords = buildVocabWords(words);
+    } catch (error) {
+      // 정답표가 시험지와 다를 수 있는 상태다 — 잘못된 정답표로 등록하느니 보내지 않는다.
+      const message = error instanceof Error ? error.message : 'unknown';
+      console.error(`[sync-to-grades] 객관식 정답 재현 실패 exam=${examId}: ${message}`);
+      return NextResponse.json({ ok: false, reason: 'choices_rebuild_failed', message }, { status: 500 });
+    }
+
     const payload = {
       sourceExamId: exam.id,
       title: exam.title,
@@ -128,11 +145,7 @@ export async function POST(request: NextRequest) {
       ...(exam.parent_exam_id
         ? { parentSourceExamId: exam.parent_exam_id, retakeNumber: exam.retake_number ?? 1 }
         : {}),
-      words: words.map((w) => ({
-        no: (w.order_index ?? 0) + 1,
-        answer: w.word,
-        type: '주관식',
-      })),
+      words: vocabWords,
       passCount: exam.pass_count,
       passPercentage: exam.pass_percentage,
       examDate: toKstDate(exam.created_at),

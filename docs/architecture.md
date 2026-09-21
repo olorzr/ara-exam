@@ -171,12 +171,15 @@ src/
           + 다음 쪽 이어 읽기 / 앞 지문에 붙이기
           + 지문의 **작품 목록**((가)(나) 줄마다 제목·지은이) / 문항이 **어느 편을 묻는지** 체크
 [아카이브] 왼쪽 패널 탭 4개(교과서·단원 | 학교 기출 | 작품 | 문법)
-          카드 클릭 → 상세 창(지문+발문+선지+정답). 작품 조건이면 지문별로 묶고, 그 안에서
-          **다른 작품과 함께 묻는 문항**을 따로 세워 표시
+          목록은 **늘 지문별로 묶어** 보여 준다(ArchiveList) — 작품 조건이면 같은 지문을
+          하나로 모으고 본문까지 읽어 그 안에서 **다른 작품과 함께 묻는 문항**을 따로 세우고,
+          그 밖에서는 같은 묶음을 **머리만** 읽어 가볍게 그린다(지문 없는 문항은 제자리에)
+          카드 클릭 → 상세 창(지문+발문+선지+정답)
           + 필터(출처·학교·년도·학년·학기·시험·교과서·단원·영역·검색)
           + 페이지네이션 + 선택 삭제
-[문제지]  골라 담기/폴더째 담기·드래그 조합 → RPC create_problem_paper(스냅샷)
-          → A4 인쇄 3종(문제지·교사용·답지)
+[문제지]  골라 담기/폴더째 담기/**지문 묶음째 담기**·드래그 조합
+          (상세 창에서도 바로 담는다 — 그 화면은 아카이브와 같은 목록 부품을 쓴다)
+          → RPC create_problem_paper(스냅샷) → A4 인쇄 3종(문제지·교사용·답지)
 [O,X·단답형] 지문 붙여넣기(또는 아카이브 지문 불러오기) → 코덱스 turn 한 번
           → 근거·답을 지문과 대조해 거르기 → 화면에서 수정·삭제 → 문제지·정답표 인쇄
           · **저장하지 않는다**(DB 표 없음, 새로고침하면 사라진다)
@@ -377,9 +380,12 @@ src/
 ## lib/problem-bank
 - 역할: 아카이브 조회·쓰기, Storage 경로·서명, 영역·단원 마스터 읽기, 필터·패싯
 - 의존: lib/supabase, lib/supabase-public(읽기 전용), lib/category-master(단원 마스터)
-- 주요 파일: queries.ts, facets.ts, mutations.ts, mutations-source.ts, review-data.ts,
+- 주요 파일: queries.ts(아카이브 목록), source-queries.ts(한 출처를 통째로 — 검수 화면), facets.ts, mutations.ts, mutations-source.ts, review-data.ts,
   storage.ts, storage-paths.ts, bbox.ts, figure-placeholders.ts, figure-capture.ts,
   area-tree.ts, area-master.ts, unit-tree.ts, unit-master.ts, grammar-tree.ts,
+  passage-groups.ts(목록을 지문별로 — 떨어져 있어도 한 상자로 모은다. 작품 모드와는
+    지문 없는 문항의 자리만 다르다),
+  detail-queries.ts(상세·묶음 머리 조회 — 목록은 본문 없이 머리만 받는다),
   scope-resolve.ts, scope-pick.ts, source-form.ts, filters.ts, selection.ts, school-exam-tree.ts,
   passage-search.ts(O,X·단답형에서 지문을 골라 오는 조회 — 목록에 html 을 싣지 않고 `.or()` 를 쓰지 않는다)
 - 분류의 세 축: **영역**(ara-system 마스터, 최대 4단), **교과서 단원**(이 앱의 카테고리 관리,

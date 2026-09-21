@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { hasActiveFilters, toProblemQuery, type ProblemFilters } from '@/lib/problem-bank/filters';
-import { fetchProblemsForBulkAdd } from '@/lib/problem-bank/queries';
+import { fetchProblemsForBulkAdd, fetchProblemsOfPassageForAdd } from '@/lib/problem-bank/queries';
 import { bulkAddToast, folderTooBigMessage, PAPER_MAX_ITEMS } from '@/lib/problem-paper/bulk-add';
 import { useArchiveSelection } from './useArchiveSelection';
 import type { ArchiveRow } from './useProblemArchive';
@@ -58,6 +58,8 @@ export function usePaperBulkAdd(archive: ArchiveLike, paper: ComposerLike) {
    */
   const selection = useArchiveSelection(archive.loading ? NO_ROWS : archive.rows);
   const [folderBusy, setFolderBusy] = useState(false);
+  /** 지금 담는 중인 지문 id — 그 묶음의 단추만 잠근다 */
+  const [passageBusy, setPassageBusy] = useState<string | null>(null);
 
   /** 조회가 도는 동안 두 번째 누름을 막는다 — state 는 이 실행 흐름에서 아직 안 바뀐다 */
   const busyRef = useRef(false);
@@ -94,18 +96,74 @@ export function usePaperBulkAdd(archive: ArchiveLike, paper: ComposerLike) {
     archive.reset();
   }, [selection, archive]);
 
+  /**
+   * 행 몇을 담고 결과를 알린다 — **담는 길은 이 함수 하나**여야 한다.
+   *
+   * 체크 담기·지문 묶음 담기·상세 창 담기가 각자 토스트를 띄우면 같은 일을 하고도 화면마다
+   * 다른 말을 하게 된다. 상한 검사와 그 알림은 캔버스(`addMany`)가 하므로 여기서는
+   * 막혔을 때(null) 조용히 돌아간다.
+   *
+   * ⚠️ **담았는지를 돌려준다.** 상세 창은 담고 나서 창을 닫는데, 상한에 막혀 하나도 안
+   *    들었는데 닫히면 **오류 토스트만 보고 담긴 줄 알게 된다**(코덱스 1R).
+   * ⚠️ **한 건도 새로 안 들었으면 false 다**(전부 이미 담긴 경우). 담는 사이 끌기로 먼저
+   *    들어가 있을 수 있는데, 그때 창이 닫히면 '담았다' 는 말과 화면이 어긋난다.
+   * @param rows - 담을 행
+   * @returns 실제로 새로 담았으면 true (막혔거나 담을 것이 없었으면 false)
+   */
+  const addRows = useCallback((rows: readonly ArchiveRow[]): boolean => {
+    if (rows.length === 0) return false;
+    const result = paper.addMany(rows);
+    if (!result) return false;
+    toast.success(bulkAddToast(result.added, result.skipped));
+    return result.added > 0;
+  }, [paper]);
+
   /** 체크한 문항을 담는다 */
   const addSelected = useCallback(() => {
     const picked = new Set(selection.selectedVisible);
     const rows = archive.rows.filter((row) => picked.has(row.id));
     if (rows.length === 0) return;
 
-    // 상한 검사와 알림은 캔버스가 한다 — 막히면 null
-    const result = paper.addMany(rows);
-    if (!result) return;
-    toast.success(bulkAddToast(result.added, result.skipped));
-    selection.exit();
-  }, [archive.rows, paper, selection]);
+    // ⚠️ **담겼을 때만** 선택을 비운다(코덱스 3R). 상한에 막혀 하나도 안 들었는데 체크가
+    //    풀리면 자리를 비운 뒤 **처음부터 다시 고르게** 된다
+    if (addRows(rows)) selection.exit();
+  }, [addRows, archive.rows, selection]);
+
+  /**
+   * **한 지문에 딸린 문항을 전부** 담는다 (묶음 머리의 '이 지문 담기').
+   *
+   * ⚠️ 화면에 보이는 행만 담지 않고 **다시 조회한다.** 그 지문의 문항이 조건에 안 걸렸거나
+   *    다음 쪽에 있을 수 있어서, 보이는 것만 담으면 '이 지문 담기' 라고 해 놓고 일부만
+   *    담는다(코덱스 정지 리뷰). 상세 창의 '이 지문의 문항 N개 담기' 와 같은 규약이다.
+   * @param passageId - 담을 지문 id
+   */
+  const addPassage = useCallback(async (passageId: string) => {
+    // 잠금은 첫 await 앞에서 건다 — 뒤에 걸면 두 번 누른 사이에 조회가 둘 돈다
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setPassageBusy(passageId);
+    const askedClear = paper.clearSeq();
+    try {
+      const rows = await fetchProblemsOfPassageForAdd(passageId);
+      if (!aliveRef.current) return;
+      // 조회하는 사이 '비우기' 를 눌렀다 — 방금 비운 캔버스를 도로 채우면 안 된다
+      if (paper.clearSeq() !== askedClear) {
+        toast.error('담는 사이에 캔버스를 비워서 담지 않았어요.');
+        return;
+      }
+      if (rows.length === 0) {
+        toast.error('그 지문의 문항을 찾지 못했어요.');
+        return;
+      }
+      // ⚠️ 조건은 보지 않는다 — 지문에 딸린 문항은 함께 담아야 문제지가 성립한다
+      addRows(rows);
+    } catch (e) {
+      if (aliveRef.current) toast.error(e instanceof Error ? e.message : '담지 못했어요.');
+    } finally {
+      busyRef.current = false;
+      if (aliveRef.current) setPassageBusy(null);
+    }
+  }, [addRows, paper]);
 
   /** 지금 조건에 걸린 문항을 통째로 담는다 */
   const addFolder = useCallback(async () => {
@@ -146,17 +204,15 @@ export function usePaperBulkAdd(archive: ArchiveLike, paper: ComposerLike) {
 
       // 상한 검사는 캔버스가 **담는 그 자리에서** 한다 — 여기서 미리 재면 조회를 기다리는
       // 사이 ＋·끌기로 늘어난 것을 놓친다(코덱스 리뷰 2R)
-      const result = paper.addMany(page.rows);
-      if (!result) return;
-      toast.success(bulkAddToast(result.added, result.skipped));
-      selection.exit();
+      // 담겼을 때만 선택을 비운다(위와 같은 규약)
+      if (addRows(page.rows)) selection.exit();
     } catch (e) {
       if (aliveRef.current) toast.error(e instanceof Error ? e.message : '담지 못했어요.');
     } finally {
       busyRef.current = false;
       if (aliveRef.current) setFolderBusy(false);
     }
-  }, [archive.filters, archive.total, paper, selection]);
+  }, [addRows, archive.filters, archive.total, paper, selection]);
 
   return {
     selection,
@@ -165,7 +221,17 @@ export function usePaperBulkAdd(archive: ArchiveLike, paper: ComposerLike) {
     folderBusy,
     /** 담을 폴더가 정해져 있는가 — 조건이 하나도 없으면 '전체' 라 담을 폴더가 아니다 */
     folderEnabled: hasActiveFilters(archive.filters) && archive.total > 0 && !archive.loading,
+    addRows,
     addSelected,
     addFolder,
+    addPassage,
+    passageBusy,
+    /**
+     * 담기가 하나라도 도는 중인가.
+     *
+     * ⚠️ 잠금(`busyRef`)은 **폴더 담기와 지문 담기가 함께 쓴다** — 누른 단추만 잠그면
+     *    다른 단추는 눌리는데 아무 일도 안 일어난다(코덱스 6R). 화면은 이 값으로 둘 다 잠근다.
+     */
+    bulkBusy: folderBusy || passageBusy !== null,
   };
 }

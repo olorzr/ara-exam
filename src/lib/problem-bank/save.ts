@@ -17,6 +17,25 @@ import type { SourceInsertPayload } from './source-form';
 const INSERT_CHUNK = 50;
 
 /**
+ * 한 표에 **나눠 넣는 행들이 함께 쓸 `created_at`**.
+ *
+ * ⚠️ 이 값을 보내지 않으면 컬럼 기본값(`now()`)이 **묶음마다 따로** 찍힌다 — 50건씩 나눠
+ *    넣기 때문이다. 아카이브 목록은 `created_at desc` 로 세우므로, 그러면 100문항짜리
+ *    시험지가 **51~100번 다음에 1~50번**으로 뒤집혀 보이고 그 경계에 걸친 지문은 **두 묶음**
+ *    으로 갈린다(지문을 묶어 보여 주는 뜻이 사라진다).
+ *    한 번에 올린 것은 한 시각으로 보는 편이 사실에도 맞다 — 묶어 나누는 것은 전송 사정이다.
+ *
+ * 맞추는 범위는 **한 표에 넣는 한 번의 호출**이다(지문과 문항이 몇 밀리초 다를 수 있다).
+ * `created_at` 으로 세우는 목록이 둘 있는데(아카이브의 문항 목록, O,X·단답형의 지문 고르기 —
+ * [passage-search.ts](./passage-search.ts)) **둘 다 한 표 안에서만** 세우므로 그것으로 충분하다.
+ * 표를 넘어 맞추려면 값을 호출부까지 들고 다녀야 하는데 얻는 것이 없다.
+ * @returns ISO 시각 문자열
+ */
+function savedAt(): string {
+  return new Date().toISOString();
+}
+
+/**
  * 출처 행을 만든다.
  *
  * ⚠️ `answer_key_paths` 는 **답지를 올렸을 때만** 보낸다(sql/19). 컬럼은 배포 직전에
@@ -88,9 +107,12 @@ export async function insertPassages(
   onChunk?: (count: number) => void,
   figurePaths: FigurePathMap = new Map(),
 ): Promise<void> {
+  const at = savedAt();
   const rows = passages.map((p) => ({
     id: p.id,
     source_id: sourceId,
+    // ⚠️ 묶음마다 기본값에 맡기면 목록에서 한 시험지가 뒤집혀 보인다(savedAt 주석)
+    created_at: at,
     label: p.label,
     // ⚠️ `title`/`author` 는 **보내지 않는다** — DB 트리거가 이 목록에서 만든다(sql/33).
     //    보내면 파생 문자열이 목록보다 먼저 굳어 둘이 어긋난다(`search_text` 와 같은 계약)
@@ -130,9 +152,12 @@ export async function insertProblems(
   onChunk?: (count: number) => void,
   figurePaths: FigurePathMap = new Map(),
 ): Promise<void> {
+  const at = savedAt();
   const rows = problems.map((p) => ({
     id: p.id,
     source_id: sourceId,
+    // ⚠️ 묶음마다 기본값에 맡기면 목록에서 한 시험지가 뒤집혀 보인다(savedAt 주석)
+    created_at: at,
     passage_id: p.passage_id,
     number: p.number,
     question_type: p.question_type,

@@ -3,49 +3,66 @@
 import { Layers } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import PassageGroupCard from '@/components/problem-bank/PassageGroupCard';
-import ProblemCard from '@/components/problem-bank/ProblemCard';
 import { splitByWorkSpan } from '@/lib/problem-bank/passage-groups';
 import type { ArchiveRow } from '@/hooks/useProblemArchive';
 import { usePassageGroups } from '@/hooks/usePassageGroups';
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls';
 
+/** 지문 묶음 하나 — 머리에 붙일 조작을 만들 때 쓴다 */
+export interface ArchiveGroup {
+  passageId: string;
+  rows: ArchiveRow[];
+}
+
 interface ArchiveListProps {
   rows: ArchiveRow[];
   loading: boolean;
-  /** Storage 경로 → 서명 URL */
-  thumbnails: Map<string, string>;
-  selectMode: boolean;
-  isSelected: (id: string) => boolean;
-  onToggleSelect: (id: string) => void;
-  onOpen: (id: string) => void;
-  /** 작품으로 훑는 중인가 — 그때만 지문별로 묶어 그린다 */
-  groupByPassage?: boolean;
-  /** 지금 훑고 있는 작품명 — 여러 작품에 걸친 문항을 갈라 보여 줄 기준이다 */
+  /**
+   * 카드 한 장을 그린다.
+   *
+   * 담기·선택·끌기는 화면마다 달라서(아카이브는 선택·삭제, 조합은 ＋·끌기) 카드는
+   * **부르는 쪽이** 만든다. 목록이 카드 props 를 전부 받아 나르면 두 화면의 규약이
+   * 이 파일에 섞인다.
+   */
+  renderCard: (row: ArchiveRow) => React.ReactNode;
+  /**
+   * 작품으로 훑는 중이면 그 작품명.
+   *
+   * 그때만 지문 **본문까지** 읽어 오고, 묶음 안에서 **다른 작품과 함께 묻는 문항**을 따로
+   * 세운다. 묶는 것 자체는 어느 조건에서나 한다.
+   */
   workTitle?: string;
+  /** 지문 묶음 머리에 붙일 조작 (조합 화면의 '이 지문 담기'). 지문 없는 묶음에는 안 붙는다 */
+  renderGroupAction?: (group: ArchiveGroup) => React.ReactNode;
 }
 
 /**
- * 아카이브 목록 — 조건에 걸린 문항을 늘어놓는다.
+ * 아카이브 목록 — 조건에 걸린 문항을 **지문별로 묶어** 늘어놓는다.
  *
- * 작품으로 훑을 때만 **지문별로 묶는다.** 같은 작품이라도 학교마다 실린 대목이 달라서,
- * 문항만 늘어놓으면 어느 대목의 문항인지 알 수 없기 때문이다. 다른 조건에서는 지문이
- * 뒤섞여 있어 묶어도 의미가 없다.
+ * 묶어 그리는 까닭: 목록만 보고는 어느 문항들이 같은 지문에 딸린 것인지 알 수 없어,
+ * 문제지에 담을 때 지문 하나를 여러 번 담거나 딸린 문항을 빠뜨린다(문제지는 같은 지문의
+ * 문항이 **붙어 있어야** 저장된다 — `compose.ts` 의 `isContiguous`).
  *
- * 묶음 안에서는 **다른 작품과 함께 묻는 문항을 따로 세운다**(sql/33). `(가)와 (나)의
- * 공통점은?` 같은 문항은 진달래꽃만 가르치는 자리에 쓸 수 없는데, 섞여 있으면 그걸 모르고
- * 골라 담게 된다.
+ * 작품으로 훑을 때는 묶음 안에서 **다른 작품과 함께 묻는 문항을 따로 세운다**(sql/33).
+ * `(가)와 (나)의 공통점은?` 같은 문항은 진달래꽃만 가르치는 자리에 쓸 수 없는데, 섞여
+ * 있으면 그걸 모르고 골라 담게 된다.
+ *
+ * 아카이브와 문제지 조합이 **이 부품 한 벌**을 쓴다 — 사본을 두면 묶는 규약이 언젠가
+ * 한쪽만 고쳐진다.
  */
 export default function ArchiveList({
-  rows, loading, thumbnails, selectMode, isSelected, onToggleSelect, onOpen, groupByPassage,
-  workTitle,
+  rows, loading, renderCard, workTitle, renderGroupAction,
 }: ArchiveListProps) {
-  const grouped = usePassageGroups(rows, Boolean(groupByPassage) && !loading);
-  // 이미지 지문의 본문과, 본문 제자리에 끼운 그림들은 서명 URL 이 있어야 보인다
+  const mode = workTitle ? 'work' : 'list';
+  const grouped = usePassageGroups(rows, mode, !loading);
+  // 이미지 지문의 본문과, 본문 제자리에 끼운 그림들은 서명 URL 이 있어야 보인다.
+  // 머리만 받아 온 묶음(`adjacent`)에는 그 값이 아예 없어 빈 목록이 된다
   const passageImages = useSignedImageUrls(
-    grouped.groups.flatMap((g) => [
-      g.passage?.render_mode === 'image' ? g.passage.image_path : '',
-      ...(g.passage?.figure_paths ?? []),
-    ]).filter(Boolean),
+    grouped.groups.flatMap((g) => {
+      const passage = g.passage;
+      if (!passage || !('html' in passage)) return [];
+      return [passage.render_mode === 'image' ? passage.image_path : '', ...passage.figure_paths];
+    }).filter(Boolean),
   );
 
   if (loading) {
@@ -66,44 +83,44 @@ export default function ArchiveList({
     );
   }
 
-  const card = (row: ArchiveRow) => (
-    <ProblemCard
-      key={row.id}
-      problem={row}
-      thumbnailUrl={thumbnails.get(row.image_path) ?? null}
-      selectMode={selectMode}
-      selected={isSelected(row.id)}
-      onToggleSelect={() => onToggleSelect(row.id)}
-      onOpen={() => onOpen(row.id)}
-    />
-  );
+  return (
+    <div className="space-y-3">
+      {grouped.groups.map((group) => {
+        const { passageId, passage, rows: groupRows } = group;
+        // 지문 없는 문항은 머리 없이 카드만 — `list` 모드에서는 제자리에 한 장씩 온다
+        if (!passageId && mode === 'list') {
+          return (
+            <div key={groupRows[0].id} className="space-y-2">
+              {groupRows.map(renderCard)}
+            </div>
+          );
+        }
 
-  if (groupByPassage) {
-    return (
-      <div className="space-y-4">
-        {grouped.groups.map((group) => (
+        const full = passage && 'html' in passage ? passage : null;
+        return (
           <PassageGroupCard
-            key={group.passageId ?? '__none__'}
-            passageId={group.passageId}
-            passage={group.passage}
-            source={group.rows[0]?.source ?? null}
-            problemCount={group.rows.length}
+            // ⚠️ 키를 지문 id 로 삼지 말 것 — 지문 없는 묶음이 여럿이라 키가 겹친다
+            key={groupRows[0].id}
+            passageId={passageId}
+            passage={passage}
+            loading={grouped.loading}
+            source={groupRows[0]?.source ?? null}
+            problemCount={groupRows.length}
             highlightWork={workTitle}
-            imageUrl={
-              group.passage?.image_path
-                ? passageImages.urls.get(group.passage.image_path)
-                : null
-            }
+            action={passageId && renderGroupAction
+              ? renderGroupAction({ passageId, rows: groupRows })
+              : undefined}
+            imageUrl={full?.image_path ? passageImages.urls.get(full.image_path) : null}
             figureUrls={passageImages.urls}
           >
-            <WorkSpanSections rows={group.rows} workTitle={workTitle ?? ''} card={card} />
+            {workTitle
+              ? <WorkSpanSections rows={groupRows} workTitle={workTitle} card={renderCard} />
+              : <div className="space-y-2">{groupRows.map(renderCard)}</div>}
           </PassageGroupCard>
-        ))}
-      </div>
-    );
-  }
-
-  return <div className="space-y-2">{rows.map(card)}</div>;
+        );
+      })}
+    </div>
+  );
 }
 
 /**

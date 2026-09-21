@@ -62,7 +62,39 @@ export async function fetchProblemsOfPassage(passageId: string): Promise<Problem
 }
 
 /**
- * 지문 여러 건을 id 로 읽는다 (작품별 보기의 묶음 머리).
+ * 묶음 머리에만 필요한 지문 값.
+ *
+ * 본문(`html`)을 **실지 않는다** — 목록 한 쪽이 60행이라 지문도 그만큼 받게 되는데,
+ * 그 화면에서 본문을 펼쳐 보는 것은 작품으로 훑을 때뿐이고, 한 문항을 자세히 볼 때는
+ * 상세 창이 따로 읽어 그린다.
+ */
+export type PassageHead = Pick<Passage, 'id' | 'label' | 'works' | 'title' | 'author'>;
+
+/**
+ * 묶음 머리용 컬럼.
+ * ⚠️ **한 줄이어야 한다** — `+` 로 이으면 리터럴 타입이 `string` 으로 넓어져
+ *    PostgREST 행 타입 추론이 통째로 풀린다(이 저장소의 오랜 규약).
+ */
+const PASSAGE_HEAD_COLUMNS = 'id, label, works, title, author';
+
+/**
+ * 지문 여러 건의 **머리만** id 로 읽는다 (목록의 지문 묶음).
+ * @param ids - 지문 id 들
+ * @returns 머리 목록 (없는 id 는 빠진다)
+ */
+export async function fetchPassageHeadsByIds(ids: string[]): Promise<PassageHead[]> {
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (unique.length === 0) return [];
+  const { data, error } = await supabase
+    .from('passages')
+    .select(PASSAGE_HEAD_COLUMNS)
+    .in('id', unique);
+  if (error) throw error;
+  return (data ?? []) as PassageHead[];
+}
+
+/**
+ * 지문 여러 건을 **본문까지** id 로 읽는다 (작품별 보기의 묶음 머리).
  * @param ids - 지문 id 들
  * @returns 지문 목록 (없는 id 는 빠진다)
  */

@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import {
-  bulkAddBlockMessage, bulkAddToast, folderTooBigMessage, PAPER_MAX_ITEMS,
+  bulkAddBlockMessage, bulkAddToast, countUnadded, folderTooBigMessage, PAPER_MAX_ITEMS,
 } from './bulk-add';
 
 /**
@@ -89,5 +89,20 @@ describe('bulkAddToast', () => {
   it('하나도 못 담았으면 까닭을 말한다', () => {
     expect(bulkAddToast(0, 5)).toContain('이미 담겨');
     expect(bulkAddToast(0, 0)).toContain('담을 문항이 없어요');
+  });
+});
+
+describe('countUnadded', () => {
+  it('담긴 것을 빼고 센다 — 전체로 세면 단추가 거짓말을 한다', () => {
+    expect(countUnadded(['a', 'b', 'c'], new Set(['b']))).toBe(2);
+  });
+
+  it('담긴 것이 없으면 전부다', () => {
+    expect(countUnadded(['a', 'b'], new Set())).toBe(2);
+    expect(countUnadded(['a', 'b'])).toBe(2);
+  });
+
+  it('다 담겼으면 0 — 부르는 쪽이 그때 단추를 잠근다', () => {
+    expect(countUnadded(['a', 'b'], new Set(['a', 'b']))).toBe(0);
   });
 });
