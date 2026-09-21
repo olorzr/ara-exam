@@ -2,7 +2,7 @@ interface ExamPrintHeaderProps {
   title: string;
   /**
    * 출처(단원) 라벨 목록. 단어 시험지는 카테고리 이름을 싣고, **기출 문제지 인쇄물은
-   * 하나도 싣지 않는다**(문제지·교사용·답지·OMR 답안지 넷 다 — 2026-09-19, 사용자 결정.
+   * 하나도 싣지 않는다**(문제지·교사용·답지 셋 다 — 2026-09-19, 사용자 결정.
    * 출처는 문항마다 그 자리에 찍고 머리글에는 모으지 않는다)
    */
   sourceLabels?: string[];
@@ -12,7 +12,7 @@ interface ExamPrintHeaderProps {
    */
   passCount?: number;
   passPercentage?: number;
-  /** 이름·날짜·점수란 — 답안지에서는 숨긴다 */
+  /** 이름·날짜·점수란 — 정답을 싣는 인쇄물(교사용·답지)에서는 숨긴다 */
   showScoreRow?: boolean;
   /** 점수란 분모 (총 문항 수) */
   totalCount?: number;

@@ -281,12 +281,6 @@
 - 코드에서의 사용: `ProblemAnswerKeyView`, `explanationEntries`, `ViewMode 'key'`
 - 관련 파일: src/components/problem-paper/ProblemAnswerKeyView.tsx, src/lib/problem-paper/answers.ts
 
-## OMR 답안지 (answer sheet)
-- 정의: 학생이 답을 옮겨 적는 종이(객관식은 ①~⑤ 동그라미, 그 밖에는 줄). 답이 **없다** —
-  '답지' 와 헷갈리지 않게 2026-09-20 부터 이름 앞에 OMR 을 붙인다
-- 코드에서의 사용: `ProblemAnswerSheetView`, `ViewMode 'sheet'`
-- 관련 파일: src/components/problem-paper/ProblemAnswerSheetView.tsx
-
 ## 폴더 전체 담기 (bulk add)
 - 정의: 문제지 조합 화면에서 **지금 조건에 걸린 문항 전부**를 한 번에 담는 것. 화면에 60개만
   보여도 조건에 걸린 것을 다시 조회해 담는다. 200문항을 넘는 폴더는 **일부만 담지 않고 막는다**

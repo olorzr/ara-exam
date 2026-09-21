@@ -124,4 +124,68 @@ describe('ProblemPaperView', () => {
     );
     expect(container.querySelector('.a4-measure')?.className).toContain('pb-sheet--paper');
   });
+
+  /**
+   * 교사용의 정답 선지 표시.
+   *
+   * ⚠️ 색만으로 알리지 않는 규약이라 **클래스와 '정답' 글자가 함께** 붙어야 한다 —
+   *    흑백으로 뽑으면 바탕색이 거의 사라진다. 타입만으로는 한쪽만 붙어도 통과한다.
+   */
+  /**
+   * 칠해진 선지의 **기호**와 '정답' 글자 수.
+   *
+   * ⚠️ 개수만 세면 `2,5` 에서 ①·②를 칠하는 회귀도 통과한다(코덱스 리뷰 1R) —
+   *    어느 칸이 칠해졌는지까지 본다.
+   * ⚠️ `.a4-stack`(실제 인쇄면)으로 좁힌다 — A4Document 는 높이를 재려고 같은 블록을
+   *    `.a4-measure` 에도 한 벌 그려서, 문서 전체를 세면 수가 두 배로 잡힌다.
+   */
+  const answersOf = (container: HTMLElement) => {
+    const printed = container.querySelector('.a4-stack');
+    if (!printed) throw new Error('인쇄면(.a4-stack)이 없다');
+    return {
+      glyphs: [...printed.querySelectorAll('.pb-q__choice--answer')]
+        .map((el) => el.querySelector('.pb-q__choice-glyph')?.textContent ?? ''),
+      labels: printed.querySelectorAll('.pb-q__choice-answer-mark').length,
+    };
+  };
+
+  it('교사용은 정답 선지 하나에 색과 글자를 붙인다', () => {
+    const { container } = render(
+      <ProblemPaperView
+        paper={paper} items={[snapshot({ answer: '2' })]} imageUrls={new Map()} showAnswers
+      />,
+    );
+    expect(answersOf(container)).toEqual({ glyphs: ['②'], labels: 1 });
+  });
+
+  /** 답지에 `②, ⑤` 라고 적고 여기서 한 칸도 안 칠하면 두 인쇄물이 다르게 읽힌다 */
+  it('복수 정답이면 선지 둘 다 걸린다', () => {
+    const { container } = render(
+      <ProblemPaperView
+        paper={paper} items={[snapshot({ answer: '2,5' })]} imageUrls={new Map()} showAnswers
+      />,
+    );
+    expect(answersOf(container)).toEqual({ glyphs: ['②', '⑤'], labels: 2 });
+  });
+
+  /**
+   * ⚠️ 5지선다에 `'2,6'` 이 적혀 있을 때 ②만 칠하면 선생님은 그 한 칸을 **완전한
+   * 정답으로 읽는다**. 반쪽을 칠하느니 아무 칸도 안 칠하고 답지에 날문자열을 남긴다
+   */
+  it('없는 선지를 가리키는 답은 반쪽도 칠하지 않는다', () => {
+    const { container } = render(
+      <ProblemPaperView
+        paper={paper} items={[snapshot({ answer: '2,6' })]} imageUrls={new Map()} showAnswers
+      />,
+    );
+    expect(answersOf(container)).toEqual({ glyphs: [], labels: 0 });
+  });
+
+  /** 학생 문제지에는 정답이 한 칸도 나가면 안 된다 */
+  it('학생 문제지에는 복수 정답도 표시하지 않는다', () => {
+    const { container } = render(
+      <ProblemPaperView paper={paper} items={[snapshot({ answer: '2,5' })]} imageUrls={new Map()} />,
+    );
+    expect(answersOf(container)).toEqual({ glyphs: [], labels: 0 });
+  });
 });

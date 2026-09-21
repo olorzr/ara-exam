@@ -66,7 +66,7 @@ export function SourceLine({ source }: { source: PaperItemSnapshot['source'] }) 
  *    **판정은 두 곳이 같은 `splitsExplanation`** 을 쓴다(갈리면 두 번 찍히거나 사라진다).
  */
 export function TeacherAnswer({ snapshot }: { snapshot: PaperItemSnapshot }) {
-  const answer = formatAnswer(snapshot.question_type, snapshot.answer);
+  const answer = formatAnswer(snapshot.question_type, snapshot.answer, snapshot.choices.length);
   // ⚠️ 판정도 그릴 것도 **정화한 값** 기준이다 — 날글자로 재면 지워질 태그만 든 해설을
   //    '길다' 고 보고 갈라낸 뒤 그릴 것이 없어진다(코덱스 정지 리뷰 2R)
   const explanation = splitsExplanation(snapshot.explanation_html)

@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { sanitizeInlineHTML, sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import { choiceGlyph } from '@/lib/problem-bank/choices';
 import { renderFiguresInHtml, unplacedFigures } from '@/lib/problem-bank/figure-render';
-import { correctChoiceIndex, splitsExplanation } from '@/lib/problem-paper/answers';
+import { correctChoiceIndices, splitsExplanation } from '@/lib/problem-paper/answers';
 import type { PaperBlock } from '@/lib/problem-paper/blocks';
 import { stripTrailingEmptyParagraphs } from '@/lib/problem-paper/html-trim';
 import { hasYetHangul } from '@/lib/yet-hangul';
@@ -188,8 +188,12 @@ function ProblemBlock({ number, snapshot, settings, imageUrls, showAnswers }: Pr
   const objective = snapshot.question_type === '객관식' && snapshot.choices.length > 0;
   // 발문·선지의 옛한글은 **고딕**이다(지문만 명조 — CLAUDE.md 2026-09-15)
   const yetHangul = hasYetHangul([snapshot.stem_html, ...snapshot.choices].join(''));
-  // 교사용에서 표시할 정답 선지. 객관식이 아니면 null 이라 아무 선지도 안 걸린다
-  const answerIndex = showAnswers ? correctChoiceIndex(snapshot.question_type, snapshot.answer) : null;
+  // 교사용에서 표시할 정답 선지. 객관식이 아니면 빈 배열이라 아무 선지도 안 걸린다.
+  // **복수 정답이면 둘 다** 걸린다 — 답지에 `③, ⑤` 라고 적고 여기서 한 칸도 안 칠하면
+  // 같은 문항이 두 인쇄물에서 다르게 읽힌다
+  const answerIndices = showAnswers
+    ? correctChoiceIndices(snapshot.question_type, snapshot.answer, snapshot.choices.length)
+    : [];
 
   return (
     <div className={problemClassName(snapshot, showAnswers, yetHangul)}>
@@ -211,7 +215,7 @@ function ProblemBlock({ number, snapshot, settings, imageUrls, showAnswers }: Pr
       {objective ? (
         <div className="pb-q__choices">
           {snapshot.choices.map((choice, i) => {
-            const isAnswer = answerIndex === i;
+            const isAnswer = answerIndices.includes(i);
             return (
               <span key={i} className={`pb-q__choice${isAnswer ? ' pb-q__choice--answer' : ''}`}>
                 <span className="pb-q__choice-glyph">{choiceGlyph(i)}</span>

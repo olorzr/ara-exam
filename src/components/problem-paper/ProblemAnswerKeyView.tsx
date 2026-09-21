@@ -8,7 +8,7 @@ import {
 } from '@/lib/problem-paper/answers';
 import type { PaperItemSnapshot, ProblemPaper } from '@/types/problem-bank';
 
-/** 한 줄에 담을 문항 수 — 답안지와 같은 규약(줄 하나가 인쇄 블록 하나) */
+/** 한 줄에 담을 문항 수 — 줄 하나가 인쇄 블록 하나다(쪽이 갈려도 줄은 안 쪼개진다) */
 const ITEMS_PER_ROW = 5;
 
 interface ProblemAnswerKeyViewProps {
@@ -93,7 +93,7 @@ export default function ProblemAnswerKeyView({ paper, items }: ProblemAnswerKeyV
       className="pb-sheet"
       firstPageHeader={
         <>
-          {/* 머리글 출처 줄은 기출 인쇄물 넷이 함께 뺐다(ProblemPaperView 참고) */}
+          {/* 머리글 출처 줄은 기출 인쇄물 셋이 함께 뺐다(ProblemPaperView 참고) */}
           <ExamPrintHeader title={title} />
           <div className="section-bar section-bar--mint mb-2">
             <span>빠른 정답 · 전체 {items.length}문항</span>

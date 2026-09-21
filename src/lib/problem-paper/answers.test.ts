@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  buildAnswerRows, correctChoiceIndex, EXPLANATION_INLINE_MAX_CHARS, explanationEntries,
+  buildAnswerRows, correctChoiceIndices, EXPLANATION_INLINE_MAX_CHARS, explanationEntries,
   explanationHtml, explanationTextLength, formatAnswer, MISSING_ANSWER_LABEL, splitsExplanation,
 } from './answers';
 import type { PaperItemSnapshot } from '@/types/problem-bank';
@@ -19,43 +19,106 @@ function snap(over: Partial<PaperItemSnapshot> = {}): PaperItemSnapshot {
   };
 }
 
-describe('correctChoiceIndex', () => {
+/** 흔한 5지선다 — 선지 수를 함께 넘겨야 없는 선지를 가리키는 답을 걸러낼 수 있다 */
+const FIVE = 5;
+
+describe('correctChoiceIndices', () => {
   it('객관식 정답 번호를 자리로 바꾼다', () => {
-    expect(correctChoiceIndex('객관식', '3')).toBe(2);
-    expect(correctChoiceIndex('객관식', ' 1 ')).toBe(0);
+    expect(correctChoiceIndices('객관식', '3', FIVE)).toEqual([2]);
+    expect(correctChoiceIndices('객관식', ' 1 ', FIVE)).toEqual([0]);
+  });
+
+  /** 운영에 실제로 있는 꼴 — 복수 정답 58건이 전부 `'1,4'` 처럼 쉼표로 이어져 있다 */
+  it('쉼표로 이은 복수 정답을 모두 읽는다', () => {
+    expect(correctChoiceIndices('객관식', '1,3', FIVE)).toEqual([0, 2]);
+    expect(correctChoiceIndices('객관식', ' 1 , 3 ', FIVE)).toEqual([0, 2]);
+    expect(correctChoiceIndices('객관식', '1,3,5', FIVE)).toEqual([0, 2, 4]);
+  });
+
+  /** 손으로 적으면 순서가 뒤집히거나 같은 번호가 두 번 들어온다 — 격자에서 튀지 않게 고른다 */
+  it('중복을 걷고 오름차순으로 돌려준다', () => {
+    expect(correctChoiceIndices('객관식', '3,1', FIVE)).toEqual([0, 2]);
+    expect(correctChoiceIndices('객관식', '1,1', FIVE)).toEqual([0]);
   });
 
   /** 주관식 답이 우연히 숫자일 수 있다 — 그걸 선지 자리로 읽으면 엉뚱한 선지가 정답이 된다 */
   it('주관식·서술형은 숫자여도 선지 자리가 아니다', () => {
-    expect(correctChoiceIndex('주관식', '3')).toBeNull();
-    expect(correctChoiceIndex('서술형', '3')).toBeNull();
+    expect(correctChoiceIndices('주관식', '3', FIVE)).toEqual([]);
+    expect(correctChoiceIndices('서술형', '3', FIVE)).toEqual([]);
+    expect(correctChoiceIndices('주관식', '1,3', FIVE)).toEqual([]);
   });
 
-  it('번호가 아니면 null', () => {
-    expect(correctChoiceIndex('객관식', '')).toBeNull();
-    expect(correctChoiceIndex('객관식', '③')).toBeNull();
-    expect(correctChoiceIndex('객관식', '1,3')).toBeNull();
+  it('번호가 아니면 빈 배열', () => {
+    expect(correctChoiceIndices('객관식', '', FIVE)).toEqual([]);
+    expect(correctChoiceIndices('객관식', '③', FIVE)).toEqual([]);
+  });
+
+  /**
+   * ⚠️ 성한 조각만 골라 읽지 않는다 — 잘못 적힌 답의 절반을 멀쩡한 정답처럼 인쇄하느니
+   * 선지로 안 읽고 적힌 그대로 내보내 사람이 알아보게 둔다
+   */
+  it('조각 하나라도 어긋나면 통째로 빈 배열', () => {
+    expect(correctChoiceIndices('객관식', '1,0', FIVE)).toEqual([]);
+    expect(correctChoiceIndices('객관식', '1,', FIVE)).toEqual([]);
+    expect(correctChoiceIndices('객관식', ',1', FIVE)).toEqual([]);
+    expect(correctChoiceIndices('객관식', '1,,3', FIVE)).toEqual([]);
+    expect(correctChoiceIndices('객관식', '1,a', FIVE)).toEqual([]);
+  });
+
+  /**
+   * ⚠️ 없는 선지를 가리키면 **통째로** 버린다(코덱스 리뷰 1R).
+   * 반만 살려 두면 교사용·아카이브가 ① 한 칸만 칠하고, 선생님은 그것을 완전한 정답으로
+   * 읽는다 — 단일 정답(`'6'`)이 아무 칸도 안 칠해져 티가 나는 것과 다르다.
+   */
+  it('선지 수를 넘는 번호가 섞이면 통째로 버린다', () => {
+    expect(correctChoiceIndices('객관식', '1,6', FIVE)).toEqual([]);
+    expect(correctChoiceIndices('객관식', '6', FIVE)).toEqual([]);
+    expect(correctChoiceIndices('객관식', '1,4', 3)).toEqual([]);
+    expect(correctChoiceIndices('객관식', '1,3', 3)).toEqual([0, 2]);
+  });
+
+  /** 선지를 본문 그림이 통째로 들고 있는 문항은 셀 것이 없다 — 범위를 검사하지 않는다 */
+  it('선지가 0개면 범위를 따지지 않는다', () => {
+    expect(correctChoiceIndices('객관식', '1,4', 0)).toEqual([0, 3]);
+    expect(correctChoiceIndices('객관식', '3', 0)).toEqual([2]);
   });
 });
 
 describe('formatAnswer', () => {
   /** 문제지에는 ①②③ 로 인쇄되는데 정답표만 '3' 이면 눈으로 맞출 때마다 셈을 해야 한다 */
   it('객관식은 선지 기호로 찍는다', () => {
-    expect(formatAnswer('객관식', '3')).toBe('③');
+    expect(formatAnswer('객관식', '3', FIVE)).toBe('③');
+  });
+
+  /** 한 격자 안에서 `③` 과 `1,4` 가 섞이면 두 칸이 서로 다른 규칙으로 적힌 것처럼 보인다 */
+  it('복수 정답도 기호로 이어 찍는다', () => {
+    expect(formatAnswer('객관식', '1,3', FIVE)).toBe('①, ③');
+    expect(formatAnswer('객관식', '3,1', FIVE)).toBe('①, ③');
   });
 
   it('주관식은 적어 둔 답 그대로', () => {
-    expect(formatAnswer('주관식', ' 은유 ')).toBe('은유');
-    expect(formatAnswer('객관식', '1,3')).toBe('1,3');
+    expect(formatAnswer('주관식', ' 은유 ', FIVE)).toBe('은유');
+    expect(formatAnswer('주관식', '1,3', FIVE)).toBe('1,3');
+  });
+
+  /** 선지로 못 읽는 꼴은 적힌 그대로 — 사람이 보고 고칠 수 있어야 한다 */
+  it('어긋난 복수 정답은 적힌 그대로 내보낸다', () => {
+    expect(formatAnswer('객관식', '1,0', FIVE)).toBe('1,0');
+    expect(formatAnswer('객관식', '1,6', FIVE)).toBe('1,6');
   });
 
   it('비었으면 미입력', () => {
-    expect(formatAnswer('객관식', '   ')).toBe(MISSING_ANSWER_LABEL);
-    expect(formatAnswer('서술형', '')).toBe(MISSING_ANSWER_LABEL);
+    expect(formatAnswer('객관식', '   ', FIVE)).toBe(MISSING_ANSWER_LABEL);
+    expect(formatAnswer('서술형', '', FIVE)).toBe(MISSING_ANSWER_LABEL);
   });
 });
 
 describe('buildAnswerRows', () => {
+  /** 문제지 스냅샷에 실제로 든 꼴 — 격자 한 칸이 `2,5` 가 아니라 `②, ⑤` 여야 한다 */
+  it('복수 정답도 격자에 기호로 들어간다', () => {
+    expect(buildAnswerRows([snap({ answer: '2,5' })])[0].answer).toBe('②, ⑤');
+  });
+
   it('번호는 문제지에서의 자리다 (원본 번호가 아니다)', () => {
     const rows = buildAnswerRows([snap({ number: 7, answer: '3' }), snap({ number: 9, answer: '1' })]);
     expect(rows.map((r) => r.number)).toEqual([1, 2]);

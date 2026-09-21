@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import ProblemPaperView from '@/components/problem-paper/ProblemPaperView';
 import ProblemAnswerKeyView from '@/components/problem-paper/ProblemAnswerKeyView';
-import ProblemAnswerSheetView from '@/components/problem-paper/ProblemAnswerSheetView';
 import { supabase } from '@/lib/supabase';
 import { useImagesReady } from '@/hooks/useImagesReady';
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls';
@@ -19,14 +18,12 @@ import {
 import { normalizePaperSettings } from '@/lib/problem-paper/settings';
 import type { PaperItemSnapshot, ProblemPaper } from '@/types/problem-bank';
 
-type ViewMode = 'paper' | 'teacher' | 'key' | 'sheet';
+type ViewMode = 'paper' | 'teacher' | 'key';
 
 const VIEW_LABELS: { mode: ViewMode; label: string }[] = [
   { mode: 'paper', label: '문제지' },
   { mode: 'teacher', label: '교사용' },
   { mode: 'key', label: '답지' },
-  // 학생이 답을 옮겨 적는 종이. '답지' 와 헷갈리지 않게 OMR 을 앞에 붙인다
-  { mode: 'sheet', label: 'OMR 답안지' },
 ];
 
 /**
@@ -222,7 +219,6 @@ export default function ProblemPaperViewPage() {
         />
       )}
       {mode === 'key' && <ProblemAnswerKeyView paper={paper} items={items} />}
-      {mode === 'sheet' && <ProblemAnswerSheetView paper={paper} items={items} />}
     </div>
   );
 }

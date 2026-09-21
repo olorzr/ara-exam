@@ -1,7 +1,7 @@
 'use client';
 
 import { choiceGlyph } from '@/lib/problem-bank/choices';
-import { correctChoiceIndex } from '@/lib/problem-paper/answers';
+import { correctChoiceIndices } from '@/lib/problem-paper/answers';
 import { renderFiguresInHtml, unplacedFigures } from '@/lib/problem-bank/figure-render';
 import { stripTrailingEmptyParagraphs } from '@/lib/problem-paper/html-trim';
 import { sanitizeInlineHTML, sanitizeProblemHTML } from '@/lib/sanitize-problem';
@@ -44,10 +44,11 @@ export default function ProblemBodyView({ problem, imageUrls }: ProblemBodyViewP
    * 정답 선지 자리.
    *
    * ⚠️ 여기서 `answer === String(i + 1)` 로 직접 견주지 않는다 — 인쇄(교사용)는
-   *    `correctChoiceIndex` 를 쓰는데, 두 규칙이 갈리면 저장값이 `' 1 '` 인 문항이
+   *    `correctChoiceIndices` 를 쓰는데, 두 규칙이 갈리면 저장값이 `' 1 '` 인 문항이
    *    **한쪽에서만** 정답으로 표시된다(코덱스 리뷰).
    */
-  const answerIndex = correctChoiceIndex(problem.question_type, problem.answer);
+  const answerIndices =
+    correctChoiceIndices(problem.question_type, problem.answer, problem.choices.length);
   /**
    * 옛한글(중세국어)이 섞였는가 — 섞였으면 블록째 옛한글 글꼴로 그린다.
    *
@@ -83,7 +84,7 @@ export default function ProblemBodyView({ problem, imageUrls }: ProblemBodyViewP
         {objective && (
           <div className="pb-q__choices">
             {problem.choices.map((choice, i) => {
-              const isAnswer = answerIndex === i;
+              const isAnswer = answerIndices.includes(i);
               return (
                 <span
                   key={i}
