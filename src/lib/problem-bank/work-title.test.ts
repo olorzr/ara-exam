@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   joinWorkTitles, normalizePassageWorks, normalizeWorkLabel, normalizeWorkTitle,
-  normalizeWorkTitles, splitWorkTitles, WORKS_MAX, worksKey,
+  normalizeWorkTitles, splitWorkTitles, workTitleKey, WORKS_MAX, worksKey,
 } from './work-title';
 
 describe('normalizeWorkTitle', () => {
@@ -163,5 +163,48 @@ describe('worksKey', () => {
   it('이름에 구분자가 들어가도 섞이지 않는다 — 작품명은 자유 텍스트다', () => {
     expect(worksKey([{ label: '', title: 'a|b', author: '' }]))
       .not.toBe(worksKey([{ label: '', title: 'a', author: 'b' }]));
+  });
+});
+
+describe('줄표 통일 (sql/46)', () => {
+  it('엔대시·엠대시·가로줄·빼기·전각 하이픈을 하이픈으로 — 김사인 작품이 이것 때문에 둘로 갈렸다', () => {
+    for (const dash of ['\u2013', '\u2014', '\u2015', '\u2212', '\uFF0D']) {
+      expect(normalizeWorkTitle(`지상의 방 한 칸 ${dash} 박영한 님의 제(題)를 빌려`))
+        .toBe('지상의 방 한 칸 - 박영한 님의 제(題)를 빌려');
+    }
+  });
+
+  it('멱등이다', () => {
+    const once = normalizeWorkTitle('동해 바다 – 후포에서');
+    expect(normalizeWorkTitle(once)).toBe(once);
+  });
+});
+
+describe('workTitleKey', () => {
+  it('띄어쓰기를 무시한다', () => {
+    expect(workTitleKey('엄마걱정')).toBe(workTitleKey('엄마 걱정'));
+    expect(workTitleKey('소설가 구보씨의 일일')).toBe(workTitleKey('소설가 구보 씨의 일일'));
+  });
+
+  it('한자만 든 괄호를 무시한다', () => {
+    expect(workTitleKey('이생규장전(李生窺墻傳)')).toBe(workTitleKey('이생규장전'));
+    expect(workTitleKey('이생규장전 (李生窺墻傳)')).toBe(workTitleKey('이생규장전'));
+    expect(workTitleKey('지상의 방 한 칸 - 박영한 님의 제(題)를 빌려'))
+      .toBe(workTitleKey('지상의 방 한칸 – 박영한 님의 제를 빌려'));
+  });
+
+  it('한글이 든 괄호는 남긴다 — 해독은 따로 서야 한다', () => {
+    expect(workTitleKey('제망매가(김완진 해독)')).not.toBe(workTitleKey('제망매가'));
+    expect(workTitleKey('찬기파랑가(김완진 해독)')).not.toBe(workTitleKey('찬기파랑가(양주동 해독)'));
+  });
+
+  it('감싼 기호까지 벗긴다 — 표기 정규화를 먼저 거친다', () => {
+    expect(workTitleKey('「엄마 걱정」')).toBe(workTitleKey('엄마걱정'));
+  });
+
+  it('DB 의 exam.work_title_key 와 같은 값 — 대장 열쇠와 어긋나면 안 된다', () => {
+    // 운영 DB 에서 SELECT exam.work_title_key(...) 로 뽑은 값(2026-09-27)
+    expect(workTitleKey('지상의 방 한 칸 - 박영한 님의 제(題)를 빌려')).toBe('지상의방한칸-박영한님의제를빌려');
+    expect(workTitleKey('제망매가(김완진 해독)')).toBe('제망매가(김완진해독)');
   });
 });

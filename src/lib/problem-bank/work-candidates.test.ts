@@ -115,6 +115,31 @@ describe('rankWorkCandidates', () => {
     expect(out[0].author).toBe('김유정');
   });
 
+  it('띄어쓰기·한자만 다른 표기도 한 작품으로 묶는다 — 두 표기를 주면 모델이 두 작품으로 읽는다', () => {
+    const out = rankWorkCandidates({
+      bundles: [bundle({ name: '2026 광희중 중2 엄마걱정', scanTitle: '2026 광희중 중2' })],
+      passages: [
+        passage({ title: '엄마 걱정', author: '기형도' }),
+        passage({ title: '이생규장전', author: '김시습' }),
+        passage({ title: '이생규장전(李生窺墻傳)', author: '김시습', year: '2024' }),
+      ],
+      wanted: wanted(),
+    });
+    expect(out.map((c) => c.title).sort()).toEqual(['엄마 걱정', '이생규장전']);
+  });
+
+  it('해독 표기는 따로 둔다 — 한글이 든 괄호는 다른 작품이다', () => {
+    const out = rankWorkCandidates({
+      bundles: [],
+      passages: [
+        passage({ title: '제망매가', author: '월명사' }),
+        passage({ title: '제망매가(김완진 해독)', author: '월명사' }),
+      ],
+      wanted: wanted(),
+    });
+    expect(out).toHaveLength(2);
+  });
+
   it('지은이 없는 줄을 합칠 때 가까운 쪽의 등급·근거를 가져온다 — 밀려나면 상한에 잘린다', () => {
     const out = rankWorkCandidates({
       // 올해 이 시험 프린트의 '동백꽃'(가장 가까움) + 작년 기출의 '동백꽃 (김유정)'

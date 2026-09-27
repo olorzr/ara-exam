@@ -1,6 +1,6 @@
 import { normalizeCategoryName } from '@/lib/category-name';
 import { semesterDigit } from './scope-pick';
-import { normalizeWorkTitle } from './work-title';
+import { normalizeWorkTitle, workTitleKey } from './work-title';
 
 /**
  * 이 학교에 **이미 적혀 있는 작품명**을 모아 업로드 폼의 작품 칸을 채운다 (순수 함수).
@@ -131,15 +131,18 @@ const closer = (a: Scored, b: Scored): Scored => (b.rank < a.rank ? b : a);
  */
 function dedupe(rows: Scored[]): Scored[] {
   const best = new Map<string, Scored>();
+  // 제목은 비교 열쇠로 본다 — '엄마 걱정'(기출)과 '엄마걱정'(프린트 이름)은 한 작품이라,
+  // 둘 다 실으면 모델이 두 작품으로 읽는다. 표기는 가까운 쪽 것을 쓴다(DB 가 어차피 맞춘다, sql/46)
   for (const row of rows) {
-    const key = `${row.title}\u0000${row.author}`;
+    const key = `${workTitleKey(row.title)}\u0000${row.author}`;
     const prev = best.get(key);
     if (!prev || row.rank < prev.rank) best.set(key, row);
   }
 
   const byTitle = new Map<string, Scored[]>();
   for (const row of best.values()) {
-    byTitle.set(row.title, [...(byTitle.get(row.title) ?? []), row]);
+    const titleKey = workTitleKey(row.title);
+    byTitle.set(titleKey, [...(byTitle.get(titleKey) ?? []), row]);
   }
 
   const out: Scored[] = [];

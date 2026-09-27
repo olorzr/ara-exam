@@ -4,7 +4,7 @@ import type { PassageWork } from '@/types/problem-bank';
 /**
  * 작품명·지은이 표기 정규화 (순수 함수).
  *
- * ⚠️ `sql/20_problem_bank_works.sql` 의 `exam.normalize_work_title()` 과 **완전히 같은
+ * ⚠️ `exam.normalize_work_title()`(지금 판은 sql/46)과 **완전히 같은
  * 규칙**이어야 한다. 한쪽만 바꾸면 앱이 저장한 값과 트리거가 옮긴 값이 갈라져
  * 작품 트리에 같은 작품이 두 폴더로 보인다(`category-name.ts` ↔ sql/16 과 같은 계약).
  *
@@ -38,17 +38,46 @@ const LEADING_WRAPPERS = new RegExp(`^[${WRAPPER_CHARS}${SPACE_CHARS}]+`);
 const TRAILING_WRAPPERS = new RegExp(`[${WRAPPER_CHARS}${SPACE_CHARS}]+$`);
 
 /**
+ * 줄표 글자들 — 하이픈·줄표·가로줄(U+2010~2015)·빼기(U+2212)·작은·전각 하이픈.
+ *
+ * 전부 `-` 로 맞춘다. 『지상의 방 한 칸 - …』 이 하이픈과 엔대시(–)로 갈려 작품 트리에
+ * 두 잎으로 섰다 — 글자만 다르고 뜻은 같다. sql/46 의 `translate` 목록과 글자 하나까지 같다.
+ */
+const DASHES = /[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g;
+
+/**
  * 작품명·지은이를 표준 표기로.
  *
- * 감싼 기호 제거 → `normalizeCategoryName`(폭 없는 문자·NFC·전각 괄호·공백·괄호 주변).
- * 멱등이다.
+ * 감싼 기호 제거 → 줄표 통일 → `normalizeCategoryName`(폭 없는 문자·NFC·전각 괄호·공백·
+ * 괄호 주변). 멱등이다.
  * @param name - 모델이 읽었거나 사람이 친 이름
  * @returns 표준 표기
  */
 export function normalizeWorkTitle(name: string): string {
   return normalizeCategoryName(
-    name.replace(LEADING_WRAPPERS, '').replace(TRAILING_WRAPPERS, ''),
+    name.replace(LEADING_WRAPPERS, '').replace(TRAILING_WRAPPERS, '').replace(DASHES, '-'),
   );
+}
+
+/** 안이 한자·공백·가운뎃점·쉼표뿐인 괄호 — `(李生窺墻傳)` 은 잡고 `(김완진 해독)` 은 놓는다 */
+const HANJA_PARENS = new RegExp(
+  `\\([\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF·,${SPACE_CHARS}]+\\)`, 'g',
+);
+const ALL_SPACES = new RegExp(`[${SPACE_CHARS}]`, 'g');
+
+/**
+ * 작품명 비교 열쇠 — 띄어쓰기와 한자 괄호를 무시한다.
+ *
+ * 표기를 바꾸는 함수가 아니라 **같은 작품인지 볼 때만** 쓴다(`엄마 걱정` ↔ `엄마걱정`,
+ * `이생규장전` ↔ `이생규장전(李生窺墻傳)`). DB 는 이 열쇠로 표준 표기 대장
+ * (`exam.work_title_canon`)을 찾아 저장값을 맞춘다 — `exam.work_title_key` 와 1:1 거울이다.
+ *
+ * ⚠️ 한글이 한 글자라도 든 괄호는 남긴다 — `제망매가(김완진 해독)` 은 따로 서야 하는 작품이다.
+ * @param title - 작품명
+ * @returns 비교 열쇠
+ */
+export function workTitleKey(title: string): string {
+  return normalizeWorkTitle(title).replace(HANJA_PARENS, '').replace(ALL_SPACES, '');
 }
 
 /**
@@ -158,4 +187,27 @@ export function workLabelText(work: PassageWork): string {
  */
 export function worksKey(works: readonly PassageWork[]): string {
   return works.map((w) => [w.label, w.title, w.author].join(FIELD_SEP)).join(ROW_SEP);
+}
+
+/**
+ * 작품 목록을 **표준 표기와 무관하게** 견주는 열쇠 — 제목만 `workTitleKey` 로 접는다.
+ *
+ * 편집기가 `엄마걱정` 으로 저장해도 DB 는 대장 표기 `엄마 걱정` 으로 넣는다. 이 열쇠가 같으면
+ * 사람이 고친 것은 그대로 들어간 것이라, 화면이 서버 값을 받아들여도 입력을 잃지 않는다.
+ * @param works - 작품 목록
+ * @returns 안정된 문자열
+ */
+export function worksMatchKey(works: readonly PassageWork[]): string {
+  // ⚠️ 접은 뒤 겹친 줄은 첫 줄만 남긴다 — DB 도 표준 표기로 바꾼 뒤 `normalize_works` 가
+  //    같은 제목의 뒷줄을 버린다. 안 걷으면 한 지문에 `엄마 걱정`·`엄마걱정` 을 함께 친 카드가
+  //    줄 수가 달라 영영 '저장 안 됨' 으로 남는다(코덱스 2R)
+  const seen = new Set<string>();
+  const folded: PassageWork[] = [];
+  for (const w of works) {
+    const title = workTitleKey(w.title);
+    if (seen.has(title)) continue;
+    seen.add(title);
+    folded.push({ ...w, title });
+  }
+  return worksKey(folded);
 }

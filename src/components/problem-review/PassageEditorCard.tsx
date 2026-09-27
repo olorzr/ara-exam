@@ -11,8 +11,9 @@ import PassageContinueButton from './PassageContinueButton';
 import FigureStrip from './FigureStrip';
 import { useFigureEditor } from '@/hooks/useFigureEditor';
 import { useTrackedState } from '@/hooks/useTrackedState';
+import { usePassageWorksState } from '@/hooks/usePassageWorksState';
 import { normalizePassageWorks, worksKey } from '@/lib/problem-bank/work-title';
-import type { Bbox, PassageWork } from '@/types/problem-bank';
+import type { Bbox } from '@/types/problem-bank';
 import AreaPathPicker from './AreaPathPicker';
 import type { AreaTreeNode } from '@/lib/problem-bank/area-tree';
 import { UNIT_DEPTH_LABELS } from '@/lib/problem-bank/unit-tree';
@@ -80,8 +81,9 @@ export default function PassageEditorCard({
   // 값과 함께 최신 ref 를 든다 — 그림을 붙이는 동안 친 글을 잃지 않으려면
   // 다 올린 **뒤에** 본문을 읽어야 한다
   const [html, setHtml, bodyRef] = useTrackedState(passage.html);
-  // 값과 함께 최신 ref 를 든다 — 저장이 도는 동안 고친 줄을 잃지 않으려면 그때의 값과 견줘야 한다
-  const [works, setWorks, worksRef] = useTrackedState<PassageWork[]>(passage.works ?? []);
+  // 값과 함께 최신 ref 를 든다 — 저장이 도는 동안 고친 줄을 잃지 않으려면 그때의 값과 견줘야 한다.
+  // 저장 뒤에는 DB 가 맞춘 표준 표기(sql/46)를 받아들인다
+  const { works, setWorks, worksRef, markSaved } = usePassageWorksState(passage);
   const [area, setArea] = useState<string[]>(passage.area_path);
   const [unit, setUnit] = useState<string[]>(passage.unit_path);
   const [figurePaths, setFigurePaths, pathsRef] = useTrackedState<string[]>(
@@ -150,6 +152,7 @@ export default function PassageEditorCard({
     const sending = backToText;
     // 보낼 때의 작품 목록을 붙잡아 둔다 — 저장이 도는 동안 줄을 더 고쳤을 수 있다
     const sentWorks = worksRef.current;
+    const sentVersion = passage.updated_at;
     const tidyWorks = normalizePassageWorks(sentWorks);
     const ok = await onSave({
       html, works: tidyWorks, area_path: area, unit_path: unit, figure_paths: figurePaths,
@@ -162,7 +165,10 @@ export default function PassageEditorCard({
     // 다듬은 값으로 칸을 맞춘다 — '(가)' 로 친 것이 DB 에는 '가' 로 들어가므로,
     // 그냥 두면 저장했는데도 화면이 계속 '저장 안 됨' 이라고 말한다.
     // ⚠️ 저장이 도는 사이 더 고쳤으면 **그대로 둔다** — 화면을 덮으면 그때 친 것이 사라진다
-    if (ok && worksKey(worksRef.current) === worksKey(sentWorks)) setWorks(tidyWorks);
+    if (ok && worksKey(worksRef.current) === worksKey(sentWorks)) {
+      setWorks(tidyWorks);
+      markSaved(sentVersion);
+    }
     setSaving(false);
   };
 

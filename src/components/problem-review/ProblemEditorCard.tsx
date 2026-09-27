@@ -16,6 +16,7 @@ import { useFigureEditor } from '@/hooks/useFigureEditor';
 import { useTrackedState } from '@/hooks/useTrackedState';
 import type { Bbox } from '@/types/problem-bank';
 import GrammarTagPicker from './GrammarTagPicker';
+import { useProblemWorkTitlesState } from '@/hooks/usePassageWorksState';
 import ProblemWorksField from './ProblemWorksField';
 import type { AreaTreeNode } from '@/lib/problem-bank/area-tree';
 import { isGrammarArea } from '@/lib/problem-bank/grammar-tree';
@@ -102,7 +103,8 @@ export default function ProblemEditorCard({
   const [area, setArea] = useState<string[]>(problem.area_path);
   const [unit, setUnit] = useState<string[]>(problem.unit_path);
   const [grammar, setGrammar] = useState<string[]>(problem.grammar_paths);
-  const [workTitles, setWorkTitles] = useState<string[]>(problem.work_titles ?? []);
+  // 저장 뒤 DB 가 맞춘 표준 표기(sql/46)를 받아들인다
+  const { workTitles, setWorkTitles, markSaved } = useProblemWorkTitlesState(problem);
   const [figurePaths, setFigurePaths, pathsRef] = useTrackedState<string[]>(
     problem.figure_paths,
   );
@@ -168,6 +170,7 @@ export default function ProblemEditorCard({
     }
 
     setSaving(true);
+    const sentVersion = problem.updated_at;
     const updatedAt = await onSave({
       stem_html: stem,
       choices: trimmed,
@@ -180,6 +183,7 @@ export default function ProblemEditorCard({
       // ⚠️ 그림 경로도 함께 — 그림 저장이 실패했을 때 사람이 다시 눌러 고칠 길이다
       figure_paths: figurePaths,
     });
+    if (updatedAt) markSaved(sentVersion);
     setSaving(false);
     return updatedAt;
   };
