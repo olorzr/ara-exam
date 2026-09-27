@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { pgArrayLiteral } from '@/lib/pg-array-literal';
 import type { Problem, ProblemSource } from '@/types/problem-bank';
 
 /**
@@ -150,22 +151,24 @@ async function runProblemQuery(
   // ⚠️ `.eq('work_title', …)` 이 아니다(sql/33). 파생 문자열로 걸면 `(가)(나)` 지문의 문항이
   //    `'먼 후일 · 독은 아름답다'` 로만 걸려 '먼 후일' 을 골랐을 때 하나도 안 나온다.
   //    빈 문자열('미지정만')은 이 축에 없다 — filters.ts 가 자유 텍스트라 막아 둔다
-  if (query.work_title) request = request.contains('work_titles', [query.work_title]);
+  // ⚠️ 배열 컬럼 조건은 전부 `pgArrayLiteral` 문자열로 넘긴다 — postgrest-js 는 배열을 따옴표
+  //    없이 join 해서 쉼표 든 제목(「소녀, 두드리다」)이 두 원소로 갈려 **0건**이 됐다(2026-09-27)
+  if (query.work_title) request = request.contains('work_titles', pgArrayLiteral([query.work_title]));
   if (query.verifiedOnly) request = request.eq('status', '검수완료');
   if (query.area_path && query.area_path.length > 0) {
     // 배열 포함 — '문학' 으로 찾으면 '문학 > 현대시' 문항도 걸린다
-    request = request.contains('area_path', query.area_path);
+    request = request.contains('area_path', pgArrayLiteral(query.area_path));
   }
   if (query.unit_path && query.unit_path.length > 0) {
     // 같은 이유로 대단원만 골라도 그 아래 소단원 문항이 함께 걸린다
-    request = request.contains('unit_path', query.unit_path);
+    request = request.contains('unit_path', pgArrayLiteral(query.unit_path));
   }
   if (query.grammar_paths && query.grammar_paths.length > 0) {
     // ⚠️ 여기만 `contains` 가 아니라 **`overlaps`** 다. 이 컬럼은 원소 하나가 경로 하나라
     //    (`'단어 > 품사 > 명사'`) 문항에 여러 개가 붙는다 — `@>` 는 "준 것을 **전부** 가진 행"
     //    이라 두 태그를 넘기면 둘 다 붙은 문항만 나온다. 상위 검색은 고른 마디와 그 아래
     //    경로를 나열해 찾는 것이라 "하나라도 걸리면" 이 맞다(grammar-tree.ts 의 grammarPathsUnder).
-    request = request.overlaps('grammar_paths', query.grammar_paths);
+    request = request.overlaps('grammar_paths', pgArrayLiteral(query.grammar_paths));
   }
   if (query.search?.trim()) {
     // .or() 를 쓰지 않는다 — 백슬래시·괄호 이스케이프가 인용을 통과하며 풀린다.
