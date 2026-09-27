@@ -65,11 +65,38 @@ export function usePaperTypeMix(archive: ArchiveLike, paper: ComposerLike, bulk:
   const askedSeq = useRef(0);
   /** 늦게 온 풀 조회를 버리려고 — 창을 닫았다 다시 연 사이의 응답은 남의 것이다 */
   const sessionRef = useRef(0);
+  /**
+   * 지금 **이 훅이** 담기 잠금을 쥐고 있는가.
+   *
+   * ⚠️ 잠금은 폴더·지문 담기와 나눠 쓰므로, 쥐지 않았을 때 푸는 일이 있으면 **남의 담기를
+   *    풀어 버린다**. 취소로 풀 때도 이 표시를 보고 판단한다(코덱스 1R).
+   */
+  const holdRef = useRef(false);
   const aliveRef = useRef(true);
+
+  /**
+   * 쥐고 있던 잠금을 푼다 — **쥐었을 때만**.
+   *
+   * ⚠️ 푸는 자리가 넷이다(취소·다시 열기·정상 종료·언마운트). 각자 적어 두면 한 곳이
+   *    빠져 잠금이 남고, 그러면 폴더·지문 담기까지 영영 막힌다(코덱스 1R·2R).
+   * ⚠️ `bulk` 객체는 렌더마다 새로 만들어지지만 `bulk.lock` 은 `useMemo([])` 라 안정적이다 —
+   *    의존성에 `bulk` 를 통째로 넣으면 정리 효과가 **렌더마다 돌아** 담는 중에 잠금을 푼다.
+   */
+  const lock = bulk.lock;
+  const releaseHold = useCallback(() => {
+    if (!holdRef.current) return;
+    holdRef.current = false;
+    lock.release();
+  }, [lock]);
+
   useEffect(() => {
     aliveRef.current = true;
-    return () => { aliveRef.current = false; };
-  }, []);
+    return () => {
+      aliveRef.current = false;
+      // 화면을 떠나는데 조회가 멎어 있으면 잠금이 영영 남는다 — 여기서 푼다
+      releaseHold();
+    };
+  }, [releaseHold]);
 
   /** 창을 열고 풀을 읽는다 */
   const openDialog = useCallback(() => {
@@ -78,6 +105,10 @@ export function usePaperTypeMix(archive: ArchiveLike, paper: ComposerLike, bulk:
     if (tooBig) { toast.error(tooBig); return; }
 
     sessionRef.current += 1;
+    // 담는 중에 다시 열면 그 담기는 취소다 — 잠금을 안 풀면 영영 남는다(코덱스 2R).
+    //    화면은 담는 중에 이 단추를 잠그지만, 훅이 그 전제에 기대면 안 된다
+    releaseHold();
+    setBusy(false);
     const mySession = sessionRef.current;
     askedSeq.current = bulk.filterSeq();
     setSession(mySession);
@@ -97,7 +128,7 @@ export function usePaperTypeMix(archive: ArchiveLike, paper: ComposerLike, bulk:
         if (!aliveRef.current || sessionRef.current !== mySession) return;
         setPoolError(e instanceof Error ? e.message : '문항을 불러오지 못했어요.');
       });
-  }, [archive.filters, archive.total, bulk]);
+  }, [archive.filters, archive.total, bulk, releaseHold]);
 
   /**
    * 창을 닫는다 — **진행 중인 담기의 취소이기도 하다**.
@@ -110,14 +141,20 @@ export function usePaperTypeMix(archive: ArchiveLike, paper: ComposerLike, bulk:
    */
   const close = useCallback(() => {
     sessionRef.current += 1;
+    // ⚠️ 잠금도 **그 자리에서** 푼다. 되읽기가 끝날 때까지 쥐고 있으면 닫자마자 다시 열
+    //    수도, 폴더·지문 담기를 할 수도 없고, 조회가 멎으면 영영 잠긴다(코덱스 1R).
+    //    늦게 끝난 그 작업은 세대가 달라 아무것도 담지 않고 잠금도 다시 풀지 않는다.
+    releaseHold();
+    setBusy(false);
     setOpen(false);
-  }, []);
+  }, [releaseHold]);
 
   /** 비율대로 뽑아 담는다 */
   const confirm = useCallback(async ({ total, objectivePercent }: TypeMixRequest) => {
     if (!pool) return;
     // 잠금은 첫 await 앞에서 건다 — 폴더·지문 담기와 하나를 나눠 쓴다
     if (!bulk.lock.acquire()) return;
+    holdRef.current = true;
     setBusy(true);
     const mySession = sessionRef.current;
     const askedClear = paper.clearSeq();
@@ -155,10 +192,14 @@ export function usePaperTypeMix(archive: ArchiveLike, paper: ComposerLike, bulk:
     } catch (e) {
       if (aliveRef.current) toast.error(e instanceof Error ? e.message : '담지 못했어요.');
     } finally {
-      bulk.lock.release();
-      if (aliveRef.current) setBusy(false);
+      // ⚠️ 취소로 이미 풀렸으면(세대가 달라졌으면) **건드리지 않는다** — 그 사이 다시 연
+      //    비율 담기나 폴더 담기가 잠가 두었을 수 있고, 여기서 풀면 남의 잠금을 푼다
+      if (sessionRef.current === mySession) {
+        releaseHold();
+        if (aliveRef.current) setBusy(false);
+      }
     }
-  }, [bulk, paper, pool]);
+  }, [bulk, paper, pool, releaseHold]);
 
   return { open, session, pool, poolError, busy, openDialog, close, confirm };
 }

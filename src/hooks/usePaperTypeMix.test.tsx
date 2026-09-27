@@ -31,18 +31,36 @@ function deferred<T>() {
 const poolRow = (id: string): TypeMixRow =>
   ({ id, question_type: '객관식', passage_id: null });
 
-/** 훅에 넘길 세 짝 — 조건 세대와 잠금을 시험이 쥔다 */
+/**
+ * 훅에 넘길 세 짝 — 조건 세대와 잠금을 시험이 쥔다.
+ *
+ * ⚠️ 잠금은 **실제로 잠기는** 것을 쓴다(늘 성공하는 목이 아니다). 폴더·지문 담기와 하나를
+ *    나눠 쓰므로, 취소 뒤에 정말 풀렸는지·남의 잠금을 풀지 않는지를 봐야 한다(코덱스 1R).
+ */
 function harness() {
   let seq = 0;
+  let locked = false;
+  const release = vi.fn(() => { locked = false; });
   const addRows = vi.fn(() => true);
   const bulk = {
     addRows,
     filterSeq: () => seq,
-    lock: { acquire: () => true, release: vi.fn() },
+    lock: {
+      acquire: () => {
+        if (locked) return false;
+        locked = true;
+        return true;
+      },
+      release,
+    },
   };
   const paper = { added: new Set<string>(), clearSeq: () => 0 };
   const archive = { filters: EMPTY_FILTERS, total: 10 };
-  return { archive, paper, bulk, addRows, bumpFilter: () => { seq += 1; } };
+  return {
+    archive, paper, bulk, addRows, release,
+    isLocked: () => locked,
+    bumpFilter: () => { seq += 1; },
+  };
 }
 
 beforeEach(() => {
@@ -143,6 +161,114 @@ describe('usePaperTypeMix', () => {
     expect(h.addRows).not.toHaveBeenCalled();
     expect(toastError).toHaveBeenCalled();
     expect(result.current.open).toBe(false);
+  });
+
+  /**
+   * ⚠️ 코덱스 1R — 세대 검사로 결과만 버리고 잠금을 쥔 채 두면, 닫자마자 다시 열 수도
+   *    폴더·지문 담기를 할 수도 없고 조회가 멎으면 **영영 잠긴다**.
+   */
+  it('취소하면 잠금이 곧바로 풀려 바로 다시 담을 수 있다', async () => {
+    fetchTypeMixPool.mockResolvedValue({ rows: [poolRow('a'), poolRow('b')], total: 2 });
+    const first = deferred<ArchiveRow[]>();
+    const second = deferred<ArchiveRow[]>();
+    fetchProblemsByIdsForAdd.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+
+    const h = harness();
+    const { result } = renderHook(() => usePaperTypeMix(h.archive, h.paper, h.bulk));
+    act(() => { result.current.openDialog(); });
+    await waitFor(() => expect(result.current.pool).toHaveLength(2));
+
+    let firstRun!: Promise<void>;
+    act(() => { firstRun = result.current.confirm({ total: 1, objectivePercent: 100 }); });
+    expect(h.isLocked()).toBe(true);
+
+    // 되읽는 사이 창을 닫았다 — 잠금이 그 자리에서 풀려야 한다
+    act(() => { result.current.close(); });
+    expect(h.isLocked()).toBe(false);
+    expect(result.current.busy).toBe(false);
+
+    // 곧바로 다시 열어 담는다
+    act(() => { result.current.openDialog(); });
+    await waitFor(() => expect(result.current.pool).toHaveLength(2));
+    let secondRun!: Promise<void>;
+    act(() => { secondRun = result.current.confirm({ total: 1, objectivePercent: 100 }); });
+    expect(h.isLocked()).toBe(true);
+
+    // 취소한 옛 작업이 이제야 끝난다 — 담지도, **새 잠금을 풀지도** 않아야 한다
+    await act(async () => {
+      first.resolve([{ id: 'a' } as ArchiveRow]);
+      await firstRun;
+    });
+    expect(h.addRows).not.toHaveBeenCalled();
+    expect(h.isLocked()).toBe(true);
+
+    await act(async () => {
+      second.resolve([{ id: 'b' } as ArchiveRow]);
+      await secondRun;
+    });
+    expect(h.addRows).toHaveBeenCalledTimes(1);
+    expect(h.isLocked()).toBe(false);
+  });
+
+  /** 풀을 읽는 중에는 잠금을 쥐지 않는다 — 닫아도 남의 담기를 풀면 안 된다 */
+  it('풀을 읽는 중에 닫아도 잠금을 건드리지 않는다', async () => {
+    const pool = deferred<{ rows: TypeMixRow[]; total: number }>();
+    fetchTypeMixPool.mockReturnValue(pool.promise);
+
+    const h = harness();
+    const { result } = renderHook(() => usePaperTypeMix(h.archive, h.paper, h.bulk));
+    act(() => { result.current.openDialog(); });
+    act(() => { result.current.close(); });
+
+    expect(h.release).not.toHaveBeenCalled();
+    await act(async () => { pool.resolve({ rows: [poolRow('a')], total: 1 }); });
+    // 닫은 뒤 도착한 풀은 버린다
+    expect(result.current.pool).toBeNull();
+  });
+
+  /** ⚠️ 코덱스 2R — 화면은 담는 중에 이 단추를 잠그지만 훅이 그 전제에 기대면 안 된다 */
+  it('담는 중에 다시 열어도 잠금이 남지 않는다', async () => {
+    fetchTypeMixPool.mockResolvedValue({ rows: [poolRow('a')], total: 1 });
+    const first = deferred<ArchiveRow[]>();
+    fetchProblemsByIdsForAdd.mockReturnValue(first.promise);
+
+    const h = harness();
+    const { result } = renderHook(() => usePaperTypeMix(h.archive, h.paper, h.bulk));
+    act(() => { result.current.openDialog(); });
+    await waitFor(() => expect(result.current.pool).toHaveLength(1));
+
+    let firstRun!: Promise<void>;
+    act(() => { firstRun = result.current.confirm({ total: 1, objectivePercent: 100 }); });
+    expect(h.isLocked()).toBe(true);
+
+    // 담는 중에 창을 다시 열었다 — 그 담기는 취소다
+    act(() => { result.current.openDialog(); });
+    expect(h.isLocked()).toBe(false);
+    expect(result.current.busy).toBe(false);
+
+    await act(async () => {
+      first.resolve([{ id: 'a' } as ArchiveRow]);
+      await firstRun;
+    });
+    expect(h.addRows).not.toHaveBeenCalled();
+    expect(h.isLocked()).toBe(false);
+  });
+
+  /** 조회가 멎은 채 화면을 떠나면 잠금이 영영 남는다 */
+  it('담는 중에 화면을 떠나면 잠금을 푼다', async () => {
+    fetchTypeMixPool.mockResolvedValue({ rows: [poolRow('a')], total: 1 });
+    fetchProblemsByIdsForAdd.mockReturnValue(deferred<ArchiveRow[]>().promise);
+
+    const h = harness();
+    const { result, unmount } = renderHook(() => usePaperTypeMix(h.archive, h.paper, h.bulk));
+    act(() => { result.current.openDialog(); });
+    await waitFor(() => expect(result.current.pool).toHaveLength(1));
+    act(() => { void result.current.confirm({ total: 1, objectivePercent: 100 }); });
+    expect(h.isLocked()).toBe(true);
+
+    unmount();
+
+    expect(h.isLocked()).toBe(false);
   });
 
   it('조건이 그대로면 담고 창을 닫는다', async () => {
