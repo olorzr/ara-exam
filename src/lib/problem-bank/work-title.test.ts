@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   joinWorkTitles, normalizePassageWorks, normalizeWorkLabel, normalizeWorkTitle,
-  normalizeWorkTitles, splitWorkTitles, workTitleKey, WORKS_MAX, worksKey,
+  foldWorkTitleKey, normalizeWorkTitles, splitWorkTitles, workTitleKey, WORKS_MAX, worksKey,
 } from './work-title';
 
 describe('normalizeWorkTitle', () => {
@@ -206,5 +206,48 @@ describe('workTitleKey', () => {
     // 운영 DB 에서 SELECT exam.work_title_key(...) 로 뽑은 값(2026-09-27)
     expect(workTitleKey('지상의 방 한 칸 - 박영한 님의 제(題)를 빌려')).toBe('지상의방한칸-박영한님의제를빌려');
     expect(workTitleKey('제망매가(김완진 해독)')).toBe('제망매가(김완진해독)');
+    // sql/50 적용 뒤 같은 식으로 뽑은 값
+    expect(workTitleKey(`동지\u3145\u1103\u119E\u11AF 기나긴 밤을`)).toBe('동짓달기나긴밤을');
+    expect(workTitleKey('정전기가 겨울로 간 까닭은?')).toBe('정전기가겨울로간까닭은');
+  });
+
+  // 운영 DB 에 실제로 갈려 있던 표기들(2026-09-27). 옛 글자는 소스에서 \u 로 적는다(CLAUDE.md 옛한글 규약)
+  it('옛 글자로 적은 같은 제목을 한 열쇠로 접는다 — 아래아·사이\u3145·홀로 선 \u3163', () => {
+    const dongji = [`동지\u3145\u1103\u119E\u11AF 기나긴 밤을`, `동지\u3145달 기나긴 밤을`, '동짓달 기나긴 밤을'];
+    for (const title of dongji) expect(workTitleKey(title)).toBe(workTitleKey('동짓달 기나긴 밤을'));
+    expect(workTitleKey(`두터비 \u1111\u119E리를 물고`)).toBe(workTitleKey('두터비 파리를 물고'));
+    expect(workTitleKey(`\u1106\u119E음이 어린 후\u3163니`)).toBe(workTitleKey('마음이 어린 후이니'));
+    expect(workTitleKey(`\u1103\u11A1\u11A8들에 동난지이 사오`)).toBe(workTitleKey('댁들에 동난지이 사오'));
+  });
+
+  it('방점을 버린다', () => {
+    expect(workTitleKey(`\u1112\u119E\u11AB\u302E \u1100\u1173\u11AF\u302F`)).toBe(workTitleKey('한 글'));
+  });
+
+  it('끝 문장부호만 뗀다 — 안쪽 물음표는 제목의 일부다', () => {
+    expect(workTitleKey('시계는 어떻게 달력을 이겼을까?')).toBe(workTitleKey('시계는 어떻게 달력을 이겼을까'));
+    expect(workTitleKey('정전기가 겨울로 간 까닭은？')).toBe(workTitleKey('정전기가 겨울로 간 까닭은'));
+    expect(workTitleKey('동짓달 기나긴 밤을…')).toBe(workTitleKey('동짓달 기나긴 밤을'));
+    expect(workTitleKey('동짓달 기나긴 밤을．')).toBe(workTitleKey('동짓달 기나긴 밤을'));
+    expect(workTitleKey('왜?’라고 묻기, 답을 찾기, 평가하기')).toContain('?');
+  });
+
+  it('낱말이 다른 갈래는 접지 않는다 — 그건 동의어 표가 사람의 판단으로 묶는다', () => {
+    expect(workTitleKey('두꺼비 파리를 물고')).not.toBe(workTitleKey('두터비 파리를 물고'));
+    expect(workTitleKey('배를 매며')).not.toBe(workTitleKey('배를 밀며'));
+    // 옛 초성(ᄲ)은 모을 음절이 없어 자모로 남는다 — 현대 표기와 같아지지 않는다
+    expect(workTitleKey(`이화우 흣\u1132\u1173릴 제`)).not.toBe(workTitleKey('이화우 흩뿌릴 제'));
+  });
+
+  it('받침이 이미 있는 음절 뒤의 \u3145 은 붙이지 않는다', () => {
+    expect(workTitleKey(`달\u3145빛`)).toBe(`달\u3145빛`);
+  });
+
+  it('멱등이다 — 대장 열쇠를 한 번 더 접어도 그대로여야 동의어 열쇠를 다시 매길 수 있다', () => {
+    for (const raw of [`동지\u3145\u1103\u119E\u11AF 기나긴 밤을`, '까닭은?!', `후\u3163니`, '동백꽃']) {
+      const once = workTitleKey(raw);
+      expect(foldWorkTitleKey(once)).toBe(once);
+      expect(workTitleKey(once)).toBe(once);
+    }
   });
 });

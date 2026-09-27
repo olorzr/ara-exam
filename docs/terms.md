@@ -209,6 +209,21 @@
 - 코드에서의 사용: `Passage.works`, `Problem.work_titles`, `normalizeWorkTitle`, `buildWorkTree`, `tallyWorkCounts`
 - 관련 파일: src/lib/problem-bank/work-title.ts, src/lib/problem-bank/work-tree.ts, src/lib/problem-bank/work-counts.ts, sql/33_problem_bank_multi_works.sql
 
+## 작품명 열쇠·대장·동의어 (work title key / canon / alias)
+- 정의: 같은 작품이 표기만 달라 두 잎으로 서지 않게 하는 세 층. **열쇠**(`workTitleKey` ↔ `exam.work_title_key`)는 띄어쓰기·한자 괄호를 지우고 옛 글자(아래아·사이ㅅ·홀로 선 ㅣ·방점)와 끝 문장부호를 접은 비교용 문자열이다. **대장**(`exam.work_title_canon`)은 열쇠마다 사람이 읽을 **대표 표기** 하나를 든다. **동의어**(`exam.work_title_alias`)는 글자가 다른 같은 작품(두꺼비↔두터비)의 열쇠를 대표에게 잇는다
+- 저장은 늘 대표 표기다 — 트리거(`aa_works_c_canon_*`)가 어느 길로 들어와도 바꿔 넣는다. 처음 보는 열쇠는 들어온 표기가 대표가 된다
+- ⚠️ **열쇠는 표기가 아니다.** 옛 글자를 표기에서 일괄로 바꾸면 `ᄆᆞᄋᆞᆷ` 이 `마암` 이 된다 — 대표 표기는 사람이 정한다(`exam.set_canonical_work_title`)
+- 대표 표기 규칙(사용자 결정 2026-09-27): 첫 구절로 부르는 작품(시조)은 **초장 첫 두 음보, 원문 낱말 + 현대 글자**(「동짓달 기나긴 밤을」「두터비 파리를 물고」). **해독자·이본은 따로 선다**(「제망매가(김완진 해독)」, 「열녀춘향수절가」 ↔ 「춘향전」)
+- 코드에서의 사용: `workTitleKey`, `foldWorkTitleKey`, `exam.canonical_work_title`, `exam.alias_work_title`
+- 관련 파일: src/lib/problem-bank/work-title.ts, sql/46_problem_bank_work_title_canon.sql, sql/47_problem_bank_work_title_alias.sql, sql/50_problem_bank_work_title_fold.sql
+
+## 닮은 작품명 (work title suspects)
+- 정의: **지은이 표기가 하나라도 겹치거나 한쪽이 비어 있고**, 열쇠가 ① 앞부분이 같거나(시조 초장을 다른 데서 끊음) ② 한두 글자만 다른(두꺼비↔두터비) 작품 쌍. 열쇠로는 확실히 접을 수 없어 **찾아내기만** 하고 사람이 정한다 — 같은 작품이면 동의어(`exam.alias_work_title`), 다른 작품이면 `exam.work_title_distinct`(`exam.mark_work_titles_distinct`)
+- ⚠️ **불변식: `exam.work_title_suspects()` 는 늘 0건이다.** 적재 스크립트가 넣기 전(`work_title_suspects_for`)과 COMMIT 직전에 확인하고, 걸리면 멈춘다. 앱으로 올라온 시험지가 만든 쌍도 다음 적재에서 걸린다
+- ⚠️ 자동으로 합치지 않는 까닭: 「배를 매며」·「배를 밀며」(장석남)는 한 지문에 함께 실린 **다른 시**다. 「사미인곡」·「속미인곡」도 한 글자 차이다
+- 코드에서의 사용: `exam.work_titles_look_alike`, `exam.work_title_suspects`, `exam.work_title_suspects_for`
+- 관련 파일: sql/51_problem_bank_work_title_suspects.sql, sql/52_problem_bank_work_title_helpers.sql, sql/53_problem_bank_work_title_dedupe.sql, ~/.claude/tools/ingest-exam.js
+
 ## 작품 갈래 (WorkKind)
 - 정의: 작품이 **문학**인가 **비문학**인가 **문법**인가. 아카이브 왼쪽 '작품' 탭의 1단 폴더이고 `'literary' | 'nonliterary' | 'grammar' | 'unknown'` 넷이다(폴더 차례도 그 순서다)
 - ⚠️ **저장하는 값이 아니라 파생값이다.** 그 작품이 실린 **지문의 영역**(`passages.area_path`)에서 정한다 — 대영역이 `'문학'` 이면 문학, [문법 영역](#문법-분류-grammar_paths)이면 문법, 다른 이름이면 비문학, 영역이 없으면 `unknown`('영역 미지정' 폴더)

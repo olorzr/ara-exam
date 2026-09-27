@@ -65,19 +65,56 @@ const HANJA_PARENS = new RegExp(
 );
 const ALL_SPACES = new RegExp(`[${SPACE_CHARS}]`, 'g');
 
+/** 아래아 ᆞ → ᅡ, ᆡ → ᅢ (NFD 로 푼 뒤) */
+const ARAEA = /\u119E/g;
+const ARAEA_I = /\u11A1/g;
+/** 방점 — 결합 문자라 문자 클래스에 넣지 않는다(no-misleading-character-class) */
+const BANGJEOM = /\u302E|\u302F/g;
+/** 모음 자모 바로 뒤의 사이ㅅ(호환 자모) — 받침 ㅅ 으로 붙인다: 동지ㅅ달 → 동짓달 */
+const SAI_SIOT = /([\u1161-\u11A7])\u3145/g;
+/** 자모 뒤에 홀로 선 ㅣ(호환 자모) — '이' 로: 후ㅣ니 → 후이니 */
+const LONE_I = /([\u1100-\u11FF])\u3163/g;
+/** 끝에 붙은 문장부호 — 같은 제목에 물음표만 붙였다 뗐다 한다 */
+const TRAILING_PUNCT = /[?!.…？！。．]+$/;
+
 /**
- * 작품명 비교 열쇠 — 띄어쓰기와 한자 괄호를 무시한다.
+ * 비교 열쇠의 옛 글자 접기 — `exam.fold_work_title_key` 와 **1:1 거울**이다(sql/50).
+ *
+ * 시조 제목은 시험지마다 `동지ㅅᄃᆞᆯ`·`동지ㅅ달`·`동짓달` 처럼 **같은 낱말을 다른 글자로** 적는다.
+ * 그 차이만 접는다 — 낱말이 다른 갈래(`두꺼비`↔`두터비`)는 동의어 표가 맡는다.
+ *
+ * ⚠️ **열쇠에만** 쓴다. 표기에 쓰면 `ᄆᆞᄋᆞᆷ` 이 `마암` 이 된다(둘째 음절 아래아는 ㅡ 로 바뀌었다).
+ * ⚠️ 차례가 뜻을 가진다 — NFD 로 풀어야 뒤에 오는 ㅅ 을 받침으로 붙일 수 있고, NFC 로 다시 모아야
+ *    `ᄃ ᅡ ᆯ` 이 `달` 이 된다. 옛 초성(ᄲ 등)은 모을 음절이 없어 자모로 남는다.
+ * @param key - 공백·한자 괄호를 걷어 낸 열쇠
+ * @returns 접은 열쇠
+ */
+export function foldWorkTitleKey(key: string): string {
+  return key
+    .normalize('NFD')
+    .replace(ARAEA, '\u1161')
+    .replace(ARAEA_I, '\u1162')
+    .replace(BANGJEOM, '')
+    .replace(SAI_SIOT, '$1\u11BA')
+    .replace(LONE_I, '$1이')
+    .normalize('NFC')
+    .replace(TRAILING_PUNCT, '');
+}
+
+/**
+ * 작품명 비교 열쇠 — 띄어쓰기·한자 괄호를 무시하고 옛 글자·끝 문장부호를 접는다.
  *
  * 표기를 바꾸는 함수가 아니라 **같은 작품인지 볼 때만** 쓴다(`엄마 걱정` ↔ `엄마걱정`,
- * `이생규장전` ↔ `이생규장전(李生窺墻傳)`). DB 는 이 열쇠로 표준 표기 대장
- * (`exam.work_title_canon`)을 찾아 저장값을 맞춘다 — `exam.work_title_key` 와 1:1 거울이다.
+ * `이생규장전` ↔ `이생규장전(李生窺墻傳)`, `동지ㅅᄃᆞᆯ 기나긴 밤을` ↔ `동짓달 기나긴 밤을`,
+ * `…까닭은?` ↔ `…까닭은`). DB 는 이 열쇠로 표준 표기 대장(`exam.work_title_canon`)을 찾아
+ * 저장값을 맞춘다 — `exam.work_title_key` 와 1:1 거울이다.
  *
  * ⚠️ 한글이 한 글자라도 든 괄호는 남긴다 — `제망매가(김완진 해독)` 은 따로 서야 하는 작품이다.
  * @param title - 작품명
  * @returns 비교 열쇠
  */
 export function workTitleKey(title: string): string {
-  return normalizeWorkTitle(title).replace(HANJA_PARENS, '').replace(ALL_SPACES, '');
+  return foldWorkTitleKey(normalizeWorkTitle(title).replace(HANJA_PARENS, '').replace(ALL_SPACES, ''));
 }
 
 /**
