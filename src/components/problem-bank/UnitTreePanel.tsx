@@ -76,6 +76,8 @@ export default function UnitTreePanel({ filters, onChange }: UnitTreePanelProps)
       ...WORK_AXIS_CLEARED,
       ...GRAMMAR_AXIS_CLEARED,
       grade: category.grade,
+      // 학년을 이 단원의 학년으로 못 박으니 학교급은 푼다 — 남기면 '고등 ∩ 중2' 가 0건이 된다
+      school_level: '',
       textbook: category.publisher,
       // 소단원이 없는 '(전체)' 잎은 대단원만 — 그 아래 문항이 모두 걸린다
       unit_path: unitPath,
