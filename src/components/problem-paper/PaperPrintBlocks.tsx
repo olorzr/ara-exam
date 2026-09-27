@@ -227,12 +227,12 @@ function ProblemBlock({ number, snapshot, settings, imageUrls, showAnswers }: Pr
           })}
         </div>
       ) : !showAnswers && (
-        <div className="pb-q__lines">
-          {/* 서술형은 쓸 자리가 더 필요하다. 교사용에는 그리지 않는다 — 쓸 사람이 없다 */}
-          {Array.from({ length: snapshot.question_type === '서술형' ? 4 : 2 }, (_, i) => (
-            <div key={i} className="pb-q__line" />
-          ))}
-        </div>
+        // 답 쓰는 자리는 **줄을 긋지 않고 비워 둔다**(2026-09-27 사용자 결정) — 18px 짜리
+        // 줄에 글씨를 맞춰 넣기가 답답하다는 제보다. 서술형은 더 넓다.
+        // 교사용에는 그리지 않는다 — 쓸 사람이 없다
+        <div
+          className={`pb-q__blank pb-q__blank--${snapshot.question_type === '서술형' ? 'long' : 'short'}`}
+        />
       )}
 
       {showAnswers && <TeacherAnswer snapshot={snapshot} />}

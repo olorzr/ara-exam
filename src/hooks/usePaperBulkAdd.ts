@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { hasActiveFilters, toProblemQuery, type ProblemFilters } from '@/lib/problem-bank/filters';
 import { fetchProblemsForBulkAdd, fetchProblemsOfPassageForAdd } from '@/lib/problem-bank/queries';
@@ -79,6 +79,26 @@ export function usePaperBulkAdd(archive: ArchiveLike, paper: ComposerLike) {
   }, []);
 
   /**
+   * 담기 잠금 — 폴더·지문·**비율 담기**가 하나를 나눠 쓴다.
+   *
+   * ⚠️ 잠금이 하나여야 하는 까닭: 셋 다 같은 캔버스를 채우므로 둘이 동시에 돌면 상한
+   *    검사를 서로 못 본 채 지나간다. 담기가 도는 동안 다른 담기 단추를 **함께** 잠그는
+   *    규약(`bulkBusy`)도 이 하나의 잠금에서 나온다(코덱스 6R).
+   */
+  const lock = useMemo(() => ({
+    /** 잠글 수 있으면 잠그고 true. 이미 누가 담는 중이면 false */
+    acquire: (): boolean => {
+      if (busyRef.current) return false;
+      busyRef.current = true;
+      return true;
+    },
+    release: () => { busyRef.current = false; },
+  }), []);
+
+  /** 지금 조건 세대 — 오래 걸리는 담기가 돌아와서 견준다 */
+  const currentFilterSeq = useCallback(() => filterSeq.current, []);
+
+  /**
    * 조건이 바뀌면 선택을 비운다.
    *
    * ⚠️ 이 화면에서 조건을 바꾸는 길은 **전부 이 함수**를 지나야 한다(트리·필터 줄·쪽 넘김).
@@ -139,8 +159,7 @@ export function usePaperBulkAdd(archive: ArchiveLike, paper: ComposerLike) {
    */
   const addPassage = useCallback(async (passageId: string) => {
     // 잠금은 첫 await 앞에서 건다 — 뒤에 걸면 두 번 누른 사이에 조회가 둘 돈다
-    if (busyRef.current) return;
-    busyRef.current = true;
+    if (!lock.acquire()) return;
     setPassageBusy(passageId);
     const askedClear = paper.clearSeq();
     try {
@@ -160,21 +179,19 @@ export function usePaperBulkAdd(archive: ArchiveLike, paper: ComposerLike) {
     } catch (e) {
       if (aliveRef.current) toast.error(e instanceof Error ? e.message : '담지 못했어요.');
     } finally {
-      busyRef.current = false;
+      lock.release();
       if (aliveRef.current) setPassageBusy(null);
     }
-  }, [addRows, paper]);
+  }, [addRows, lock, paper]);
 
   /** 지금 조건에 걸린 문항을 통째로 담는다 */
   const addFolder = useCallback(async () => {
-    // ⚠️ 잠금은 첫 await 앞에서 건다 — 뒤에 걸면 두 번 누른 사이에 조회가 둘 돈다
-    if (busyRef.current) return;
-
     // 폴더 자체가 상한을 넘으면 조회도 하지 않는다 — 어차피 잘라 담을 수 없다
     const tooBig = folderTooBigMessage(archive.total);
     if (tooBig) { toast.error(tooBig); return; }
 
-    busyRef.current = true;
+    // ⚠️ 잠금은 첫 await 앞에서 건다 — 뒤에 걸면 두 번 누른 사이에 조회가 둘 돈다
+    if (!lock.acquire()) return;
     setFolderBusy(true);
     // 누른 그 순간의 조건과 세대 — 둘 다 이 자리에서 잡는다(닫아 두는 값이 아니다)
     const asked = toProblemQuery(archive.filters);
@@ -209,16 +226,20 @@ export function usePaperBulkAdd(archive: ArchiveLike, paper: ComposerLike) {
     } catch (e) {
       if (aliveRef.current) toast.error(e instanceof Error ? e.message : '담지 못했어요.');
     } finally {
-      busyRef.current = false;
+      lock.release();
       if (aliveRef.current) setFolderBusy(false);
     }
-  }, [addRows, archive.filters, archive.total, paper, selection]);
+  }, [addRows, archive.filters, archive.total, lock, paper, selection]);
 
   return {
     selection,
     patch,
     reset,
     folderBusy,
+    /** 담기 잠금 — 비율 담기(`usePaperTypeMix`)가 같은 것을 받아 쓴다 */
+    lock,
+    /** 지금 조건 세대 — 비율 담기가 창을 열 때와 담을 때를 견준다 */
+    filterSeq: currentFilterSeq,
     /** 담을 폴더가 정해져 있는가 — 조건이 하나도 없으면 '전체' 라 담을 폴더가 아니다 */
     folderEnabled: hasActiveFilters(archive.filters) && archive.total > 0 && !archive.loading,
     addRows,
@@ -229,8 +250,9 @@ export function usePaperBulkAdd(archive: ArchiveLike, paper: ComposerLike) {
     /**
      * 담기가 하나라도 도는 중인가.
      *
-     * ⚠️ 잠금(`busyRef`)은 **폴더 담기와 지문 담기가 함께 쓴다** — 누른 단추만 잠그면
-     *    다른 단추는 눌리는데 아무 일도 안 일어난다(코덱스 6R). 화면은 이 값으로 둘 다 잠근다.
+     * ⚠️ 잠금(`lock`)은 **폴더·지문·비율 담기가 함께 쓴다** — 누른 단추만 잠그면
+     *    다른 단추는 눌리는데 아무 일도 안 일어난다(코덱스 6R). 화면은 이 값으로 다 잠근다.
+     *    비율 담기가 도는 중인지는 그 훅이 따로 알려 준다(화면에서 합쳐 쓴다).
      */
     bulkBusy: folderBusy || passageBusy !== null,
   };

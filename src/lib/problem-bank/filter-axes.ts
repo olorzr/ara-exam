@@ -4,6 +4,7 @@ import { areaPathLabel } from './area-tree';
 import { formatGrammarPath, parseGrammarPath } from './grammar-tree';
 import { EXAM_TYPE_OPTIONS, SOURCE_TYPE_OPTIONS } from './source-form';
 import { UNSPECIFIED_AXIS, type ProblemFilters } from './filters';
+import { QUESTION_KINDS, QUESTION_KIND_LABELS } from './question-kind';
 import { unitPathLabel } from './unit-tree';
 import type { SourceFacets, WorkFacet } from './facets';
 
@@ -172,6 +173,15 @@ export function buildFilterAxes(input: BuildInput): FilterAxis[] {
     options: withValue(withAll('문법', grammarOptions), grammarValue),
     toPatch: (v) => ({ grammar_path: v === ALL_AXIS ? [] : parseGrammarPath(v), page: 0 }),
   });
+
+  // ⚠️ 문법 칸과 같이 `showAxis` 를 걸지 않는다 — 선택지가 **정해진 둘**이라 빌 일이 없다.
+  //    값은 갈래(`objective`·`subjective`)이고 DB 의 `question_type` 이 아니다
+  //    ('서술형' 은 '주관식' 갈래에 든다 — question-kind.ts). '미지정' 칸도 두지 않는다:
+  //    `question_type` 은 NOT NULL DEFAULT '객관식' 이라 미지정인 행이 없다
+  simple(
+    'question_kind', '문항 유형', 'w-36',
+    QUESTION_KINDS.map((kind) => ({ value: kind, label: QUESTION_KIND_LABELS[kind] })),
+  );
 
   return axes;
 }

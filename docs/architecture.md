@@ -462,6 +462,11 @@ src/
   싣는다(sql/35, 옛 스냅샷에는 없어 옵셔널)
 - **여러 문항 담기**: `bulk-add.ts`(상한·문구) + `usePaperBulkAdd`(선택·폴더 조회) +
   `PaperPickBar`. 상한 200 은 RPC 와 같은 값이고, 넘치면 **일부만 담지 않고 막는다**
+- **비율로 담기**: `type-mix.ts`(계산·뽑기, 순수) + `type-mix-queries.ts`(가벼운 풀 ≤1,000행 →
+  뽑힌 id 로 되읽기) + `usePaperTypeMix` + `TypeMixDialog`/`TypeMixForm`. 잠금과 조건 세대는
+  `usePaperBulkAdd` 의 것을 **나눠 쓴다**(셋이 같은 캔버스를 채운다)
+- **문항 갈래 필터**(`question_kind`)는 아카이브와 조합 화면이 함께 쓰는 필터 줄에 있다 —
+  그것만으로 폴더 담기·골라 담기가 유형을 따른다
 
 ### 인쇄
 

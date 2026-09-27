@@ -3,7 +3,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import ArchiveList from '@/components/problem-bank/ArchiveList';
 import ArchivePager from '@/components/problem-bank/ArchivePager';
@@ -14,9 +13,12 @@ import ProblemFilterBar from '@/components/problem-bank/ProblemFilterBar';
 import CanvasItem from '@/components/problem-paper/CanvasItem';
 import PaperPickBar from '@/components/problem-paper/PaperPickBar';
 import PaperToolbar from '@/components/problem-paper/PaperToolbar';
+import PassageAddButton from '@/components/problem-paper/PassageAddButton';
+import TypeMixDialog from '@/components/problem-paper/TypeMixDialog';
 import { useListDrag } from '@/hooks/useListDrag';
 import { usePaperBulkAdd } from '@/hooks/usePaperBulkAdd';
 import { usePaperComposer } from '@/hooks/usePaperComposer';
+import { usePaperTypeMix } from '@/hooks/usePaperTypeMix';
 import { useProblemArchive, type ArchiveRow } from '@/hooks/useProblemArchive';
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls';
 import { groupsOf } from '@/lib/problem-paper/compose';
@@ -35,6 +37,9 @@ export default function PaperComposePage() {
   const archive = useProblemArchive();
   const paper = usePaperComposer();
   const bulk = usePaperBulkAdd(archive, paper);
+  const mix = usePaperTypeMix(archive, paper, bulk);
+  /** 담기가 하나라도 도는 중인가 — 잠금이 하나라 단추를 **함께** 잠근다 */
+  const addBusy = bulk.bulkBusy || mix.busy;
   const canvasRef = useRef<HTMLDivElement>(null);
 
   /** 지금 끌고 있는 것 — 아카이브에서 새로 담는 중이거나, 캔버스 안에서 옮기는 중 */
@@ -88,7 +93,8 @@ export default function PaperComposePage() {
         <h1 className="text-2xl font-bold text-gray-900">🧩 문제지 조합</h1>
         <p className="mt-1 text-sm text-gray-500">
           왼쪽 트리에서 단원·학교·작품·문법을 고르고, 문항을 끌어다 오른쪽에 놓으세요.
-          고른 폴더를 <strong>통째로 담거나</strong> 체크해서 여럿을 한 번에 담을 수도 있어요.
+          고른 폴더를 <strong>통째로 담거나</strong>, 체크해서 여럿을, 또는
+          <strong> 유형 비율</strong>(객관식 8 : 주관식 2 같은)로 무작위로 담을 수도 있어요.
           같은 지문의 문항은 자동으로 붙습니다.
         </p>
       </div>
@@ -132,12 +138,13 @@ export default function PaperComposePage() {
               folderTotal={archive.total}
               folderEnabled={bulk.folderEnabled}
               folderBusy={bulk.folderBusy}
-              bulkBusy={bulk.bulkBusy}
+              bulkBusy={addBusy}
               onEnter={bulk.selection.enter}
               onExit={bulk.selection.exit}
               onToggleAll={bulk.selection.toggleAll}
               onAddSelected={bulk.addSelected}
               onAddFolder={bulk.addFolder}
+              onOpenMix={mix.openDialog}
             />
 
             <div className="max-h-[70vh] overflow-y-auto pr-1">
@@ -175,7 +182,7 @@ export default function PaperComposePage() {
                   <PassageAddButton
                     passageId={group.passageId}
                     busy={bulk.passageBusy === group.passageId}
-                    disabled={bulk.bulkBusy}
+                    disabled={addBusy}
                     onAdd={bulk.addPassage}
                   />
                 )}
@@ -262,36 +269,17 @@ export default function PaperComposePage() {
         onAdd={bulk.addRows}
         addedIds={paper.added}
       />
-    </div>
-  );
-}
 
-/**
- * 지문 묶음 머리의 '이 지문 담기'.
- *
- * 지문에 딸린 문항은 **함께 담아야** 쓸모가 있다 — 문제지는 같은 지문의 문항이 붙어 있어야
- * 저장되고(`isContiguous`), 하나만 담으면 나머지는 잊힌다.
- *
- * ⚠️ 개수를 적지 않는다. 담는 것은 **그 지문의 문항 전부**인데(보이는 행이 아니다) 그 수는
- *    조회해 봐야 알고, 보이는 수를 적으면 실제로 담기는 수와 어긋난다 — 몇 개가 들어갔는지는
- *    담은 뒤 토스트가 말해 준다.
- */
-function PassageAddButton({ passageId, busy, disabled, onAdd }: {
-  passageId: string;
-  busy: boolean;
-  disabled: boolean;
-  onAdd: (passageId: string) => void;
-}) {
-  return (
-    <Button
-      type="button" variant="outline" size="sm" className="text-xs"
-      disabled={disabled}
-      // 목록에 안 보이는 문항까지 담는다는 것을 손끝에도 남긴다 — 머리의 '문항 N' 은
-      // **이 목록에 보이는** 수라 둘이 다를 수 있다
-      title="지금 조건에 안 걸렸거나 다음 쪽에 있는 문항까지, 이 지문의 문항을 모두 담아요."
-      onClick={() => onAdd(passageId)}
-    >
-      {busy ? '담는 중…' : '이 지문 전체 담기'}
-    </Button>
+      <TypeMixDialog
+        open={mix.open}
+        session={mix.session}
+        pool={mix.pool}
+        poolError={mix.poolError}
+        busy={mix.busy}
+        added={paper.added}
+        onConfirm={mix.confirm}
+        onClose={mix.close}
+      />
+    </div>
   );
 }

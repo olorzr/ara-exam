@@ -1,4 +1,5 @@
 import { grammarPathsUnder } from './grammar-tree';
+import { QUESTION_KIND_TYPES, parseQuestionKind, type QuestionKindFilter } from './question-kind';
 import type { ProblemQuery } from './queries';
 
 /**
@@ -29,6 +30,12 @@ export interface ProblemFilters {
    */
   grammar_path: string[];
   /**
+   * 문항 갈래 — `''`(전체) · `'objective'` · `'subjective'`.
+   * ⚠️ 값이 DB 의 `question_type` 이 **아니다**. 갈래는 둘이고 '서술형' 은 '주관식' 갈래에
+   *    든다(`question-kind.ts`) — 저장값으로 펴는 일은 `toProblemQuery` 가 한다.
+   */
+  question_kind: QuestionKindFilter;
+  /**
    * 작품명 **한 편**. 자유 텍스트라 '미지정만' 을 쓰지 않는다.
    * ⚠️ 축 이름은 단수 그대로지만 조회는 `problems.work_titles` 배열 포함이다(sql/33) —
    *    `(가)(나)` 를 함께 묻는 문항도 두 작품 어느 쪽으로 훑어도 나온다.
@@ -41,8 +48,8 @@ export interface ProblemFilters {
 
 export const EMPTY_FILTERS: ProblemFilters = {
   source_type: '', school_name: '', year: '', grade: '', semester: '', exam_type: '', textbook: '',
-  area_path: [], unit_path: [], grammar_path: [], work_title: '', search: '', verifiedOnly: false,
-  page: 0,
+  area_path: [], unit_path: [], grammar_path: [], question_kind: '', work_title: '',
+  search: '', verifiedOnly: false, page: 0,
 };
 
 /** 영역 경로를 주소에 실을 때 쓰는 구분자 — 이름에 들어갈 일이 없는 글자 */
@@ -103,6 +110,7 @@ export function filtersToQueryString(filters: ProblemFilters): string {
   if (filters.area_path.length > 0) params.set('area', filters.area_path.join(AREA_SEPARATOR));
   if (filters.unit_path.length > 0) params.set('unit', filters.unit_path.join(AREA_SEPARATOR));
   if (filters.grammar_path.length > 0) params.set('gram', filters.grammar_path.join(AREA_SEPARATOR));
+  if (filters.question_kind) params.set('kind', filters.question_kind);
   if (filters.work_title) params.set('work', filters.work_title);
   if (filters.search) params.set('q', filters.search);
   if (filters.verifiedOnly) params.set('verified', '1');
@@ -132,6 +140,7 @@ export function filtersFromParams(params: URLSearchParams): ProblemFilters {
     area_path: area ? area.split(AREA_SEPARATOR).filter(Boolean) : [],
     unit_path: unit ? unit.split(AREA_SEPARATOR).filter(Boolean) : [],
     grammar_path: grammar ? grammar.split(AREA_SEPARATOR).filter(Boolean) : [],
+    question_kind: parseQuestionKind(params.get('kind')),
     work_title: params.get('work') ?? '',
     search: params.get('q') ?? '',
     verifiedOnly: params.get('verified') === '1',
@@ -161,6 +170,9 @@ export function toProblemQuery(filters: ProblemFilters): ProblemQuery {
     // 배열 포함(@>)으로는 상위 검색이 안 되고, 나열해 겹침(&&)으로 찾아야 한다
     ...(filters.grammar_path.length > 0
       ? { grammar_paths: grammarPathsUnder(filters.grammar_path) } : {}),
+    // 갈래 하나를 DB 값들로 편다 — '주관식' 갈래는 '주관식'·'서술형' 둘 다 걸려야 한다
+    ...(filters.question_kind
+      ? { question_types: [...QUESTION_KIND_TYPES[filters.question_kind]] } : {}),
     // 작품명은 자유 텍스트다 — '미지정만' 을 허용하면 그런 이름의 작품과 겹친다
     ...axisEntry('work_title', filters.work_title),
     ...(filters.search.trim() ? { search: filters.search.trim() } : {}),
@@ -179,6 +191,6 @@ export function hasActiveFilters(filters: ProblemFilters): boolean {
     filters.source_type || filters.school_name || filters.year || filters.grade
     || filters.semester || filters.exam_type || filters.textbook || filters.area_path.length > 0
     || filters.unit_path.length > 0 || filters.grammar_path.length > 0
-    || filters.work_title || filters.search || filters.verifiedOnly,
+    || filters.question_kind || filters.work_title || filters.search || filters.verifiedOnly,
   );
 }

@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { pgArrayLiteral } from '@/lib/pg-array-literal';
-import type { Problem, ProblemSource } from '@/types/problem-bank';
+import type { Problem, ProblemSource, QuestionType } from '@/types/problem-bank';
 
 /**
  * 기출 아카이브 **목록** 조회.
@@ -18,6 +18,16 @@ const PROBLEM_LIST_COLUMNS =
   + 'area_path, unit_path, grammar_paths, work_titles, work_title, page_no, image_path, '
   + 'render_mode, status, created_at';
 
+/**
+ * 목록·담기 조회가 함께 쓰는 select 문자열.
+ *
+ * ⚠️ 임베드 별칭(`source:`)은 어떤 select 를 쓰든 **반드시 남긴다** — 출처 축 필터
+ *    (`source.year` 등)가 그 별칭을 타므로, 빼면 PostgREST 가 요청을 통째로 거부한다.
+ * ⚠️ **한 줄이어야 한다** — `+` 로 이으면 리터럴 타입이 `string` 으로 넓어져 행 타입
+ *    추론이 풀린다(이 저장소의 오랜 규약).
+ */
+export const PROBLEM_LIST_SELECT = `${PROBLEM_LIST_COLUMNS}, source:problem_sources!inner(*)`;
+
 /** 한 화면에 보여 줄 문항 수 */
 export const PROBLEM_PAGE_SIZE = 60;
 
@@ -28,11 +38,18 @@ export const PROBLEM_PAGE_SIZE = 60;
 //    `fetchProblemsOfSource`·`fetchProblem`). 검수 화면이 쓰고, 빠짐없이 읽는 것이 계약이다.
 //  · 여기는 **아카이브 목록**뿐이다 — 조건으로 걸러 한 쪽씩, 컬럼을 좁혀 읽는다.
 
-export interface ProblemPage {
-  rows: (Problem & { source: ProblemSource })[];
+/** 조회 결과 한 구간 — 행 모양은 넘긴 select 에 따라 다르다 */
+export interface QueryPage<Row> {
+  rows: Row[];
   /** 필터에 걸린 전체 개수 (페이지 수 계산용) */
   total: number;
 }
+
+/** 목록 컬럼을 다 읽은 행 */
+export type ProblemRow = Problem & { source: ProblemSource };
+
+/** 목록 조회 결과 */
+export type ProblemPage = QueryPage<ProblemRow>;
 
 /** 목록 조회 조건 */
 export interface ProblemQuery {
@@ -60,6 +77,11 @@ export interface ProblemQuery {
    *    `(가)(나)` 를 함께 묻는 문항도 두 작품 어느 쪽으로 훑어도 나온다.
    */
   work_title?: string;
+  /**
+   * 문항 유형 — **하나라도 맞으면** 걸린다(`in`).
+   * 갈래('주관식')를 저장값 둘('주관식'·'서술형')로 펴는 일은 `filters.ts` 가 끝내고 넘긴다.
+   */
+  question_types?: QuestionType[];
   /** 발문·선지·작품명 평문 검색 */
   search?: string;
   /** '검수완료' 만 보기 */
@@ -79,7 +101,7 @@ export function escapeIlike(value: string): string {
 }
 
 /** 목록을 늘어놓는 순서 */
-type ProblemOrder =
+export type ProblemOrder =
   /** 최근에 올린 것부터, 같은 때 올라온 것끼리는 시험지에 실린 차례 — 아카이브 기본 */
   | 'recent'
   /** 출처 > 지문 > 쪽 > 번호 — 시험지에 실린 차례 그대로 */
@@ -90,18 +112,22 @@ type ProblemOrder =
  *
  * ⚠️ 필터 체인·컬럼 목록·임베드 별칭이 **여기 한 벌**뿐이어야 한다. 조회 함수마다 베끼면
  *    언젠가 한쪽만 고쳐져 "목록에는 보이는데 담기에는 안 걸리는" 문항이 생긴다.
+ *    그래서 형제 조회 모듈(`type-mix-queries.ts`)도 select 만 바꿔 **이 함수를 부른다** —
+ *    체인을 베끼지 말 것.
  * @param query - 필터
  * @param order - 늘어놓을 순서
  * @param from - 첫 행 (0부터)
  * @param to - 마지막 행 (포함)
+ * @param select - 읽을 컬럼. 기본은 목록 컬럼 전부 (`source:` 임베드는 반드시 남길 것)
  * @returns 행과 조건에 걸린 전체 개수
  */
-async function runProblemQuery(
+export async function runProblemQuery<Row = ProblemRow>(
   query: ProblemQuery, order: ProblemOrder, from: number, to: number,
-): Promise<ProblemPage> {
+  select: string = PROBLEM_LIST_SELECT,
+): Promise<QueryPage<Row>> {
   let request = supabase
     .from('problems')
-    .select(`${PROBLEM_LIST_COLUMNS}, source:problem_sources!inner(*)`, { count: 'exact' });
+    .select(select, { count: 'exact' });
 
   if (order === 'reading') {
     // 지문 순서로 늘어놓는다 — 화면이 지문별로 묶어 그리므로 같은 지문의 문항이 흩어지면
@@ -154,6 +180,10 @@ async function runProblemQuery(
   // ⚠️ 배열 컬럼 조건은 전부 `pgArrayLiteral` 문자열로 넘긴다 — postgrest-js 는 배열을 따옴표
   //    없이 join 해서 쉼표 든 제목(「소녀, 두드리다」)이 두 원소로 갈려 **0건**이 됐다(2026-09-27)
   if (query.work_title) request = request.contains('work_titles', pgArrayLiteral([query.work_title]));
+  // 갈래 필터 — 넘어온 유형 가운데 하나면 통과. 빈 배열은 '조건 없음' 이라 걸지 않는다
+  if (query.question_types && query.question_types.length > 0) {
+    request = request.in('question_type', query.question_types);
+  }
   if (query.verifiedOnly) request = request.eq('status', '검수완료');
   if (query.area_path && query.area_path.length > 0) {
     // 배열 포함 — '문학' 으로 찾으면 '문학 > 현대시' 문항도 걸린다
@@ -178,10 +208,7 @@ async function runProblemQuery(
 
   const { data, error, count } = await request;
   if (error) throw error;
-  return {
-    rows: (data ?? []) as unknown as (Problem & { source: ProblemSource })[],
-    total: count ?? 0,
-  };
+  return { rows: (data ?? []) as unknown as Row[], total: count ?? 0 };
 }
 
 /**
@@ -215,16 +242,16 @@ export async function fetchProblemPage(query: ProblemQuery): Promise<ProblemPage
  */
 export async function fetchProblemsOfPassageForAdd(
   passageId: string,
-): Promise<(Problem & { source: ProblemSource })[]> {
+): Promise<ProblemRow[]> {
   const { data, error } = await supabase
     .from('problems')
-    .select(`${PROBLEM_LIST_COLUMNS}, source:problem_sources!inner(*)`)
+    .select(PROBLEM_LIST_SELECT)
     .eq('passage_id', passageId)
     .order('page_no')
     .order('number', { nullsFirst: false })
     .order('id');
   if (error) throw error;
-  return (data ?? []) as unknown as (Problem & { source: ProblemSource })[];
+  return (data ?? []) as unknown as ProblemRow[];
 }
 
 /**

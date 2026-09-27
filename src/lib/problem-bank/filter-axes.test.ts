@@ -110,6 +110,32 @@ describe('경로 축 (단원·영역)', () => {
   });
 });
 
+describe('문항 유형 축', () => {
+  /**
+   * 문법 칸과 같은 규약 — 선택지가 **정해진 둘**이라 패싯을 보지 않고 늘 그린다.
+   * 값은 갈래이고 DB 의 `question_type` 이 아니다('서술형' 은 '주관식' 갈래에 든다).
+   */
+  it('늘 나오고 선택지는 갈래 둘이다', () => {
+    const a = axis(build(), 'question_kind')!;
+
+    expect(values(a)).toEqual([ALL_AXIS, 'objective', 'subjective']);
+    expect(labels(a)).toContain('주관식·서술형');
+    expect(a.value).toBe(ALL_AXIS);
+  });
+
+  it("'미지정' 칸은 두지 않는다 — question_type 은 늘 값이 있다", () => {
+    expect(values(axis(build(), 'question_kind')!)).not.toContain(UNSPECIFIED_AXIS);
+  });
+
+  it('고르면 축을 채우고 전체는 비운다 — 둘 다 첫 쪽으로', () => {
+    const a = axis(build({ question_kind: 'subjective' }), 'question_kind')!;
+
+    expect(a.value).toBe('subjective');
+    expect(a.toPatch('objective')).toEqual({ question_kind: 'objective', page: 0 });
+    expect(a.toPatch(ALL_AXIS)).toEqual({ question_kind: '', page: 0 });
+  });
+});
+
 describe('문법 축', () => {
   /**
    * 이 테스트가 고정하는 것: 문법 칸은 **패싯이 비어도 항상** 그린다.

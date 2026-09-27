@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckSquare, FolderPlus, Plus, X } from 'lucide-react';
+import { CheckSquare, FolderPlus, Percent, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface PaperPickBarProps {
@@ -32,6 +32,8 @@ interface PaperPickBarProps {
   onToggleAll: () => void;
   onAddSelected: () => void;
   onAddFolder: () => void;
+  /** 유형 비율로 담기 창 열기 */
+  onOpenMix: () => void;
 }
 
 /**
@@ -43,7 +45,7 @@ interface PaperPickBarProps {
  */
 export default function PaperPickBar({
   selectMode, count, isAllSelected, disabled, folderTotal, folderEnabled, folderBusy, bulkBusy,
-  onEnter, onExit, onToggleAll, onAddSelected, onAddFolder,
+  onEnter, onExit, onToggleAll, onAddSelected, onAddFolder, onOpenMix,
 }: PaperPickBarProps) {
   if (!selectMode) {
     return (
@@ -63,6 +65,18 @@ export default function PaperPickBar({
           <span className="ml-1">
             {folderBusy ? '담는 중…' : `이 폴더 전체 담기${folderEnabled ? ` · ${folderTotal}문항` : ''}`}
           </span>
+        </Button>
+        <Button
+          type="button" variant="outline" size="sm"
+          onClick={onOpenMix}
+          disabled={!folderEnabled || folderBusy || bulkBusy}
+          // 폴더 담기와 같은 조건이다 — 뽑을 폴더가 정해져야 비율도 뜻이 있다
+          title={folderEnabled
+            ? '객관식·주관식 비율을 정해 무작위로 담아요.'
+            : '왼쪽 트리에서 폴더를 고르거나 조건을 걸어 주세요.'}
+        >
+          <Percent className="h-4 w-4" />
+          <span className="ml-1">비율로 담기</span>
         </Button>
       </div>
     );

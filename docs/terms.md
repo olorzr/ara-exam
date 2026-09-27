@@ -306,6 +306,22 @@
 - 코드에서의 사용: `usePaperBulkAdd.addFolder`, `fetchProblemsForBulkAdd`, `folderTooBigMessage`
 - 관련 파일: src/hooks/usePaperBulkAdd.ts, src/lib/problem-paper/bulk-add.ts, src/components/problem-paper/PaperPickBar.tsx
 
+## 문항 갈래 (question kind)
+- 정의: 선생님이 말하는 **객관식/주관식** 두 가지. DB 의 `question_type` 은 셋이지만
+  (`'객관식'·'주관식'·'서술형'`) **'서술형' 은 '주관식' 갈래에 든다** — 비율을 말할 때 그 둘을
+  가르지 않고 인쇄도 비객관식을 한 모양(답 쓰는 빈칸)으로 그린다. 필터 값은 `objective`·
+  `subjective` 이고 저장값이 아니다
+- 코드에서의 사용: `QuestionKind`, `kindOf`, `QUESTION_KIND_TYPES`, 아카이브 필터 `kind`
+- 관련 파일: src/lib/problem-bank/question-kind.ts, src/lib/problem-bank/filters.ts
+
+## 비율로 담기 (type mix)
+- 정의: 문제지 조합 화면에서 **문항 수와 객관식 비율**(객관식만·8:2·주관식만 …)을 정해 지금
+  조건에 걸린 문항에서 **무작위로** 담는 것. 같은 지문의 문항은 붙여 담고, 한쪽 갈래가
+  모자라면 **다른 갈래로 채우지 않고** 덜 담으며 그 사실을 담기 전에 알린다
+- 코드에서의 사용: `planTypeMix`, `sampleTypeMix`, `usePaperTypeMix`, `fetchTypeMixPool`
+- 관련 파일: src/lib/problem-paper/type-mix.ts, src/lib/problem-bank/type-mix-queries.ts,
+  src/hooks/usePaperTypeMix.ts, src/components/problem-paper/TypeMixDialog.tsx
+
 ## 교과서 (textbook)
 - 정의: 그 기출이 다루는 교과서. 값은 카테고리 관리의 **출판사 이름 스냅샷**(`exam.publishers.name`)이다
 - 코드에서의 사용: `ProblemSource.textbook`, `fetchUnitTree`, 아카이브 필터 `book`

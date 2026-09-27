@@ -70,6 +70,39 @@ function draw(items: PaperItemSnapshot[], showAnswers: boolean) {
   return render(<div>{nodes}</div>).container;
 }
 
+describe('답 쓰는 자리', () => {
+  /**
+   * 기출 문제지는 **줄을 긋지 않고 비워 둔다**(2026-09-27 사용자 결정).
+   * ⚠️ `.pb-q__line` 은 O,X·프린트 문답 시험지가 계속 쓰므로 CSS 는 남아 있다 —
+   *    이 테스트가 고정하는 것은 **기출 문제지에서는 쓰지 않는다** 는 것이다.
+   */
+  it('주관식은 짧은 빈칸 하나다 — 줄은 긋지 않는다', () => {
+    const container = draw([snapshot({ question_type: '주관식', choices: [], answer: '봄' })], false);
+
+    expect(container.querySelectorAll('.pb-q__line')).toHaveLength(0);
+    expect(container.querySelectorAll('.pb-q__blank--short')).toHaveLength(1);
+  });
+
+  it('서술형은 더 넓은 빈칸이다', () => {
+    const container = draw([snapshot({ question_type: '서술형', choices: [], answer: '' })], false);
+
+    expect(container.querySelectorAll('.pb-q__blank--long')).toHaveLength(1);
+    expect(container.querySelectorAll('.pb-q__blank--short')).toHaveLength(0);
+  });
+
+  it('객관식에는 빈칸을 두지 않는다 — 선지가 그 자리를 쓴다', () => {
+    const container = draw([snapshot()], false);
+
+    expect(container.querySelectorAll('.pb-q__blank')).toHaveLength(0);
+  });
+
+  it('교사용에는 빈칸을 두지 않는다 — 쓸 사람이 없다', () => {
+    const container = draw([snapshot({ question_type: '주관식', choices: [], answer: '봄' })], true);
+
+    expect(container.querySelectorAll('.pb-q__blank')).toHaveLength(0);
+  });
+});
+
 describe('problemClassName', () => {
   it('해설이 없으면 문항이 제 여백을 그대로 진다', () => {
     const container = draw([snapshot()], true);

@@ -27,6 +27,7 @@ describe('filters ↔ 주소', () => {
       source_type: '내신기출', school_name: '상현중', year: '2026', grade: '중2',
       semester: '1학기', exam_type: '중간', textbook: '천재(노미숙)', area_path: ['문학', '현대시'],
       unit_path: ['1. 문학', '(1) 시'], grammar_path: ['단어', '품사'],
+      question_kind: 'subjective' as const,
       work_title: '동백꽃', search: '심상', verifiedOnly: true, page: 2,
     };
     const back = filtersFromParams(new URLSearchParams(filtersToQueryString(source).slice(1)));
@@ -50,6 +51,17 @@ describe('filters ↔ 주소', () => {
     const q = filtersToQueryString({ ...EMPTY_FILTERS, semester: '2학기' });
     expect(q).toContain('sem=');
     expect(filtersFromParams(new URLSearchParams(q.slice(1))).semester).toBe('2학기');
+  });
+
+  it('문항 유형은 kind 로 싣고 되읽는다', () => {
+    const q = filtersToQueryString({ ...EMPTY_FILTERS, question_kind: 'objective' });
+    expect(q).toContain('kind=objective');
+    expect(filtersFromParams(new URLSearchParams(q.slice(1))).question_kind).toBe('objective');
+  });
+
+  /** 주소는 사람이 고쳐 칠 수 있다 — 오타로 목록이 0건이 되면 까닭을 알 수 없다 */
+  it('모르는 문항 유형은 전체로 본다', () => {
+    expect(filtersFromParams(new URLSearchParams('kind=주관식')).question_kind).toBe('');
   });
 
   it('쪽 번호는 주소에서 1부터, 내부에서 0부터', () => {
@@ -136,6 +148,15 @@ describe('toProblemQuery', () => {
     expect(q.textbook).toBe(UNSPECIFIED_AXIS);
   });
 
+  it("문항 유형은 갈래를 저장값으로 편다 — '주관식' 갈래는 '서술형' 까지 걸린다", () => {
+    expect(toProblemQuery({ ...EMPTY_FILTERS, question_kind: 'objective' }).question_types)
+      .toEqual(['객관식']);
+    expect(toProblemQuery({ ...EMPTY_FILTERS, question_kind: 'subjective' }).question_types)
+      .toEqual(['주관식', '서술형']);
+    // 전체는 조건을 만들지 않는다
+    expect('question_types' in toProblemQuery(EMPTY_FILTERS)).toBe(false);
+  });
+
   it('학기도 조건이 된다', () => {
     expect(toProblemQuery({ ...EMPTY_FILTERS, semester: '1학기' }).semester).toBe('1학기');
     expect(toProblemQuery(EMPTY_FILTERS).semester).toBeUndefined();
@@ -153,6 +174,7 @@ describe('hasActiveFilters', () => {
     expect(hasActiveFilters({ ...EMPTY_FILTERS, semester: '1학기' })).toBe(true);
     expect(hasActiveFilters({ ...EMPTY_FILTERS, semester: UNSPECIFIED_AXIS })).toBe(true);
     expect(hasActiveFilters({ ...EMPTY_FILTERS, work_title: '동백꽃' })).toBe(true);
+    expect(hasActiveFilters({ ...EMPTY_FILTERS, question_kind: 'objective' })).toBe(true);
   });
 
   it('쪽 번호만으로는 조건이 아니다', () => {
