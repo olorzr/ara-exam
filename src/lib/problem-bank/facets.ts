@@ -9,6 +9,8 @@ import type { PassageWork } from '@/types/problem-bank';
 import {
   SCHOOL_EXAM_SOURCE_TYPE, schoolExamKey, type SchoolExamFacet,
 } from './school-exam-tree';
+import { collectSchoolsByLevel } from './school-level';
+import type { SchoolLevel } from './source-form';
 
 /**
  * 아카이브 필터 선택지(패싯) 모으기.
@@ -36,11 +38,14 @@ export interface SourceFacets {
   semesters: string[];
   /** 학교 기출 트리를 만들 갈래 (내신기출만, 중복 없음) */
   schoolExams: SchoolExamFacet[];
+  /** 학교급 → 그 학교급 학년의 출처가 있는 학교들 (학교 칸을 좁힌다) */
+  schoolsByLevel: Record<SchoolLevel, string[]>;
 }
 
 /** 아직 못 읽었을 때 쓰는 빈 선택지 */
 export const EMPTY_SOURCE_FACETS: SourceFacets = {
   schools: [], years: [], grades: [], textbooks: [], semesters: [], schoolExams: [],
+  schoolsByLevel: { 중등: [], 고등: [] },
 };
 
 /** 패싯 스캔이 읽는 출처 컬럼 */
@@ -78,6 +83,7 @@ export async function fetchSourceFacets(): Promise<SourceFacets> {
     textbooks: uniq(rows.map((r) => r.textbook)),
     semesters: uniq(rows.map((r) => r.semester)),
     schoolExams: collectSchoolExams(rows),
+    schoolsByLevel: collectSchoolsByLevel(rows),
   };
 }
 

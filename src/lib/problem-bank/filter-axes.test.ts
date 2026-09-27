@@ -136,6 +136,57 @@ describe('문항 유형 축', () => {
   });
 });
 
+describe('학교급 축', () => {
+  const facets: Partial<SourceFacets> = {
+    schools: ['광희중', '성수고'],
+    grades: ['고1', '고2', '중1', '중2'],
+    schoolsByLevel: { 중등: ['광희중'], 고등: ['성수고'] },
+  };
+
+  it('학교·학년보다 앞에 늘 나오고 선택지는 전체·중등·고등이다', () => {
+    const axes = build();
+    const keys = axes.map((a) => a.key);
+
+    expect(values(axis(axes, 'school_level')!)).toEqual([ALL_AXIS, '중등', '고등']);
+    expect(keys.indexOf('school_level')).toBeLessThan(keys.indexOf('school_name'));
+    expect(keys.indexOf('school_level')).toBeLessThan(keys.indexOf('grade'));
+  });
+
+  it('고르면 학교·학년 칸이 그 학교급으로 좁혀지고 미지정 칸은 빠진다', () => {
+    const axes = build({ school_level: '고등' }, facets);
+
+    expect(values(axis(axes, 'school_name')!)).toEqual([ALL_AXIS, '성수고']);
+    expect(values(axis(axes, 'grade')!)).toEqual([ALL_AXIS, '고1', '고2']);
+  });
+
+  /** 남기면 '고등 ∩ 중2' 가 조용히 0건이 된다 */
+  it('어긋나는 학교·학년은 비우고, 맞는 것은 남긴다', () => {
+    const off = axis(build({ school_name: '광희중', grade: '중2' }, facets), 'school_level')!;
+    expect(off.toPatch('고등')).toEqual({
+      school_level: '고등', school_name: '', grade: '', page: 0,
+    });
+
+    const fits = axis(build({ school_name: '성수고', grade: '고1' }, facets), 'school_level')!;
+    expect(fits.toPatch('고등')).toEqual({ school_level: '고등', page: 0 });
+  });
+
+  it("'미지정' 학년은 학교급과 함께 걸 수 없어 비운다", () => {
+    const a = axis(build({ grade: UNSPECIFIED_AXIS }, facets), 'school_level')!;
+    expect(a.toPatch('중등')).toEqual({ school_level: '중등', grade: '', page: 0 });
+  });
+
+  /** 패싯을 못 읽었을 때 멀쩡한 학교 조건을 지우면 안 된다 */
+  it('패싯에 없는 학교는 판정하지 않고 남긴다', () => {
+    const a = axis(build({ school_name: '행당중' }, facets), 'school_level')!;
+    expect(a.toPatch('고등')).toEqual({ school_level: '고등', page: 0 });
+  });
+
+  it('전체로 돌리면 학교급만 비운다', () => {
+    const a = axis(build({ school_level: '중등', grade: '중2' }, facets), 'school_level')!;
+    expect(a.toPatch(ALL_AXIS)).toEqual({ school_level: '', page: 0 });
+  });
+});
+
 describe('문법 축', () => {
   /**
    * 이 테스트가 고정하는 것: 문법 칸은 **패싯이 비어도 항상** 그린다.

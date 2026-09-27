@@ -174,6 +174,8 @@ export function schoolExamFilterPatch(facet: SchoolExamFacet): Partial<ProblemFi
     // 빈 값은 '전체' 가 아니라 '미지정인 것만' 이다
     year: axisValue(facet.year),
     grade: axisValue(facet.grade),
+    // 학년을 이 갈래로 못 박으니 학교급은 푼다 — 남기면 '고등 ∩ 중2' 가 조용히 0건이 된다
+    school_level: '',
     semester: axisValue(facet.semester),
     exam_type: axisValue(facet.exam_type),
     textbook: '',

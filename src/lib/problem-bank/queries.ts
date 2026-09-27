@@ -57,6 +57,8 @@ export interface ProblemQuery {
   school_name?: string;
   year?: string;
   grade?: string;
+  /** 학년 **여럿** — 하나라도 맞으면 걸린다(`in`). 학교급 필터가 편 값이다 */
+  grades?: string[];
   /** 학기 ('1학기'·'2학기') */
   semester?: string;
   exam_type?: string;
@@ -171,6 +173,7 @@ export async function runProblemQuery<Row = ProblemRow>(
   if (query.school_name !== undefined) request = request.eq('source.school_name', query.school_name);
   if (query.year !== undefined) request = request.eq('source.year', query.year);
   if (query.grade !== undefined) request = request.eq('source.grade', query.grade);
+  if (query.grades && query.grades.length > 0) request = request.in('source.grade', query.grades);
   if (query.semester !== undefined) request = request.eq('source.semester', query.semester);
   if (query.exam_type !== undefined) request = request.eq('source.exam_type', query.exam_type);
   if (query.textbook !== undefined) request = request.eq('source.textbook', query.textbook);

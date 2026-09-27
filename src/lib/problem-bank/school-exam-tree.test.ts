@@ -96,7 +96,7 @@ describe('schoolExamFilterPatch', () => {
   it('학교 축을 채우고 교과서·단원을 비운다 — 두 트리가 조용히 교집합이 되면 안 된다', () => {
     const patch = schoolExamFilterPatch(facet());
     expect(patch).toEqual({
-      source_type: '내신기출', school_name: '상현중', year: '2026', grade: '중2',
+      source_type: '내신기출', school_name: '상현중', year: '2026', grade: '중2', school_level: '',
       semester: '1학기', exam_type: '중간', textbook: '', unit_path: [], work_title: '',
       grammar_path: [], page: 0,
     });

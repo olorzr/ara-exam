@@ -2,7 +2,8 @@ import type { SelectOption } from '@/components/ui/option-select';
 import { SEMESTER_OPTIONS } from '@/lib/constants';
 import { areaPathLabel } from './area-tree';
 import { formatGrammarPath, parseGrammarPath } from './grammar-tree';
-import { EXAM_TYPE_OPTIONS, SOURCE_TYPE_OPTIONS } from './source-form';
+import { EXAM_TYPE_OPTIONS, levelFromGrade, SCHOOL_LEVEL_OPTIONS, SOURCE_TYPE_OPTIONS } from './source-form';
+import { gradeFitsSchoolLevel, parseSchoolLevel } from './school-level';
 import { UNSPECIFIED_AXIS, type ProblemFilters } from './filters';
 import { QUESTION_KINDS, QUESTION_KIND_LABELS } from './question-kind';
 import { unitPathLabel } from './unit-tree';
@@ -130,9 +131,38 @@ export function buildFilterAxes(input: BuildInput): FilterAxis[] {
   };
 
   simple('source_type', '유형', 'w-32', SOURCE_TYPE_OPTIONS.map(plain));
-  simple('school_name', '학교', 'w-36', facets.schools.map(plain));
+
+  // 학교급은 학교·학년 칸을 **좁힌다** — 그래서 둘보다 앞에 둔다.
+  // ⚠️ 학교급을 바꿀 때 이미 고른 학교·학년이 어긋나면 비운다. 남기면 '고등 ∩ 중2' 가
+  //    조용히 0건이 되고 왜 비었는지 화면에 단서가 없다. 학교는 패싯에 **있는** 학교만
+  //    판정한다 — 패싯을 아직 못 읽었을 때 멀쩡한 조건을 지우지 않으려고.
+  const level = filters.school_level;
+  axes.push({
+    key: 'school_level', label: '학교급', widthClass: 'w-28', value: level || ALL_AXIS,
+    options: withAll('학교급', SCHOOL_LEVEL_OPTIONS.map(plain)),
+    toPatch: (v) => {
+      const next = parseSchoolLevel(v === ALL_AXIS ? '' : v);
+      const school = filters.school_name;
+      const schoolOff = Boolean(next && school && facets.schools.includes(school)
+        && !facets.schoolsByLevel[next].includes(school));
+      return {
+        school_level: next,
+        ...(schoolOff ? { school_name: '' } : {}),
+        ...(gradeFitsSchoolLevel(filters.grade, next) ? {} : { grade: '' }),
+        page: 0,
+      };
+    },
+  });
+
+  simple('school_name', '학교', 'w-36', (level ? facets.schoolsByLevel[level] : facets.schools).map(plain));
   simple('year', '학년도', 'w-28', facets.years.map(plain), true);
-  simple('grade', '학년', 'w-24', facets.grades.map(plain), true);
+  // 학교급이 걸리면 그 학교급 학년만 — '미지정' 도 뺀다(학년이 빈 출처는 학교급에 안 걸린다).
+  // 주소로 '미지정' 이 같이 들어왔으면 칸이 '__none__' 을 그대로 드러내지 않게 남겨 둔다
+  simple(
+    'grade', '학년', 'w-24',
+    facets.grades.filter((g) => !level || levelFromGrade(g) === level).map(plain),
+    !level || filters.grade === UNSPECIFIED_AXIS,
+  );
   if (showAxis(facets.semesters.length > 0, Boolean(filters.semester))) {
     simple('semester', '학기', 'w-24', SEMESTER_OPTIONS.map(plain), true);
   }

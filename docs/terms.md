@@ -360,8 +360,11 @@
 ## 학교급 (SchoolLevel)
 - 정의: 중등 / 고등. 업로드 폼에서 학교·학년 선택지를 좁히는 데만 쓰고 **저장하지 않는다** —
   DB 에서는 학년('중2') 접두사로 되찾는다
-- 코드에서의 사용: `SCHOOL_LEVEL_OPTIONS`, `gradeOptionsForLevel`, `levelFromGrade`
-- 관련 파일: src/lib/problem-bank/source-form.ts
+- 아카이브 필터로도 쓴다(`school_level`, 주소 `lvl`) — 저장 컬럼이 없어 그 학교급의 학년 전부로
+  펴서(`grades` → `source.grade in (…)`) 찾는다. 학년이 빈 출처는 어느 학교급에도 안 걸린다
+- 코드에서의 사용: `SCHOOL_LEVEL_OPTIONS`, `gradeOptionsForLevel`, `levelFromGrade`,
+  `SchoolLevelFilter`, `gradesForSchoolLevel`, `gradeFitsSchoolLevel`
+- 관련 파일: src/lib/problem-bank/source-form.ts, src/lib/problem-bank/school-level.ts
 
 ## 영역 경로 (area_path)
 - 정의: 문항의 분류를 **이름 배열**로 스냅샷한 값 (`['문학','현대시']`). 마스터는 ara-system 이 소유하고 여기서는 고르기만 한다

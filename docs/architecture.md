@@ -467,6 +467,9 @@ src/
   `usePaperBulkAdd` 의 것을 **나눠 쓴다**(셋이 같은 캔버스를 채운다)
 - **문항 갈래 필터**(`question_kind`)는 아카이브와 조합 화면이 함께 쓰는 필터 줄에 있다 —
   그것만으로 폴더 담기·골라 담기가 유형을 따른다
+- **학교급 필터**(`school_level`, `school-level.ts`)도 같은
+  필터 줄에 있다. `toProblemQuery` 가 학년들로 펴고, 학교·학년 칸을 그 학교급으로 좁힌다
+  (`SourceFacets.schoolsByLevel`)
 
 ### 인쇄
 

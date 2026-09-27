@@ -1,5 +1,6 @@
 import { grammarPathsUnder } from './grammar-tree';
 import { QUESTION_KIND_TYPES, parseQuestionKind, type QuestionKindFilter } from './question-kind';
+import { gradesForSchoolLevel, parseSchoolLevel, type SchoolLevelFilter } from './school-level';
 import type { ProblemQuery } from './queries';
 
 /**
@@ -14,6 +15,11 @@ export interface ProblemFilters {
   source_type: string;
   school_name: string;
   year: string;
+  /**
+   * 학교급 — `''`(전체) · `'중등'` · `'고등'`.
+   * ⚠️ 저장 컬럼이 없다. 그 학교급 학년 전부로 펴는 일은 `toProblemQuery` 가 한다(school-level.ts).
+   */
+  school_level: SchoolLevelFilter;
   grade: string;
   /** 학기 ('1학기'·'2학기'). '' 는 전체 */
   semester: string;
@@ -47,7 +53,7 @@ export interface ProblemFilters {
 }
 
 export const EMPTY_FILTERS: ProblemFilters = {
-  source_type: '', school_name: '', year: '', grade: '', semester: '', exam_type: '', textbook: '',
+  source_type: '', school_name: '', year: '', school_level: '', grade: '', semester: '', exam_type: '', textbook: '',
   area_path: [], unit_path: [], grammar_path: [], question_kind: '', work_title: '',
   search: '', verifiedOnly: false, page: 0,
 };
@@ -103,6 +109,7 @@ export function filtersToQueryString(filters: ProblemFilters): string {
   if (filters.source_type) params.set('type', filters.source_type);
   if (filters.school_name) params.set('school', filters.school_name);
   if (filters.year) params.set('year', filters.year);
+  if (filters.school_level) params.set('lvl', filters.school_level);
   if (filters.grade) params.set('grade', filters.grade);
   if (filters.semester) params.set('sem', filters.semester);
   if (filters.exam_type) params.set('exam', filters.exam_type);
@@ -133,6 +140,7 @@ export function filtersFromParams(params: URLSearchParams): ProblemFilters {
     source_type: params.get('type') ?? '',
     school_name: params.get('school') ?? '',
     year: params.get('year') ?? '',
+    school_level: parseSchoolLevel(params.get('lvl')),
     grade: params.get('grade') ?? '',
     semester: params.get('sem') ?? '',
     exam_type: params.get('exam') ?? '',
@@ -161,6 +169,8 @@ export function toProblemQuery(filters: ProblemFilters): ProblemQuery {
     // 선택지가 정해진 축만 '미지정만' 을 받는다(자유 텍스트는 값과 겹칠 수 있다)
     ...axisEntry('year', filters.year, true),
     ...axisEntry('grade', filters.grade, true),
+    // 학교급을 학년들로 편다 — 학년 칸과 **따로** 건다(둘 다 걸리면 교집합)
+    ...(filters.school_level ? { grades: gradesForSchoolLevel(filters.school_level) } : {}),
     ...axisEntry('semester', filters.semester, true),
     ...axisEntry('exam_type', filters.exam_type, true),
     ...axisEntry('textbook', filters.textbook),
@@ -188,7 +198,7 @@ export function toProblemQuery(filters: ProblemFilters): ProblemQuery {
  */
 export function hasActiveFilters(filters: ProblemFilters): boolean {
   return Boolean(
-    filters.source_type || filters.school_name || filters.year || filters.grade
+    filters.source_type || filters.school_name || filters.year || filters.school_level || filters.grade
     || filters.semester || filters.exam_type || filters.textbook || filters.area_path.length > 0
     || filters.unit_path.length > 0 || filters.grammar_path.length > 0
     || filters.question_kind || filters.work_title || filters.search || filters.verifiedOnly,

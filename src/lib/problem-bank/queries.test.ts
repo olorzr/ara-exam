@@ -70,3 +70,21 @@ describe('fetchProblemPage — 배열 컬럼 조건의 URL 표기', () => {
     expect(lastParam('work_titles')).toBeNull();
   });
 });
+
+describe('fetchProblemPage — 학교급', () => {
+  it('학년 여럿은 출처 임베드의 학년에 in 으로 건다', async () => {
+    await fetchProblemPage({ grades: ['중1', '중2', '중3'] });
+    expect(lastParam('source.grade')).toBe('in.(중1,중2,중3)');
+  });
+
+  it('학년 칸과 함께 걸리면 두 조건이 다 실린다', async () => {
+    await fetchProblemPage({ grade: '고2', grades: ['고1', '고2', '고3'] });
+    const url = captured[captured.length - 1];
+    expect(url.searchParams.getAll('source.grade')).toEqual(['eq.고2', 'in.(고1,고2,고3)']);
+  });
+
+  it('빈 목록은 조건을 만들지 않는다', async () => {
+    await fetchProblemPage({ grades: [] });
+    expect(lastParam('source.grade')).toBeNull();
+  });
+});

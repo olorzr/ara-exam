@@ -59,6 +59,16 @@ describe('filters ↔ 주소', () => {
     expect(filtersFromParams(new URLSearchParams(q.slice(1))).question_kind).toBe('objective');
   });
 
+  it('학교급은 lvl 로 싣고 되읽는다', () => {
+    const q = filtersToQueryString({ ...EMPTY_FILTERS, school_level: '고등' });
+    expect(q).toContain('lvl=');
+    expect(filtersFromParams(new URLSearchParams(q.slice(1))).school_level).toBe('고등');
+  });
+
+  it('모르는 학교급은 전체로 본다', () => {
+    expect(filtersFromParams(new URLSearchParams('lvl=초등')).school_level).toBe('');
+  });
+
   /** 주소는 사람이 고쳐 칠 수 있다 — 오타로 목록이 0건이 되면 까닭을 알 수 없다 */
   it('모르는 문항 유형은 전체로 본다', () => {
     expect(filtersFromParams(new URLSearchParams('kind=주관식')).question_kind).toBe('');
@@ -157,6 +167,15 @@ describe('toProblemQuery', () => {
     expect('question_types' in toProblemQuery(EMPTY_FILTERS)).toBe(false);
   });
 
+  it('학교급은 그 학교급 학년 전부로 편다 — 학년 칸과는 따로 건다', () => {
+    expect(toProblemQuery({ ...EMPTY_FILTERS, school_level: '중등' }).grades)
+      .toEqual(['중1', '중2', '중3']);
+    const both = toProblemQuery({ ...EMPTY_FILTERS, school_level: '고등', grade: '고2' });
+    expect(both.grades).toEqual(['고1', '고2', '고3']);
+    expect(both.grade).toBe('고2');
+    expect('grades' in toProblemQuery(EMPTY_FILTERS)).toBe(false);
+  });
+
   it('학기도 조건이 된다', () => {
     expect(toProblemQuery({ ...EMPTY_FILTERS, semester: '1학기' }).semester).toBe('1학기');
     expect(toProblemQuery(EMPTY_FILTERS).semester).toBeUndefined();
@@ -175,6 +194,7 @@ describe('hasActiveFilters', () => {
     expect(hasActiveFilters({ ...EMPTY_FILTERS, semester: UNSPECIFIED_AXIS })).toBe(true);
     expect(hasActiveFilters({ ...EMPTY_FILTERS, work_title: '동백꽃' })).toBe(true);
     expect(hasActiveFilters({ ...EMPTY_FILTERS, question_kind: 'objective' })).toBe(true);
+    expect(hasActiveFilters({ ...EMPTY_FILTERS, school_level: '중등' })).toBe(true);
   });
 
   it('쪽 번호만으로는 조건이 아니다', () => {

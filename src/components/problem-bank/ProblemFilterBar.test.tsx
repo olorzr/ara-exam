@@ -36,6 +36,16 @@ describe('ProblemFilterBar', () => {
     expect(screen.getByRole('combobox', { name: '학교' }).textContent).toContain('학교 전체');
   });
 
+  it('학교급 칸이 사람 말로 보인다', () => {
+    renderBar();
+    expect(screen.getByRole('combobox', { name: '학교급' }).textContent).toContain('학교급 전체');
+  });
+
+  it('학교급 조건이 걸리면 고른 학교급이 보인다', () => {
+    renderBar({ school_level: '고등' });
+    expect(screen.getByRole('combobox', { name: '학교급' }).textContent).toContain('고등');
+  });
+
   /** 태그가 0건이어도 문법 칸은 나와야 한다 — 안 나오면 붙일 길이 없다 */
   it('문법 칸은 태그가 하나도 없어도 보인다', () => {
     renderBar();
