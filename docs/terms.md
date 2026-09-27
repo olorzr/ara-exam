@@ -135,6 +135,14 @@
 - 코드에서의 사용: `runPrintQaAnswers`, `parsePrintQaAnswers`, `applyGeneratedAnswers`, `qa_meta.references`
 - 관련 파일: `src/lib/print-qa/{prompt-answers,parse-answers,run-answers}.ts`
 
+## 마킹 모드 (marking mode)
+- 정의: 개념지 편집기·미리보기에서 **본문을 드래그하면 마크(빈칸 후보)가 붙고, 마크를 누르면 떨어지는** 상태. 꺼져 있으면 두 화면 어디서도 포인터로 마크가 바뀌지 않는다 — 기존 개념지는 미리보기로 바로 열리므로 인쇄하려다 단어를 누른 것만으로 문서가 바뀌면 안 된다
+- 편집기와 미리보기가 **한 값**을 나눠 쓴다. 화면을 오가도 되돌리지 않는다
+- 미리보기에서는 개념지 탭에만 단추가 있고, 꺼져 있으면 마크를 `concept` 모드(클릭할 수 없는 하이라이트)로 그린다. '전체 출력' 탭은 늘 비대화형이다
+- 사이드바의 해제·전체 해제·AI 추천 빈칸은 단추를 눌러 하는 일이라 이 모드와 무관하다
+- 코드에서의 사용: `markingMode`, `toggleMarkingMode`, `MarkingModeToggle`, `ExamSheetRenderer.interactive`, `resolveTransformMode`
+- 관련 파일: `src/hooks/useConceptSheetEditor.ts`, `src/components/exam-builder/{MarkingModeToggle,ExamEditor,ExamPreview,ExamSheetRenderer}.tsx`, `src/lib/exam-transform.ts`
+
 ## AI 추천 빈칸 (concept pick)
 - 정의: 개념지 본문에서 빈칸으로 낼 용어를 AI 가 골라 **곧바로 마킹**하는 기능. 붙인 낱말을 칩으로 보여 주고 개별·전체 되돌리기가 있다. 개념지와 프린트 시험지 **양쪽**에서 쓴다(같은 편집기)
 - ⚠️ 추천은 **띄어쓰기 없는 한 어절**이어야 한다. `extractMarks` 가 마킹 구간을 공백으로 쪼개 세므로, 구절을 고르면 빈칸이 여러 개가 되고 마킹 수(= 문항 수 = 합격 기준의 분모)가 부풀어 학원 성적까지 어긋난다

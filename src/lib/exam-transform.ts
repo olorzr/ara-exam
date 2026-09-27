@@ -64,6 +64,18 @@ export function transformHTML(editorHTML: string, mode: TransformMode): string {
   return div.innerHTML;
 }
 
+/**
+ * 시트가 실제로 쓸 변환 모드를 정한다 — 개념지 탭의 `concept-interactive` 는
+ * **마킹 모드가 켜져 있을 때만** 그대로 쓰고, 꺼져 있으면 클릭할 수 없는 `concept` 로 내린다.
+ * 다른 모드(단계·답안지)는 그대로 돌려준다.
+ * @param mode - 시트 설정의 모드
+ * @param interactive - 마킹 모드가 켜져 있는가
+ */
+export function resolveTransformMode(mode: TransformMode, interactive: boolean): TransformMode {
+  if (mode !== 'concept-interactive') return mode;
+  return interactive ? 'concept-interactive' : 'concept';
+}
+
 /** 블록으로 취급하는 태그들 */
 const BLOCK_TAGS = new Set(['P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6']);
 

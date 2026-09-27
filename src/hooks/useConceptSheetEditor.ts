@@ -66,6 +66,11 @@ export function useConceptSheetEditor(opts: ConceptSheetEditorOptions) {
   // 이 값이 학원 관리 시스템의 합격/불합격 판정 기준이 된다(sql/25).
   const [passPercentage, setPassPercentage] = useState(DEFAULT_PASS_PERCENTAGE);
   const [previewTab, setPreviewTab] = useState('concept');
+  // 마킹 모드 — 편집기와 미리보기가 **한 값**을 나눠 쓴다. 꺼져 있으면 어느 화면에서도 포인터
+  // (드래그·클릭)로 마크가 붙거나 떨어지지 않는다. 화면을 오가도 되돌리지 않는다(편집기는 미리보기
+  // 중에도 마운트된 채라 두 벌을 두면 언젠가 갈린다).
+  const [markingMode, setMarkingMode] = useState(false);
+  const toggleMarkingMode = useCallback(() => setMarkingMode((v) => !v), []);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(!isNew);
   const [savedId, setSavedId] = useState<string | null>(isNew ? null : sheetId);
@@ -230,6 +235,8 @@ export function useConceptSheetEditor(opts: ConceptSheetEditorOptions) {
     setPassPercentage,
     previewTab,
     setPreviewTab,
+    markingMode,
+    toggleMarkingMode,
     saving,
     loading,
     initialHTML,

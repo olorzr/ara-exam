@@ -271,6 +271,15 @@ node /Users/ara/Projects/Ara-system/scripts/post-update.js "<HTML>"
 - [2026-09-04] 표 재분할은 한 패스에 **표 하나**만 쪼갠다(상한 32). 표가 많은 개념지는 그만큼 재측정이 돈다 — 렌더가 몇 프레임 늦을 뿐 내용에는 영향이 없다. 페이지 끝에 걸린 조각이 측정 오차로 다시 밀리면 **1행짜리 조각(+반복된 제목 행)** 이 남을 수 있다(내용 유실 없음, 외관 문제)
 
 ## Architecture Decisions
+- [2026-09-27] **마킹은 '마킹 모드' 가 켜져 있을 때만 붙고 떨어진다 — 미리보기도 같다**([useConceptSheetEditor.ts](src/hooks/useConceptSheetEditor.ts) 의 `markingMode`, [MarkingModeToggle.tsx](src/components/exam-builder/MarkingModeToggle.tsx), [ExamPreview.tsx](src/components/exam-builder/ExamPreview.tsx), [exam-transform.ts](src/lib/exam-transform.ts) 의 `resolveTransformMode`). 제보는 "마킹 모드가 아닐 때도 미리보기에서 클릭만 해도 마킹이 사라지거나 추가된다" 였다. 마킹 모드가 `ExamEditor` 의 **지역 state** 라 미리보기는 읽을 길이 없었고, 미리보기의 클릭 해제에는 가드가 아예 없었다. 기존 개념지는 미리보기로 바로 열리므로 인쇄하려다 단어를 한 번 누른 것만으로 **문서가 조용히 바뀌었다**. 되돌리지 말아야 할 판단들:
+  - **상태는 훅 하나에 있다.** 편집기와 미리보기가 **같은 값**을 보고, 화면을 오가도 되돌리지 않는다. 편집기는 미리보기 중에도 마운트된 채라 두 벌을 두면 언젠가 갈린다. 훅은 `setMarkingMode` 를 내주지 않고 `toggleMarkingMode` 만 내준다
+  - ⚠️ **꺼져 있으면 미리보기의 마크를 `concept` 모드로 그린다**(`data-concept-interactive` 속성도, 손가락 커서도 없다). 핸들러만 막고 클릭 모양(`.eb-concept-preview-mark`)을 그대로 두면 눌러도 아무 일이 없는 단추가 된다 — 눌리는데 조용한 것이 가장 나쁘다. 핸들러 가드(`canMark`)도 **따로** 둔다: 드래그 마킹은 마크 모양과 무관하게 본문 어디서나 걸리기 때문이다
+  - **모드를 가르는 자리는 `ExamSheetRenderer.interactive` 한 곳이다**(`resolveTransformMode`). 예전에는 그 prop 이 `::selection` 색만 바꾸는 겉치레였다. 호출부가 `SHEET_CONFIGS` 를 복사해 `mode` 를 덮는 방식으로 되돌리지 말 것 — '전체 출력' 탭이 쓰던 그 복사를 이번에 걷어냈다(`interactive` 를 안 넘기면 같은 결과다)
+  - **'전체 출력' 탭은 마킹 모드와 무관하게 늘 비대화형이다** — 인쇄용 탭이다
+  - **막는 것은 문서 위의 포인터 조작(드래그·클릭)뿐이다.** 사이드바의 해제·전체 해제·AI 추천 빈칸은 단추를 눌러 하는 일이라 마킹 모드와 무관하다 — 그것까지 막으면 마킹 모드를 켜지 않고는 추천도 못 받는다. 그래서 가드는 `useConceptMarkActions` 가 아니라 **미리보기 호출부**에 있다
+  - **단추는 `MarkingModeToggle` 한 벌**을 편집기 툴바와 미리보기 탭 바가 나눠 쓴다. `aria-pressed` 로 켜짐을 알린다. 미리보기에서는 **개념지 탭에만** 나온다 — 다른 탭은 원래 마킹이 없다. 켜져 있으면 탭 바 밑줄이 `border-primary` 가 된다(편집기 테두리와 같은 신호, 탭 바는 `data-no-print`)
+  - `.eb-concept-preview-mark` 의 좌우 여백을 `.eb-concept-highlight` 와 같은 1px 로 맞췄다. 다르면 모드를 켜고 끌 때마다 마크마다 폭이 달라져 줄바꿈·쪽 배정이 흔들린다
+  - [ExamPreview.test.tsx](src/components/exam-builder/ExamPreview.test.tsx) 는 **실제 `ExamSheetRenderer` 를 그린다**(jsdom 에는 `ResizeObserver`·`getBoundingClientRect` 스텁이 필요하다). 렌더러를 목으로 두면 모드 가르기가 깨져도 초록이다 — 드래그 가드를 뺐을 때와 렌더러가 `interactive` 를 무시할 때 각각 실패하는 것을 확인했다
 - [2026-09-27] **아카이브에 학교급(중등/고등) 필터를 더했다 — 저장 컬럼 없이 학년으로 편다**([school-level.ts](src/lib/problem-bank/school-level.ts), [filter-axes.ts](src/lib/problem-bank/filter-axes.ts)). 제보는 "문제를 찾을 때 중등인지 고등인지 드롭다운 하나". DB 변경 없음. 되돌리지 말아야 할 판단들:
   - **학교급은 여전히 저장하지 않는다**(source-form.ts 의 규약). 필터 값 `'중등'` 을 `toProblemQuery` 가 `grades: ['중1','중2','중3']` 으로 펴고 `runProblemQuery` 가 `source.grade in (…)` 으로 건다. 학년 칸(`grade`, eq)과는 **따로** 건다 — 둘 다 걸리면 교집합이다. 학년이 빈 출처는 어느 학교급에도 안 걸린다(적용 날 운영에는 빈 학년 출처가 0건이었다)
   - ⚠️ **학교급을 바꿀 때 어긋나는 학교·학년을 비운다**(`toPatch`). 남기면 '고등 ∩ 중2' 가 조용히 0건이 된다. '미지정' 학년도 비운다 — 학년이 빈 출처는 학교급에 안 걸리므로 늘 0건이다. 학교는 **패싯에 있는 학교만** 판정한다(패싯을 못 읽었을 때 멀쩡한 조건을 지우지 않으려고)

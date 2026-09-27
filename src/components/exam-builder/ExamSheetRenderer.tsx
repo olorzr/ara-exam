@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { transformHTML, stripTrailingEmpty } from '@/lib/exam-transform';
+import { resolveTransformMode, stripTrailingEmpty, transformHTML } from '@/lib/exam-transform';
 import type { TransformMode } from '@/lib/exam-transform';
 import { A4Document, CompactPageHeader } from '@/components/print';
 import { SHEET_BODY_CLASS, useConceptSheetBlocks } from '@/hooks/useConceptSheetBlocks';
@@ -41,7 +41,7 @@ interface ExamSheetRendererProps {
    * 단어 시험지(ExamPrintHeader)와 같은 문구다 — 선생님이 두 인쇄물에서 같은 말을 봐야 한다.
    */
   passPercentage?: number;
-  /** 개념지 탭에서 인터랙티브 모드 */
+  /** 마킹 모드가 켜져 있는가 — 켜져야 클릭 가능한 마크(`concept-interactive`)로 그리고, 꺼지면 `concept` 로 내린다 */
   interactive?: boolean;
   /** '전체 출력' 에서 다음 시트를 새 페이지에서 시작시킨다 */
   breakAfterLast?: boolean;
@@ -57,7 +57,7 @@ export default function ExamSheetRenderer({
   category,
   markCount,
   passPercentage,
-  interactive,
+  interactive = false,
   breakAfterLast,
 }: ExamSheetRendererProps) {
   const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -74,9 +74,11 @@ export default function ExamSheetRenderer({
     ];
   const title = [...titleParts, unitText].filter(Boolean).join(' ');
 
+  // 클릭 가능한 마크는 마킹 모드가 켜져 있을 때만 — 꺼진 미리보기에서 단어를 누른 것만으로 문서가 바뀌면 안 된다
+  const mode = resolveTransformMode(config.mode, interactive);
   const bodyHTML = useMemo(
-    () => transformHTML(stripTrailingEmpty(editorHTML), config.mode),
-    [editorHTML, config.mode],
+    () => transformHTML(stripTrailingEmpty(editorHTML), mode),
+    [editorHTML, mode],
   );
 
   /**

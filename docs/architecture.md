@@ -141,6 +141,7 @@ src/
   (`finalizePrintHtml` → `sanitizeConceptHTML` 을 거쳐 저장된다). 그 뒤 경로는 완전히 같다
 - 입력 (저장): TipTap `editor.getHTML()` → `sanitizeConceptHTML` → supabase insert/update (`src/hooks/useConceptSheetEditor.ts` 의 `handleSave`)
 - 출력 (렌더): supabase select → `src/lib/exam-transform.ts` 의 `transformHTML` / `stripTrailingEmpty` / `extractMarkedWords` 각 함수 entry 에서 `sanitizeConceptHTML` 호출 → `ExamSheetRenderer` 의 `dangerouslySetInnerHTML`
+- 마킹(`<mark data-concept>` 붙이기·떼기)은 **마킹 모드가 켜져 있을 때만** 포인터로 바뀐다. 상태는 `useConceptSheetEditor.markingMode` 하나이고 편집기(`ExamEditor`)와 미리보기(`ExamPreview`)가 나눠 쓴다. 꺼진 미리보기는 `ExamSheetRenderer` 가 `interactive=false` 로 받아 `resolveTransformMode` 로 `concept` 모드(클릭 불가)로 그린다. 사이드바의 해제·AI 추천은 단추 조작이라 이 모드와 무관하다
 - 화이트리스트 위치: `src/lib/sanitize-html.ts` (`ALLOWED_TAGS`, `ALLOWED_ATTR`). 새 TipTap 확장 추가 시 같이 갱신 필수
 - 네트워크 계층 방어: `next.config.ts` 의 CSP — `object-src 'none'`, `frame-ancestors 'none'`, `connect-src` 화이트리스트(Supabase, NaverWorks)
 

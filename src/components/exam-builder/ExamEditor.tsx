@@ -6,11 +6,12 @@ import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
 import { Table, TableRow } from '@tiptap/extension-table';
 import { Mark } from '@tiptap/core';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { Editor } from '@tiptap/react';
 import type { MarkItem } from './ExamMarkingSidebar';
 import { CustomTableCell, CustomTableHeader } from './CustomTableCell';
 import CellStyleToolbar from './CellStyleToolbar';
+import MarkingModeToggle from './MarkingModeToggle';
 import { AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import { extractMarks } from '@/lib/concept-marks';
 
@@ -46,14 +47,19 @@ interface ExamEditorProps {
   editorRef: React.MutableRefObject<Editor | null>;
   /** 초기 에디터 콘텐츠 (저장된 개념지 불러오기 시 사용) */
   initialContent?: string;
+  /** 마킹 모드 — 부모(`useConceptSheetEditor`)가 쥐고 미리보기와 같은 값을 나눠 쓴다 */
+  markingMode: boolean;
+  onToggleMarkingMode: () => void;
 }
 
 /**
  * TipTap 리치 에디터 + 마킹 모드 토글.
  * 마킹 ON 상태에서 드래그 → 하이라이트, 기존 마킹 클릭 → 해제.
+ * 마킹 모드 값은 부모가 쥔다(미리보기와 같은 값을 본다) — 여기서는 읽고 토글만 부른다.
  */
-export default function ExamEditor({ onHTMLChange, onMarksChange, editorRef, initialContent }: ExamEditorProps) {
-  const [markingMode, setMarkingMode] = useState(false);
+export default function ExamEditor({
+  onHTMLChange, onMarksChange, editorRef, initialContent, markingMode, onToggleMarkingMode,
+}: ExamEditorProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
 
   const syncMarks = useCallback((e: Editor) => {
@@ -126,7 +132,7 @@ export default function ExamEditor({ onHTMLChange, onMarksChange, editorRef, ini
       className={`bg-white rounded-lg shadow-sm border-2 transition-colors flex flex-col overflow-hidden h-full ${markingMode ? 'border-primary' : 'border-transparent'}`}
     >
       {/* 툴바 */}
-      <EditorToolbar editor={editor} markingMode={markingMode} onToggleMarking={() => setMarkingMode((v) => !v)} />
+      <EditorToolbar editor={editor} markingMode={markingMode} onToggleMarking={onToggleMarkingMode} />
 
       {/* 에디터 본문 */}
       <div className="eb-editor-wrap" ref={wrapRef} onMouseUp={handleMouseUp}>
@@ -248,18 +254,8 @@ function EditorToolbar({ editor, markingMode, onToggleMarking }: ToolbarProps) {
       {/* 셀 스타일 (테두리 방향별 + 배경색) */}
       <CellStyleToolbar editor={editor} />
 
-      {/* 마킹 모드 토글 */}
-      <button
-        className={`ml-auto flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border-2 text-[13px] font-bold transition-all
-          ${markingMode
-            ? 'bg-primary border-primary text-white'
-            : 'bg-white border-primary text-primary'
-          }`}
-        onClick={onToggleMarking}
-      >
-        <span className={`w-2.5 h-2.5 rounded-full transition-colors ${markingMode ? 'bg-white' : 'bg-gray-300'}`} />
-        마킹 모드
-      </button>
+      {/* 마킹 모드 토글 — 미리보기 탭 바와 같은 단추 */}
+      <MarkingModeToggle pressed={markingMode} onToggle={onToggleMarking} className="ml-auto" />
     </div>
   );
 }

@@ -60,6 +60,8 @@ export default function ConceptSheetWorkspace({
             onEdit={() => e.setScreen('editor')}
             onConceptClick={e.removeMarkByText}
             onConceptDrag={e.addMarkByText}
+            markingMode={e.markingMode}
+            onToggleMarkingMode={e.toggleMarkingMode}
           />
         </div>
       )}
@@ -119,6 +121,8 @@ export default function ConceptSheetWorkspace({
               onMarksChange={e.setMarks}
               editorRef={e.editorRef}
               initialContent={e.initialHTML ?? undefined}
+              markingMode={e.markingMode}
+              onToggleMarkingMode={e.toggleMarkingMode}
             />
           </div>
           <div className="flex-[3] min-w-[280px] h-full overflow-y-auto">
