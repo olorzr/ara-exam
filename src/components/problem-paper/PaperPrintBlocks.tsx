@@ -6,6 +6,7 @@ import { choiceGlyph } from '@/lib/problem-bank/choices';
 import { renderFiguresInHtml, unplacedFigures } from '@/lib/problem-bank/figure-render';
 import { correctChoiceIndices, splitsExplanation } from '@/lib/problem-paper/answers';
 import type { PaperBlock } from '@/lib/problem-paper/blocks';
+import { boxPartClassName } from '@/lib/problem-paper/box-parts';
 import { stripTrailingEmptyParagraphs } from '@/lib/problem-paper/html-trim';
 import { hasYetHangul } from '@/lib/yet-hangul';
 import type { PaperItemSnapshot, PaperSettings } from '@/types/problem-bank';
@@ -46,27 +47,39 @@ export function renderPaperBlocks({
       case 'passage-header':
         return <p key={block.key} className="pb-passage-header">{block.text}</p>;
 
-      case 'passage-part':
+      case 'passage-part': {
+        // 옛한글 지문은 명조로 — 판정은 blocks.ts 가 지문 전체로 한 번 해서 모든 조각에 싣는다
+        const className = `pb-passage-part${block.first ? ' pb-passage-part--first' : ''}${
+          block.last ? ' pb-passage-part--last' : ''
+        }${block.serif ? ' yet-hangul-serif' : ''}`;
+        // 〈보기〉 상자·표 안에 남은 그림 자리표시자를 여기서 끼운다 — 구조를 자르지 않는다
+        const body = { __html: renderFiguresInHtml(block.html, block.figures ?? [], imageUrls) };
+        // 상자 밖 조각은 예전 DOM 그대로 — 틀을 더 두르면 잰 높이와 CSS 가 달라진다
+        if (!block.box) return <div key={block.key} className={className} dangerouslySetInnerHTML={body} />;
+        // 터뜨린 상자의 조각 — 틀은 React 가 두른다. 말머리는 타입으로 온 값이고(box-labels 를
+        // 지났다) HTML 문자열을 잇지 않는다: 정화는 쪼개기 전에 끝났고 다시 하지 않는다
         return (
-          <div
-            key={block.key}
-            // 옛한글 지문은 명조로 — 판정은 blocks.ts 가 지문 전체로 한 번 해서 모든 조각에 싣는다
-            className={`pb-passage-part${block.first ? ' pb-passage-part--first' : ''}${
-              block.last ? ' pb-passage-part--last' : ''
-            }${block.serif ? ' yet-hangul-serif' : ''}`}
-            // 〈보기〉 상자·표 안에 남은 그림 자리표시자를 여기서 끼운다 — 구조를 자르지 않는다
-            dangerouslySetInnerHTML={{
-              __html: renderFiguresInHtml(block.html, block.figures ?? [], imageUrls),
-            }}
-          />
-        );
-
-      case 'passage-figure':
-        return (
-          <div key={block.key} className="pb-passage-part pb-figure">
-            <PrintImage path={block.path} urls={imageUrls} alt={`${block.label || '지문'} 자료`} />
+          <div key={block.key} className={className}>
+            <blockquote
+              data-box={block.box.label}
+              className={boxPartClassName(block.box)}
+              dangerouslySetInnerHTML={body}
+            />
           </div>
         );
+      }
+
+      case 'passage-figure': {
+        const image = <PrintImage path={block.path} urls={imageUrls} alt={`${block.label || '지문'} 자료`} />;
+        return (
+          <div key={block.key} className="pb-passage-part pb-figure">
+            {/* 상자 안 그림도 같은 틀에 담는다 — 안 그러면 상자 윤곽이 그림 자리에서 끊긴다 */}
+            {block.box
+              ? <blockquote data-box={block.box.label} className={boxPartClassName(block.box)}>{image}</blockquote>
+              : image}
+          </div>
+        );
+      }
 
       case 'passage-image':
         return (

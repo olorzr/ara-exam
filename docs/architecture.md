@@ -439,7 +439,7 @@ src/
 ## lib/problem-paper
 - 역할: 문제지 조합 규칙(지문 묶음 연속성)과 인쇄 블록 조립
 - 의존: lib/print(splitHtmlBlocks), lib/shuffle
-- 주요 파일: compose.ts, dnd.ts, blocks.ts, answers.ts, bulk-add.ts, html-trim.ts,
+- 주요 파일: compose.ts, dnd.ts, blocks.ts, box-parts.ts, answers.ts, bulk-add.ts, html-trim.ts,
   settings.ts, shuffle-groups.ts
 - 배점은 인쇄하지 않는다(2026-09-08). `PaperSettings.showScore` 키는 RPC 화이트리스트
   호환용으로만 남아 있고 렌더러는 보지 않는다
@@ -480,3 +480,6 @@ src/
 
 ⚠️ 지문은 **문단 단위 블록**으로 쪼갠다. 통째로 한 블록에 넣으면 한 쪽을 넘는 순간
 `transform: scale()` 로 깨알같이 줄어든다. 문항은 하나가 한 블록이다(발문과 선지가 갈리면 못 읽는다).
+최상위 **구역 상자**(`blockquote[data-box]`)도 자식 단위로 터뜨린다(`box-parts.ts`, 2026-09-27) —
+조각마다 `box` 표시를 싣고 렌더러가 React 로 상자 틀을 두르며, 말머리·윗선은 첫 조각·아랫선은
+마지막 조각에만 간다(`.pb-box-part--first/--last`).

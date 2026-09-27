@@ -1,8 +1,9 @@
 import { splitHtmlBlocks } from '@/lib/print/split-html-blocks';
-import { soleFigureIndex, unplacedFigures } from '@/lib/problem-bank/figure-render';
+import { unplacedFigures } from '@/lib/problem-bank/figure-render';
 import { sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import { hasYetHangul } from '@/lib/yet-hangul';
 import { explanationHtml, splitsExplanation } from './answers';
+import { splitPassagePieces, type BoxPart } from './box-parts';
 import { trimEdgeEmptyParagraphs } from './html-trim';
 import type { PaperItemSnapshot } from '@/types/problem-bank';
 import { groupRangeLabel, groupsOf, type PaperItem } from './compose';
@@ -38,10 +39,15 @@ export type PaperBlock =
     figures?: string[];
     first: boolean;
     last: boolean;
+    /**
+     * 터뜨린 구역 상자의 조각일 때 그 상자 — 그리는 쪽이 `<blockquote data-box>` 틀을 두른다.
+     * 상자를 통째로 한 블록에 두면 3,000자 (가) 지문이 한 쪽을 넘겨 깨알같이 줄어든다(box-parts.ts)
+     */
+    box?: BoxPart;
   }
   | { kind: 'passage-image'; key: string; path: string; label: string }
-  /** 지문 본문 제자리에 끼울 그림 한 장 — 문단 조각들 사이에 낀다 */
-  | { kind: 'passage-figure'; key: string; path: string; label: string }
+  /** 지문 본문 제자리에 끼울 그림 한 장 — 문단 조각들 사이에 낀다. 상자 안이면 같은 틀을 두른다 */
+  | { kind: 'passage-figure'; key: string; path: string; label: string; box?: BoxPart }
   | { kind: 'problem'; key: string; number: number; snapshot: PaperItemSnapshot }
   /**
    * 교사용에서 **따로 흘려 보내는** 해설 조각.
@@ -112,37 +118,22 @@ export function buildPaperBlocks(
           label: passage.title || passage.label,
         });
       } else {
-        // 가장자리 빈 문단을 먼저 걷어낸다 — 상자 테두리 안이 위아래로 뜨는 것을 막고,
-        // first/last 표시도 진짜 첫·마지막 조각에 붙는다
         const figures = passage.figure_paths ?? [];
-        // ⚠️ **최상위 블록으로 먼저 쪼갠다.** 자리표시자에서 문자열을 자르면 〈보기〉 상자나
-        //    표 안에 있는 그림에서 여는 태그와 닫는 태그가 갈려 상자가 깨진다.
-        //    쪼갠 **뒤에** 그림만인 조각을 가려내고, 상자 안에 남은 것은 그리는 쪽이 끼운다
-        const raw = trimEdgeEmptyParagraphs(splitHtmlBlocks(sanitizeProblemHTML(passage.html)));
         const serif = hasYetHangul(passage.html);
-        const parts: PaperBlock[] = raw.map((html, i): PaperBlock => {
-          const only = soleFigureIndex(html);
-          const path = only === null ? '' : figures[only - 1];
-          if (only !== null && path) {
-            return {
-              kind: 'passage-figure',
-              key: `pf-${group.start}-${i}`,
-              path,
-              label: passage.title || passage.label,
-            };
-          }
-          return {
-            kind: 'passage-part',
-            key: `pp-${group.start}-${i}`,
-            html,
-            serif,
-            // 상자 안에 남은 자리표시자는 그리는 쪽이 서명 URL 로 끼운다
-            figures,
-            first: false,
-            last: false,
-          };
-        // 그림만이었는데 경로가 없는 조각은 버린다 — 빈 줄만 남는다
-        }).filter((b) => b.kind !== 'passage-part' || soleFigureIndex(b.html) === null);
+        const label = passage.title || passage.label;
+        // ⚠️ 최상위 요소 단위로 쪼개되 **구역 상자는 자식 단위로 터뜨린다**(box-parts.ts) — 상자 하나에
+        //    지문 전체가 담기면 한 쪽을 넘겨 통째로 축소된다. 자리표시자에서 문자열을 자르지 않으므로
+        //    표 안의 그림은 그리는 쪽이 끼운다. 경로 없는 그림·가장자리 빈 문단은 거기서 걷는다
+        const parts = splitPassagePieces(sanitizeProblemHTML(passage.html), figures)
+          .map((piece, i): PaperBlock => {
+            const box = piece.box ? { box: piece.box } : {};
+            return piece.figurePath
+              ? { kind: 'passage-figure', key: `pf-${group.start}-${i}`, path: piece.figurePath, label, ...box }
+              : {
+                kind: 'passage-part', key: `pp-${group.start}-${i}`, html: piece.html,
+                serif, figures, first: false, last: false, ...box,
+              };
+          });
 
         // ⚠️ 자리표시자가 없는 그림은 **본문 끝에** 붙인다. 화면(`BodyWithFigures`)이
         //    그렇게 그리는데 인쇄만 빠뜨리면, 선생님이 화면에서 본 그림이 인쇄물에서만
@@ -152,7 +143,7 @@ export function buildPaperBlocks(
             kind: 'passage-figure',
             key: `pf-${group.start}-x${index}`,
             path,
-            label: passage.title || passage.label,
+            label,
           });
         }
 

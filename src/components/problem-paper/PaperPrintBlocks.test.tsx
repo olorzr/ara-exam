@@ -60,11 +60,11 @@ const LONG = `<p>${'해'.repeat(EXPLANATION_INLINE_MAX_CHARS + 50)}</p>`;
 /** 문항 블록 안에 붙는 짧은 해설 */
 const SHORT = '<p>정답은 소설이다.</p>';
 
-function draw(items: PaperItemSnapshot[], showAnswers: boolean) {
+function draw(items: PaperItemSnapshot[], showAnswers: boolean, imageUrls = new Map<string, string>()) {
   const nodes = renderPaperBlocks({
     blocks: buildPaperBlocks(items, showAnswers),
     settings: SETTINGS,
-    imageUrls: new Map(),
+    imageUrls,
     showAnswers,
   });
   return render(<div>{nodes}</div>).container;
@@ -220,5 +220,64 @@ describe('ProblemPaperView', () => {
       <ProblemPaperView paper={paper} items={[snapshot({ answer: '2,5' })]} imageUrls={new Map()} />,
     );
     expect(answersOf(container)).toEqual({ glyphs: [], labels: 0 });
+  });
+});
+
+describe('구역 상자 조각', () => {
+  /**
+   * 지문의 최상위 상자는 자식 단위로 여러 블록이 된다(box-parts.ts). 틀은 조각마다 React 가
+   * 두르고, 말머리·윗선은 첫 조각·아랫선은 마지막 조각에만 간다 — 클래스가 빠지면 인쇄물에서
+   * (가) 가 문단마다 찍히거나 상자 선이 조각 사이에서 끊긴다.
+   */
+  const withPassage = (html: string, figure_paths: string[] = []) => [snapshot({
+    passage: {
+      id: 'P1', label: '', title: '춘향전', author: '', html,
+      render_mode: 'text', image_path: '', figure_paths,
+    },
+  })];
+
+  it('터뜨린 상자 조각은 틀에 담기고 처음·끝 표시는 한 번씩이다', () => {
+    const container = draw(withPassage('<blockquote data-box="가"><p>1</p><p>2</p><p>3</p></blockquote>'), false);
+    const frames = Array.from(container.querySelectorAll('.pb-passage-part > blockquote[data-box="가"]'));
+
+    expect(frames).toHaveLength(3);
+    expect(frames.map((f) => f.className)).toEqual([
+      'pb-box-part pb-box-part--first', 'pb-box-part', 'pb-box-part pb-box-part--last',
+    ]);
+    expect(frames.map((f) => f.innerHTML)).toEqual(['<p>1</p>', '<p>2</p>', '<p>3</p>']);
+  });
+
+  it('상자 안 그림도 같은 틀 안에 그린다 — 윤곽이 그림 위에서 끊기면 안 된다', () => {
+    const container = draw(
+      withPassage('<blockquote data-box="보기"><p>앞</p><figure data-figure="1"></figure><p>뒤</p></blockquote>', ['g.jpg']),
+      false,
+      new Map([['g.jpg', 'https://example.test/g.jpg']]),
+    );
+
+    expect(container.querySelector('.pb-figure > blockquote.pb-box-part[data-box="보기"] img')).not.toBeNull();
+  });
+
+  it('상자 밖 조각에는 틀을 두르지 않는다 — 예전 DOM 그대로다', () => {
+    const container = draw(withPassage('<p>a</p><p>b</p>'), false);
+
+    expect(container.querySelectorAll('.pb-box-part')).toHaveLength(0);
+    expect(Array.from(container.querySelectorAll('.pb-passage-part')).map((el) => el.innerHTML))
+      .toEqual(['<p>a</p>', '<p>b</p>']);
+  });
+
+  it('상자 안 상자는 그대로 둔다', () => {
+    const container = draw(
+      withPassage('<blockquote data-box="가"><p>a</p><blockquote data-box="보기"><p>x</p></blockquote></blockquote>'),
+      false,
+    );
+
+    expect(container.querySelector('blockquote.pb-box-part[data-box="가"] > blockquote[data-box="보기"]'))
+      .not.toBeNull();
+  });
+
+  it('옛한글 지문의 명조 표시는 틀 바깥 조각에 붙는다', () => {
+    const container = draw(withPassage('<blockquote data-box="가"><p>\u1112\u119E\u11AB</p><p>b</p></blockquote>'), false);
+
+    expect(container.querySelectorAll('.pb-passage-part.yet-hangul-serif > blockquote.pb-box-part')).toHaveLength(2);
   });
 });

@@ -342,3 +342,47 @@ describe('buildPaperBlocks — 교사용 해설', () => {
     expect(blocks.some((b) => b.kind === 'explanation-part')).toBe(true);
   });
 });
+
+describe('buildPaperBlocks — 구역 상자 지문', () => {
+  /** 춘향전 모양 — 지문 전체가 (가) 상자 하나에 들었다(2026-09-27 제보, 3,416자·60문단) */
+  const WHOLE = `<blockquote data-box="가">${
+    Array.from({ length: 60 }, (_, i) => `<p>${`${i}번째 문단의 글 `.repeat(6)}</p>`).join('')
+  }</blockquote>`;
+  const partsOf = (html: string, figure_paths: string[] = []) =>
+    build([snap({ passage: { ...passage('p1', html), figure_paths } })]);
+
+  it('상자 하나로 된 긴 지문도 문단 단위로 쪼갠다 — 통째로 두면 한 블록이 되어 깨알같이 줄어든다', () => {
+    const parts = partsOf(WHOLE).filter((b) => b.kind === 'passage-part');
+    expect(parts).toHaveLength(60);
+    expect(parts.every((b) => b.kind === 'passage-part' && b.box?.label === '가')).toBe(true);
+    // 상자의 처음·끝과 지문 테두리의 처음·끝이 양끝에 하나씩
+    expect(parts.filter((b) => b.kind === 'passage-part' && b.box?.first)).toEqual([parts[0]]);
+    expect(parts.filter((b) => b.kind === 'passage-part' && b.box?.last)).toEqual([parts[59]]);
+    expect(parts[0]).toMatchObject({ first: true, last: false });
+    expect(parts[59]).toMatchObject({ first: false, last: true });
+  });
+
+  it('(가)(나) 두 상자는 상자마다 처음·끝을 따로 표시하고 지문 테두리는 전체에 한 번이다', () => {
+    const parts = partsOf(
+      '<blockquote data-box="가"><p>a</p><p>b</p></blockquote><blockquote data-box="나"><p>c</p><p>d</p></blockquote>',
+    ).filter((b) => b.kind === 'passage-part');
+    expect(parts.map((b) => b.kind === 'passage-part' && [b.box?.label, b.box?.first, b.box?.last, b.first, b.last]))
+      .toEqual([
+        ['가', true, false, true, false], ['가', false, true, false, false],
+        ['나', true, false, false, false], ['나', false, true, false, true],
+      ]);
+  });
+
+  it('상자 안 그림은 그림 블록이 되되 상자 표시를 이어 받는다 — 윤곽이 그림에서 끊기지 않게', () => {
+    const blocks = partsOf('<blockquote data-box="보기"><p>앞</p><figure data-figure="1"></figure><p>뒤</p></blockquote>', ['g.jpg']);
+    expect(blocks.map((b) => b.kind)).toEqual([
+      'passage-header', 'passage-part', 'passage-figure', 'passage-part', 'problem',
+    ]);
+    expect(blocks[2]).toMatchObject({ path: 'g.jpg', box: { label: '보기', first: false, last: false } });
+  });
+
+  it('상자 밖 조각에는 상자 표시가 없다 — 예전 블록 그대로다', () => {
+    const parts = partsOf('<p>a</p><p>b</p>').filter((b) => b.kind === 'passage-part');
+    expect(parts.every((b) => !('box' in b))).toBe(true);
+  });
+});

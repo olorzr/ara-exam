@@ -107,6 +107,13 @@ describe('buildProblemOcrPrompt', () => {
     expect(prompt).toContain('구역이 아니다');
   });
 
+  it('지문 전체를 두른 테두리는 구역이 아니라고 못 박는다 — 대원국제중 지문이 통째로 (가) 상자가 됐다', () => {
+    expect(prompt).toContain('지문 전체를 두른 테두리');
+    expect(prompt).toContain('실제로 인쇄되어 있을 때만');
+    // [A] 가 지문 전체를 감싸면 인쇄에서 [A] 가 어디까지인지 사라진다
+    expect(prompt).toContain('걸친 줄만');
+  });
+
   it('배점은 옮기지 말라고 한다 — 인쇄에 쓰지 않는다', () => {
     expect(prompt).toContain('배점 표기는 옮기지 않는다');
   });

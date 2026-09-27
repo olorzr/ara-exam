@@ -181,6 +181,36 @@
   margin: 4px 0;
 }
 
+/*
+ * 터뜨린 구역 상자의 조각 (`.pb-box-part`, lib/problem-paper/box-parts.ts).
+ * 지문의 최상위 상자는 자식 단위로 여러 블록이 된다 — 3,000자 (가) 상자가 한 블록이면 한 쪽을 넘겨
+ * 통째로 축소돼 깨알같이 찍혔다(2026-09-27). 그래서 조각마다 상자 틀을 두르되, 말머리·윗선·위 여백은
+ * 첫 조각에만, 아랫선·아래 여백은 마지막 조각에만 둔다. 종류별 모양(〈보기〉 테두리 / (가) 머리글 /
+ * [A] 왼쪽 세로선)은 위의 `[data-box=…]` 규칙이 그대로 맡고 여기서는 처음·끝만 가른다.
+ * 선택자 특이도 (0,3,1) 가 종류별 규칙 (0,2,1) 을 이긴다.
+ * ⚠️ 조각 사이 margin 은 0 이어야 좌우선·세로선이 이어져 보인다. `.a4-block` 이 flow-root 라
+ *    margin 도 잰 높이에 들어가므로 0 이면 측정과 실제가 함께 0 이다.
+ */
+.pb-sheet blockquote.pb-box-part:not(.pb-box-part--first) {
+  margin-top: 0;
+  border-top: 0;
+  padding-top: 0;
+}
+/* 말머리는 첫 조각에만 — 안 막으면 (가)·〈보기〉·[A] 가 문단마다 찍힌다 */
+.pb-sheet blockquote.pb-box-part:not(.pb-box-part--first)::before {
+  content: none;
+}
+/*
+ * 마지막이 아닌 조각은 아랫선·아래 여백을 뗀다. padding-bottom 3pt 는 문단 사이 간격을 되살리는 값이다 —
+ * 조각마다 `<p>` 가 `:last-child` 가 되어 `.pb-sheet p:last-child { margin-bottom: 0 }` 에 걸리므로,
+ * 안 넣으면 한 상자 안에서 3pt 씩 띄어 있던 문단이 붙는다((가)(나) 지문이 예전 모양을 잃는다).
+ */
+.pb-sheet blockquote.pb-box-part:not(.pb-box-part--last) {
+  margin-bottom: 0;
+  border-bottom: 0;
+  padding-bottom: 3pt;
+}
+
 /* ── 문항 ─────────────────────────────────────────── */
 
 /*
