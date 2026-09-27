@@ -99,7 +99,19 @@ export function usePaperTypeMix(archive: ArchiveLike, paper: ComposerLike, bulk:
       });
   }, [archive.filters, archive.total, bulk]);
 
-  const close = useCallback(() => { setOpen(false); }, []);
+  /**
+   * 창을 닫는다 — **진행 중인 담기의 취소이기도 하다**.
+   *
+   * ⚠️ 창 오른쪽 위 X·Escape·바깥 누르기는 담는 중에도 눌린다. 그때 그냥 닫기만 하면
+   *    조회가 끝난 뒤 **닫은 창의 문항이 캔버스에 담긴다**(코덱스 정지 게이트).
+   *    닫는 길을 전부 막는 안은 버렸다 — 조회가 멎으면 창이 영영 안 닫힌다
+   *    (`authFetch` 에 타임아웃이 없다, CLAUDE.md 의 concept-pick 3~4R 과 같은 자리).
+   *    세대를 올려 **돌아온 결과를 버리는** 쪽이 안전하다(읽기라 부작용이 없다).
+   */
+  const close = useCallback(() => {
+    sessionRef.current += 1;
+    setOpen(false);
+  }, []);
 
   /** 비율대로 뽑아 담는다 */
   const confirm = useCallback(async ({ total, objectivePercent }: TypeMixRequest) => {
@@ -107,6 +119,7 @@ export function usePaperTypeMix(archive: ArchiveLike, paper: ComposerLike, bulk:
     // 잠금은 첫 await 앞에서 건다 — 폴더·지문 담기와 하나를 나눠 쓴다
     if (!bulk.lock.acquire()) return;
     setBusy(true);
+    const mySession = sessionRef.current;
     const askedClear = paper.clearSeq();
     try {
       // 창을 열어 둔 사이 다른 폴더를 눌렀다 — 보이는 것과 다른 것을 담으면 안 된다
@@ -120,6 +133,11 @@ export function usePaperTypeMix(archive: ArchiveLike, paper: ComposerLike, bulk:
 
       const rows = await fetchProblemsByIdsForAdd(picks.map((p) => p.id));
       if (!aliveRef.current) return;
+      // 되읽는 사이 창을 닫았다(X·Escape·바깥 누르기) — 닫은 것은 취소라는 뜻이다
+      if (sessionRef.current !== mySession) {
+        toast.error('창을 닫아서 담지 않았어요.');
+        return;
+      }
       // ⚠️ 되읽는 **사이**에도 조건이 바뀔 수 있다 — 창이 모달이라 드문 자리지만, 그때 담으면
       //    옛 폴더에서 뽑은 문항이 들어간다. 폴더 담기가 조회 앞뒤로 두 번 보는 것과 같은 규약
       //    (코덱스 1R)

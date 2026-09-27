@@ -115,7 +115,8 @@ export default function TypeMixForm({
       </div>
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button type="button" variant="outline" onClick={onCancel} disabled={busy}>취소</Button>
+        {/* 담는 중에도 눌린다 — 창 오른쪽 위 X 와 같은 길이고, 그것이 곧 취소다 */}
+        <Button type="button" variant="outline" onClick={onCancel}>취소</Button>
         <Button type="submit" disabled={busy || takeTotal === 0}>
           {busy ? '담는 중…' : `${takeTotal}문항 담기`}
         </Button>

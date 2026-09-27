@@ -117,6 +117,34 @@ describe('usePaperTypeMix', () => {
     expect(result.current.open).toBe(true);
   });
 
+  /**
+   * ⚠️ 코덱스 정지 게이트가 짚은 자리 — 창 오른쪽 위 X·Escape·바깥 누르기는 담는 중에도
+   *    눌리는데, 그때 그냥 닫기만 하면 조회가 끝난 뒤 **닫은 창의 문항이 담긴다**.
+   */
+  it('되읽는 사이 창을 닫으면 담지 않는다 — 닫은 것이 곧 취소다', async () => {
+    fetchTypeMixPool.mockResolvedValue({ rows: [poolRow('a'), poolRow('b')], total: 2 });
+    const reload = deferred<ArchiveRow[]>();
+    fetchProblemsByIdsForAdd.mockReturnValue(reload.promise);
+
+    const h = harness();
+    const { result } = renderHook(() => usePaperTypeMix(h.archive, h.paper, h.bulk));
+    act(() => { result.current.openDialog(); });
+    await waitFor(() => expect(result.current.pool).toHaveLength(2));
+
+    let confirmed!: Promise<void>;
+    act(() => { confirmed = result.current.confirm({ total: 2, objectivePercent: 100 }); });
+    // 되읽는 사이 X 를 눌러 창을 닫았다
+    act(() => { result.current.close(); });
+    await act(async () => {
+      reload.resolve([{ id: 'a' } as ArchiveRow, { id: 'b' } as ArchiveRow]);
+      await confirmed;
+    });
+
+    expect(h.addRows).not.toHaveBeenCalled();
+    expect(toastError).toHaveBeenCalled();
+    expect(result.current.open).toBe(false);
+  });
+
   it('조건이 그대로면 담고 창을 닫는다', async () => {
     fetchTypeMixPool.mockResolvedValue({ rows: [poolRow('a'), poolRow('b')], total: 2 });
     fetchProblemsByIdsForAdd.mockResolvedValue([{ id: 'a' } as ArchiveRow]);
