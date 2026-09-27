@@ -171,6 +171,7 @@ export default function ProblemEditorCard({
 
     setSaving(true);
     const sentVersion = problem.updated_at;
+    const sentTitles = workTitles;
     const updatedAt = await onSave({
       stem_html: stem,
       choices: trimmed,
@@ -179,11 +180,11 @@ export default function ProblemEditorCard({
       area_path: area,
       unit_path: unit,
       grammar_paths: grammar,
-      work_titles: workTitles,
+      work_titles: sentTitles,
       // ⚠️ 그림 경로도 함께 — 그림 저장이 실패했을 때 사람이 다시 눌러 고칠 길이다
       figure_paths: figurePaths,
     });
-    if (updatedAt) markSaved(sentVersion);
+    if (updatedAt) markSaved(sentVersion, sentTitles);
     setSaving(false);
     return updatedAt;
   };

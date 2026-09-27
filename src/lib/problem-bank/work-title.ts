@@ -188,26 +188,3 @@ export function workLabelText(work: PassageWork): string {
 export function worksKey(works: readonly PassageWork[]): string {
   return works.map((w) => [w.label, w.title, w.author].join(FIELD_SEP)).join(ROW_SEP);
 }
-
-/**
- * 작품 목록을 **표준 표기와 무관하게** 견주는 열쇠 — 제목만 `workTitleKey` 로 접는다.
- *
- * 편집기가 `엄마걱정` 으로 저장해도 DB 는 대장 표기 `엄마 걱정` 으로 넣는다. 이 열쇠가 같으면
- * 사람이 고친 것은 그대로 들어간 것이라, 화면이 서버 값을 받아들여도 입력을 잃지 않는다.
- * @param works - 작품 목록
- * @returns 안정된 문자열
- */
-export function worksMatchKey(works: readonly PassageWork[]): string {
-  // ⚠️ 접은 뒤 겹친 줄은 첫 줄만 남긴다 — DB 도 표준 표기로 바꾼 뒤 `normalize_works` 가
-  //    같은 제목의 뒷줄을 버린다. 안 걷으면 한 지문에 `엄마 걱정`·`엄마걱정` 을 함께 친 카드가
-  //    줄 수가 달라 영영 '저장 안 됨' 으로 남는다(코덱스 2R)
-  const seen = new Set<string>();
-  const folded: PassageWork[] = [];
-  for (const w of works) {
-    const title = workTitleKey(w.title);
-    if (seen.has(title)) continue;
-    seen.add(title);
-    folded.push({ ...w, title });
-  }
-  return worksKey(folded);
-}

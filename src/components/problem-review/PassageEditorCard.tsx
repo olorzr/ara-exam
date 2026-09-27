@@ -167,7 +167,7 @@ export default function PassageEditorCard({
     // ⚠️ 저장이 도는 사이 더 고쳤으면 **그대로 둔다** — 화면을 덮으면 그때 친 것이 사라진다
     if (ok && worksKey(worksRef.current) === worksKey(sentWorks)) {
       setWorks(tidyWorks);
-      markSaved(sentVersion);
+      markSaved(sentVersion, tidyWorks);
     }
     setSaving(false);
   };
