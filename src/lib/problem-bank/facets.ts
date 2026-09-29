@@ -7,7 +7,7 @@ import {
 } from './work-counts';
 import type { PassageWork } from '@/types/problem-bank';
 import {
-  SCHOOL_EXAM_SOURCE_TYPE, schoolExamKey, type SchoolExamFacet,
+  MOCK_EXAM_SOURCE_TYPE, SCHOOL_EXAM_SOURCE_TYPE, schoolExamKey, type SchoolExamFacet,
 } from './school-exam-tree';
 import { collectSchoolsByLevel } from './school-level';
 import type { SchoolLevel } from './source-form';
@@ -36,7 +36,7 @@ export interface SourceFacets {
   textbooks: string[];
   /** 학기 ('1학기'·'2학기') */
   semesters: string[];
-  /** 학교 기출 트리를 만들 갈래 (내신기출만, 중복 없음) */
+  /** 기출 트리를 만들 갈래 (학교가 있는 내신기출 + 모의고사, 중복 없음) */
   schoolExams: SchoolExamFacet[];
   /** 학교급 → 그 학교급 학년의 출처가 있는 학교들 (학교 칸을 좁힌다) */
   schoolsByLevel: Record<SchoolLevel, string[]>;
@@ -57,9 +57,9 @@ interface SourceFacetRow extends SchoolExamFacet {
 /**
  * 출처 컬럼에서 실제로 존재하는 값들을 모은다.
  *
- * 학교 기출 트리의 갈래도 **같은 스캔**에서 뽑는다 — 컬럼 몇 개를 더 고르는 것뿐이라
+ * 기출 트리의 갈래도 **같은 스캔**에서 뽑는다 — 컬럼 몇 개를 더 고르는 것뿐이라
  * 왕복을 늘릴 이유가 없다.
- * @returns 학교·학년도·학년·교과서·학기 목록과 학교 기출 갈래
+ * @returns 학교·학년도·학년·교과서·학기 목록과 기출 갈래
  */
 export async function fetchSourceFacets(): Promise<SourceFacets> {
   const rows: SourceFacetRow[] = [];
@@ -87,14 +87,15 @@ export async function fetchSourceFacets(): Promise<SourceFacets> {
   };
 }
 
-/** 내신기출 행에서 학교 기출 갈래를 중복 없이 모은다 */
+/** 내신기출(학교가 있는 것)·모의고사 행에서 기출 트리 갈래를 중복 없이 모은다 */
 function collectSchoolExams(rows: SourceFacetRow[]): SchoolExamFacet[] {
   const seen = new Set<string>();
   const out: SchoolExamFacet[] = [];
   for (const row of rows) {
-    if (row.source_type !== SCHOOL_EXAM_SOURCE_TYPE || !row.school_name) continue;
+    const isSchool = row.source_type === SCHOOL_EXAM_SOURCE_TYPE && Boolean(row.school_name);
+    if (!isSchool && row.source_type !== MOCK_EXAM_SOURCE_TYPE) continue;
     const facet: SchoolExamFacet = {
-      school_name: row.school_name, year: row.year, grade: row.grade,
+      source_type: row.source_type, school_name: row.school_name, year: row.year, grade: row.grade,
       semester: row.semester, exam_type: row.exam_type,
     };
     const key = schoolExamKey(facet);

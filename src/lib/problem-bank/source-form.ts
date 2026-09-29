@@ -16,8 +16,59 @@ import type { ProblemSourceType } from '@/types/problem-bank';
 /** 출처 유형 선택지 — 화면 순서가 곧 이 순서다 */
 export const SOURCE_TYPE_OPTIONS: ProblemSourceType[] = ['내신기출', '모의고사', '문제집', '프린트'];
 
+/** filters.ts 의 `UNSPECIFIED_AXIS` 와 같은 값 — 그 모듈을 부르면 순환하므로 값만 둔다 */
+const UNSPECIFIED_AXIS_VALUE = '__none__';
+
 /** 시험 구분 선택지. '' 는 미지정 */
 export const EXAM_TYPE_OPTIONS = ['중간', '기말'] as const;
+
+/**
+ * 모의고사의 **회차** 선택지 — 같은 `exam_type` 칸에 담는다(중간·기말 자리).
+ *
+ * 전국 공통 시험이라 학교·학기가 없고, 같은 학년도 안에서 시험을 가르는 것이 회차뿐이다.
+ * 기출 트리의 '모의고사·수능' 잎이 이 값으로 갈린다(school-exam-tree.ts).
+ * ⚠️ DB CHECK(sql/55)와 **같은 목록**이어야 한다 — 한쪽에만 더하면 저장이 거절되거나
+ *    화면에 없는 값이 생긴다.
+ */
+export const MOCK_EXAM_TYPE_OPTIONS = [
+  '수능', '6월 모평', '9월 모평', '모평', '예비평가', '예비시행', '예시문항',
+  '3월 학평', '4월 학평', '5월 학평', '6월 학평', '7월 학평', '9월 학평', '10월 학평', '11월 학평',
+] as const;
+
+/** 평가원 회차 — 전부 고3 시험이라 학년으로 가르지 않는다(기출 트리·잎 필터) */
+const KICE_ROUNDS: readonly string[] = MOCK_EXAM_TYPE_OPTIONS.slice(0, 7);
+
+/**
+ * 평가원 회차인가 — 학년이 빈 출처와 '고3' 출처가 섞여도 한 시험으로 묶어야 한다.
+ * 교육청 학평은 같은 달에 고1·고2·고3 이 따로 있어 학년이 곧 시험을 가른다.
+ * @param examType - 회차
+ * @returns 평가원 회차면 true
+ */
+export function isKiceRound(examType: string): boolean {
+  return KICE_ROUNDS.includes(examType);
+}
+
+/**
+ * 그 출처 유형에서 고를 수 있는 시험 구분.
+ * @param type - 출처 유형 ('' 는 전체)
+ * @returns 모의고사면 회차, 그 밖에는 중간·기말
+ */
+export function examTypeOptionsFor(type: string): readonly string[] {
+  return type === '모의고사' ? MOCK_EXAM_TYPE_OPTIONS : EXAM_TYPE_OPTIONS;
+}
+
+/**
+ * 유형을 바꿨을 때 지금 고른 시험 구분을 남겨도 되는가 — 새 유형의 선택지에 있어야 한다.
+ * 모의고사 회차('수능')를 내신에 남기면 조건이 불가능한 조합이 되고, 내신의 '중간' 을
+ * 모의고사에 남기면 회차 칸에 없는 값이 된다.
+ * @param type - 새 유형 ('' = 전체면 무엇이든 남긴다)
+ * @param examType - 지금 값 ('' 또는 '미지정만' 센티널은 늘 남긴다)
+ * @returns 남겨도 되면 true
+ */
+export function examTypeFits(type: string, examType: string): boolean {
+  if (!type || !examType || examType === UNSPECIFIED_AXIS_VALUE) return true;
+  return examTypeOptionsFor(type).includes(examType);
+}
 
 /**
  * 학교급.

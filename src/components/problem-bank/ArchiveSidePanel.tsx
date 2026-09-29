@@ -27,7 +27,7 @@ interface ArchiveSidePanelProps {
  * 아카이브 왼쪽 패널 — 훑는 방법을 고른다.
  *
  * 같은 문항에 이르는 길이 넷이다: **교과서 단원**(무엇을 가르치는 문항인가),
- * **학교 기출**(누가 언제 낸 문항인가), **작품**(어떤 글에 딸린 문항인가),
+ * **기출**(누가 언제 낸 문항인가 — 학교 기출·모의고사), **작품**(어떤 글에 딸린 문항인가),
  * **문법**(어떤 개념을 묻는 문항인가).
  * 한 화면에 쌓으면 세로가 길어져 트리를 쓸 수 없으므로 탭으로 가른다.
  *
@@ -63,7 +63,7 @@ export default function ArchiveSidePanel({
     <Tabs value={tab} onValueChange={changeTab}>
       <TabsList className="w-full">
         <TabsTrigger value="units">교과서</TabsTrigger>
-        <TabsTrigger value="schools">학교 기출</TabsTrigger>
+        <TabsTrigger value="schools">기출</TabsTrigger>
         <TabsTrigger value="works">작품</TabsTrigger>
         <TabsTrigger value="grammar">문법</TabsTrigger>
       </TabsList>

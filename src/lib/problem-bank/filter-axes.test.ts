@@ -39,6 +39,33 @@ describe("'전체' 칸", () => {
   });
 });
 
+describe('유형 칸 — 시험 구분과 맞추기', () => {
+  it('모의고사 회차를 고른 채 내신으로 바꾸면 회차를 비운다 — 있을 수 없는 조합이라 0건이 된다', () => {
+    expect(axis(build({ source_type: '모의고사', exam_type: '수능' }), 'source_type')!.toPatch('내신기출'))
+      .toEqual({ source_type: '내신기출', exam_type: '', page: 0 });
+  });
+
+  it('맞는 값이면 그대로 둔다', () => {
+    expect(axis(build({ source_type: '내신기출', exam_type: '중간' }), 'source_type')!.toPatch('문제집'))
+      .toEqual({ source_type: '문제집', page: 0 });
+  });
+
+  it('모의고사로 바꾸면 학교·학기를 비운다 — 모의고사는 둘 다 빈 채로 저장된다', () => {
+    const patch = axis(build({ source_type: '내신기출', school_name: '상현중', semester: '1학기', exam_type: '중간' }), 'source_type')!
+      .toPatch('모의고사');
+    expect(patch).toEqual({ source_type: '모의고사', exam_type: '', school_name: '', semester: '', page: 0 });
+  });
+
+  it("'전체' 로 풀면 무엇이든 남긴다", () => {
+    expect(axis(build({ source_type: '모의고사', exam_type: '수능' }), 'source_type')!.toPatch(ALL_AXIS))
+      .toEqual({ source_type: '', page: 0 });
+  });
+
+  it('유형이 모의고사면 시험 칸 선택지가 회차다', () => {
+    expect(values(axis(build({ source_type: '모의고사' }), 'exam_type')!)).toContain('수능');
+  });
+});
+
 describe("'미지정' 칸", () => {
   /**
    * 빈 문자열은 이 필터에서 '전체' 라 '미지정인 것만' 을 따로 표시해야 한다.

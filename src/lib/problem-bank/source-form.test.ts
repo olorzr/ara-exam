@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
+  examTypeFits,
+  examTypeOptionsFor,
   gradeOptionsForLevel,
+  isKiceRound,
   levelFromGrade,
   requiresSchool,
   suggestTitle,
@@ -101,6 +104,27 @@ describe('visibleFields / requiresSchool', () => {
   it('내신 기출만 학교가 필수다', () => {
     expect(requiresSchool('내신기출')).toBe(true);
     expect(requiresSchool('모의고사')).toBe(false);
+  });
+});
+
+describe('모의고사 회차 (exam_type)', () => {
+  it('유형에 따라 선택지가 다르다', () => {
+    expect(examTypeOptionsFor('모의고사')).toContain('수능');
+    expect(examTypeOptionsFor('내신기출')).toEqual(['중간', '기말']);
+    expect(examTypeOptionsFor('')).toEqual(['중간', '기말']);
+  });
+
+  it('평가원 회차만 학년으로 가르지 않는다', () => {
+    expect(isKiceRound('수능')).toBe(true);
+    expect(isKiceRound('9월 모평')).toBe(true);
+    expect(isKiceRound('3월 학평')).toBe(false);
+  });
+
+  it('유형을 바꿀 때 남겨도 되는 시험 구분', () => {
+    expect(examTypeFits('내신기출', '수능')).toBe(false);
+    expect(examTypeFits('모의고사', '중간')).toBe(false);
+    expect(examTypeFits('', '수능')).toBe(true);
+    expect(examTypeFits('내신기출', '__none__')).toBe(true);
   });
 });
 

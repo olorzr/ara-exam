@@ -3,7 +3,7 @@
 import { Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { sourceLabel } from '@/lib/problem-bank/source-label';
+import { sourceMetaLabel } from '@/lib/problem-bank/source-label';
 import SourceTextbookPicker from './SourceTextbookPicker';
 import type { ProblemSource } from '@/types/problem-bank';
 
@@ -35,7 +35,7 @@ export default function ReviewHeader({
         <h1 className="text-2xl font-bold text-gray-900">{source.title}</h1>
         <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
           <Badge variant="outline">{source.source_type}</Badge>
-          {sourceLabel(source)}
+          {sourceMetaLabel(source)}
           <span>· 문항 {problemCount}개</span>
           {/*
             PDF 에 박힌 글자를 참고로 썼으면 글자 오독이 적다 — 어디를 얼마나 꼼꼼히 볼지

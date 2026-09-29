@@ -12,7 +12,7 @@ import {
 } from '@/lib/problem-bank/mutations';
 import { fetchPassagesByIds } from '@/lib/problem-bank/detail-queries';
 import { fetchProblem, fetchSource } from '@/lib/problem-bank/source-queries';
-import { sourceLabel } from '@/lib/problem-bank/source-label';
+import { sourceMetaLabel } from '@/lib/problem-bank/source-label';
 import type { PassageWork, Problem, ProblemSource } from '@/types/problem-bank';
 
 /**
@@ -106,7 +106,7 @@ export default function ProblemEditPage() {
         <h1 className="text-2xl font-bold text-gray-900">✏️ 문항 편집</h1>
         {source && (
           <p className="mt-1 text-sm text-gray-500">
-            {source.title} · {sourceLabel(source)} · {problem.page_no}쪽
+            {source.title} · {sourceMetaLabel(source)} · {problem.page_no}쪽
           </p>
         )}
       </div>

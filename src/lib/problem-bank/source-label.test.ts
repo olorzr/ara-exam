@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sourceLabel, sourceLabelWithType, type SourceLabelInput } from './source-label';
+import { sourceLabel, sourceLabelWithType, sourceMetaLabel, type SourceLabelInput } from './source-label';
 
 function source(over: Partial<SourceLabelInput> = {}): SourceLabelInput {
   return {
@@ -39,6 +39,33 @@ describe('sourceLabel', () => {
       title: '문제집 3단원',
     });
     expect(sourceLabel(bare)).toBe('문제집 3단원');
+  });
+});
+
+describe('sourceLabel — 모의고사', () => {
+  /** 칸을 이으면 한 시험의 공통·화법과 작문·언어와 매체가 같은 줄이 된다 */
+  it('제목을 쓴다', () => {
+    const mock = source({
+      source_type: '모의고사', title: '2026학년도 수능 (언어와 매체)', school_name: '',
+      grade: '고3', semester: '', exam_type: '수능', publisher: '평가원',
+    });
+    expect(sourceLabel(mock)).toBe('2026학년도 수능 (언어와 매체)');
+  });
+
+  it('제목을 따로 보여 주는 화면용 라벨은 칸을 잇는다 — 제목이 두 번 찍히면 안 된다', () => {
+    const mock = source({
+      source_type: '모의고사', title: '2026학년도 수능 (언어와 매체)', school_name: '',
+      grade: '고3', semester: '', exam_type: '수능', publisher: '평가원',
+    });
+    expect(sourceMetaLabel(mock)).toBe('2026 고3 평가원 수능');
+    expect(sourceMetaLabel(source())).toBe(sourceLabel(source()));
+  });
+
+  it('제목이 비면 칸을 잇는다', () => {
+    const mock = source({
+      source_type: '모의고사', title: ' ', school_name: '', grade: '고3', semester: '', exam_type: '수능', publisher: '평가원',
+    });
+    expect(sourceLabel(mock)).toBe('2026 고3 평가원 수능');
   });
 });
 

@@ -2,7 +2,7 @@ import type { SelectOption } from '@/components/ui/option-select';
 import { SEMESTER_OPTIONS } from '@/lib/constants';
 import { areaPathLabel } from './area-tree';
 import { formatGrammarPath, parseGrammarPath } from './grammar-tree';
-import { EXAM_TYPE_OPTIONS, levelFromGrade, SCHOOL_LEVEL_OPTIONS, SOURCE_TYPE_OPTIONS } from './source-form';
+import { examTypeFits, examTypeOptionsFor, levelFromGrade, SCHOOL_LEVEL_OPTIONS, SOURCE_TYPE_OPTIONS } from './source-form';
 import { gradeFitsSchoolLevel, parseSchoolLevel } from './school-level';
 import { UNSPECIFIED_AXIS, type ProblemFilters } from './filters';
 import { QUESTION_KINDS, QUESTION_KIND_LABELS } from './question-kind';
@@ -131,6 +131,19 @@ export function buildFilterAxes(input: BuildInput): FilterAxis[] {
   };
 
   simple('source_type', '유형', 'w-32', SOURCE_TYPE_OPTIONS.map(plain));
+  // 유형을 바꿀 때 새 유형과 맞지 않는 칸을 함께 비운다(코덱스 리뷰 2R·3R) — 남기면 DB 에
+  // 있을 수 없는 조합이라 목록이 조용히 0건이 된다: '수능' 을 고른 채 내신기출로, 또는
+  // 학교·학기를 고른 채 모의고사로(모의고사는 학교·학기를 늘 비워 저장한다)
+  const typeAxis = axes[axes.length - 1];
+  typeAxis.toPatch = (v) => {
+    const next = v === ALL_AXIS ? '' : v;
+    return {
+      source_type: next,
+      ...(examTypeFits(next, filters.exam_type) ? {} : { exam_type: '' }),
+      ...(next === '모의고사' ? { school_name: '', semester: '' } : {}),
+      page: 0,
+    };
+  };
 
   // 학교급은 학교·학년 칸을 **좁힌다** — 그래서 둘보다 앞에 둔다.
   // ⚠️ 학교급을 바꿀 때 이미 고른 학교·학년이 어긋나면 비운다. 남기면 '고등 ∩ 중2' 가
@@ -166,7 +179,8 @@ export function buildFilterAxes(input: BuildInput): FilterAxis[] {
   if (showAxis(facets.semesters.length > 0, Boolean(filters.semester))) {
     simple('semester', '학기', 'w-24', SEMESTER_OPTIONS.map(plain), true);
   }
-  simple('exam_type', '시험', 'w-24', EXAM_TYPE_OPTIONS.map(plain), true);
+  // 유형이 모의고사면 이 칸은 회차(수능·6월 모평 …)다 — 같은 exam_type 칸을 쓴다
+  simple('exam_type', '시험', 'w-24', examTypeOptionsFor(filters.source_type).map(plain), true);
   if (showAxis(facets.textbooks.length > 0, Boolean(filters.textbook))) {
     simple('textbook', '교과서', 'w-40', facets.textbooks.map(plain));
   }

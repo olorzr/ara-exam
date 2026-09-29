@@ -56,7 +56,7 @@ function ArchiveContent() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">🗂️ 문제 아카이브</h1>
           <p className="mt-1 text-sm text-gray-500">
-            읽어 둔 기출 문항입니다. 왼쪽에서 교과서 단원이나 학교 기출을 고르거나 조건으로 찾아 새 문제지를 만들 수 있어요.
+            읽어 둔 기출 문항입니다. 왼쪽에서 교과서 단원이나 기출을 고르거나 조건으로 찾아 새 문제지를 만들 수 있어요.
           </p>
         </div>
         <div className="flex gap-2">

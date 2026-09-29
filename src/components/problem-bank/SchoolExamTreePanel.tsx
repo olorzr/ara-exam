@@ -4,25 +4,26 @@ import { useMemo, useState } from 'react';
 import FacetTree from '@/components/problem-bank/FacetTree';
 import type { ProblemFilters } from '@/lib/problem-bank/filters';
 import {
-  buildSchoolExamTree, SCHOOL_AXES_CLEARED, schoolExamFilterPatch,
+  buildSchoolExamTree, MOCK_EXAM_SOURCE_TYPE, SCHOOL_AXES_CLEARED, schoolExamFilterPatch,
   schoolExamKey, type SchoolExamFacet,
 } from '@/lib/problem-bank/school-exam-tree';
 
 interface SchoolExamTreePanelProps {
   filters: ProblemFilters;
-  /** 아카이브에 실제로 있는 학교 기출 갈래 */
+  /** 아카이브에 실제로 있는 기출 갈래 (학교 기출 + 모의고사) */
   tuples: SchoolExamFacet[];
   onChange: (patch: Partial<ProblemFilters>) => void;
 }
 
 /**
- * 학교 기출별로 훑어보는 왼쪽 트리.
+ * 기출별로 훑어보는 왼쪽 트리.
  *
- * **학교 › 학년도 › 학년 › 학기·시험** 순이다 — 선생님이 기출을 떠올리는 순서가
- * "상현중 작년 2학기 기말" 이기 때문이다. 잎을 고르면 그 시험의 문항만 남는다.
+ * 맨 위가 **고등 / 중등 / 모의고사·수능** 이다. 학교 기출은 그 아래 **학교 › 학년도 › 학년 ›
+ * 학기·시험** — 선생님이 기출을 떠올리는 순서가 "상현중 작년 2학기 기말" 이기 때문이다.
+ * 모의고사는 **학년도 › 회차**("2026학년도 수능"). 잎을 고르면 그 시험의 문항만 남는다.
  *
- * ⚠️ 트리에는 `내신기출` 출처만 나온다. 모의고사·문제집은 학교가 없거나(출판사가 대신 있다)
- *    학기·시험 구분이 의미가 없어 같은 축으로 묶이지 않는다 — 그쪽은 위 필터 줄로 찾는다.
+ * ⚠️ 문제집·프린트는 나오지 않는다 — 학교도 회차도 없어 같은 축으로 묶이지 않는다.
+ *    그쪽은 위 필터 줄로 찾는다.
  */
 export default function SchoolExamTreePanel({
   filters, tuples, onChange,
@@ -57,8 +58,8 @@ export default function SchoolExamTreePanel({
   return (
     <div className="rounded-lg border border-gray-200 p-2">
       <div className="flex items-center justify-between px-2 py-1">
-        <p className="text-xs font-medium text-gray-500">학교 · 기출</p>
-        {filters.school_name && (
+        <p className="text-xs font-medium text-gray-500">기출</p>
+        {(filters.school_name || filters.source_type === MOCK_EXAM_SOURCE_TYPE) && (
           <button
             type="button"
             className="text-xs text-primary underline underline-offset-2"
@@ -73,7 +74,7 @@ export default function SchoolExamTreePanel({
           nodes={nodes}
           onSelect={handleSelect}
           selectedId={selectedId}
-          emptyText="읽어 둔 학교 기출이 아직 없어요."
+          emptyText="읽어 둔 기출이 아직 없어요."
         />
       </div>
     </div>
