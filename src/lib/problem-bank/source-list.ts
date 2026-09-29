@@ -1,5 +1,7 @@
 import { supabase } from '@/lib/supabase';
+import { applySourceAxes, escapeIlike } from './queries';
 import { sourceRefetchChunks } from './source-delete';
+import type { SourceListQuery } from './source-list-filters';
 import type { ProblemSource } from '@/types/problem-bank';
 
 /**
@@ -23,40 +25,69 @@ export const SOURCE_PAGE_SIZE = 30;
  */
 const MAX_PAGES_PER_REQUEST = Math.floor(1000 / SOURCE_PAGE_SIZE);
 
+/** 목록 한 줄 — 출처와 그 안의 문항 수 */
+export interface SourceListRow extends ProblemSource {
+  /** 이 출처에서 읽어 낸 문항 수. 0 이면 적재가 덜 끝난 것이다 */
+  problem_count: number;
+}
+
 /** 출처 목록 한 페이지 */
 export interface SourcePage {
-  rows: ProblemSource[];
-  /** 전체 개수 — '더 보기'를 보일지 판단한다 */
+  rows: SourceListRow[];
+  /** 조건에 걸린 전체 개수 — '더 보기'를 보일지 판단한다 */
   total: number;
+}
+
+/** 출처 행 + 문항 수 임베드(`problems(count)`) */
+type SourceRowWithCount = ProblemSource & { problems?: { count: number }[] };
+
+/** 임베드 모양을 목록 줄 모양으로 */
+function toListRow(row: SourceRowWithCount): SourceListRow {
+  const { problems, ...source } = row;
+  return { ...source, problem_count: problems?.[0]?.count ?? 0 };
 }
 
 /**
  * 출처 목록.
  *
- * ⚠️ 상한만 걸고 자르면 안 된다 — 업로드가 쌓이면 **옛 출처가 목록에서 사라지고**
- *    검수를 못 끝낸 것도 함께 묻힌다(코덱스 리뷰 4R). 총 개수를 함께 돌려준다.
- * @param opts - 상태 필터, 페이지(0-based), 한 번에 받을 쪽 수(기본 1, 상한까지 잘린다)
+ * ⚠️ 상한만 걸고 자르면 안 된다 — 쌓이면 **옛 출처가 목록에서 사라진다**(코덱스 리뷰 4R).
+ *    총 개수를 함께 돌려준다.
+ * ⚠️ 어느 차례든 **마지막 키는 `id`** 다 — 동률이 쪽 경계에 걸리면 '더 보기' 에서 같은 행이
+ *    두 번 오거나 빠진다(queries.ts 의 fetchProblemPage 주석 참조).
+ * @param opts - 조건, 페이지(0-based), 한 번에 받을 쪽 수(기본 1, 상한까지 잘린다)
  * @returns 행과 전체 개수
  */
 export async function fetchSources(
-  opts: { status?: string; page?: number; pageCount?: number } = {},
+  opts: { query?: SourceListQuery; page?: number; pageCount?: number } = {},
 ): Promise<SourcePage> {
   const page = Math.max(0, opts.page ?? 0);
   const span = Math.min(MAX_PAGES_PER_REQUEST, Math.max(1, Math.floor(opts.pageCount ?? 1)));
   const from = page * SOURCE_PAGE_SIZE;
+  const query: SourceListQuery = opts.query ?? { sort: 'recent' };
 
-  let query = supabase
+  let request = supabase
     .from('problem_sources')
-    .select('*', { count: 'exact' })
-    .order('created_at', { ascending: false })
-    // 같은 이유로 안정적인 2차 정렬 키를 둔다(queries.ts 의 fetchProblemPage 주석 참조)
-    .order('id', { ascending: false })
-    .range(from, from + SOURCE_PAGE_SIZE * span - 1);
-  if (opts.status) query = query.eq('status', opts.status);
+    // 문항 수를 같은 왕복에서 센다 — 줄마다 따로 물으면 30번 왕복이다
+    .select('*, problems(count)', { count: 'exact' });
+  request = applySourceAxes(request, query, '');
+  if (query.title) request = request.ilike('title', `%${escapeIlike(query.title)}%`);
 
-  const { data, error, count } = await query;
+  if (query.sort === 'exam') {
+    // 시험 차례: 최근 학년도 → 학교 → 학년 → 학기 → 시험(중간이 기말보다, 수능이 모평보다 먼저)
+    request = request
+      .order('year', { ascending: false })
+      .order('school_name')
+      .order('grade')
+      .order('semester')
+      .order('exam_type', { ascending: false });
+  } else {
+    request = request.order('created_at', { ascending: false });
+  }
+  request = request.order('id', { ascending: false });
+
+  const { data, error, count } = await request.range(from, from + SOURCE_PAGE_SIZE * span - 1);
   if (error) throw error;
-  return { rows: (data ?? []) as ProblemSource[], total: count ?? 0 };
+  return { rows: ((data ?? []) as SourceRowWithCount[]).map(toListRow), total: count ?? 0 };
 }
 
 /**
@@ -66,15 +97,19 @@ export async function fetchSources(
  * 하나씩 당겨져서, 이어서 다음 쪽을 받을 때 **경계에 걸린 행 하나가 영영 안 보인다**
  * (중복보다 나쁘다. 그 출처가 지워진 줄 안다).
  * @param pageCount - 지금까지 펼친 쪽 수
+ * @param query - 지금 걸린 조건 (없으면 전체)
  * @returns 그 범위의 행 전부와 전체 개수
  * @throws 조회 실패 시 (호출부는 목록을 '다시 읽어야 하는 상태' 로 두어야 한다)
  */
-export async function refetchSources(pageCount: number): Promise<SourcePage> {
-  const rows: ProblemSource[] = [];
+export async function refetchSources(
+  pageCount: number,
+  query?: SourceListQuery,
+): Promise<SourcePage> {
+  const rows: SourceListRow[] = [];
   let total = 0;
 
   for (const { page, span } of sourceRefetchChunks(pageCount, MAX_PAGES_PER_REQUEST)) {
-    const chunk = await fetchSources({ page, pageCount: span });
+    const chunk = await fetchSources({ query, page, pageCount: span });
     rows.push(...chunk.rows);
     total = chunk.total;
     // 요청한 것보다 적게 왔으면 끝까지 읽은 것이다 — 더 물어도 빈 응답만 온다

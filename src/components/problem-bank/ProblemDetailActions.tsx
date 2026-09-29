@@ -22,7 +22,7 @@ interface ProblemDetailActionsProps {
 /**
  * 상세 창 아래의 조작 줄.
  *
- * 링크(편집·검수)는 늘 있고, **담기 단추는 `onAdd` 를 받았을 때만** 나온다 — 아카이브에는
+ * 링크(편집·시험지)는 늘 있고, **담기 단추는 `onAdd` 를 받았을 때만** 나온다 — 아카이브에는
  * 담을 캔버스가 없으므로 그 화면에서는 단추가 보이지 않는다.
  *
  * 담기가 둘인 까닭: 지문에 딸린 문항은 **혼자 담아 봐야 쓸모가 적다.** `[22~23]` 지문의
@@ -48,7 +48,7 @@ export default function ProblemDetailActions({
         href={`/problems/sources/${source.id}?item=${shown.id}`}
         className="text-primary underline underline-offset-2"
       >
-        검수 화면에서 보기
+        시험지에서 보기
       </Link>
 
       {onAdd && (

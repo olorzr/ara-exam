@@ -10,7 +10,7 @@ import {
   passageQuizEmptyNotice, runPassageQuiz, toQuizItems,
   type PassageQuizCounts, type PassageQuizDropped, type QuizItem, type QuizReferenceText,
 } from '@/lib/passage-quiz';
-import { ocrStillEnabled } from './useProblemOcr';
+import { ocrStillEnabled } from '@/lib/ai/still-enabled';
 
 /**
  * 지문으로 O,X·단답형을 만드는 화면의 상태.
@@ -61,7 +61,7 @@ export function usePassageQuiz() {
   const [dropped, setDropped] = useState<PassageQuizDropped | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  // 화면이 사라지면 진행 중인 생성을 끊는다(useProblemOcr 과 같은 이유로 layout effect)
+  // 화면이 사라지면 진행 중인 생성을 끊는다(usePrintScanOcr 과 같은 이유로 layout effect)
   useLayoutEffect(() => () => abortRef.current?.abort(), []);
 
   const cancel = useCallback(() => abortRef.current?.abort(), []);

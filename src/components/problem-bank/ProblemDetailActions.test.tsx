@@ -24,6 +24,9 @@ describe('ProblemDetailActions', () => {
 
     expect(screen.queryByRole('button', { name: /담기/ })).toBeNull();
     expect(screen.getByRole('link', { name: '문항 편집' })).toBeTruthy();
+    // 검수 절차는 걷었다(2026-09-30) — 같은 화면을 '시험지' 로 부른다
+    const sheet = screen.getByRole('link', { name: '시험지에서 보기' }) as HTMLAnchorElement;
+    expect(sheet.getAttribute('href')).toContain(`/problems/sources/${source.id}`);
   });
 
   it('누르면 지금 보고 있는 문항에 출처를 붙여 넘긴다', () => {

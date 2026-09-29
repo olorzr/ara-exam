@@ -12,7 +12,7 @@ import {
   type ConceptPick, type ConceptPickDropped, type ConceptPickResult,
 } from '@/lib/concept-pick';
 import type { MarkItem } from '@/components/exam-builder';
-import { ocrStillEnabled } from './useProblemOcr';
+import { ocrStillEnabled } from '@/lib/ai/still-enabled';
 
 /**
  * AI 추천 빈칸 — 본문에서 외울 용어를 골라 **곧바로 마킹**한다.
@@ -93,7 +93,7 @@ export function useConceptPick({
   const [progress, setProgress] = useState<ConceptPickProgress | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  // 화면이 사라지면 진행 중인 생성을 끊는다(useProblemOcr 과 같은 이유로 layout effect)
+  // 화면이 사라지면 진행 중인 생성을 끊는다(usePrintScanOcr 과 같은 이유로 layout effect)
   useLayoutEffect(() => () => abortRef.current?.abort(), []);
 
   const cancel = useCallback(() => abortRef.current?.abort(), []);

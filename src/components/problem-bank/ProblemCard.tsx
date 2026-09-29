@@ -131,9 +131,6 @@ export default function ProblemCard({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1.5">
           <Badge variant="outline">{problem.question_type}</Badge>
-          {problem.status === '검수완료' && (
-            <Badge className="bg-emerald-500 text-white">검수</Badge>
-          )}
           {problem.render_mode === 'image' && <Badge variant="outline">이미지</Badge>}
           {!problem.answer && <Badge className="bg-amber-500 text-white">정답 없음</Badge>}
         </div>

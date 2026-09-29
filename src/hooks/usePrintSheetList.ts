@@ -2,25 +2,51 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { useAuth } from '@/lib/auth-context';
+import type { OwnerScope } from '@/lib/owner-scope';
 import { fetchScansWithBundles } from '@/lib/print-scan/queries';
 import {
   createSheetForBundle, deleteBundle as deleteBundleRow, deleteScan as deleteScanRow,
   ensureSchoolMaterial,
 } from '@/lib/print-scan/save';
 import { bundleDeleteConfirmMessage, scanDeleteConfirmMessage } from '@/lib/print-scan/scan-delete';
+import { isTypedBundle } from '@/lib/print-scan/typed';
 import { registeredWordCount } from '@/lib/print-words';
 import type { PrintBundleRow, PrintScanRow } from '@/types/print-scan';
+
+/** 읽어 둔 목록 — 어느 탭의 것인지와 함께 든다 */
+interface LoadedScans {
+  key: string;
+  scans: PrintScanRow[];
+}
 
 /**
  * 학교 프린트 목록 화면의 상태.
  *
- * 목록은 스캔 몇 건뿐이라 페이지네이션을 두지 않는다(상한 100). 지우고 나면
+ * 목록은 스캔 몇 건뿐이라 페이지네이션을 두지 않는다(탭마다 상한 100). 지우고 나면
  * **통째로 다시 읽는다** — 지역에서 행만 빼면 안에 딸린 시험지 수 같은 파생값이 어긋난다.
+ *
+ * 탭(내 것 / 다른 선생님 것)을 바꾸면 그 탭을 새로 읽는다. 로딩은 **"어느 탭의 목록을 읽어
+ * 두었는가" 에서 파생**한다 — 탭을 바꾼 직후 옛 탭의 줄이 새 탭 이름 아래 보이면 안 된다.
+ * @param scope - 내 것 / 다른 선생님 것
  */
-export function usePrintSheetList() {
-  const [scans, setScans] = useState<PrintScanRow[]>([]);
-  const [loading, setLoading] = useState(true);
+export function usePrintSheetList(scope: OwnerScope) {
+  const { user } = useAuth();
+  const userId = user?.id ?? '';
+  const key = `${scope}:${userId}`;
+  const [loaded, setLoaded] = useState<LoadedScans | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  /** 목록 요청 세대 — 탭을 오가며 늦게 온 옛 탭의 응답이 새 목록을 덮지 않게 */
+  const reqSeq = useRef(0);
+  /**
+   * 지금 보고 있는 탭.
+   *
+   * ⚠️ `load` 는 이 ref 를 읽는다 — 탭을 닫아 두지 않는다(코덱스 1R). 지우기·시험지 만들기·
+   *    다시 읽기는 끝나고 나서 목록을 다시 읽는데, 그 사이 탭을 바꿨으면 닫아 둔 **옛 탭**을
+   *    읽게 된다. 그 요청이 세대를 올려 새 탭의 응답을 버리게 하고 자기는 옛 탭 결과를 남겨,
+   *    **지금 탭이 영영 '읽는 중'** 으로 멈췄다. 늘 지금 탭을 읽으면 가장 늦은 요청이 맞는 답이다.
+   */
+  const currentRef = useRef({ scope, userId, key });
   const aliveRef = useRef(true);
   /**
    * 지우기·만들기가 겹치지 않게 하는 잠금.
@@ -31,23 +57,29 @@ export function usePrintSheetList() {
   const busyRef = useRef(false);
 
   const load = useCallback(async () => {
+    const { scope: wantedScope, userId: wantedUser, key: wantedKey } = currentRef.current;
+    if (!wantedUser) return;
+    const seq = ++reqSeq.current;
     try {
-      const rows = await fetchScansWithBundles();
-      if (aliveRef.current) setScans(rows);
+      const rows = await fetchScansWithBundles(wantedScope, wantedUser);
+      if (aliveRef.current && seq === reqSeq.current) setLoaded({ key: wantedKey, scans: rows });
     } catch (e) {
+      if (!aliveRef.current || seq !== reqSeq.current) return;
       toast.error(e instanceof Error ? e.message : '목록을 불러오지 못했어요.');
-    } finally {
-      if (aliveRef.current) setLoading(false);
+      // 같은 탭을 다시 읽다 실패했으면 보던 목록을 둔다. 처음 읽기였으면 빈 목록으로 끝낸다
+      setLoaded((prev) => (prev?.key === wantedKey ? prev : { key: wantedKey, scans: [] }));
     }
   }, []);
 
   useEffect(() => {
+    // 탭을 먼저 적어 두고 읽는다 — 끝나고 다시 읽는 작업들도 이 값을 본다
+    currentRef.current = { scope, userId, key };
     // ⚠️ 효과 본문에서 true 로 **되돌린다** — StrictMode 는 마운트 → 언마운트 → 재마운트라,
     //    안 되돌리면 재마운트 뒤 이 화면의 기능이 조용히 통째로 죽는다
     aliveRef.current = true;
     load();
     return () => { aliveRef.current = false; };
-  }, [load]);
+  }, [key, scope, userId, load]);
 
   /** 잠금·busy 표시·다시 읽기를 한 벌로 묶는다 */
   const withBusy = useCallback(async (id: string, job: () => Promise<void>) => {
@@ -100,7 +132,8 @@ export function usePrintSheetList() {
    * 시험지를 지웠다가 되살리고 싶을 때의 길이다.
    */
   const createSheet = useCallback(async (bundle: PrintBundleRow) => {
-    if (!bundle.ocr_html) {
+    // 직접 입력한 프린트는 읽어 둔 원문이 원래 없다 — 빈 시험지를 만든다(만들다 실패한 것을 되살리는 길)
+    if (!bundle.ocr_html && !isTypedBundle(bundle)) {
       toast.error('읽어 둔 내용이 없어요. 먼저 읽기를 해 주세요.');
       return;
     }
@@ -115,5 +148,14 @@ export function usePrintSheetList() {
     });
   }, [withBusy]);
 
-  return { scans, loading, busyId, reload: load, deleteScan, deleteBundle, createSheet };
+  const current = loaded?.key === key ? loaded : null;
+  return {
+    scans: current?.scans ?? [],
+    loading: current === null,
+    busyId,
+    reload: load,
+    deleteScan,
+    deleteBundle,
+    createSheet,
+  };
 }

@@ -68,16 +68,6 @@ export default function ProblemFilterBar({
           />
         </div>
 
-        <label className="flex items-center gap-1.5 text-sm text-gray-600">
-          <input
-            type="checkbox"
-            checked={filters.verifiedOnly}
-            onChange={(e) => onChange({ verifiedOnly: e.target.checked, page: 0 })}
-            className="h-4 w-4 accent-[color:var(--primary)]"
-          />
-          검수한 것만
-        </label>
-
         {hasActiveFilters(filters) && (
           <Button type="button" variant="outline" size="sm" onClick={onReset}>
             <X className="h-3.5 w-3.5" />

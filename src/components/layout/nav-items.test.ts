@@ -61,6 +61,7 @@ describe('학교 프린트 시험지 메뉴', () => {
     const printSheets = findItem(sections, '/print-sheets');
     expect(isNavItemActive('/print-sheets', printSheets)).toBe(true);
     expect(isNavItemActive('/print-sheets/upload', printSheets)).toBe(true);
+    expect(isNavItemActive('/print-sheets/new', printSheets)).toBe(true);
     expect(isNavItemActive('/print-sheets/abc-123', printSheets)).toBe(true);
   });
 
@@ -73,11 +74,11 @@ describe('학교 프린트 시험지 메뉴', () => {
 describe('문제 은행 메뉴', () => {
   it('형제 경로가 서로를 켜지 않는다 — /problems 를 실제 경로로 두지 않은 이유', () => {
     const archive = findItem(sections, '/problems/archive');
-    const upload = findItem(sections, '/problems/upload');
+    const sources = findItem(sections, '/problems/sources');
     const papers = findItem(sections, '/problems/papers');
 
-    expect(isNavItemActive('/problems/upload', archive)).toBe(false);
-    expect(isNavItemActive('/problems/archive', upload)).toBe(false);
+    expect(isNavItemActive('/problems/sources', archive)).toBe(false);
+    expect(isNavItemActive('/problems/archive', sources)).toBe(false);
     expect(isNavItemActive('/problems/papers/abc-123', papers)).toBe(true);
     expect(isNavItemActive('/problems/papers/new', archive)).toBe(false);
   });
@@ -89,7 +90,7 @@ describe('문제 은행 메뉴', () => {
     expect(isNavItemActive('/problems/edit/abc-123', findItem(sections, '/problems/sources'))).toBe(false);
   });
 
-  it('출처 상세(검수 화면)는 출처·검수에 붙는다', () => {
+  it('시험지 한 건의 화면은 올라간 기출에 붙는다', () => {
     const sources = findItem(sections, '/problems/sources');
     expect(isNavItemActive('/problems/sources/abc-123', sources)).toBe(true);
   });
@@ -130,7 +131,7 @@ describe('buildNavSections', () => {
     // 그룹 이름은 '문제 은행' — 접힘 상태 저장 키(id)는 'problems' 그대로다
     expect(problems.kind === 'group' && problems.label).toBe('문제 은행');
     expect(problems.items.map((i) => i.label)).toEqual([
-      '문제 아카이브', '기출 업로드', '출처·검수', '문제지 조합', 'O,X·단답형',
+      '문제 아카이브', '올라간 기출', '문제지 조합', 'O,X·단답형',
     ]);
 
     const etc = sections.find((s) => s.id === 'etc')!;

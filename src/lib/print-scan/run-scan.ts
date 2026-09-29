@@ -86,6 +86,8 @@ function toBundle(row: SavedRow, pagePaths: Map<number, string>): PrintBundle {
   return {
     ...row,
     school_id: row.school_id,
+    // 이 길로 오는 것은 전부 스캔이다(직접 입력은 `typed.ts` 가 만든다). DB 기본값과 같다
+    source: 'scan',
     // pages 와 **같은 순서**로. 못 올린 쪽은 빈 문자열로 자리를 남긴다 —
     // 압축하면 쪽 번호와 어긋나 엉뚱한 쪽 이미지가 옆에 붙는다
     page_paths: row.pages.map((p) => pagePaths.get(p) ?? ''),

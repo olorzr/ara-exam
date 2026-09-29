@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { applyOwnerScope, type OwnerScope } from '@/lib/owner-scope';
 import type { PrintBundle, PrintScan, PrintScanRow } from '@/types/print-scan';
 
 /**
@@ -8,7 +9,7 @@ import type { PrintBundle, PrintScan, PrintScanRow } from '@/types/print-scan';
  * 따로 읽는데, 개념지 쪽에서 거는 편이 인덱스(`idx_concept_sheets_print_bundle`)를 탄다.
  */
 
-/** 한 번에 보여 줄 스캔 수. 넘으면 오래된 것부터 안 보인다 — 지금 규모(주 몇 건)에는 넉넉하다 */
+/** 한 번에 보여 줄 스캔 수(탭마다). 넘으면 오래된 것부터 안 보인다 — 지금 규모(주 몇 건)에는 넉넉하다 */
 const SCAN_LIMIT = 100;
 
 /** 개념지에서 읽어 오는 연결 정보 */
@@ -20,14 +21,23 @@ interface SheetLink {
 
 /**
  * 스캔 목록과 그 묶음들 (최신순).
+ *
+ * 만든 사람은 **스캔**으로 가른다 — 목록이 스캔 단위로 묶이고, 스캔과 그 묶음은 한 흐름에서
+ * 같은 사람이 만든다. (시험지 행의 `user_id` 는 쓰지 않는다: '시험지 만들기' 를 다른 선생님이
+ * 누르면 그 사람 것이 된다.)
+ * @param scope - 내 것 / 다른 선생님 것
+ * @param userId - 로그인한 사람의 id
  * @returns 목록 행들
  * @throws 조회 실패 시 (조용히 빈 목록을 주면 "왜 안 보이지" 가 된다)
  */
-export async function fetchScansWithBundles(): Promise<PrintScanRow[]> {
-  const { data, error } = await supabase
-    .from('print_scans')
-    .select('*, print_bundles(*)')
+export async function fetchScansWithBundles(
+  scope: OwnerScope,
+  userId: string,
+): Promise<PrintScanRow[]> {
+  const request = supabase.from('print_scans').select('*, print_bundles(*)');
+  const { data, error } = await applyOwnerScope(request, scope, userId)
     .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
     .limit(SCAN_LIMIT);
   if (error) throw error;
 

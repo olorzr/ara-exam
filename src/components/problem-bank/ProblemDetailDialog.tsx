@@ -127,7 +127,6 @@ function DetailBody({ problemId, onClose, onAdd, addedIds }: {
         </DialogTitle>
         <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
           <Badge variant="outline">{shown.question_type}</Badge>
-          {shown.status === '검수완료' && <Badge className="bg-emerald-500 text-white">검수</Badge>}
           <span>{sourceLabel(source)}</span>
           {/* 문항이 여러 작품에 걸리면 파생 문자열이 아니라 낱개로 찍는다 */}
           {(shown.work_titles ?? []).map((title) => <span key={title}>· {title}</span>)}

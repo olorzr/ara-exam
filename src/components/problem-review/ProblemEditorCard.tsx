@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Check, Image as ImageIcon, Trash2, Type } from 'lucide-react';
+import { Image as ImageIcon, Trash2, Type } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,10 +57,8 @@ interface ProblemEditorCardProps {
   onSelect: () => void;
   /** 저장 후 새 `updated_at` 을 돌려준다. 실패하면 null */
   onSave: (patch: ProblemPatch) => Promise<string | null>;
-  /** `knownUpdatedAt` 은 방금 저장해 이미 아는 버전 — 화면 state 가 안 돌아도 맞는 값을 쓴다 */
-  onToggleVerified: (verified: boolean, knownUpdatedAt?: string) => void;
   onDelete: () => void;
-  /** 저장하지 않은 수정이 생기거나 사라질 때 알린다 — 화면이 '검수 마치기'를 막는 데 쓴다 */
+  /** 저장하지 않은 수정이 생기거나 사라질 때 알린다 — 화면이 지우기·합치기 전에 묻는 데 쓴다 */
   onDirtyChange?: (dirty: boolean) => void;
   /** OCR 이 이 문항에 남긴 확인거리 — 위 배너의 경고를 카드에도 붙인다 */
   issues?: string[];
@@ -81,17 +79,20 @@ interface ProblemEditorCardProps {
 }
 
 /**
- * 문항 한 개의 검수 카드.
+ * 문항 한 개의 편집 카드 (시험지 화면·문항 편집 화면이 함께 쓴다).
  *
  * 저장은 **누를 때만** 한다(자동 저장 없음) — 공유 표라 자동 저장이 겹치면
- * 남의 검수를 계속 밀어내게 된다.
+ * 남이 고친 것을 계속 밀어내게 된다.
+ *
+ * 검수 표시(검수 완료/해제)는 2026-09-30 에 걷었다 — 기출은 원장님이 적재하고
+ * 틀린 곳은 보이는 대로 고친다. `problems.status` 컬럼은 그대로 두고 화면만 안 쓴다.
  *
  * ⚠️ 호출부는 반드시 `key={problem.id}` 를 준다. 폼 값을 지역 state 로 들고 있으므로,
  *    key 없이 다른 문항을 같은 자리에 그리면 **앞 문항의 입력이 남는다**.
  *    효과로 되돌리는 대신 key 로 다시 마운트하는 것이 React 권장 방식이다.
  */
 export default function ProblemEditorCard({
-  problem, passageWorks, areaTree, unitTree, selected, onSelect, onSave, onToggleVerified,
+  problem, passageWorks, areaTree, unitTree, selected, onSelect, onSave,
   onDelete, onDirtyChange, issues, figureUrls, onStartCapture, capturing, capturingFigure,
 }: ProblemEditorCardProps) {
   // 값과 함께 최신 ref 를 든다 — 그림을 붙이는 동안 친 글을 잃지 않으려면
@@ -129,15 +130,13 @@ export default function ProblemEditorCard({
 
 
 
-  const verified = problem.status === '검수완료';
   const missingAnswer = !answer.trim();
 
   /**
    * 저장하지 않은 수정이 있는가.
    *
-   * ⚠️ 이걸 안 보면 **고친 내용을 버린 채 옛 OCR 결과가 '검수완료'로 굳는다** —
-   *    화면을 떠나면 지역 state 가 사라지는데 상태만 검수완료로 남아,
-   *    검수한 자료인 줄 알고 그대로 인쇄하게 된다(코덱스 리뷰 8R).
+   * ⚠️ 이걸 안 보면 지우기·합치기·교과서 변경이 **고치던 입력을 말없이 버린다** —
+   *    화면이 이 값을 모아 그 전에 한 번 묻는다(`useReviewGuards`).
    */
   const dirty = stem !== problem.stem_html
     || answer !== problem.answer
@@ -146,11 +145,11 @@ export default function ProblemEditorCard({
     || area.join('>') !== problem.area_path.join('>')
     || unit.join('>') !== problem.unit_path.join('>')
     || grammar.join('\u0000') !== problem.grammar_paths.join('\u0000')
-    // ⚠️ 그림 경로도 센다 — 뺐는데 저장이 실패하면 화면에서만 사라진 채 검수완료로 굳는다
+    // ⚠️ 그림 경로도 센다 — 뺐는데 저장이 실패하면 화면에서만 사라진 채로 남는다
     || figurePaths.join('\u0000') !== problem.figure_paths.join('\u0000')
     || trimTrailingChoices(choices).join('\u0000') !== problem.choices.join('\u0000');
 
-  // 화면이 '검수 마치기' 를 막을 수 있게 알린다. 렌더 중 부모 state 를 건드리지 않도록
+  // 화면이 미저장 수정을 지킬 수 있게 알린다. 렌더 중 부모 state 를 건드리지 않도록
   // 값이 바뀔 때만 효과로 통지한다
   useEffect(() => {
     onDirtyChange?.(dirty);
@@ -189,21 +188,6 @@ export default function ProblemEditorCard({
     return updatedAt;
   };
 
-  /**
-   * 검수 완료로 표시한다. 저장하지 않은 수정이 있으면 **먼저 저장하고**,
-   * 저장이 실패하면 검수 표시도 하지 않는다 — 고친 내용을 버린 채 상태만 굳으면 안 된다.
-   */
-  const handleVerify = async (next: boolean) => {
-    if (next && dirty) {
-      const updatedAt = await handleSave();
-      if (!updatedAt) return;
-      // 방금 받은 버전을 그대로 넘긴다 — 화면 state 는 아직 안 돌았다
-      onToggleVerified(next, updatedAt);
-      return;
-    }
-    onToggleVerified(next);
-  };
-
   const toggleRenderMode = () => {
     const next = problem.render_mode === 'image' ? 'text' : 'image';
     if (next === 'image' && !problem.image_path) return;
@@ -224,7 +208,6 @@ export default function ProblemEditorCard({
           {problem.number !== null ? `${problem.number}번` : '번호 없음'}
         </button>
         <Badge variant="outline">{problem.page_no}쪽</Badge>
-        {verified && <Badge className="bg-emerald-500 text-white">검수완료</Badge>}
         {missingAnswer && <Badge className="bg-amber-500 text-white">정답 미입력</Badge>}
         {issues && issues.length > 0 && (
           <Badge className="bg-amber-500 text-white">확인 필요 {issues.length}</Badge>
@@ -240,14 +223,6 @@ export default function ProblemEditorCard({
                 : <><ImageIcon className="h-3.5 w-3.5" /><span className="ml-1">이미지로 출제</span></>}
             </Button>
           )}
-          <Button
-            type="button" variant={verified ? 'outline' : 'default'} size="sm"
-            onClick={() => handleVerify(!verified)}
-            disabled={saving}
-          >
-            <Check className="h-3.5 w-3.5" />
-            <span className="ml-1">{verified ? '검수 해제' : '검수 완료'}</span>
-          </Button>
           <Button
             type="button" variant="outline" size="sm"
             onClick={() => { if (window.confirm('이 문항을 지울까요?')) onDelete(); }}

@@ -48,14 +48,13 @@ export interface ProblemFilters {
    */
   work_title: string;
   search: string;
-  verifiedOnly: boolean;
   page: number;
 }
 
 export const EMPTY_FILTERS: ProblemFilters = {
   source_type: '', school_name: '', year: '', school_level: '', grade: '', semester: '', exam_type: '', textbook: '',
   area_path: [], unit_path: [], grammar_path: [], question_kind: '', work_title: '',
-  search: '', verifiedOnly: false, page: 0,
+  search: '', page: 0,
 };
 
 /** 영역 경로를 주소에 실을 때 쓰는 구분자 — 이름에 들어갈 일이 없는 글자 */
@@ -120,7 +119,6 @@ export function filtersToQueryString(filters: ProblemFilters): string {
   if (filters.question_kind) params.set('kind', filters.question_kind);
   if (filters.work_title) params.set('work', filters.work_title);
   if (filters.search) params.set('q', filters.search);
-  if (filters.verifiedOnly) params.set('verified', '1');
   if (filters.page > 0) params.set('page', String(filters.page + 1));
   const query = params.toString();
   return query ? `?${query}` : '';
@@ -151,7 +149,6 @@ export function filtersFromParams(params: URLSearchParams): ProblemFilters {
     question_kind: parseQuestionKind(params.get('kind')),
     work_title: params.get('work') ?? '',
     search: params.get('q') ?? '',
-    verifiedOnly: params.get('verified') === '1',
     // 주소는 사람이 읽는 1-based, 내부는 0-based
     page: Number.isFinite(rawPage) && rawPage > 1 ? rawPage - 1 : 0,
   };
@@ -186,7 +183,6 @@ export function toProblemQuery(filters: ProblemFilters): ProblemQuery {
     // 작품명은 자유 텍스트다 — '미지정만' 을 허용하면 그런 이름의 작품과 겹친다
     ...axisEntry('work_title', filters.work_title),
     ...(filters.search.trim() ? { search: filters.search.trim() } : {}),
-    ...(filters.verifiedOnly ? { verifiedOnly: true } : {}),
     page: filters.page,
   };
 }
@@ -201,6 +197,6 @@ export function hasActiveFilters(filters: ProblemFilters): boolean {
     filters.source_type || filters.school_name || filters.year || filters.school_level || filters.grade
     || filters.semester || filters.exam_type || filters.textbook || filters.area_path.length > 0
     || filters.unit_path.length > 0 || filters.grammar_path.length > 0
-    || filters.question_kind || filters.work_title || filters.search || filters.verifiedOnly,
+    || filters.question_kind || filters.work_title || filters.search,
   );
 }

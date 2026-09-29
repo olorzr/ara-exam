@@ -1,15 +1,19 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
-import { FileScan, PlusCircle } from 'lucide-react';
+import { FileScan, PenLine, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { OwnerScopeTabs } from '@/components/ui/owner-scope-tabs';
 import { PrintScanCard } from '@/components/print-scan';
 import OcrProgress from '@/components/problem-ocr/OcrProgress';
 import { useAiEnabled } from '@/hooks/useAiEnabled';
+import { useCreatorNames } from '@/hooks/useCreatorNames';
 import { usePrintScanOcr } from '@/hooks/usePrintScanOcr';
 import { usePrintSheetList } from '@/hooks/usePrintSheetList';
 import { usePrintWordsRegister } from '@/hooks/usePrintWordsRegister';
+import type { OwnerScope } from '@/lib/owner-scope';
 import type { PrintBundleRow, PrintScanRow } from '@/types/print-scan';
 
 /**
@@ -17,11 +21,16 @@ import type { PrintBundleRow, PrintScanRow } from '@/types/print-scan';
  *
  * 스캔 한 건 안에 프린트(묶음)가 여러 장 들어 있고, 프린트 한 장이 시험지 한 장이다.
  * 읽기가 실패했거나 아직 안 읽은 프린트는 여기서 다시 읽는다 — 올려 둔 원본 PDF 를 쓰므로
- * 파일을 다시 고를 필요가 없다.
+ * 파일을 다시 고를 필요가 없다. 스캔 없이 **직접 입력**해서 만들 수도 있다(`/print-sheets/new`).
+ *
+ * 내가 올린 것과 다른 선생님이 올린 것을 탭으로 가른다 — 들어올 때마다 내 것부터 연다.
  */
 export default function PrintSheetsPage() {
   const ai = useAiEnabled();
-  const list = usePrintSheetList();
+  const [scope, setScope] = useState<OwnerScope>('mine');
+  const list = usePrintSheetList(scope);
+  // 다른 선생님 탭에서만 누가 올렸는지 적는다
+  const names = useCreatorNames(scope === 'others' ? list.scans.map((s) => s.user_id) : []);
   const ocr = usePrintScanOcr();
   const words = usePrintWordsRegister();
 
@@ -43,29 +52,29 @@ export default function PrintSheetsPage() {
   //    같은 브릿지로 두 생성이 겹친다
   const busy = ocr.running || words.running || list.busyId !== null;
 
-  if (list.loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">🖨️ 학교 프린트 시험지</h1>
           <p className="mt-1 text-sm text-gray-500">
-            아이들이 가져온 학교 프린트를 스캔해 올리면 빈칸 시험지로 만들 수 있어요.
+            아이들이 가져온 학교 프린트를 스캔해 올리거나 직접 입력하면 빈칸 시험지로 만들 수 있어요.
           </p>
         </div>
-        <Link href="/print-sheets/upload">
-          <Button className="bg-primary hover:bg-primary-hover text-white">
-            <PlusCircle className="mr-2 h-4 w-4" />
-            새 스캔 올리기
-          </Button>
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/print-sheets/new">
+            <Button variant="outline">
+              <PenLine className="mr-2 h-4 w-4" />
+              직접 입력하기
+            </Button>
+          </Link>
+          <Link href="/print-sheets/upload">
+            <Button className="bg-primary hover:bg-primary-hover text-white">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              새 스캔 올리기
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {ocr.running && (
@@ -98,31 +107,47 @@ export default function PrintSheetsPage() {
         </Card>
       )}
 
-      {list.scans.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-gray-300">
-          <FileScan className="mb-3 h-12 w-12" />
-          <p className="text-sm">아직 올린 스캔이 없습니다.</p>
-          <Link href="/print-sheets/upload" className="mt-4">
-            <Button variant="outline" size="sm">첫 스캔 올리기</Button>
-          </Link>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {list.scans.map((scan: PrintScanRow) => (
-            <PrintScanCard
-              key={scan.id}
-              scan={scan}
-              busy={busy}
-              aiEnabled={ai.features.print_ocr}
-              onRead={read}
-              onCreateSheet={list.createSheet}
-              onRegisterWords={registerWords}
-              onDeleteBundle={list.deleteBundle}
-              onDeleteScan={list.deleteScan}
-            />
-          ))}
-        </div>
-      )}
+      <OwnerScopeTabs value={scope} onChange={setScope}>
+        {list.loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          </div>
+        ) : list.scans.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+            <FileScan className="mb-3 h-12 w-12 text-gray-300" />
+            <p className="text-sm">
+              {scope === 'mine' ? '아직 올린 프린트가 없습니다.' : '다른 선생님이 올린 프린트가 없습니다.'}
+            </p>
+            {scope === 'mine' && (
+              <div className="mt-4 flex gap-2">
+                <Link href="/print-sheets/new">
+                  <Button variant="outline" size="sm">직접 입력하기</Button>
+                </Link>
+                <Link href="/print-sheets/upload">
+                  <Button variant="outline" size="sm">첫 스캔 올리기</Button>
+                </Link>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {list.scans.map((scan: PrintScanRow) => (
+              <PrintScanCard
+                key={scan.id}
+                scan={scan}
+                busy={busy}
+                aiEnabled={ai.features.print_ocr}
+                onRead={read}
+                onCreateSheet={list.createSheet}
+                onRegisterWords={registerWords}
+                onDeleteBundle={list.deleteBundle}
+                onDeleteScan={list.deleteScan}
+                creatorName={names.get(scan.user_id)}
+              />
+            ))}
+          </div>
+        )}
+      </OwnerScopeTabs>
     </div>
   );
 }

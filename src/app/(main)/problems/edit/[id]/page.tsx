@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import ProblemEditorCard from '@/components/problem-review/ProblemEditorCard';
 import { useSourceTrees } from '@/hooks/useSourceTrees';
 import {
-  ConflictError, deleteProblem, setProblemVerified, updateProblem, type ProblemPatch,
+  ConflictError, deleteProblem, updateProblem, type ProblemPatch,
 } from '@/lib/problem-bank/mutations';
 import { fetchPassagesByIds } from '@/lib/problem-bank/detail-queries';
 import { fetchProblem, fetchSource } from '@/lib/problem-bank/source-queries';
@@ -17,7 +17,7 @@ import type { PassageWork, Problem, ProblemSource } from '@/types/problem-bank';
 
 /**
  * 문항 한 개 편집 (`/problems/edit/[id]`).
- * 아카이브 목록에서만 들어온다 — 검수 화면(`/problems/sources/[id]`)은 출처 단위다.
+ * 아카이브 목록에서만 들어온다 — 시험지 화면(`/problems/sources/[id]`)은 출처 단위다.
  */
 export default function ProblemEditPage() {
   const params = useParams<{ id: string }>();
@@ -62,7 +62,7 @@ export default function ProblemEditPage() {
 
   /**
    * 문항을 저장한다.
-   * @returns 새 `updated_at`. 실패하면 null — 저장 직후 검수까지 이어질 때
+   * @returns 새 `updated_at`. 실패하면 null — 그림을 붙인 뒤처럼 저장이 이어질 때
    *   화면 state 가 아직 안 돌아도 맞는 버전을 쓸 수 있어야 한다
    */
   const save = async (patch: ProblemPatch): Promise<string | null> => {
@@ -120,22 +120,6 @@ export default function ProblemEditPage() {
         selected
         onSelect={() => { /* 단건 화면이라 선택 개념이 없다 */ }}
         onSave={save}
-        onToggleVerified={async (verified, knownUpdatedAt) => {
-          try {
-            // 검수 토글도 updated_at 을 바꾼다 — 같이 갱신해야 다음 저장이 충돌하지 않는다.
-            // 방금 저장했다면 그때 받은 버전을 쓴다(화면 state 는 아직 안 돌았다)
-            const updatedAt = await setProblemVerified(
-              problem.id, knownUpdatedAt ?? problem.updated_at, verified,
-            );
-            // ⚠️ 바깥의 `problem` 을 펼치면 **방금 저장한 값이 옛 값으로 되돌아간다**
-            //    (이 클로저는 저장 전 상태를 붙잡고 있다). 최신 상태 위에서 두 칸만 바꾼다
-            setProblem((prev) => (prev
-              ? { ...prev, status: verified ? '검수완료' : '초안', updated_at: updatedAt }
-              : prev));
-          } catch (e) {
-            toast.error(e instanceof ConflictError ? e.message : '저장하지 못했어요.');
-          }
-        }}
         onDelete={async () => {
           try {
             await deleteProblem(problem.id);

@@ -93,7 +93,7 @@ export default function WorkTreePanel({ filters, works, onChange }: WorkTreePane
           nodes={nodes}
           onSelect={handleSelect}
           selectedId={selectedId}
-          emptyText="작품명이 붙은 문항이 아직 없어요. 검수 화면에서 지문의 작품명을 적으면 여기 나와요."
+          emptyText="작품명이 붙은 문항이 아직 없어요. 올라간 기출에서 지문의 작품명을 적으면 여기 나와요."
         />
       </div>
     </div>

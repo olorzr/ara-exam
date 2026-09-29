@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import PassageEditorCard from '@/components/problem-review/PassageEditorCard';
 import ProblemEditorCard from '@/components/problem-review/ProblemEditorCard';
@@ -26,7 +25,6 @@ interface ReviewCardListProps {
   onDirtyChange: (id: string, dirty: boolean) => void;
   savePassage: (id: string, patch: PassagePatch) => Promise<boolean>;
   saveProblem: (id: string, patch: ProblemPatch) => Promise<string | null>;
-  toggleVerified: (id: string, verified: boolean, knownUpdatedAt?: string) => void;
   deletePassage: (id: string) => void;
   deleteProblem: (id: string) => void;
   /** 다음 쪽에서 이어지는 본문 읽어 오기. AI 가 꺼져 있으면 없다 */
@@ -56,14 +54,14 @@ interface ReviewCardListProps {
 }
 
 /**
- * 검수 화면 오른쪽의 카드 목록.
+ * 시험지 화면 오른쪽의 카드 목록.
  *
  * 페이지에서 떼어 둔 이유는 길이뿐이다 — 상태는 전부 페이지가 들고 있고
  * 여기서는 그리기만 한다.
  */
 export default function ReviewCardList({
   rows, passages, problems, mountKey, areaTree, unitTree, selectedId, issues,
-  onSelect, onDirtyChange, savePassage, saveProblem, toggleVerified, deletePassage, deleteProblem,
+  onSelect, onDirtyChange, savePassage, saveProblem, deletePassage, deleteProblem,
   continuePassage, continuingId, sourcePageCount, mergePassage,
   figureUrls, capturingId, capturingFigure, onStartCapture,
 }: ReviewCardListProps) {
@@ -71,14 +69,9 @@ export default function ReviewCardList({
     return (
       <Card>
         <CardContent className="space-y-3 py-12 text-center text-sm text-gray-500">
-          <p>읽어 낸 문항이 없어요.</p>
-          {/* 실패·취소한 작업에서 실제로 돌아갈 곳을 준다 — 안내만 하고 길이 없으면 막힌다 */}
-          <Link
-            href="/problems/upload"
-            className="inline-block rounded-md bg-primary px-3 py-2 text-sm text-white"
-          >
-            다시 업로드하기
-          </Link>
+          <p>이 시험지에 들어 있는 문항이 없어요.</p>
+          {/* 앱에는 업로드 화면이 없다(2026-09-30) — 기출은 적재 스크립트로 다시 넣는다 */}
+          <p>원장님께 다시 올려 달라고 말씀해 주세요.</p>
         </CardContent>
       </Card>
     );
@@ -146,9 +139,6 @@ export default function ReviewCardList({
             onSelect={() => onSelect(problem.id, problem.page_no)}
             onSave={(patch) => saveProblem(problem.id, patch)}
             onDirtyChange={(dirty) => onDirtyChange(problem.id, dirty)}
-            // 방금 저장해서 알고 있는 버전을 **그대로 넘긴다** — 버리면 저장 직후
-            // 검수가 옛 버전으로 걸려 아무도 안 고쳤는데 충돌한다
-            onToggleVerified={(v, knownUpdatedAt) => toggleVerified(problem.id, v, knownUpdatedAt)}
             onDelete={() => deleteProblem(problem.id)}
             figureUrls={figureUrls}
             capturing={capturingId === problem.id}

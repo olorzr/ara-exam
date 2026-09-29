@@ -31,7 +31,7 @@ interface PassageEditorCardProps {
   onSelect: () => void;
   onSave: (patch: PassagePatch) => Promise<boolean>;
   onDelete: () => void;
-  /** 저장하지 않은 수정이 생기거나 사라질 때 알린다 — '검수 마치기' 를 막는 데 쓴다 */
+  /** 저장하지 않은 수정이 생기거나 사라질 때 알린다 — 화면이 지우기·합치기 전에 묻는 데 쓴다 */
   onDirtyChange?: (dirty: boolean) => void;
   /** OCR 이 이 지문에 남긴 확인거리 — 위 배너의 경고를 카드에도 붙인다 */
   issues?: string[];

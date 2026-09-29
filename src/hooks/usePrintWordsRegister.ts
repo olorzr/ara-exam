@@ -10,7 +10,7 @@ import { bundleWordsCategory } from '@/lib/print-scan/bundle-plan';
 import { updateBundle } from '@/lib/print-scan/save';
 import { registerBundleWords, registeredWordCount } from '@/lib/print-words';
 import type { PrintBundle } from '@/types/print-scan';
-import { ocrStillEnabled } from './useProblemOcr';
+import { ocrStillEnabled } from '@/lib/ai/still-enabled';
 
 /**
  * 목록의 '단어 등록' — 읽어 둔 원문(`ocr_html`)으로 단어만 따로 등록한다.
@@ -28,7 +28,7 @@ export function usePrintWordsRegister() {
   const [runningName, setRunningName] = useState('');
   const abortRef = useRef<AbortController | null>(null);
 
-  // 느슨한 정리는 늦게 실행돼 이미 끝난 생성이 슬쩍 통과할 수 있다(useProblemOcr 과 같은 이유)
+  // 느슨한 정리는 늦게 실행돼 이미 끝난 생성이 슬쩍 통과할 수 있다(usePrintScanOcr 과 같은 이유)
   useLayoutEffect(() => () => abortRef.current?.abort(), []);
 
   const cancel = useCallback(() => abortRef.current?.abort(), []);

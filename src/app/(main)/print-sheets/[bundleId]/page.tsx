@@ -8,6 +8,7 @@ import { PrintPageStrip } from '@/components/print-scan';
 import { ConceptSheetWorkspace } from '@/components/exam-builder';
 import OcrProgress from '@/components/problem-ocr/OcrProgress';
 import { bundleWarnings } from '@/lib/print-scan/reading-state';
+import { isTypedBundle } from '@/lib/print-scan/typed';
 import { useBundlePageImages } from '@/hooks/useBundlePageImages';
 import { useConceptSheetEditor } from '@/hooks/useConceptSheetEditor';
 import type { SignedImages } from '@/hooks/useSignedImageUrls';
@@ -21,7 +22,8 @@ const LIST_HREF = '/print-sheets';
  *
  * 시험지는 개념지와 **같은 것**이라 편집·마킹·미리보기·인쇄·성적 연동이 전부 그대로다.
  * 다른 점은 왼쪽에 원본 쪽 이미지와 **읽기가 남긴 경고**를 세워 둔다는 것뿐이다 —
- * 경고는 '어디를 원본과 대조해야 하는지' 라서 원본 옆이 제자리다(기출 검수 화면과 같은 규약).
+ * 경고는 '어디를 원본과 대조해야 하는지' 라서 원본 옆이 제자리다(기출 시험지 화면과 같은 규약).
+ * **직접 입력한 프린트**(sql/56)는 원본도 경고도 없어 그 칸을 두지 않는다 — 개념지 편집과 같다.
  *
  * ⚠️ 훅은 조건부로 못 부르므로 시험지 id 를 아는 바깥과 편집기를 부르는 안쪽을 나눈다.
  */
@@ -50,6 +52,7 @@ export default function PrintSheetPage() {
 
 /** 아직 시험지가 없을 때 무엇을 하면 되는지 */
 function pendingDetail(bundle: PrintBundle): string {
+  if (isTypedBundle(bundle)) return '목록에서 "시험지 만들기" 를 누르면 빈 시험지가 만들어져요.';
   if (bundle.status === '읽는중') return '지금 읽는 중이에요. 잠시 뒤에 목록에서 다시 확인해 주세요.';
   if (bundle.status === '실패') return '읽기가 끝나지 못했어요. 목록에서 "다시 읽기" 를 눌러 주세요.';
   if (bundle.status === '읽기완료') return '목록에서 "시험지 만들기" 를 누르면 바로 만들어집니다.';
@@ -90,13 +93,14 @@ function PrintSheetWorkspace({
       editor={editor}
       backHref={LIST_HREF}
       titlePlaceholder="시험지 제목을 입력하세요"
-      sidePanel={
+      // 직접 입력한 프린트에는 원본 쪽이 없다 — 빈 '원본 0쪽' 칸을 세우지 않는다
+      sidePanel={isTypedBundle(bundle) ? undefined : (
         <div className="space-y-3">
           {/* 읽기가 빠뜨린 곳 — `ocr_meta` 에만 있으면 아무도 못 본다(기출은 검수 화면이 같은 일을 한다) */}
           <OcrProgress progress={null} label="" warnings={bundleWarnings(bundle)} />
           <PrintPageStrip pages={bundle.pages} paths={bundle.page_paths} images={images} />
         </div>
-      }
+      )}
     />
   );
 }

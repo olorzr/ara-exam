@@ -12,7 +12,7 @@ import {
 } from '@/lib/print-scan/run-scan';
 import { PRINT_MAX_MERGED_WARNINGS } from '@/lib/print-scan/constants';
 import type { PrintBundle, PrintScan } from '@/types/print-scan';
-import { ocrStillEnabled } from './useProblemOcr';
+import { ocrStillEnabled } from '@/lib/ai/still-enabled';
 
 /** 단계별 한글 이름 — 진행률 문구가 화면마다 달라지지 않게 한 곳에 둔다 */
 const PHASE_LABEL: Record<PrintRunProgress['phase'], string> = {
@@ -27,7 +27,7 @@ const PHASE_LABEL: Record<PrintRunProgress['phase'], string> = {
 /**
  * 학교 프린트 읽기 실행 상태.
  *
- * `useProblemOcr` 과 같은 규약이다 — 킬스위치를 **행을 만들기 전에** 다시 확인하고,
+ * 옛 기출 업로드(`useProblemOcr`, 2026-09-30 삭제)와 같은 규약이다 — 킬스위치를 **행을 만들기 전에** 다시 확인하고,
  * 취소는 `AbortSignal` 로 끝까지 전달되며, 언마운트 때 진행 중인 생성을 끊는다.
  */
 export function usePrintScanOcr() {

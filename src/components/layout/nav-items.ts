@@ -1,8 +1,8 @@
 import {
   BookOpen,
   BookText,
-  ClipboardCheck,
   FileScan,
+  FileStack,
   FolderCog,
   FolderOpen,
   History,
@@ -14,7 +14,6 @@ import {
   ScrollText,
   ShieldCheck,
   Sparkles,
-  Upload,
   type LucideIcon,
 } from 'lucide-react';
 import { ADMIN_EMAIL } from '@/lib/constants';
@@ -108,7 +107,7 @@ export function buildNavSections(isAdmin: boolean): NavSection[] {
       items: [
         // 개념지 편집기(/exam/builder/new, /exam/builder/[id])도 이 항목에 속한다
         { href: '/exam/builder', label: '개념지', icon: ScrollText },
-        // 스캔 올리기(/print-sheets/upload)와 시험지(/print-sheets/[bundleId])도 이 항목이다.
+        // 스캔 올리기(/print-sheets/upload)·직접 입력(/print-sheets/new)과 시험지(/print-sheets/[bundleId])도 이 항목이다.
         // 개념지와 경로가 갈려 있어 서로를 켜지 않는다(세그먼트 접두사 비교).
         { href: '/print-sheets', label: '학교 프린트 시험지', icon: FileScan },
         // 새로 올리기(/reference-texts/new)와 편집(/reference-texts/[id])도 이 항목이다.
@@ -149,9 +148,9 @@ export function buildNavSections(isAdmin: boolean): NavSection[] {
           icon: FolderOpen,
           extraPrefixes: ['/problems/edit'],
         },
-        { href: '/problems/upload', label: '기출 업로드', icon: Upload },
-        // 출처 상세(/problems/sources/[id])가 검수 화면이다
-        { href: '/problems/sources', label: '출처·검수', icon: ClipboardCheck },
+        // 기출은 원장님이 적재 스크립트로 올린다 — 앱의 업로드 화면은 없앴다(2026-09-30).
+        // 시험지 한 건의 화면(/problems/sources/[id])에서 원본과 대조하며 고친다
+        { href: '/problems/sources', label: '올라간 기출', icon: FileStack },
         // 저장된 문제지 보기(/problems/papers/[id])도 이 항목 아래다
         { href: '/problems/papers', label: '문제지 조합', icon: Layers },
         // 지문을 넣으면 AI 가 O,X·단답형을 만든다. 만든 문항은 저장하지 않아 하위 경로가 없다

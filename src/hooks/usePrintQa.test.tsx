@@ -20,7 +20,7 @@ vi.mock('@/lib/print-qa', async (importOriginal) => ({
 vi.mock('@/lib/print-scan/save', () => ({
   updateBundle: (...args: unknown[]) => updateBundle(...args),
 }));
-vi.mock('./useProblemOcr', () => ({
+vi.mock('@/lib/ai/still-enabled', () => ({
   ocrStillEnabled: (...args: unknown[]) => ocrStillEnabled(...args),
 }));
 vi.mock('@/lib/ai/localPort', () => ({ getCodexPort: () => 8899 }));
@@ -47,7 +47,7 @@ const item = (over: Partial<PrintQaItem> = {}): PrintQaItem => ({
 const bundle = (over: Partial<PrintBundle> = {}): PrintBundle => ({
   id: 'b1', scan_id: 's1', name: '2026 광희중 동백꽃', school_id: null,
   school_name: '광희중학교', year: '2026', grade: '중2', semester: '2학기', exam_type: '중간',
-  include_handwriting: false, register_words: false, pages: [1], page_paths: [''],
+  include_handwriting: false, register_words: false, source: 'scan', pages: [1], page_paths: [''],
   ocr_html: '<p>1. 물음 답: 가</p>', ocr_meta: {}, words_meta: {},
   qa_items: [], qa_meta: {}, status: '읽기완료', user_id: 'u', updated_by: null,
   created_at: '', updated_at: '', ...over,

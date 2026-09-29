@@ -35,20 +35,9 @@ export async function deleteSource(id: string): Promise<void> {
 }
 
 /**
- * 출처 상태를 바꾼다(검수중 → 완료).
- * @param id - 출처 id
- * @param status - 새 상태
- * @throws 저장 실패 시
- */
-export async function setSourceStatus(id: string, status: string): Promise<void> {
-  const { error } = await supabase.from('problem_sources').update({ status }).eq('id', id);
-  if (error) throw error;
-}
-
-/**
  * 출처의 교과서를 바꾼다 — 이미 붙은 단원 태그도 같은 트랜잭션에서 정리한다.
  *
- * 업로드 때 못 골랐거나 잘못 고른 것을 검수에서 고칠 수 있어야 한다 — 교과서가 없으면
+ * 적재 때 못 골랐거나 잘못 고른 것을 시험지 화면에서 고칠 수 있어야 한다 — 교과서가 없으면
  * 단원 칸 자체가 안 뜨므로, 이 경로가 없으면 옛 출처는 **영영 분류할 수 없다**
  * (코덱스 리뷰 1R).
  *

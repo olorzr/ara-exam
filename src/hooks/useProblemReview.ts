@@ -8,7 +8,7 @@ import { fetchProblemsOfSource } from '@/lib/problem-bank/source-queries';
 import { loadReviewData } from '@/lib/problem-bank/review-data';
 import {
   ConflictError, deletePassage, deleteProblem, mergePassages,
-  setProblemVerified, updatePassage, updateProblem,
+  updatePassage, updateProblem,
   type PassagePatch, type ProblemPatch,
 } from '@/lib/problem-bank/mutations';
 import { countTaggedUnits, setSourceTextbook } from '@/lib/problem-bank/mutations-source';
@@ -82,8 +82,8 @@ export function useProblemReview(sourceId: string) {
    * 문항을 저장한다.
    * @returns 새 `updated_at`. 실패하면 null
    *
-   * 불리언이 아니라 새 버전을 돌려주는 이유: 저장 직후 검수 완료까지 이어서 누르면
-   * 화면 state 가 아직 안 돌아 **옛 버전으로 검수를 시도해 충돌**한다(코덱스 리뷰 9R).
+   * 불리언이 아니라 새 버전을 돌려주는 이유: 저장 직후 이어지는 쓰기(그림 붙이기 등)는
+   * 화면 state 가 아직 안 돌아 **옛 버전으로 걸면 충돌**한다(코덱스 리뷰 9R).
    * 호출부가 받은 값을 그대로 넘길 수 있어야 한다.
    */
   const saveProblem = useCallback(async (
@@ -173,35 +173,6 @@ export function useProblemReview(sourceId: string) {
     }
     // `problems` 는 **저장 전** 버전을 견주는 데 쓴다 — 무엇이 실제로 바뀌었는지 가르는 기준이다
   }, [passages, problems, sourceId, bumpItems]);
-
-  /**
-   * 검수 완료 표시를 켜고 끈다.
-   * @param knownUpdatedAt - 방금 저장해서 이미 알고 있는 버전(있으면 이걸 쓴다).
-   *   화면 state 가 아직 안 돈 시점에도 맞는 버전으로 걸 수 있다
-   */
-  const toggleVerified = useCallback(async (
-    id: string,
-    verified: boolean,
-    knownUpdatedAt?: string,
-  ) => {
-    const target = problems.find((p) => p.id === id);
-    if (!target) return;
-    try {
-      // 읽어 온 버전을 걸고, 새 버전을 받아 화면도 갱신한다.
-      // 조건이 없으면 남이 고친 문항의 새 버전을 물려받은 채 옛 본문을 들고 있게 되고,
-      // 다음 저장이 검사를 통과하며 남의 수정을 덮어쓴다
-      const updatedAt = await setProblemVerified(
-        id, knownUpdatedAt ?? target.updated_at, verified,
-      );
-      setProblems((list) => list.map((p) => (
-        p.id === id
-          ? { ...p, status: verified ? '검수완료' : '초안', updated_at: updatedAt }
-          : p
-      )));
-    } catch (e) {
-      reportError(e);
-    }
-  }, [problems]);
 
   const removeProblem = useCallback(async (id: string) => {
     try {
@@ -312,11 +283,6 @@ export function useProblemReview(sourceId: string) {
     }
   }, [load, bumpAll]);
 
-  const verifiedCount = useMemo(
-    () => problems.filter((p) => p.status === '검수완료').length,
-    [problems],
-  );
-
   /**
    * 본문에 끼운 그림들의 서명 URL.
    * 쪽 이미지와 **따로** 받는다 — 그림은 검수 중에 늘고 줄지만 쪽 이미지는 고정이다.
@@ -355,9 +321,9 @@ export function useProblemReview(sourceId: string) {
   }, [sourceId]);
 
   return {
-    source, passages, problems, loading, busy, error, verifiedCount, reloadSeq, mountKey,
+    source, passages, problems, loading, busy, error, reloadSeq, mountKey,
     figureUrls: figureImages.urls,
-    reload: load, saveProblem, savePassage, toggleVerified, changeTextbook,
+    reload: load, saveProblem, savePassage, changeTextbook,
     removeProblem, removePassage, mergePassageInto, pageUrlFor, reloadPageUrl,
   };
 }

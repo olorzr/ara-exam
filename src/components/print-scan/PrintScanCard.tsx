@@ -3,6 +3,7 @@
 import { Trash2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatDateKR } from '@/lib/format';
+import { isTypedBundle } from '@/lib/print-scan/typed';
 import type { PrintBundleRow, PrintScanRow } from '@/types/print-scan';
 import PrintBundleRowItem from './PrintBundleRow';
 
@@ -16,11 +17,28 @@ interface PrintScanCardProps {
   onRegisterWords: (bundle: PrintBundleRow) => void;
   onDeleteBundle: (bundle: PrintBundleRow) => void;
   onDeleteScan: (scan: PrintScanRow) => void;
+  /** 다른 선생님 탭에서 — 누가 올렸는지 */
+  creatorName?: string;
+}
+
+/**
+ * 카드 아래 줄 — 올린 날·쪽 수·프린트 수.
+ * 직접 입력한 프린트는 원본이 없어 '0쪽' 대신 '직접 입력' 이라고 쓴다.
+ */
+function scanSummary(scan: PrintScanRow, creatorName?: string): string {
+  const typedOnly = scan.bundles.length > 0 && scan.bundles.every((b) => isTypedBundle(b));
+  return [
+    creatorName && `${creatorName} 선생님`,
+    formatDateKR(scan.created_at),
+    typedOnly ? '직접 입력' : `${scan.page_count}쪽`,
+    `프린트 ${scan.bundles.length}장`,
+  ].filter(Boolean).join(' · ');
 }
 
 /** 스캔 한 건 + 그 안의 프린트들 */
 export default function PrintScanCard({
   scan, busy, aiEnabled, onRead, onCreateSheet, onRegisterWords, onDeleteBundle, onDeleteScan,
+  creatorName,
 }: PrintScanCardProps) {
   return (
     <Card>
@@ -30,9 +48,7 @@ export default function PrintScanCard({
             <h2 className="truncate text-base font-semibold text-gray-900">
               {scan.title || '제목 없는 스캔'}
             </h2>
-            <p className="text-xs text-gray-500">
-              {formatDateKR(scan.created_at)} · {scan.page_count}쪽 · 프린트 {scan.bundles.length}장
-            </p>
+            <p className="text-xs text-gray-500">{scanSummary(scan, creatorName)}</p>
           </div>
           <button
             type="button"

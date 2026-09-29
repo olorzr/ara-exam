@@ -5,6 +5,7 @@ import { BookA, FileText, ListChecks, RefreshCw, Trash2, Wand2 } from 'lucide-re
 import { Button } from '@/components/ui/button';
 import { qaChip } from '@/lib/print-qa';
 import { bundleWarnings, isStalledReading } from '@/lib/print-scan/reading-state';
+import { isTypedBundle } from '@/lib/print-scan/typed';
 import { registeredWordCount, wordsChip } from '@/lib/print-words';
 import type { PrintBundleRow as BundleRow } from '@/types/print-scan';
 import PrintBundleStatusBadge from './PrintBundleStatusBadge';
@@ -58,6 +59,9 @@ export default function PrintBundleRow({
     : null;
   // 읽어 둔 원문이 있는가 — 시험지도 단어도 여기서부터 ChatGPT 없이(또는 한 번만) 만들 수 있다
   const hasOcrText = bundle.status === '읽기완료' && !!bundle.ocr_html;
+  // 직접 입력한 프린트 — 읽을 원본이 없다. 단어 등록·문답은 읽어 둔 원문을 쓰므로 함께 없다
+  // (`hasOcrText` 가 이미 false 다). 시험지가 없으면 '읽기' 가 아니라 빈 시험지를 만든다
+  const typed = isTypedBundle(bundle);
 
   /** 멈춘 것으로 보이는 줄은 한 번 묻고 읽는다 — 다른 탭이 진짜로 읽는 중일 수 있다 */
   const read = () => {
@@ -73,7 +77,13 @@ export default function PrintBundleRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="truncate text-sm font-medium text-gray-900">{bundle.name}</span>
-          <PrintBundleStatusBadge status={bundle.status} />
+          {typed ? (
+            <span className="shrink-0 rounded bg-sky-100 px-1.5 py-0.5 text-xs font-medium text-sky-800">
+              직접 입력
+            </span>
+          ) : (
+            <PrintBundleStatusBadge status={bundle.status} />
+          )}
           {/* 읽히긴 했는데 빠진 데가 있는 것 — '읽기완료' 만 보고 그대로 인쇄하면 안 된다 */}
           {warnings.length > 0 && (
             <span
@@ -113,7 +123,8 @@ export default function PrintBundleRow({
           )}
         </div>
         <p className="truncate text-xs text-gray-500">
-          {meta || '학교 미지정'} · {bundle.pages.length}쪽
+          {meta || '학교 미지정'}
+          {!typed && ` · ${bundle.pages.length}쪽`}
           {bundle.sheetId && ` · 빈칸 ${bundle.markCount}개`}
           {bundle.include_handwriting && ' · 손글씨 포함'}
         </p>
@@ -155,8 +166,8 @@ export default function PrintBundleRow({
             시험지 열기
           </Button>
         </Link>
-      ) : hasOcrText ? (
-        // 읽어 둔 원문이 있으니 ChatGPT 를 다시 쓰지 않는다
+      ) : hasOcrText || typed ? (
+        // 읽어 둔 원문이 있으니 ChatGPT 를 다시 쓰지 않는다(직접 입력은 빈 시험지를 만든다)
         <Button
           type="button" size="sm" variant="outline"
           onClick={() => onCreateSheet(bundle)}

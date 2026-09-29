@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import LabeledSelect from '@/components/problem-ocr/LabeledSelect';
@@ -17,12 +18,24 @@ interface ScanMetaFormProps {
   schools: SelectableSchool[];
   disabled?: boolean;
   onChange: (patch: Partial<ScanMetaValues>) => void;
+  /** 제목 칸 이름 — 직접 입력 화면은 '스캔' 이 아니다 */
+  titleLabel?: string;
+  /** 제목 칸 아래 안내 */
+  titleHelp?: ReactNode;
 }
+
+/** 스캔 올리기의 제목 칸 안내 */
+const SCAN_TITLE_HELP = (
+  <>
+    목록에서 이 스캔을 찾는 이름이고, <strong>프린트 이름 앞에 그대로 붙습니다.</strong>
+    {' '}직접 고쳐도 되고, 비우면 다시 자동으로 채워집니다.
+  </>
+);
 
 /**
  * 스캔 한 건의 공통 정보 — **학교급 → 학교 → 학년 → 학년도 → 학기 → 중간/기말**.
  *
- * 묻는 순서가 곧 좁혀 가는 순서다(기출 업로드의 `SourceMetaForm` 과 같은 규약):
+ * 묻는 순서가 곧 좁혀 가는 순서다(옛 기출 업로드 폼과 같은 규약):
  * 학교급을 먼저 골라야 학교 목록과 학년을 그 급으로 좁힐 수 있다. 예전에는 이 값들을
  * 프린트마다 물었는데, 한 번에 스캔해 오는 프린트는 거의 같은 시험 것이라 같은 값을
  * 대여섯 번 고르게 됐다.
@@ -31,7 +44,9 @@ interface ScanMetaFormProps {
  * ⚠️ 선택지의 값은 이름이 아니라 **학교 id** 다 — 마스터에는 이름 UNIQUE 가 없어
  *    이름으로 id 를 되찾으면 동명 학교가 생기는 순간 조용히 엉뚱한 학교에 붙는다.
  */
-export default function ScanMetaForm({ state, schools, disabled, onChange }: ScanMetaFormProps) {
+export default function ScanMetaForm({
+  state, schools, disabled, onChange, titleLabel = '스캔 제목', titleHelp = SCAN_TITLE_HELP,
+}: ScanMetaFormProps) {
   const { values } = state;
   const schoolOptions = schoolsForLevel(schools, values.level)
     .map((s) => ({ value: s.id, label: schoolOptionLabel(s) }));
@@ -101,7 +116,7 @@ export default function ScanMetaForm({ state, schools, disabled, onChange }: Sca
       </p>
 
       <div className="space-y-1.5">
-        <Label htmlFor="scan-title">스캔 제목</Label>
+        <Label htmlFor="scan-title">{titleLabel}</Label>
         <Input
           id="scan-title"
           value={values.title}
@@ -110,10 +125,7 @@ export default function ScanMetaForm({ state, schools, disabled, onChange }: Sca
           disabled={disabled}
           className="max-w-md"
         />
-        <p className="text-xs text-gray-400">
-          목록에서 이 스캔을 찾는 이름이고, <strong>프린트 이름 앞에 그대로 붙습니다.</strong>
-          {' '}직접 고쳐도 되고, 비우면 다시 자동으로 채워집니다.
-        </p>
+        <p className="text-xs text-gray-400">{titleHelp}</p>
       </div>
     </div>
   );

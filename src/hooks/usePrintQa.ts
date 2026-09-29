@@ -59,7 +59,7 @@ export function usePrintQa(bundle: PrintBundle) {
    */
   const savingRef = useRef(false);
 
-  // 느슨한 정리는 늦게 실행돼 이미 끝난 생성이 슬쩍 통과할 수 있다(useProblemOcr 과 같은 이유)
+  // 느슨한 정리는 늦게 실행돼 이미 끝난 생성이 슬쩍 통과할 수 있다(usePrintScanOcr 과 같은 이유)
   useLayoutEffect(() => () => abortRef.current?.abort(), []);
 
   // 나누기가 보는 평문과 **같은 함수**로 만든다 — 따로 만들면 모범답안의 근거 대조가

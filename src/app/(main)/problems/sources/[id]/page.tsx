@@ -13,7 +13,6 @@ import { usePassageContinuation } from '@/hooks/usePassageContinuation';
 import { useReviewGuards } from '@/hooks/useReviewGuards';
 import { useSourceDelete } from '@/hooks/useSourceDelete';
 import { useFigureCapture } from '@/hooks/useFigureCapture';
-import { setSourceStatus } from '@/lib/problem-bank/mutations-source';
 import PageImageWithBoxes, { type BoxOverlay } from '@/components/problem-review/PageImageWithBoxes';
 import ReviewCardList, { type ReviewRow } from '@/components/problem-review/ReviewCardList';
 import ReviewHeader from '@/components/problem-review/ReviewHeader';
@@ -23,10 +22,11 @@ import { toBbox } from '@/lib/problem-bank/bbox';
 import { issuesByTargetId } from '@/lib/problem-ocr/warnings';
 
 /**
- * 기출 검수 화면 (`/problems/sources/[id]`).
+ * 올라간 기출 한 건 (`/problems/sources/[id]`).
  *
- * 왼쪽에 원본 페이지, 오른쪽에 읽어 낸 지문·문항을 둔다.
- * **원본과 대조**하는 것이 검수의 핵심이라 두 화면을 나란히 본다.
+ * 왼쪽에 원본 페이지, 오른쪽에 읽어 낸 지문·문항을 둔다. 틀린 곳을 **원본과 대조**하며
+ * 고치는 자리라 두 화면을 나란히 본다. 검수 절차(검수 마치기·문항별 검수 표시)는
+ * 2026-09-30 에 걷었다 — 기출은 원장님이 적재하고 보이는 대로 고친다.
  */
 function ProblemSourceReviewContent() {
   const params = useParams<{ id: string }>();
@@ -40,10 +40,7 @@ function ProblemSourceReviewContent() {
   // 이미 저장된 지문이 잘려 있을 때 그 쪽 한 장만 다시 읽는다(ChatGPT 1회)
   const continuation = usePassageContinuation(review.source);
   /**
-   * 저장하지 않은 수정이 있는 문항.
-   *
-   * ⚠️ 이걸 안 보면 고치던 내용을 버린 채 출처가 '완료' 로 굳는다 — 검수한 자료인 줄
-   *    알고 그대로 인쇄하게 된다(코덱스 리뷰 14R).
+   * 저장하지 않은 수정이 있는 문항 — 지우기·합치기·교과서 변경 전에 묻는 데 쓴다.
    */
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
 
@@ -158,23 +155,6 @@ function ProblemSourceReviewContent() {
     });
   }, []);
 
-  const finish = async () => {
-    if (dirtyIds.size > 0) {
-      const ok = window.confirm(
-        `저장하지 않은 문항·지문이 ${dirtyIds.size}개 있어요.\n`
-        + '지금 마치면 그 수정은 사라지고 옛 내용이 검수한 자료로 남습니다. 계속할까요?',
-      );
-      if (!ok) return;
-    }
-    try {
-      await setSourceStatus(sourceId, '완료');
-      toast.success('검수를 마쳤어요. 아카이브에서 문제지에 담을 수 있어요.');
-      router.push('/problems/archive');
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : '상태를 바꾸지 못했어요.');
-    }
-  };
-
   if (review.loading || review.busy) {
     return (
       <div className="flex justify-center py-16">
@@ -200,9 +180,7 @@ function ProblemSourceReviewContent() {
       <ReviewHeader
         source={source}
         problemCount={review.problems.length}
-        verifiedCount={review.verifiedCount}
         onTextbook={(textbook) => review.changeTextbook(textbook, () => dirtyIds.size)}
-        onFinish={finish}
         onDelete={() => del.requestDelete(source)}
         deleting={del.deletingId !== null}
       />
@@ -274,7 +252,6 @@ function ProblemSourceReviewContent() {
             onDirtyChange={markDirty}
             savePassage={guards.savePassage}
             saveProblem={review.saveProblem}
-            toggleVerified={review.toggleVerified}
             deletePassage={guards.removePassage}
             deleteProblem={review.removeProblem}
             continuePassage={ai.features.problem_ocr

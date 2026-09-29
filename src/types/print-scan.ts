@@ -8,6 +8,12 @@
 /** 묶음의 읽기 상태 */
 export type PrintBundleStatus = '대기' | '읽는중' | '읽기완료' | '실패';
 
+/**
+ * 묶음이 어디서 왔는가 (sql/56).
+ * 'scan' 은 스캔을 읽은 것, 'typed' 는 선생님이 편집기에 직접 입력한 것(원본 쪽이 없다).
+ */
+export type PrintBundleSource = 'scan' | 'typed';
+
 /** 읽기 기록. 기출의 `OcrMeta` 와 달리 경고가 **문자열뿐**이다(가리킬 카드가 없다) */
 export interface PrintOcrMeta {
   model?: string | null;
@@ -188,7 +194,9 @@ export interface PrintBundle {
   include_handwriting: boolean;
   /** 프린트에 적힌 '단어 — 뜻' 을 이 프린트 카테고리의 단어로 등록할 것인가 */
   register_words: boolean;
-  /** 이 묶음이 덮는 원본 쪽 번호(1-based, 오름차순) */
+  /** 스캔을 읽었나, 직접 입력했나 — 직접 입력이면 원본 쪽·읽기·단어 등록·문답이 없다 */
+  source: PrintBundleSource;
+  /** 이 묶음이 덮는 원본 쪽 번호(1-based, 오름차순). 직접 입력이면 빈 배열 */
   pages: number[];
   /** pages 와 **같은 순서**의 Storage 경로. 못 올린 쪽은 '' */
   page_paths: string[];

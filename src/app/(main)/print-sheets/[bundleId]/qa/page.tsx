@@ -19,6 +19,7 @@ import { useUnsavedGuard } from '@/hooks/useUnsavedGuard';
 import type { SignedImages } from '@/hooks/useSignedImageUrls';
 import { looksLikeQaPrint, qaAnswerCounts, qaReferenceBlocker } from '@/lib/print-qa';
 import { signalsFromBundle } from '@/lib/quiz-references/signals';
+import { isTypedBundle } from '@/lib/print-scan/typed';
 import type { PrintBundle, PrintScan } from '@/types/print-scan';
 
 /**
@@ -65,6 +66,16 @@ export default function PrintQaPage() {
 
   if (!data.bundle) {
     return <Notice title="프린트를 찾을 수 없어요." detail={data.error ?? undefined} />;
+  }
+
+  // 직접 입력한 프린트에는 읽어 둔 원문이 원래 없고 '읽기' 도 없다 — '먼저 읽으라' 고 하면 막다른 길이다
+  if (isTypedBundle(data.bundle)) {
+    return (
+      <Notice
+        title={`"${data.bundle.name}" 은(는) 직접 입력한 프린트예요.`}
+        detail="문답 시험지는 스캔으로 읽은 프린트에서만 만들 수 있어요. 빈칸 시험지는 목록에서 '시험지 열기' 로 여세요."
+      />
+    );
   }
 
   // 읽어 둔 원문이 없으면 나눌 것이 없다 — 무엇을 하면 되는지 함께 말한다

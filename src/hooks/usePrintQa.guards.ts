@@ -3,7 +3,7 @@
 import { toast } from 'sonner';
 import { aiErrorMessage } from '@/lib/ai/errors';
 import { isAiError } from '@/lib/ai/types';
-import { ocrStillEnabled } from './useProblemOcr';
+import { ocrStillEnabled } from '@/lib/ai/still-enabled';
 
 /**
  * 문답 시험지 훅이 쓰는 잠금·알림 도우미.

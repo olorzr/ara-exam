@@ -22,9 +22,9 @@ src/
 │       │   ├── history/     # 단어 시험지 (목록 + 새 시험지 버튼)
 │       │   ├── builder/     # 개념지 (목록 + [id] 편집기)
 │       │   └── view/        # 시험지/답안지/단어장 보기
-│       ├── print-sheets/    # 학교 프린트 시험지 (목록 · upload 스캔 올리기 · [bundleId] 편집)
+│       ├── print-sheets/    # 학교 프린트 시험지 (목록 · upload 스캔 올리기 · new 직접 입력 · [bundleId] 편집)
 │       ├── reference-texts/ # 작품 전문 (목록 · [id] 편집, 'new' 면 새로 올리기)
-│       └── problems/         # 문제 은행 (archive 아카이브 · upload 기출 올리기 · sources 검수 ·
+│       └── problems/         # 문제 은행 (archive 아카이브 · sources 올라간 기출 ·
 │                             #            papers 문제지 조합 · quiz O,X·단답형)
 ├── components/
 │   ├── layout/              # 앱 셸 (AppShell·Sidebar·nav-items — 좌측 사이드바 네비게이션)
@@ -150,25 +150,18 @@ src/
 
 ## 문제 은행 (2026-09)
 
-학교 기출·모의고사·문제집 PDF 를 읽어 문항 단위로 쌓고, 골라서 새 문제지를 만든다.
+학교 기출·모의고사·문제집을 문항 단위로 쌓고, 골라서 새 문제지를 만든다.
 
 ### 데이터 흐름
 
 ```
-[업로드]  출처 정보(학교급 → 학교 → 학년 → … → 교과서, 제목 자동)
-          · **작품 칸**은 그 학교의 프린트 이름·기출 지문의 작품에서 자동으로 채운다(저장하지 않고
-            프롬프트의 '작품후보' 로만 실린다 — work-candidates.ts)
-          → PDF(+ 선택: 답지 PDF 하나 또는 사진 여러 장)
-          → pdf.js 렌더(scale 2) → 쪽 역할 지정(문제/정답표/제외, '마지막 N쪽' 단축)
-          → Storage(exam-problem-bank) → problem_sources(추출중)
-[OCR]     3쪽씩(겹침 1) 묶어 선생님 PC 의 코덱스 turn → parse → merge
-          · 2단 쪽은 **단별 이미지 두 장**(columnDetect) + PDF 글자 레이어가 있으면 함께
-          · 실패한 묶음은 **쪽을 쪼개 한 번 더**
-          → verify-structure / verify-text 로 확인거리 자동 표시
-          → passages/problems INSERT → bbox 로 영역 크롭 + **그림만 따로 크롭**
-          → 정답표는 따로 읽어 번호로 붙임(원본 안 쪽 + 별도 답지를 각각 5장 묶음)
-          → problem_sources(검수중)
-[검수]    원본 페이지 이미지 + 영역 오버레이 ↔ TipTap 편집·정답·영역·교과서 단원
+[적재]    **앱 밖**이다(2026-09-30). 원장님이 쪽 이미지를 읽어 스펙 JSON 을 만들고
+          `~/.claude/tools/ingest-exam.js` 가 Storage(원본·쪽·답지·그림) + problem_sources/
+          passages/problems 를 한 트랜잭션으로 넣는다. 앱의 업로드 화면·OCR 파이프라인
+          (problem-ocr 의 run·parse·merge·verify·answer-key)과 검수 절차는 걷었다 — git 이력에 있다
+[올라간 기출] 표 목록(`/problems/sources`) — 위 드롭다운(유형·학교급·학교·학년도·학년·학기·
+          시험·교과서) + 제목 검색 + 차례, 문항 수(0 이면 '문항 없음'), '더 보기'
+[시험지]  원본 페이지 이미지 + 영역 오버레이 ↔ TipTap 편집·정답·영역·교과서 단원 — 틀린 곳을 고친다
           + 따로 올린 답지 보기 + 그림 추가(끌어 잡기)·다시 자르기·빼기
           + 다음 쪽 이어 읽기 / 앞 지문에 붙이기
           + 지문의 **작품 목록**((가)(나) 줄마다 제목·지은이) / 문항이 **어느 편을 묻는지** 체크
@@ -239,7 +232,12 @@ src/
   page-preview.ts(크게 보기 이동 규칙),
   prompt.ts, schema.ts, parse.ts, read-bundle.ts(묶음 읽기), run-env.ts(실행 환경 타입),
   quality.ts(화질 경고), run.ts(묶음 하나의 상태 전이), run-scan.ts(스캔 전체·다시 읽기),
-  save.ts, queries.ts, page-images.ts, storage-paths.ts, scan-delete.ts
+  save.ts, queries.ts, page-images.ts, storage-paths.ts, scan-delete.ts,
+  typed.ts·typed-create.ts(직접 입력 시험지 — 파일 없는 스캔 + 쪽 없는 묶음 + 빈 시험지, sql/56)
+- **직접 입력도 스캔·묶음 모양으로 저장한다**(`source='typed'`). 목록·지우기·카테고리 트리·편집 화면을
+  그대로 쓰고, 화면은 `isTypedBundle` 로 원본 패널·'읽기'·쪽 수만 가른다
+- 목록은 **내가 올린 것 / 다른 선생님이 올린 것** 탭으로 갈린다(`fetchScansWithBundles(scope, userId)`,
+  스캔의 `user_id` 기준 — `lib/owner-scope.ts`). 문제지 조합 목록도 같은 탭을 쓴다(`lib/problem-paper/paper-list.ts`)
 - **분류는 스캔마다 한 번 묻고 묶음마다 복사한다**(`scan-meta.ts` → `toBundleInsert`). DB 는
   묶음 단위 그대로다 — 카테고리 트리·rename 트리거·목록 줄이 전부 묶음 행을 본다
 - 쪽 **크게 보기**는 화면마다 그림의 출처가 다르다: 업로드 화면은 PDF 를 1.5배로 다시 그리고
@@ -337,53 +335,20 @@ src/
   (detect.test.ts 가 CSS 를 읽어 대조한다)
 
 ## lib/problem-ocr
-- 역할: 프롬프트 조립 → 구조화 출력 파싱 → 묶음 실행 → 병합 → 영역 크롭
+- 역할: **남은 것은 공유 부품뿐이다**(2026-09-30). 기출 업로드의 OCR 파이프라인(run·run-images·
+  parse·merge·merge-fill·verify-structure·verify-text·answer-key*·yet-hangul-pages)은 업로드 화면과
+  함께 걷었다 — 기출은 원장님이 적재 스크립트로 넣는다. 아래 규약 기록은 git 이력(2026-09-29 까지)에 있다
+- 남은 쓰임: 학교 프린트 읽기(`lib/print-scan` 이 batch-plan·batch-run·batch-attempt·constants·
+  page-text·describe-images·normalize-html·warnings·crop-dom 을 쓴다), 시험지 화면의 '다음 쪽 이어 읽기'
+  (continue-passage·prompt·schema·merge-keys), 그림 영역 좌표(crop)
 - 의존: lib/ai, lib/pdf, lib/sanitize-problem
-- 주요 파일: schema.ts, prompt.ts, describe-images.ts(보낸 이미지 설명 — **lib/print-scan 과 공유**.
-  기출 전용 문구는 호출자가 `splitRules` 로 넘긴다), prompt-answer-key.ts, parse.ts, parse-answer-key.ts,
-  normalize-html.ts, batch-plan.ts, batch-attempt.ts, batch-run.ts,
-  merge.ts, merge-keys.ts, merge-fill.ts, crop.ts, run.ts, run-images.ts,
-  page-text.ts, verify-structure.ts, verify-text.ts, continue-passage.ts,
-  answer-key.ts, answer-key-input.ts, answer-key-upload.ts, run-answer-key.ts,
-  yet-hangul-pages.ts(옛한글이 든 쪽 모으기 — 경고를 쪽 단위로 내려는 값),
-  warnings.ts(경고의 대상·지킬 차례·뒤집힌 판단 걷어내기)
-- **경고에는 지킬 차례가 있다**(`warnings.ts` 의 `keep`, sql/33 작업에서 도입).
-  `'always'`(못 바꾼 옛한글 표기 — 안 보이면 틀린 글자가 그대로 인쇄된다) ›
-  `'merge'`(병합이 값을 바꿨다 — 저장될 값이 화면과 다른데 표시가 없으면 아무도 못 찾는다) ›
-  `'work'`(작품명을 알아봤다) › 보통. 묶음 상한(`pushDraftWarning`)과 최종 상한(`capWarnings`)이
-  **같은 차례**를 써야 한다 — 한쪽만 다르면 묶음에서 살아남은 경고가 최종에서 사라진다.
-  병합이 끝나면 `dropStaleWarnings` 가 **뒤집힌 판단**(지문에 붙은 문항의 '지문을 못 찾았다',
-  빠진 작품에 대한 '알아봤어요')을 걷어낸다
-- **실패한 묶음은 쪽을 쪼개 한 번 더** 읽는다(batch-attempt/batch-run). 겹침이 1쪽뿐이라
-  묶음 가운데 쪽은 그 묶음만 보는데, 죽으면 그 쪽이 통째로 사라졌다. 살려 낸 쪽은
-  실패로 세지 않고 **끝내 못 읽은 쪽만** 경고에 싣는다
-- **읽고 난 뒤 기계적으로 대조한다**(verify-structure: 빠진 번호·선지 수·머리글 범위,
-  verify-text: PDF 글자와의 대조). **확실할 때만 말한다** — 번호가 겹치는 자료(문제집)는
-  검사를 건너뛰고, **옛한글이 든 항목은 대조하지 않는다**(PDF 는 한양 PUA·모델은 첫가끝 자모라
-  같은 글도 늘 '다르다' 가 된다)
-  빠짐 검사를 아예 건너뛴다. 틀린 경고가 섞이면 경고 전체를 못 믿게 된다
-- **그림은 부분만 잘라 본문 제자리에 끼운다.** `figures`(쪽 + 좌표)와 본문의
-  `<figure data-figure="n">` 이 순번으로 짝이다. 조각을 이어 붙일 때 번호를 민다 —
-  쪽 넘김 그림 지문이 이것으로 온전해졌다
-- ⚠️ **짝이 어긋나면 1번 자리에 딴 그림이 그려진다.** 그래서 글을 갈아 끼울 때는 그림도
-  함께 갈고(`replaceFragment`·`fillGaps`), 좌표를 버릴 때는 번호를 옮겨 붙인다
-  (`remapFigurePlaceholders`). 그리기는 HTML 을 **자르지 않고** 그 자리의 태그만
-  바꾼다(`figure-render.ts`) — 자르면 〈보기〉 상자가 먼저 닫혀 그림이 밖으로 나온다
-- 정답표는 **두 곳**에서 온다: 원본 PDF 안의 '정답표' 쪽과 따로 올린 답지 파일.
-  둘은 다른 문서라 묶음을 섞지 않는다(`run-answer-key.ts` 가 공급원 목록으로 다룬다)
-- 서식 규약: 밑줄 `<u>`, 시행 줄바꿈 `<br>`, 원문의 빈 줄 `<p></p>`, 구분선 `<hr>`,
-  구역 상자 `<blockquote data-box="…">`. **다듬기(normalize-html)가 정화보다 먼저** 돈다 —
-  정화기는 허용 목록 밖 `data-box` 값을 되돌릴 수 없게 지운다
-- 배점은 읽지 않는다(2026-09-08). 스키마·프롬프트·정답표 모두에서 뺐다
-- 문법 분류는 모델에게 **마디 배열의 배열**(`[['단어','품사','명사']]`)로 받고 `parse.ts` 가
-  저장 모양인 경로 문자열로 접는다 — `OcrItem.grammar_paths` 는 **접은 뒤**의 모양이라
-  JSON 스키마와 타입이 다르다. 병합에서 이 축만 **합집합**이다(겹쳐 읽은 묶음이 각각 다른
-  개념을 알아볼 수 있어 '빈 칸만 채운다' 규칙을 쓰면 나중 것이 버려진다)
 
 ## lib/problem-bank
 - 역할: 아카이브 조회·쓰기, Storage 경로·서명, 영역·단원 마스터 읽기, 필터·패싯
 - 의존: lib/supabase, lib/supabase-public(읽기 전용), lib/category-master(단원 마스터)
-- 주요 파일: queries.ts(아카이브 목록), source-queries.ts(한 출처를 통째로 — 검수 화면), facets.ts, mutations.ts, mutations-source.ts, review-data.ts,
+- 주요 파일: queries.ts(아카이브 목록 + 출처 칸 조건 `applySourceAxes` — 올라간 기출 목록과 한 벌),
+  source-list.ts·source-list-filters.ts(올라간 기출 목록 — 칸 규칙은 `buildFilterAxes` 를 빌려 쓴다),
+  source-queries.ts(한 출처를 통째로 — 시험지 화면), facets.ts, mutations.ts, mutations-source.ts, review-data.ts,
   storage.ts, storage-paths.ts, bbox.ts, figure-placeholders.ts, figure-capture.ts,
   area-tree.ts, area-master.ts, unit-tree.ts, unit-master.ts, grammar-tree.ts,
   passage-groups.ts(목록을 지문별로 — 떨어져 있어도 한 상자로 모은다. 작품 모드와는
@@ -437,6 +402,7 @@ src/
 - 원시 래퍼 `Select`(`select.tsx`)는 `items` 를 **타입으로 강제**한다. 빠뜨리면 화면에서만
   드러나고 타입은 멀쩡했던 버그라, 컴파일에서 잡히게 해 두었다
 - 주요 파일: `option-select.tsx`(+ 회귀 테스트), `select.tsx`
+- `owner-scope-tabs.tsx` — '내가 만든 것 / 다른 선생님이 만든 것' 탭(문제지 조합·학교 프린트 시험지 목록). 패널은 탭마다 `TabsContent` 로 두고 목록은 고른 탭에만 그린다
 
 ## lib/problem-paper
 - 역할: 문제지 조합 규칙(지문 묶음 연속성)과 인쇄 블록 조립

@@ -55,6 +55,8 @@
 - ⚠️ **개념지 목록(`/exam/builder`)에는 보이지 않는다.** `print_bundle_id IS NULL` 인 행만 그 목록에 나오고, 프린트 시험지는 `/print-sheets` 에서만 보인다(한 학기에 수십 장이라 섞이면 개념지가 묻힌다)
 - ⚠️ '프린트' 라는 말이 이 저장소에 **셋** 있다: ① 카테고리 레벨 `외부지문 및 프린트`(단어·개념지의 학교별 분류), ② 기출 출처 유형 `프린트`(기출 문제 은행), ③ 이 기능. 이 기능은 ①의 카테고리를 **그대로 쓴다**(학교 > 년도 > 학년 > 프린트명)
 - 묶음마다 **단어 등록**을 켤 수 있다 — 아래 '프린트 단어 등록' 참조
+- 스캔 없이 **직접 입력**해서도 만든다 — 아래 '직접 입력 시험지' 참조
+- 목록은 **내가 올린 것 / 다른 선생님이 올린 것** 탭으로 갈린다 — 아래 '만든 사람 탭' 참조
 - 코드에서의 사용: `concept_sheets.print_bundle_id`, `createSheetForBundle`, `bundleSheetCategory`
 - 관련 파일: `src/lib/print-scan/save.ts`, `src/lib/print-scan/bundle-plan.ts`, `src/app/(main)/print-sheets/`, `sql/26_print_scans.sql`
 
@@ -100,8 +102,24 @@
 - ⚠️ 그 `semester` 를 `bundleSheetCategory` 에 **넣지 않는다** — 외부지문 계층은 `학교 > 년도 > 학년 > 프린트` 라 학기가 자연키에 없다. 넣으면 이미 만든 시험지가 트리에서 다른 자리로 옮겨가고 ara-system 성적 시리즈 이름도 갈라진다
 - 상태: `대기 → 읽는중 → 읽기완료 | 실패`. ⚠️ 어떤 길로 실패해도 **'읽는중' 으로 남기지 않는다**(영영 돌고 있는 것처럼 보인다). 취소로 시작조차 못 한 묶음은 '실패' 가 아니라 **'대기'** 다
 - ⚠️ `page_paths` 는 `pages` 와 **같은 순서**다. 못 올린 쪽은 빈 문자열로 자리를 남긴다 — 압축하면 쪽 번호와 어긋나 엉뚱한 쪽 이미지가 옆에 붙는다
-- 코드에서의 사용: `PrintBundle`, `PrintBundleStatus`, `runBundle`, `bundleBatches`, `register_words`
+- 어디서 왔는지(`source`, sql/56): `scan`(스캔을 읽음, 기본) · `typed`(직접 입력 — 원본 쪽이 없다)
+- 코드에서의 사용: `PrintBundle`, `PrintBundleStatus`, `PrintBundleSource`, `runBundle`, `bundleBatches`, `register_words`
 - 관련 파일: `src/lib/print-scan/run.ts`, `src/lib/print-scan/bundles.ts`, `sql/26_print_scans.sql`
+
+## 직접 입력 시험지 (typed print sheet)
+- 정의: 스캔을 읽지 않고 선생님이 편집기에 **직접 쳐서** 만든 학교 프린트 시험지(2026-09-30). 개념지를 만드는 것과 같다
+- 저장 모양은 스캔과 같다 — **파일 없는 스캔 한 건**(`file_path ''`, `page_count 0`) + **쪽 없는 묶음 한 장**(`source 'typed'`, `pages '{}'`, 처음부터 `읽기완료`) + 빈 시험지. 스캔 단위 목록·지우기·카테고리 트리·편집 화면을 그대로 쓰려고
+- 이름·저장값은 스캔 길과 **같은 함수**다(`composePrintName`·`toStoredValue`) — 따로 이으면 같은 프린트가 두 폴더로 갈라진다
+- 원본 쪽·읽기·**단어 등록·문답 시험지가 없다**(둘 다 읽어 둔 원문 `ocr_html` 을 쓴다). 목록 줄은 상태 대신 '직접 입력' 칩을 달고, 시험지가 없으면 '읽기' 대신 '시험지 만들기' 를 낸다
+- 코드에서의 사용: `isTypedBundle`, `toTypedBundleInsert`, `createTypedPrintSheet`, `/print-sheets/new`
+- 관련 파일: `src/lib/print-scan/typed.ts`, `src/lib/print-scan/typed-create.ts`, `src/app/(main)/print-sheets/new/page.tsx`, `sql/56_print_bundle_typed_source.sql`
+
+## 만든 사람 탭 (OwnerScope)
+- 정의: 목록을 **내가 만든 것 / 다른 선생님이 만든 것** 으로 가르는 탭. 문제지 조합 목록과 학교 프린트 시험지 목록이 쓴다. 들어올 때마다 내 것부터 연다(기억하지 않는다)
+- 가르는 기준은 행의 `user_id` 하나다(트리거가 `auth.uid()` 로 채우고 잠근다). 프린트는 **스캔**의 `user_id` 로 가른다 — 시험지 행은 '시험지 만들기' 를 누른 사람 것이 된다
+- ⚠️ **권한이 아니다.** RLS 는 그대로 학원 공유라 다른 선생님 것도 열고 지울 수 있다. 다른 선생님 탭에는 만든 사람 이름을 `public.profiles` 에서 읽어 붙인다(못 읽으면 말없이 생략)
+- 코드에서의 사용: `OwnerScope`, `applyOwnerScope`, `OwnerScopeTabs`, `fetchCreatorNames`, `useCreatorNames`
+- 관련 파일: `src/lib/owner-scope.ts`, `src/components/ui/owner-scope-tabs.tsx`, `src/lib/creator-names.ts`
 
 ## 손글씨 포함 (include_handwriting)
 - 정의: 아이가 **손으로 적은 답·필기까지** 옮길지 여부. 묶음마다 고르고 기본은 꺼짐(인쇄된 활자만)
@@ -180,9 +198,17 @@
 - 관련 파일: `src/lib/naesin-scope/`, `src/lib/supabase-public.ts`, `src/components/exam/NaesinScopeLoader.tsx`
 
 ## 기출 출처 (ProblemSource)
-- 정의: 선생님이 올린 기출 PDF 한 건. 학교 내신·모의고사·문제집·프린트 네 종류
+- 정의: 올라간 기출 시험지 한 건. 학교 내신·모의고사·문제집·프린트 네 종류
+- ⚠️ **앱에는 올리는 화면이 없다**(2026-09-30). 원장님이 적재 스크립트(`~/.claude/tools/ingest-exam.js`)로 올리고, 선생님은 '올라간 기출' 목록에서 찾아 시험지 화면에서 고친다. 검수 절차(검수 마치기·문항별 검수 표시·'검수한 것만')도 걷었다 — `status`·`problems.status`·`verified_*` 컬럼은 남아 있지만 화면이 쓰지 않는다
 - 코드에서의 사용: `ProblemSource`, `problem_sources` 표, `source_type`
 - 관련 파일: src/types/problem-bank.ts, src/lib/problem-bank/source-form.ts, sql/17_problem_bank.sql
+
+## 올라간 기출 (source list)
+- 정의: 문제 은행 메뉴의 **올라간 기출 시험지 목록**(`/problems/sources`, 옛 이름 '출처·검수'). 표 한 줄이 시험지 한 건이고, 위 필터 줄의 드롭다운(유형·학교급·학교·학년도·학년·학기·시험·교과서)과 제목 검색으로 좁힌다. 제목을 누르면 원본과 나란히 보며 고치는 시험지 화면으로 간다
+- ⚠️ 칸 규칙은 **아카이브 필터와 한 벌이다**(`buildSourceAxes` 가 `buildFilterAxes` 를 불러 출처 칸만 고른다). 조회 조건도 `applySourceAxes` 한 곳이 아카이브(`source.` 임베드)와 이 목록(표 자체)에 건다 — 같은 조건이 두 화면에서 다른 개수를 내면 안 된다
+- 문항이 0개인 시험지는 '문항 없음' 으로 짚는다 — 적재가 덜 끝난 것이다
+- 코드에서의 사용: `SourceListFilters`, `toSourceListQuery`, `fetchSources`, `useSourceList`, `SourceTable`, `SourceFilterBar`
+- 관련 파일: `src/lib/problem-bank/source-list-filters.ts`, `src/lib/problem-bank/source-list.ts`, `src/app/(main)/problems/sources/page.tsx`
 
 ## 지문 (Passage)
 - 정의: 여러 문항이 함께 쓰는 글. "[1~3] 다음 글을 읽고 물음에 답하시오" 의 그 글
@@ -247,6 +273,7 @@
 - 트리거가 **표마다 두 벌**인 까닭: 화면이 목록과 옛 문자열을 한 UPDATE 에 함께 보내면, 한 벌짜리 규칙("문자열이 바뀌었으니 목록을 다시 만든다")이 **방금 더한 작품을 지운다**. `aa_works_a_*`(목록이 SET 에 있으면 목록이 이긴다) → `aa_works_b_*`(문자열만 바뀌었을 때의 back-compat) 순서로 가른다
 
 ## 작품 후보 (work candidates)
+- ⚠️ **2026-09-30 기출 업로드 화면과 함께 쓰는 곳이 사라졌다.** 아래는 그때의 규약 기록이다. `work-candidates.ts` 의 `printLabelOf` 만 참고자료 찾기가 계속 쓴다
 - 정의: 기출 업로드 화면의 **'작품' 칸**에 자동으로 채워지는, 그 학교에 **이미 적혀 있는 작품명들**. 출처는 둘이다 — ① 학교 프린트 시험지의 프린트별 이름(`print_bundles.name` 에서 스캔 제목 접두를 벗긴 나머지), ② 같은 학교 기출 지문의 작품들(`passages.works` 를 **낱개로 펴서** 쓴다 — 이어 붙인 이름을 후보로 주면 모델이 그런 작품이 있는 줄 알고 베껴 적는다)
 - ⚠️ **저장하지 않는다.** OCR 프롬프트의 `작품후보` 로만 실려, 모델이 작품을 알아보고 **그 표기 그대로** 적게 한다(표기가 갈리면 작품 트리가 쪼개진다)
 - 학년이 다른 줄은 후보에서 **뺀다**(작품은 학년마다 통째로 다르다). 학년도·학기·시험은 줄 세우기에만 쓴다

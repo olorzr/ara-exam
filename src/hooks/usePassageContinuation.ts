@@ -10,7 +10,7 @@ import { signProblemFile } from '@/lib/problem-bank/storage';
 import { readPassageContinuation } from '@/lib/problem-ocr/continue-passage';
 import type { OcrSourceMeta } from '@/lib/problem-ocr/prompt';
 import type { ProblemSource } from '@/types/problem-bank';
-import { ocrStillEnabled } from './useProblemOcr';
+import { ocrStillEnabled } from '@/lib/ai/still-enabled';
 
 /**
  * 검수 화면에서 지문의 **뒷부분만** 다음 쪽에서 다시 읽어 오는 훅.

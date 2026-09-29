@@ -15,3 +15,5 @@ export * from './save';
 export * from './scan-delete';
 export * from './schema';
 export * from './storage-paths';
+export * from './typed';
+export * from './typed-create';

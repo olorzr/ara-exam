@@ -13,7 +13,7 @@ vi.mock('@/lib/concept-pick', () => ({
   runConceptPick: (...args: unknown[]) => runConceptPick(...args),
   conceptPickEmptyNotice: (...args: unknown[]) => conceptPickEmptyNotice(...args),
 }));
-vi.mock('./useProblemOcr', () => ({
+vi.mock('@/lib/ai/still-enabled', () => ({
   ocrStillEnabled: (...args: unknown[]) => ocrStillEnabled(...args),
 }));
 vi.mock('@/lib/ai/localPort', () => ({ getCodexPort: () => 8899 }));

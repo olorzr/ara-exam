@@ -28,10 +28,16 @@ describe('filters ↔ 주소', () => {
       semester: '1학기', exam_type: '중간', textbook: '천재(노미숙)', area_path: ['문학', '현대시'],
       unit_path: ['1. 문학', '(1) 시'], grammar_path: ['단어', '품사'],
       question_kind: 'subjective' as const,
-      work_title: '동백꽃', search: '심상', verifiedOnly: true, page: 2,
+      work_title: '동백꽃', search: '심상', page: 2,
     };
     const back = filtersFromParams(new URLSearchParams(filtersToQueryString(source).slice(1)));
     expect(back).toEqual(source);
+  });
+
+  it('옛 링크의 verified=1 은 조용히 무시한다 — 검수 필터는 2026-09-30 에 걷었다', () => {
+    const back = filtersFromParams(new URLSearchParams('school=상현중&verified=1'));
+    expect(back).toEqual({ ...EMPTY_FILTERS, school_name: '상현중' });
+    expect(filtersToQueryString(back)).toBe('?school=%EC%83%81%ED%98%84%EC%A4%91');
   });
 
   it('작품은 work 로 싣고 되읽는다', () => {
@@ -186,7 +192,6 @@ describe('hasActiveFilters', () => {
   it('조건이 있으면 true', () => {
     expect(hasActiveFilters(EMPTY_FILTERS)).toBe(false);
     expect(hasActiveFilters({ ...EMPTY_FILTERS, search: '심상' })).toBe(true);
-    expect(hasActiveFilters({ ...EMPTY_FILTERS, verifiedOnly: true })).toBe(true);
     expect(hasActiveFilters({ ...EMPTY_FILTERS, area_path: ['문학'] })).toBe(true);
     expect(hasActiveFilters({ ...EMPTY_FILTERS, textbook: '동아' })).toBe(true);
     expect(hasActiveFilters({ ...EMPTY_FILTERS, unit_path: ['1. 문학'] })).toBe(true);
