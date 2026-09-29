@@ -33,6 +33,24 @@ describe('gradeSyncFailureMessage', () => {
     expect(msg).toContain('원본 시험지');
   });
 
+  it('409 문항 수 잠금은 원본 미등록과 다르게 알린다 (이미 채점한 문제지·단어 시험)', () => {
+    const msg = gradeSyncFailureMessage({
+      ok: false, reason: 'intake_failed', status: 409, intakeCode: 'total_questions_locked',
+    });
+    expect(msg).toContain('문항 수');
+    expect(msg).not.toContain('원본');
+  });
+
+  it('OMR 로 못 보내는 문제지는 라우트가 만든 문구(문항 번호 포함)를 그대로 쓴다', () => {
+    const msg = gradeSyncFailureMessage({ ok: false, reason: 'omr_blocked', message: '3번 정답 미입력' });
+    expect(msg).toBe('3번 정답 미입력');
+  });
+
+  it('문제지 사유도 사람 말로 알린다', () => {
+    expect(gradeSyncFailureMessage({ ok: false, reason: 'omr_no_objective' })).toContain('객관식');
+    expect(gradeSyncFailureMessage({ ok: false, reason: 'paper_not_found' })).toContain('문제지');
+  });
+
   it('응답을 못 받으면 연결 실패로 알린다', () => {
     expect(gradeSyncFailureMessage(undefined)).toContain('연결');
   });

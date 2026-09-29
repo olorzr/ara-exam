@@ -12,6 +12,9 @@
 --
 -- [2026-09-20] 항목 스냅샷의 **출처에 학기**(sql/35)가 실리는지도 함께 본다 — 그 키가 빠지면
 -- 문항 위의 출처가 '2026 중2 상현중 중간' 까지만 찍혀 1·2학기를 구분할 수 없다.
+--
+-- [2026-09-29] **OMR 채점 설정**(sql/54)도 본다. 계약: 불리언 true 일 때만 켜지고 나머지는 전부 꺼짐
+-- (앱 `normalizePaperSettings` 의 `value.omr === true` 와 1:1 거울 — 옛 문제지가 성적 시스템에 저절로 오르면 안 된다).
 DO $verify$
 DECLARE
   v_problem    UUID;
@@ -24,6 +27,9 @@ DECLARE
   v_bad        INT := 0;
   v_left       BIGINT;
   v_semester_problem UUID;
+  v_omr_problem UUID;
+  v_bad_problem UUID;
+  v_rejected  BOOLEAN;
   v_has_semester BOOLEAN;
   v_semester   TEXT;
   v_labels     TEXT;
@@ -76,6 +82,81 @@ BEGIN
     IF SQLERRM <> 'ROLLBACK_VERIFY' THEN RAISE; END IF;
     RAISE NOTICE '다섯 경우 모두 기대대로 — 검증용 문제지는 되돌렸다';
   END;
+
+  -- OMR 채점 설정 (sql/54) — 불리언 true 만 켠다.
+  -- ⚠️ 켜진 경우는 정답 검사를 통과해야 만들어지므로 **채점할 수 있는 객관식 문항**으로 돌린다
+  SELECT id INTO v_omr_problem FROM exam.problems
+   WHERE question_type = '객관식'
+     AND exam.omr_choice_answer_ok(answer, CASE WHEN jsonb_typeof(choices) = 'array' THEN jsonb_array_length(choices) ELSE 0 END)
+   LIMIT 1;
+  v_bad := 0;
+  IF v_omr_problem IS NULL THEN
+    RAISE NOTICE '채점할 수 있는 객관식 문항이 없어 omr 저장 검사는 건너뛴다';
+  ELSE
+  BEGIN
+    PERFORM set_config('request.jwt.claims', json_build_object(
+      'sub', v_user::text, 'role', 'authenticated', 'email', 'verify@araeducation.co.kr'
+    )::text, true);
+
+    FOR v_case IN
+      SELECT * FROM (VALUES
+        ('omr 키 없음',        '{"columns":2}'::jsonb,                 false),
+        ('omr 불리언 true',    '{"columns":2,"omr":true}'::jsonb,      true),
+        ('omr 불리언 false',   '{"columns":2,"omr":false}'::jsonb,     false),
+        ('omr 문자열 "true"',  '{"columns":2,"omr":"true"}'::jsonb,    false),
+        ('omr 숫자 1',         '{"columns":2,"omr":1}'::jsonb,         false)
+      ) AS t(label, settings, expected)
+    LOOP
+      v_id := exam.create_problem_paper('검증용 임시 문제지 ' || v_case.label,
+                                        ARRAY[v_omr_problem], v_case.settings);
+      SELECT (settings ->> 'omr')::boolean INTO v_got
+        FROM exam.problem_papers WHERE id = v_id;
+
+      IF v_got IS DISTINCT FROM v_case.expected THEN
+        v_bad := v_bad + 1;
+        RAISE WARNING '% → omr = % (기대 %)', v_case.label, v_got, v_case.expected;
+      ELSE
+        RAISE NOTICE '% → omr = % (기대대로)', v_case.label, v_got;
+      END IF;
+    END LOOP;
+
+    IF v_bad > 0 THEN
+      RAISE EXCEPTION 'omr 화이트리스트가 계약과 다르다 (%건)', v_bad;
+    END IF;
+    RAISE EXCEPTION 'ROLLBACK_VERIFY';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM <> 'ROLLBACK_VERIFY' THEN RAISE; END IF;
+    RAISE NOTICE 'omr 다섯 경우 모두 기대대로 — 검증용 문제지는 되돌렸다';
+  END;
+  END IF;
+
+  -- OMR 을 켰는데 채점할 수 없는 정답(미입력·①~⑤ 밖)이면 **만들지 않는다**(sql/54, 코덱스 1R)
+  SELECT id INTO v_bad_problem FROM exam.problems
+   WHERE question_type = '객관식'
+     AND NOT exam.omr_choice_answer_ok(answer, CASE WHEN jsonb_typeof(choices) = 'array' THEN jsonb_array_length(choices) ELSE 0 END)
+   LIMIT 1;
+  IF v_bad_problem IS NULL THEN
+    RAISE NOTICE '채점할 수 없는 객관식 문항이 없어 거절 검사는 건너뛴다';
+  ELSE
+    v_rejected := false;
+    BEGIN
+      PERFORM set_config('request.jwt.claims', json_build_object(
+        'sub', v_user::text, 'role', 'authenticated', 'email', 'verify@araeducation.co.kr'
+      )::text, true);
+      v_id := exam.create_problem_paper('검증용 임시 문제지 OMR 거절',
+                                        ARRAY[v_bad_problem], '{"columns":2,"omr":true}'::jsonb);
+      RAISE EXCEPTION 'ROLLBACK_VERIFY';
+    EXCEPTION
+      WHEN check_violation THEN
+        v_rejected := true;
+        RAISE NOTICE 'OMR 거절 확인: %', SQLERRM;
+      WHEN OTHERS THEN
+        IF SQLERRM <> 'ROLLBACK_VERIFY' THEN RAISE; END IF;
+    END;
+    IF NOT v_rejected THEN
+      RAISE EXCEPTION '채점할 수 없는 정답으로 OMR 문제지가 만들어졌다 — sql/54 검사가 빠졌다';
+    END IF;
+  END IF;
 
   -- 출처 스냅샷에 학기 키가 실리는가 (sql/35).
   -- ⚠️ **키가 있는가**로 본다 — 학기가 비어 있는 출처도 있어서 값으로 보면 그 출처를

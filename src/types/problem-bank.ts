@@ -233,6 +233,12 @@ export interface PaperSettings {
    */
   showScore: boolean;
   showSource: boolean;
+  /**
+   * OMR(90A) 채점 문제지인가 — 켜면 저장 직후 학원 성적 시스템에 시험으로 등록되고
+   * 인쇄물에 답안지 안내가 붙는다(2026-09-29, sql/54). 기본 **꺼짐**.
+   * ⚠️ 만들 때만 정한다 — 문제지는 불변 스냅샷이라 나중에 켤 길이 없다.
+   */
+  omr: boolean;
 }
 
 /** 조합한 문제지 */

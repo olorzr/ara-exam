@@ -20,6 +20,7 @@ export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
   columns: 2,
   showScore: false,
   showSource: true,
+  omr: false,
 };
 
 /**
@@ -39,6 +40,9 @@ export function normalizePaperSettings(raw: unknown): PaperSettings {
     showSource: typeof value.showSource === 'boolean'
       ? value.showSource
       : DEFAULT_PAPER_SETTINGS.showSource,
+    // 불리언 true 일 때만 켠다 — RPC(sql/54)의 `jsonb_typeof(...) = 'boolean'` 과 1:1 거울.
+    // 옛 문제지(키 없음)가 OMR 문제지로 읽히면 성적 등록 단추가 뜨고 인쇄물에 답안지 안내가 붙는다
+    omr: value.omr === true,
   };
 }
 

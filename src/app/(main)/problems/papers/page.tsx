@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Trash2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { supabase } from '@/lib/supabase';
+import { normalizePaperSettings } from '@/lib/problem-paper/settings';
 import type { ProblemPaper } from '@/types/problem-bank';
 
 /**
@@ -77,7 +78,15 @@ export default function ProblemPapersPage() {
               className="flex items-center gap-3 rounded-lg border border-gray-200 p-4"
             >
               <Link href={`/problems/papers/${paper.id}`} className="min-w-0 flex-1">
-                <p className="font-semibold text-gray-900">{paper.title}</p>
+                <p className="font-semibold text-gray-900">
+                  {paper.title}
+                  {/* 옛 문제지는 키가 없다 — 정규화해서 읽는다(문자열 'true' 로 켜지지 않게) */}
+                  {normalizePaperSettings(paper.settings).omr && (
+                    <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 align-middle text-xs font-medium text-primary">
+                      OMR
+                    </span>
+                  )}
+                </p>
                 <p className="mt-0.5 text-xs text-gray-500">
                   {paper.total_questions}문항
                   {paper.source_labels.length > 0 && ` · ${paper.source_labels.join(', ')}`}

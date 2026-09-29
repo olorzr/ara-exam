@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import ProblemPaperView from '@/components/problem-paper/ProblemPaperView';
 import ProblemAnswerKeyView from '@/components/problem-paper/ProblemAnswerKeyView';
+import PaperGradeSyncButton from '@/components/problem-paper/PaperGradeSyncButton';
 import { supabase } from '@/lib/supabase';
 import { useImagesReady } from '@/hooks/useImagesReady';
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls';
@@ -147,8 +148,17 @@ export default function ProblemPaperViewPage() {
         </Link>
         <span className="ml-2 font-semibold text-gray-900">{paper.title}</span>
         <span className="text-sm text-gray-500">{items.length}문항</span>
+        {paper.settings.omr && (
+          <span
+            className="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary"
+            title="학원 성적 시스템에 시험으로 등록되고 90A 답안지로 채점해요"
+          >
+            OMR 채점
+          </span>
+        )}
 
         <div className="ml-auto flex items-center gap-1">
+          {paper.settings.omr && <PaperGradeSyncButton paperId={paper.id} />}
           {VIEW_LABELS.map((v) => (
             <Button
               key={v.mode} type="button" size="sm"

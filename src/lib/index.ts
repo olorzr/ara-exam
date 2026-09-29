@@ -12,6 +12,7 @@ export {
 } from './concept-sheet-form';
 export type { ConceptSheetPayload } from './concept-sheet-form';
 export { fireConceptGradeSync } from './concept-grade-sync';
+export { toKstDate } from './kst-date';
 export { categoryNaturalKey, withNormalizedCategoryNames } from './category-key';
 export type { CategoryNaturalKeyFields } from './category-key';
 export { conceptCategoryKey, conceptSheetToCategory } from './concept-category';

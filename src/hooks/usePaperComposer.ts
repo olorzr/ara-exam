@@ -10,6 +10,7 @@ import { moveTargetIndex } from '@/lib/problem-paper/dnd';
 import { shuffleGroups } from '@/lib/problem-paper/shuffle-groups';
 import { bulkAddBlockMessage } from '@/lib/problem-paper/bulk-add';
 import { DEFAULT_PAPER_SETTINGS } from '@/lib/problem-paper/settings';
+import { buildOmrAnswerKey, describeOmrBlockers, type OmrKeyPlan } from '@/lib/problem-paper/omr-payload';
 import type { PaperSettings } from '@/types/problem-bank';
 import type { ArchiveRow } from './useProblemArchive';
 
@@ -143,6 +144,20 @@ export function usePaperComposer() {
   const added = useMemo(() => new Set(items.map((i) => i.problemId)), [items]);
 
   /**
+   * OMR 채점을 켰을 때의 정답표 미리보기 — 담은 문항의 원본(`rows`)으로 조립한다.
+   * 저장된 스냅샷으로 다시 검사하는 것은 발신 라우트다(**같은 함수**). 원본을 못 찾은 문항이
+   * 하나라도 있으면 번호가 밀려 거짓을 말하므로 null 로 두고 서버 검사에 맡긴다.
+   */
+  const omrPlan = useMemo((): OmrKeyPlan | null => {
+    if (!settings.omr) return null;
+    const sources = items.flatMap((i) => {
+      const row = rows.get(i.problemId);
+      return row ? [row] : [];
+    });
+    return sources.length === items.length ? buildOmrAnswerKey(sources) : null;
+  }, [items, rows, settings.omr]);
+
+  /**
    * 문제지를 저장한다. 쓰기는 RPC 한 곳으로만 열려 있고 본문은 서버가 스냅샷으로 굳힌다.
    * @returns 만들어진 문제지 id. 실패하면 null
    */
@@ -158,6 +173,16 @@ export function usePaperComposer() {
     // 서버(RPC)도 같은 검사를 하지만, 여기서 걸러야 사람이 어디를 고쳐야 할지 안다
     if (!isContiguous(items)) {
       toast.error('같은 지문의 문항이 떨어져 있어요. 붙여 주세요.');
+      return null;
+    }
+    // OMR 을 골랐는데 채점할 수 없는 정답이면 **만들기 전에** 막는다 — 만들고 나면 문제지는 고칠 수 없고
+    // 성적 등록만 거절돼, 새로 만들어야 한다
+    if (omrPlan && omrPlan.blockers.length > 0) {
+      toast.error(`OMR 로 채점할 수 없어요 — ${describeOmrBlockers(omrPlan.blockers)}`);
+      return null;
+    }
+    if (omrPlan && omrPlan.objectiveCount === 0) {
+      toast.error('객관식 문항이 없어 OMR 로 채점할 수 없어요. OMR 채점을 끄고 만들어 주세요.');
       return null;
     }
 
@@ -176,10 +201,10 @@ export function usePaperComposer() {
     } finally {
       setSaving(false);
     }
-  }, [items, settings, title]);
+  }, [items, settings, title, omrPlan]);
 
   return {
-    items, rows, settings, title, saving, added,
+    items, rows, settings, title, saving, added, omrPlan,
     setSettings, setTitle, add, addMany, remove, move, moveWholeGroup, shuffle, clear,
     clearSeq, save,
   };

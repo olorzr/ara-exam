@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { suggestsSingleColumn } from '@/lib/problem-paper/settings';
+import type { OmrPlanNotice } from '@/lib/problem-paper/omr-payload';
 import type { PaperSettings } from '@/types/problem-bank';
 
 interface PaperToolbarProps {
@@ -13,6 +14,8 @@ interface PaperToolbarProps {
   count: number;
   saving: boolean;
   longestPassageChars: number;
+  /** OMR 채점을 켰을 때의 안내 — 막히면 `block`, 알아 둘 것은 `info` */
+  omrNotice?: OmrPlanNotice | null;
   onTitle: (title: string) => void;
   onSettings: (patch: Partial<PaperSettings>) => void;
   onShuffle: () => void;
@@ -27,7 +30,7 @@ interface PaperToolbarProps {
  * 단위로 흘려 보내므로 2단에서도 내용이 잘리지는 않는다.
  */
 export default function PaperToolbar({
-  title, settings, count, saving, longestPassageChars,
+  title, settings, count, saving, longestPassageChars, omrNotice = null,
   onTitle, onSettings, onShuffle, onClear, onSave,
 }: PaperToolbarProps) {
   const hint = settings.columns === 2 && suggestsSingleColumn(longestPassageChars);
@@ -67,6 +70,17 @@ export default function PaperToolbar({
           출처 숨기기
         </label>
 
+        {/* 켜면 저장 직후 학원 성적 시스템에 시험으로 등록되고 인쇄물에 90A 답안지 안내가 붙는다.
+            문제지는 만든 뒤 고칠 수 없어 **만들 때만** 정한다 */}
+        <label className="flex items-center gap-1.5 text-gray-600" title="학원 성적에 시험으로 등록하고 90A 답안지로 채점해요">
+          <input
+            type="checkbox" checked={settings.omr}
+            onChange={(e) => onSettings({ omr: e.target.checked })}
+            className="h-4 w-4 accent-[color:var(--primary)]"
+          />
+          OMR 채점(90A)
+        </label>
+
         <div className="ml-auto flex items-center gap-1">
           <Button type="button" variant="outline" size="sm" onClick={onShuffle} disabled={count < 2}>
             <Shuffle className="h-3.5 w-3.5" /><span className="ml-1">섞기</span>
@@ -83,6 +97,12 @@ export default function PaperToolbar({
           </Button>
         </div>
       </div>
+
+      {omrNotice && (
+        <p className={`text-xs ${omrNotice.tone === 'block' ? 'text-red-600' : 'text-gray-500'}`} role="status">
+          {omrNotice.text}
+        </p>
+      )}
 
       {hint && (
         <p className="text-xs text-amber-700">

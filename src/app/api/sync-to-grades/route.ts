@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireSession } from '@/lib/require-session';
 import { resolveSingleDivision } from '@/lib/grade-division';
 import { buildVocabWords } from '@/lib/vocab-payload';
+import { toKstDate } from '@/lib/kst-date';
 
 /**
  * ara-system(학원 관리 시스템) 성적 자동 등록 브릿지 — 발신부.
@@ -35,17 +36,6 @@ interface ExamWordRow {
 interface CategoryRow {
   level: string;
   grade: string;
-}
-
-/** created_at(UTC) → KST 기준 YYYY-MM-DD */
-function toKstDate(iso: string | null): string | null {
-  if (!iso) return null;
-  try {
-    // en-CA 로케일은 YYYY-MM-DD 형식을 준다.
-    return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
-  } catch {
-    return null;
-  }
 }
 
 export async function POST(request: NextRequest) {

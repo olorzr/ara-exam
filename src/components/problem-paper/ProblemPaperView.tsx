@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { A4Document, CompactPageHeader } from '@/components/print';
 import ExamPrintHeader from '@/components/exam/ExamPrintHeader';
 import { buildPaperBlocks } from '@/lib/problem-paper/blocks';
+import { buildOmrAnswerKey, omrSheetCountOf } from '@/lib/problem-paper/omr-payload';
 import type { PaperItemSnapshot, ProblemPaper } from '@/types/problem-bank';
 import { renderPaperBlocks } from './PaperPrintBlocks';
 
@@ -35,14 +36,21 @@ interface ProblemPaperViewProps {
 export default function ProblemPaperView({
   paper, items, imageUrls, showAnswers = false,
 }: ProblemPaperViewProps) {
+  // OMR 문제지만 90A 답안지 안내를 붙인다 — 학생 종이에만(교사용은 채점하는 종이라 칸 안내가 필요 없다).
+  // 장 수는 성적 시스템과 같은 규칙(버블로 채점하는 마지막 번호)으로 잰다
+  const omrSheets = useMemo(
+    () => (paper.settings.omr && !showAnswers ? omrSheetCountOf(buildOmrAnswerKey(items)) : 0),
+    [items, paper.settings.omr, showAnswers],
+  );
   const blocks = useMemo(
     () => renderPaperBlocks({
       blocks: buildPaperBlocks(items, showAnswers),
       settings: paper.settings,
       imageUrls,
       showAnswers,
+      omrSheetCount: omrSheets,
     }),
-    [items, paper.settings, imageUrls, showAnswers],
+    [items, paper.settings, imageUrls, showAnswers, omrSheets],
   );
 
   // 제목으로 두 인쇄물을 가른다 — 같은 제목이면 책상에 나란히 놓였을 때 구분이 안 된다
@@ -58,11 +66,22 @@ export default function ProblemPaperView({
       firstPageHeader={
         // 머리글에 출처를 모아 찍지 않는다 — 출처는 문항마다 그 자리에 있다(`showSource`)
         // 이름·점수란은 학생 종이에만 — 교사용에 두면 채점표처럼 보인다
-        <ExamPrintHeader
-          title={title}
-          showScoreRow={!showAnswers}
-          totalCount={items.length}
-        />
+        <>
+          <ExamPrintHeader
+            title={title}
+            showScoreRow={!showAnswers}
+            totalCount={items.length}
+            answerSheetCount={omrSheets}
+          />
+          {omrSheets > 0 && (
+            <div className="section-bar section-bar--mint mb-2">
+              <span>
+                객관식은 OMR 답안지(90A)에 표시하세요. 답이 여러 개인 문항은 해당 번호를 모두 표시해요.
+                {omrSheets > 1 && ' 문항 번호 옆의 작은 숫자는 (답안지 장 - 칸 번호) 입니다.'}
+              </span>
+            </div>
+          )}
+        </>
       }
       laterPageHeader={<CompactPageHeader title={title} />}
     />

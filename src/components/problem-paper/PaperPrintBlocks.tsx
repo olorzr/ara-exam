@@ -11,6 +11,7 @@ import { stripTrailingEmptyParagraphs } from '@/lib/problem-paper/html-trim';
 import { hasYetHangul } from '@/lib/yet-hangul';
 import type { PaperItemSnapshot, PaperSettings } from '@/types/problem-bank';
 import { PrintImage, SourceLine, TeacherAnswer } from './PaperPrintParts';
+import { OmrSlotLabel, withOmrSheetBreak } from './PaperOmrMarks';
 
 /**
  * 인쇄 블록을 실제 React 노드로 그린다.
@@ -32,6 +33,16 @@ interface RenderArgs {
    * 학생이 쓸 답 줄은 그리지 않는다(선생님 종이에는 쓸 일이 없다).
    */
   showAnswers?: boolean;
+  /**
+   * OMR 문제지의 90A 답안지 장 수. **2 이상일 때만** 객관식 번호 옆에 보조 표기(`2-1`)를 달고
+   * 새 답안지가 시작되는 문항 앞에 구분 줄을 끼운다. 0·1 이면 아무것도 더하지 않는다.
+   */
+  omrSheetCount?: number;
+}
+
+/** 객관식이면 답안지 칸 표기를 단다 — 주관식은 답안지에 칠하지 않으니 칸이 없다 */
+function slotFor(snapshot: PaperItemSnapshot, number: number, multiSheet: boolean): ReactNode {
+  return multiSheet && snapshot.question_type === '객관식' ? <OmrSlotLabel number={number} /> : null;
 }
 
 /**
@@ -40,8 +51,12 @@ interface RenderArgs {
  * @returns 블록 순서 그대로의 노드 배열
  */
 export function renderPaperBlocks({
-  blocks, settings, imageUrls, showAnswers = false,
+  blocks, settings, imageUrls, showAnswers = false, omrSheetCount = 0,
 }: RenderArgs): ReactNode[] {
+  const multiSheet = omrSheetCount > 1;
+  // 구분 줄은 문항 **앞**에 붙어 그 문항과 한 블록이 된다 — 지문 조각 앞에 붙이면 안 된다
+  const wrap = (node: ReactNode, number: number, key: string): ReactNode =>
+    multiSheet ? withOmrSheetBreak(node, number, `${key}-omr`) : node;
   return blocks.map((block) => {
     switch (block.kind) {
       case 'passage-header':
@@ -89,18 +104,21 @@ export function renderPaperBlocks({
         );
 
       case 'problem-image':
-        return (
+        return wrap(
           <div key={block.key} className={problemClassName(block.snapshot, showAnswers)}>
             {/* 출처 표시는 글 문항과 같아야 한다 — 그림 문항만 빠지면 표기가 들쭉날쭉해진다 */}
             {settings.showSource && <SourceLine source={block.snapshot.source} />}
             <div className="pb-q__head">
               <span className="q-num q-num--mint">{String(block.number).padStart(2, '0')}</span>
+              {slotFor(block.snapshot, block.number, multiSheet)}
             </div>
             <PrintImage path={block.path} urls={imageUrls} alt={`${block.number}번 문항`} />
             {/* 이미지 문항의 정답·해설도 교사용에는 있어야 한다 — 글로 옮기지 못했을 뿐
                 채점은 똑같이 한다. 빠지면 그 문항만 답을 따로 찾게 된다 */}
             {showAnswers && <TeacherAnswer snapshot={block.snapshot} />}
-          </div>
+          </div>,
+          block.number,
+          block.key,
         );
 
       case 'explanation-part':
@@ -122,7 +140,7 @@ export function renderPaperBlocks({
         );
 
       case 'problem':
-        return (
+        return wrap(
           <ProblemBlock
             key={block.key}
             number={block.number}
@@ -130,7 +148,10 @@ export function renderPaperBlocks({
             settings={settings}
             imageUrls={imageUrls}
             showAnswers={showAnswers}
-          />
+            slot={slotFor(block.snapshot, block.number, multiSheet)}
+          />,
+          block.number,
+          block.key,
         );
 
       default:
@@ -166,6 +187,8 @@ interface ProblemBlockProps {
   settings: PaperSettings;
   imageUrls: Map<string, string>;
   showAnswers: boolean;
+  /** 답안지 칸 보조 표기(OMR 문제지가 여러 장일 때만) */
+  slot?: ReactNode;
 }
 
 /**
@@ -197,7 +220,7 @@ function StemWithFigures({
 }
 
 /** 문항 하나 — 출처·발문·선지·삽화(교사용이면 답까지)가 한 블록이다(갈리면 읽을 수 없다) */
-function ProblemBlock({ number, snapshot, settings, imageUrls, showAnswers }: ProblemBlockProps) {
+function ProblemBlock({ number, snapshot, settings, imageUrls, showAnswers, slot = null }: ProblemBlockProps) {
   const objective = snapshot.question_type === '객관식' && snapshot.choices.length > 0;
   // 발문·선지의 옛한글은 **고딕**이다(지문만 명조 — CLAUDE.md 2026-09-15)
   const yetHangul = hasYetHangul([snapshot.stem_html, ...snapshot.choices].join(''));
@@ -214,6 +237,7 @@ function ProblemBlock({ number, snapshot, settings, imageUrls, showAnswers }: Pr
 
       <div className="pb-q__head">
         <span className="q-num q-num--mint">{String(number).padStart(2, '0')}</span>
+        {slot}
         <div className="pb-q__stem">
           {/* 끝에 붙은 빈 문단을 걷어낸다 — 그대로 두면 선지 앞에 빈 줄이 생긴다 */}
           <StemWithFigures

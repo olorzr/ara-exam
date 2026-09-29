@@ -50,3 +50,26 @@ describe('PaperToolbar 출처 체크박스', () => {
     expect(onSettings).toHaveBeenCalledWith({ showSource: true });
   });
 });
+
+describe('PaperToolbar OMR 채점', () => {
+  it('기본은 꺼져 있고, 켜면 omr:true 를 보낸다', () => {
+    const { onSettings } = renderToolbar();
+    const omr = screen.getByLabelText('OMR 채점(90A)') as HTMLInputElement;
+    expect(omr.checked).toBe(false);
+
+    fireEvent.click(omr);
+
+    expect(onSettings).toHaveBeenCalledWith({ omr: true });
+  });
+
+  it('안내를 받으면 그대로 보여 준다', () => {
+    render(
+      <PaperToolbar
+        title="t" settings={{ ...DEFAULT_PAPER_SETTINGS, omr: true }} count={1} saving={false}
+        longestPassageChars={0} omrNotice={{ tone: 'block', text: 'OMR 로 채점할 수 없어요 — 3번 정답 미입력.' }}
+        onTitle={() => {}} onSettings={() => {}} onShuffle={() => {}} onClear={() => {}} onSave={() => {}}
+      />,
+    );
+    expect(screen.getByRole('status').textContent).toContain('3번 정답 미입력');
+  });
+});

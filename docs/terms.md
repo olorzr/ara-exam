@@ -307,7 +307,20 @@
 - 정의: 아카이브 문항을 골라 조합한 인쇄물. 본문은 만든 시점의 **스냅샷**이라 원본이 바뀌어도 변하지 않는다
 - 한 장은 **1~200문항**이다(RPC 가 강제하고 앱의 `PAPER_MAX_ITEMS` 가 그 거울이다)
 - 코드에서의 사용: `ProblemPaper`, `problem_papers` / `problem_paper_items`, RPC `create_problem_paper`
-- 관련 파일: src/lib/problem-paper/compose.ts, sql/17_problem_bank.sql, sql/35_problem_paper_source_semester.sql
+- 관련 파일: src/lib/problem-paper/compose.ts, sql/17_problem_bank.sql, sql/54_problem_paper_omr_setting.sql(정식 정의)
+
+## OMR 채점 문제지 (omr paper)
+- 정의: 만들 때 **'OMR 채점(90A)'** 을 골라 둔 문제지. 저장 직후 학원 성적 시스템(ara-system)에 시험으로 등록되고,
+  학생은 학원의 기성 **90A 답안지**에 객관식 답을 마킹한다. 주관식·서술형은 스캔 뒤 검수 화면에서 선생님이 O/X 로 채점한다
+- 옵트인이고 **만들 때만** 정한다 — 문제지는 불변 스냅샷이라 나중에 켤 길이 없다(새로 만든다)
+- 성적 시스템 자리: 학교급 > **'문제은행 시험지'**(최상위 — 주간 내신 테스트 알림톡에 안 실린다) > **만든 선생님** 폴더 >
+  문제지 하나 = 시험 하나(**회차 번호 없음**, 제목이 곧 시험 이름)
+- 정답표 규칙: 번호는 **문제지 안의 자리**, 객관식은 보기 번호 `'1'`~`'5'`, **복수 정답은 `'1,4'`**(오름차순·공백 없는 쉼표 —
+  성적 시스템이 칠한 보기를 모두 읽어 **전부·그것만** 칠해야 정답으로 본다). 미입력·⑥ 이상은 만들기 전에 막는다
+- 인쇄: 학생용 첫 쪽에 표시 안내, 91문항부터 `답안지 N장`·보조 번호(`2-1`)·구분 줄(단어 객관식 시험지와 같은 규약)
+- 코드에서의 사용: `PaperSettings.omr`, `buildOmrAnswerKey`, `/api/sync-paper-to-grades`
+- 관련 파일: src/lib/problem-paper/omr-payload.ts, src/app/api/sync-paper-to-grades/route.ts,
+  src/components/problem-paper/PaperOmrMarks.tsx, sql/54_problem_paper_omr_setting.sql
 
 ## 교사용 (teacher sheet)
 - 정의: 문항 **바로 밑에** 정답과 해설이 붙은 문제지. 객관식은 정답 선지에 표시가 붙고,

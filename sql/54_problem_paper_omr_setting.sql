@@ -1,25 +1,31 @@
 -- ---------------------------------------------------------------
--- 35. 문제지 출처에 학기를 싣는다
+-- 54. 문제지에 'OMR 채점' 설정을 싣는다
 -- ---------------------------------------------------------------
--- 출처를 **문항마다 그 자리에** 찍게 되면서(2026-09-20) 표기가 정확해야 할 이유가 생겼다.
--- 지금 스냅샷의 출처에는 학기가 없어 `2026 중2 상현중 중간` 까지만 찍히는데, 그 학교의
--- 1학기 중간과 2학기 중간을 **구분할 수 없다**(아카이브에 학기 필터 축이 따로 있는 것이
--- 그래서다). 문제지 목록이 쓰는 머리말 출처 줄(`source_labels`)도 같은 문제였다.
+-- 문제은행에서 만든 문제지도 단어 시험처럼 기성 90A OMR 답안지로 채점하게 됐다(2026-09-29).
+-- 대신 **선생님이 문제지마다 고른다**(사용자 결정) — 조합 화면의 'OMR 채점' 체크가
+-- `settings.omr` 로 저장되고, 켜진 문제지만 저장 직후 성적 시스템(ara-system)에 시험으로 등록된다
+-- (`/api/sync-paper-to-grades` → ara-system `integrations/problem-paper`, 그쪽 mig519).
 --
--- ⚠️⚠️ **정식 정의는 이제 sql/54 다**(2026-09-29 — `omr` 설정 키). 이 파일을 단독으로 다시 돌리면
---    `omr` 키가 조용히 빠져 OMR 을 켜고 만든 문제지가 성적 시스템에 등록되지 않는다.
--- (옛 문구) 이 파일이 `exam.create_problem_paper` 의 정식 정의였다(sql/17 → 23 → 34 → 여기 → 54).
---    sql/34 를 나중에 단독으로 다시 돌리면 학기가 조용히 빠진다 — 그 파일 머리에 경고를
---    적어 두었다. 함수를 고칠 일이 생기면 **번호가 가장 큰 정의**를 고칠 것.
+-- ⚠️ **이 파일이 `exam.create_problem_paper` 의 정식 정의다**(sql/17 → 23 → 34 → 35 → 여기).
+--    sql/35 를 나중에 단독으로 다시 돌리면 `omr` 키가 조용히 빠져 **OMR 을 켜고 만든 문제지가
+--    등록되지 않는다**(발신 라우트가 `omr_not_enabled` 로 거절한다). 그 파일 머리에 경고를 적었다.
 --
--- 바뀐 **실행 로직**은 둘뿐이다: `source_labels` 의 concat_ws 에 학기 한 칸,
--- 항목 스냅샷 `source` 에 `'semester'` 한 키. 그 밖에는 sql/34 본문 그대로다.
+-- 바뀐 **실행 로직**은 하나뿐이다: 설정 화이트리스트에 `'omr'` 한 키. 그 밖에는 sql/35 본문 그대로다.
+-- ⚠️ **불리언일 때만 그 값을 쓴다**(`jsonb_typeof`) — 앱 `normalizePaperSettings` 의
+--    `value.omr === true` 와 1:1 거울이다. 문자열 `"true"` 로 켜지면 앱과 갈린다(sql/34 의 showSource 와 같은 근거).
+--    기본은 **꺼짐**이다 — 옛 문제지와 키를 빠뜨린 호출이 성적 시스템에 저절로 올라가면 안 된다.
 -- 멱등: CREATE OR REPLACE 라 다시 돌려도 안전하다.
 --
--- ⚠️ **이미 만들어 둔 문제지는 바뀌지 않는다**(스냅샷은 불변이다 — 그래서 스냅샷이다).
---    옛 문제지의 출처는 계속 학기 없이 찍힌다. 앱은 그 키를 옵셔널로 받는다.
+-- ⚠️ **OMR 을 켰으면 정답 모양을 여기서도 검사한다**(코덱스 1R). 앱(`buildOmrAnswerKey`)이 미리 막지만,
+--    RPC 를 직접 부르거나 조합 화면을 연 사이 다른 선생님이 정답을 고치면 OMR 로 못 채점하는 문제지가
+--    **불변으로** 만들어져 성적 등록이 영영 거절된다. 스냅샷을 굳히는 **같은 트랜잭션·같은 잠금** 아래서
+--    객관식 정답이 보기 번호(①~⑤, 복수 '1,4')인지, 객관식이 하나 이상인지 본다.
+--    규칙은 `exam.omr_choice_answer_ok` 한 곳 — 앱 `omr-payload.ts` 의 `checkObjective` 와 1:1 거울이다.
 --
--- 적용: node /Users/ara/Projects/Ara-system/scripts/run-sql.js sql/35_problem_paper_source_semester.sql
+-- ⚠️ **이미 만들어 둔 문제지는 바뀌지 않는다**(스냅샷은 불변이다). OMR 은 **만들 때만** 정한다 —
+--    옛 문제지를 OMR 로 채점하려면 새로 만든다.
+--
+-- 적용: node /Users/ara/Projects/Ara-system/scripts/run-sql.js /Users/ara/Projects/ara-exam/sql/54_problem_paper_omr_setting.sql
 
 DO $guard$
 BEGIN
@@ -28,6 +34,24 @@ BEGIN
   END IF;
 END
 $guard$;
+
+-- 객관식 정답을 90A OMR 로 채점할 수 있는가 — 앱 `omr-payload.ts` 의 `checkObjective` 거울.
+--   조각(**반각 쉼표**로만 가르고 앞뒤 공백 허용 — 교사용·답지의 `correctChoiceIndices` 와 같은 규칙)이
+--   **전부** 한 자리 번호이며(빈 조각·공백 구분·전각 쉼표 = 실패: 인쇄물이 정답을 표시하지 못하는 값이다),
+--   선지 수(0 이면 90A 칸 수 5)와 5 가운데 작은 값을 넘지 않아야 한다.
+--   ⚠️ 캐스트를 CASE 안에 둔다 — AND 는 계산 순서를 보장하지 않아 '가'::int 가 터질 수 있다.
+CREATE OR REPLACE FUNCTION exam.omr_choice_answer_ok(p_answer TEXT, p_choice_count INT)
+RETURNS BOOLEAN
+LANGUAGE sql IMMUTABLE
+SET search_path = exam, pg_temp
+AS $$
+  SELECT COUNT(*) > 0 AND COALESCE(bool_and(
+           CASE WHEN x ~ '^[1-9]$'
+                THEN x::int <= CASE WHEN COALESCE(p_choice_count, 0) > 0 THEN LEAST(p_choice_count, 5) ELSE 5 END
+                ELSE false
+           END), false)
+    FROM regexp_split_to_table(btrim(COALESCE(p_answer, '')), '\s*,\s*') AS x;
+$$;
 
 CREATE OR REPLACE FUNCTION exam.create_problem_paper(
   p_title       TEXT,
@@ -110,8 +134,40 @@ BEGIN
                     WHEN jsonb_typeof(p_settings -> 'showSource') = 'boolean'
                       THEN (p_settings -> 'showSource')::boolean
                     ELSE true
+                  END,
+    -- 2026-09-29(sql/54): OMR 채점을 골랐는가. 기본 **꺼짐** — 불리언 true 일 때만 켠다.
+    'omr',        CASE
+                    WHEN jsonb_typeof(p_settings -> 'omr') = 'boolean'
+                      THEN (p_settings -> 'omr')::boolean
+                    ELSE false
                   END
   );
+
+  -- OMR 을 켰으면 **굳히기 전에** 정답 모양을 본다 — 불변 문제지가 영영 등록 못 되는 일을 막는다.
+  --   번호는 문제지 안의 자리(ord)라 화면·성적 시스템의 번호와 같다
+  IF (v_settings ->> 'omr')::boolean THEN
+    DECLARE
+      v_objective INT;
+      v_bad       TEXT;
+    BEGIN
+      SELECT COUNT(*) FILTER (WHERE p.question_type = '객관식'),
+             string_agg(t.ord::text || '번', ', ' ORDER BY t.ord) FILTER (
+               WHERE p.question_type = '객관식'
+                 AND NOT exam.omr_choice_answer_ok(
+                   p.answer,
+                   CASE WHEN jsonb_typeof(p.choices) = 'array' THEN jsonb_array_length(p.choices) ELSE 0 END))
+        INTO v_objective, v_bad
+        FROM unnest(p_problem_ids) WITH ORDINALITY AS t(pid, ord)
+        JOIN exam.problems p ON p.id = t.pid;
+      IF v_bad IS NOT NULL THEN
+        RAISE EXCEPTION 'OMR 로 채점할 수 없는 정답이 있어요 (%) — 객관식 정답은 ①~⑤ 번호여야 해요', v_bad
+          USING ERRCODE = 'check_violation';
+      END IF;
+      IF v_objective = 0 THEN
+        RAISE EXCEPTION '객관식 문항이 없어 OMR 로 채점할 수 없어요' USING ERRCODE = 'check_violation';
+      END IF;
+    END;
+  END IF;
 
   INSERT INTO exam.problem_papers (title, settings, total_questions, source_labels, user_id)
   SELECT
@@ -193,7 +249,7 @@ GRANT EXECUTE ON FUNCTION exam.create_problem_paper(TEXT, UUID[], JSONB) TO auth
 NOTIFY pgrst, 'reload schema';
 
 -- ---------------------------------------------
--- 확인 — 정의에 학기가 두 곳 다 들어갔는가
+-- 확인 — omr 키가 들어갔고, 앞 마이그레이션의 결정이 살아 있는가
 -- ---------------------------------------------
 -- ⚠️ 정의 문자열 검사는 "그 자리에 그 코드가 있다" 까지만 말한다. 실제로 그렇게 저장되는지는
 --    sql/verify_problem_paper_settings.sql 처럼 함수를 불러 봐야 알 수 있다.
@@ -218,6 +274,24 @@ BEGIN
   IF position('figure_paths' IN v_src) = 0 THEN
     RAISE EXCEPTION 'sql/23 의 그림 스냅샷이 되돌아갔다';
   END IF;
-  RAISE NOTICE 'create_problem_paper: 학기 2곳 + showSource 기본값 + 그림 스냅샷 모두 확인';
+  IF position('jsonb_typeof(p_settings -> ''omr'') = ''boolean''' IN v_src) = 0 THEN
+    RAISE EXCEPTION 'omr 설정 키가 안 들어갔다';
+  END IF;
+  IF position('omr_choice_answer_ok' IN v_src) = 0 THEN
+    RAISE EXCEPTION 'OMR 정답 검사가 안 들어갔다';
+  END IF;
+  -- 정답 검사 함수가 앱 규칙과 같은가(거울) — 대표 경우를 직접 불러 본다
+  IF NOT (exam.omr_choice_answer_ok('3', 5) AND exam.omr_choice_answer_ok('4, 1', 5)
+          AND exam.omr_choice_answer_ok('5', 0)
+          AND NOT exam.omr_choice_answer_ok('', 5) AND NOT exam.omr_choice_answer_ok('6', 5)
+          AND NOT exam.omr_choice_answer_ok('1,6', 5) AND NOT exam.omr_choice_answer_ok('5', 4)
+          AND NOT exam.omr_choice_answer_ok('ㄱ', 5) AND NOT exam.omr_choice_answer_ok('③', 5)
+          AND NOT exam.omr_choice_answer_ok('14', 5) AND NOT exam.omr_choice_answer_ok('6', 0)
+          AND NOT exam.omr_choice_answer_ok('1,', 5) AND NOT exam.omr_choice_answer_ok(',1', 5)
+          AND NOT exam.omr_choice_answer_ok('1,,3', 5) AND exam.omr_choice_answer_ok(' 1 , 4 ', 5)
+          AND NOT exam.omr_choice_answer_ok('1 4', 5) AND NOT exam.omr_choice_answer_ok('4，1', 5)) THEN
+    RAISE EXCEPTION 'omr_choice_answer_ok 가 앱 규칙(omr-payload.ts)과 다르다';
+  END IF;
+  RAISE NOTICE 'create_problem_paper: omr 키 + 학기 2곳 + showSource 기본값 + 그림 스냅샷 모두 확인';
 END
 $verify$;

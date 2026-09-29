@@ -96,6 +96,28 @@
 - 합격 기준: 개념지의 `pass_percentage`(기본 80)와 그로 계산한 `passCount` 를 함께 보낸다.
   계산식(CEIL)은 [pass-count.ts](../src/lib/pass-count.ts) 단일 출처 — RPC·마이그레이션·백필과 미러
 
+## POST /api/sync-paper-to-grades
+- 설명: **OMR 채점을 켠 문제지**(`settings.omr`)를 ara-system 성적에 시험으로 등록한다(2026-09-29).
+  서버가 `problem_papers` + `problem_paper_items` 스냅샷을 읽어 정답표를 만들고 ara-system
+  `/api/integrations/problem-paper` 로 보낸다. 자리는 그쪽이 정한다 — 학교급별 **'문제은행 시험지'**(최상위,
+  주간 알림톡 제외) > **만든 선생님** 폴더 > 문제지 하나 = 시험 하나(**회차 번호 없음**)
+- 인증: `Authorization: Bearer <supabase access_token>` (도메인 검사 포함)
+- Body: `{ paperId: string }` (UUID)
+- 보내는 것: `{ sourceExamId, title, totalQuestions, items: [{ no, answer, type }], division?, examDate, createdBy: { id, email } }` —
+  `no` 는 문제지 안의 자리(`order_index + 1`), 객관식 `answer` 는 보기 번호 `'1'`~`'5'`(복수 정답 `'1,4'`),
+  주관식·서술형은 `type: '주관식'`(스캔 뒤 검수 화면에서 O/X). 조립은 [omr-payload.ts](../src/lib/problem-paper/omr-payload.ts) —
+  조합 화면과 **같은 함수**다
+- Response: `{ ok: true, result }` — result 에 `subtypeId`·`groupId`·`created`·`teacher`,
+  채점이 시작된 시험이면 `answerKeyFrozen`, 정답표가 OMR 로 못 채점하는 모양이면 `omrTemplateDetached`
+- 에러: 401 `unauthorized` · 400 `bad_body`/`bad_paperId`/**`omr_not_enabled`**/**`omr_blocked`**(+`blockers`·`message`)/**`omr_no_objective`** ·
+  404 `paper_not_found` · 500 `items_read_failed`/**`items_mismatch`**/`exception` ·
+  502 `intake_failed`(+`status`·`detail`·**`intakeCode`**) · 503 `not_configured`
+- ⚠️ 수신부 409 는 **`intakeCode: 'total_questions_locked'`** 다 — 이미 OMR 로 채점한 시험의 문항 수를 바꿀 수 없다.
+  단어 재시험의 409(원본 미등록)와 화면 문구를 가르려고 코드를 실어 보낸다
+- 비고: 조합 화면이 저장 직후 **fire-and-forget** 으로 한 번 쏘고, 상세 화면의 '학원 성적에 등록' 단추가
+  기다려서 결과를 보여 준다(수신부 멱등). 등록 상태는 이 앱에 저장하지 않는다(진실은 ara-system `source_exam_id`).
+  학교급은 출처 학년으로 가르고 섞이면 빼서 수신부 기본(중등부)에 맡긴다
+
 ## RPC exam.set_source_textbook
 - 설명: 기출 출처의 교과서를 바꾸고, 원하면 그 출처의 단원 태그를 **같은 트랜잭션에서** 지운다
 - 인자: `p_source_id uuid`, `p_textbook text`, `p_clear_units boolean` (기본 true)
@@ -134,6 +156,7 @@
 - Response: 만들어진 문제지 `uuid`
 - 검증: 도메인 · 제목 비지 않음 · 1~200개 · 중복 없음 · 전부 실재 ·
   **같은 지문의 문항이 붙어 있을 것**(흩어지면 인쇄에서 지문이 여러 번 나온다)
-- 비고: 본문을 `problem_paper_items.snapshot` 에 굳힌다. 설정은 화이트리스트로 재조립한다.
+- 비고: 본문을 `problem_paper_items.snapshot` 에 굳힌다. 설정은 화이트리스트로 재조립한다
+  (`columns`·`showScore`·`showSource`·**`omr`** — `omr` 은 불리언 true 일 때만 켜진다, sql/54. **정식 정의는 sql/54**).
   지문 스냅샷에 `figure_paths` 가 있다(sql/23) — 안 실으면 아카이브 화면은 멀쩡한데
   **인쇄물에서만** 그림이 사라진다. sql/23 이전 문제지에는 이 키가 없으므로 앱이 `?? []` 로 받는다

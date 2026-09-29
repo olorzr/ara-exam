@@ -22,6 +22,8 @@ import { usePaperTypeMix } from '@/hooks/usePaperTypeMix';
 import { useProblemArchive, type ArchiveRow } from '@/hooks/useProblemArchive';
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls';
 import { groupsOf } from '@/lib/problem-paper/compose';
+import { describeOmrPlan } from '@/lib/problem-paper/omr-payload';
+import { fireGradeSync } from '@/lib/grade-sync-client';
 
 /**
  * 문제지 조합 (`/problems/papers/new`).
@@ -75,10 +77,12 @@ export default function PaperComposePage() {
 
   const handleSave = async () => {
     const id = await paper.save();
-    if (id) {
-      toast.success('문제지를 만들었어요.');
-      router.push(`/problems/papers/${id}`);
-    }
+    if (!id) return;
+    // OMR 문제지는 학원 성적에 시험으로 등록한다(실패하면 경고 토스트 — 상세 화면에서 다시 보낼 수 있다)
+    if (paper.settings.omr) fireGradeSync('/api/sync-paper-to-grades', { paperId: id });
+    // ⚠️ 등록은 기다리지 않으므로 '등록했어요' 라고 말하지 않는다 — 실패하면 경고 토스트가 따로 뜬다
+    toast.success(paper.settings.omr ? '문제지를 만들었어요. 학원 성적에도 등록하는 중이에요.' : '문제지를 만들었어요.');
+    router.push(`/problems/papers/${id}`);
   };
 
   /** 담은 문항의 원본 — 필터를 바꿔도 이미 담은 것은 계속 보여야 한다 */
@@ -204,6 +208,7 @@ export default function PaperComposePage() {
               count={paper.items.length}
               saving={paper.saving}
               longestPassageChars={longestPassageChars}
+              omrNotice={paper.omrPlan ? describeOmrPlan(paper.omrPlan) : null}
               onTitle={paper.setTitle}
               onSettings={(patch) => paper.setSettings({ ...paper.settings, ...patch })}
               onShuffle={paper.shuffle}

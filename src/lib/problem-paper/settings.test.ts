@@ -3,12 +3,12 @@ import { DEFAULT_PAPER_SETTINGS, normalizePaperSettings, suggestsSingleColumn } 
 
 describe('normalizePaperSettings', () => {
   it('기본값은 2단·출처 표시 (배점은 인쇄하지 않는다)', () => {
-    expect(DEFAULT_PAPER_SETTINGS).toEqual({ columns: 2, showScore: false, showSource: true });
+    expect(DEFAULT_PAPER_SETTINGS).toEqual({ columns: 2, showScore: false, showSource: true, omr: false });
   });
 
   it('저장값을 그대로 읽는다', () => {
-    expect(normalizePaperSettings({ columns: 1, showScore: true, showSource: true }))
-      .toEqual({ columns: 1, showScore: true, showSource: true });
+    expect(normalizePaperSettings({ columns: 1, showScore: true, showSource: true, omr: true }))
+      .toEqual({ columns: 1, showScore: true, showSource: true, omr: true });
   });
 
   /**
@@ -22,6 +22,16 @@ describe('normalizePaperSettings', () => {
   it('출처 값이 없거나 불리언이 아니면 기본(표시)으로 채운다', () => {
     expect(normalizePaperSettings({ columns: 2 }).showSource).toBe(true);
     expect(normalizePaperSettings({ columns: 2, showSource: 'yes' }).showSource).toBe(true);
+  });
+
+  // sql/54 의 `jsonb_typeof(...) = 'boolean'` 과 같은 계약 — 불리언 true 만 켠다
+  it.each([
+    ['키 없음(옛 문제지)', {}, false],
+    ['불리언 true', { omr: true }, true],
+    ['문자열 "true"', { omr: 'true' }, false],
+    ['숫자 1', { omr: 1 }, false],
+  ])('OMR 채점: %s → %s', (_label, raw, want) => {
+    expect(normalizePaperSettings({ columns: 2, ...raw }).omr).toBe(want);
   });
 
   it('모양을 믿지 않는다 — jsonb 에 뭐가 들었든 기본값으로 채운다', () => {

@@ -24,7 +24,7 @@ beforeAll(() => {
   } as unknown as typeof ResizeObserver;
 });
 
-const SETTINGS: PaperSettings = { columns: 2, showScore: false, showSource: true };
+const SETTINGS: PaperSettings = { columns: 2, showScore: false, showSource: true, omr: false };
 
 function snapshot(over: Partial<PaperItemSnapshot> = {}): PaperItemSnapshot {
   return {
@@ -138,6 +138,44 @@ describe('problemClassName', () => {
   });
 });
 
+/**
+ * OMR 문제지의 답안지 안내 — 90문항을 넘어 답안지가 두 장일 때만.
+ * ⚠️ 구분 줄과 그 문항이 **한 노드**여야 한다 — 따로면 안내만 앞 단 바닥에 남는다(MultipleChoiceView 규약).
+ */
+describe('OMR 답안지 안내', () => {
+  function drawOmr(items: PaperItemSnapshot[], omrSheetCount: number) {
+    const nodes = renderPaperBlocks({
+      blocks: buildPaperBlocks(items, false), settings: SETTINGS, imageUrls: new Map(), omrSheetCount,
+    });
+    return render(<div>{nodes.map((n, i) => <section key={i} data-block={i}>{n}</section>)}</div>).container;
+  }
+  const many = (n: number) => Array.from({ length: n }, (_, i) => snapshot({ number: i + 1 }));
+
+  it('답안지가 한 장이면 보조 번호도 구분 줄도 없다', () => {
+    const container = drawOmr(many(3), 1);
+    expect(container.querySelectorAll('.mc-q-slot')).toHaveLength(0);
+    expect(container.querySelectorAll('.mc-sheet-break')).toHaveLength(0);
+  });
+
+  it('두 장이면 95번은 2-5 이고, 91번 문항과 구분 줄이 한 블록이다', () => {
+    const container = drawOmr(many(95), 2);
+    const slots = [...container.querySelectorAll('.mc-q-slot')].map((el) => el.textContent);
+    expect(slots).toHaveLength(95);
+    expect(slots[94]).toBe('2-5');
+    const breaks = container.querySelectorAll('.mc-sheet-break');
+    expect(breaks).toHaveLength(1);
+    const block = breaks[0].closest('section');
+    expect(block?.querySelector('.q-num')?.textContent).toBe('91');
+  });
+
+  it('주관식에는 칸 표기를 달지 않는다 — 답안지에 칠하지 않는다', () => {
+    const items = [...many(90), snapshot({ question_type: '주관식', choices: [], answer: '봄' }), snapshot()];
+    const container = drawOmr(items, 2);
+    const q91 = [...container.querySelectorAll('.pb-q')].find((el) => el.querySelector('.q-num')?.textContent === '91');
+    expect(q91?.querySelector('.mc-q-slot')).toBeNull();
+  });
+});
+
 describe('ProblemPaperView', () => {
   const paper: ProblemPaper = {
     id: 'p1',
@@ -150,6 +188,20 @@ describe('ProblemPaperView', () => {
     created_at: '2026-09-20T00:00:00Z',
     updated_at: '2026-09-20T00:00:00Z',
   };
+
+  it('OMR 문제지는 학생용에만 답안지 표시 안내를 붙인다', () => {
+    const omrPaper = { ...paper, settings: { ...SETTINGS, omr: true } };
+    const student = render(<ProblemPaperView paper={omrPaper} items={[snapshot()]} imageUrls={new Map()} />);
+    expect(student.container.textContent).toContain('OMR 답안지(90A)에 표시하세요');
+    student.unmount();
+
+    const teacher = render(<ProblemPaperView paper={omrPaper} items={[snapshot()]} imageUrls={new Map()} showAnswers />);
+    expect(teacher.container.textContent).not.toContain('OMR 답안지(90A)');
+    teacher.unmount();
+
+    const plain = render(<ProblemPaperView paper={paper} items={[snapshot()]} imageUrls={new Map()} />);
+    expect(plain.container.textContent).not.toContain('OMR 답안지(90A)');
+  });
 
   it('기출 문제지 스코프를 붙여 문항 사이를 넓힌다 (측정 컨테이너에도 같이 붙어야 한다)', () => {
     const { container } = render(
