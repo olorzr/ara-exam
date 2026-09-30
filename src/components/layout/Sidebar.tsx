@@ -7,9 +7,9 @@ import { useMemo, useState } from 'react';
 import { ChevronDown, LogOut } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { cn } from '@/lib/utils';
+import { isAdminEmail } from '@/lib/constants';
 import {
   buildNavSections,
-  isAdminEmail,
   isNavItemActive,
   isNavSectionActive,
   type NavItem,

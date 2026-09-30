@@ -16,7 +16,6 @@ import {
   Sparkles,
   type LucideIcon,
 } from 'lucide-react';
-import { ADMIN_EMAIL } from '@/lib/constants';
 
 /** 사이드바의 개별 메뉴 항목 */
 export interface NavItem {
@@ -176,13 +175,4 @@ export function buildNavSections(isAdmin: boolean): NavSection[] {
         ] satisfies NavSection[])
       : []),
   ];
-}
-
-/**
- * 로그인 이메일이 관리자 계정인지 판정한다.
- * @param email - 로그인 사용자 이메일 (null/undefined 허용)
- * @returns 관리자면 true
- */
-export function isAdminEmail(email: string | null | undefined): boolean {
-  return email === ADMIN_EMAIL;
 }

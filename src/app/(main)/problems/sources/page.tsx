@@ -57,7 +57,7 @@ function SourcesContent() {
 
   const query = useMemo(() => toSourceListQuery({ ...filters, title }), [filters, title]);
   const list = useSourceList(query);
-  const { deletingId, requestDelete } = useSourceDelete(list.afterDelete);
+  const { deletingId, requestDelete, canDelete } = useSourceDelete(list.afterDelete);
 
   const patch = (next: Partial<SourceListFilters>) => setFilters((prev) => ({ ...prev, ...next }));
   const reset = () => setFilters((prev) => ({ ...EMPTY_SOURCE_LIST_FILTERS, sort: prev.sort }));
@@ -98,7 +98,8 @@ function SourcesContent() {
             rows={list.rows}
             refreshing={list.refreshing}
             deleting={deletingId !== null}
-            onDelete={requestDelete}
+            // 지우기는 원장만 — 아니면 칸째 없다(sql/57 이 DB 에서 같은 선을 긋는다)
+            onDelete={canDelete ? requestDelete : undefined}
           />
 
           {/*

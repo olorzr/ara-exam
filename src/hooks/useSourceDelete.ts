@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { useAuth } from '@/lib/auth-context';
+import { isAdminEmail } from '@/lib/constants';
 import { deleteSource } from '@/lib/problem-bank/mutations-source';
 import { countPapersUsing } from '@/lib/problem-bank/mutations';
 import { countSourceProblems, fetchSourceProblemIds } from '@/lib/problem-bank/source-list';
@@ -19,6 +21,10 @@ import type { ProblemSource } from '@/types/problem-bank';
  *
  * 미저장 수정 확인도 **일부러 하지 않는다.** 어차피 출처를 통째로 버리는 참이고,
  * 되돌릴 수 없는 확인창 위에 확인창을 하나 더 얹으면 읽지 않고 누르게 된다.
+ *
+ * **지우는 것은 원장만이다**(2026-09-30). 권위는 DB 정책(sql/57)이고, 여기서 내주는
+ * `canDelete` 는 두 화면이 단추를 그릴지 정하는 **한 곳**이다 — 화면마다 따로 판정하면
+ * 한쪽만 고쳐진다. `requestDelete` 도 한 번 더 막는다(단추를 거치지 않고 부른 경우).
  */
 
 /** 지운 뒤의 뒷정리. 목록 다시 읽기처럼 기다려야 하는 일이면 Promise 를 돌려준다 */
@@ -27,10 +33,12 @@ export type OnSourceDeleted = (id: string) => void | Promise<void>;
 /**
  * 출처 삭제 훅.
  * @param onDeleted - 지운 뒤 화면이 할 뒷정리 (지운 출처 id 를 받는다)
- * @returns 지우는 중인 출처 id 와 삭제를 시작하는 함수
+ * @returns 지우는 중인 출처 id, 삭제를 시작하는 함수, 지울 수 있는 계정인가
  */
 export function useSourceDelete(onDeleted: OnSourceDeleted) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const { user } = useAuth();
+  const canDelete = isAdminEmail(user?.email);
 
   /**
    * 진행 중 잠금.
@@ -53,6 +61,10 @@ export function useSourceDelete(onDeleted: OnSourceDeleted) {
   }, []);
 
   const requestDelete = useCallback(async (source: ProblemSource) => {
+    if (!canDelete) {
+      toast.error('올라간 기출은 원장님만 지울 수 있어요.');
+      return;
+    }
     if (busyRef.current) return;
     busyRef.current = true;
     setDeletingId(source.id);
@@ -93,7 +105,7 @@ export function useSourceDelete(onDeleted: OnSourceDeleted) {
       busyRef.current = false;
       setDeletingId(null);
     }
-  }, [onDeleted]);
+  }, [onDeleted, canDelete]);
 
-  return { deletingId, requestDelete };
+  return { deletingId, requestDelete, canDelete };
 }

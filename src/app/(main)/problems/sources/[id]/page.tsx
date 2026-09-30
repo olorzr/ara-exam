@@ -181,7 +181,8 @@ function ProblemSourceReviewContent() {
         source={source}
         problemCount={review.problems.length}
         onTextbook={(textbook) => review.changeTextbook(textbook, () => dirtyIds.size)}
-        onDelete={() => del.requestDelete(source)}
+        // 지우기는 원장만 — 아니면 단추가 없다(sql/57)
+        onDelete={del.canDelete ? () => del.requestDelete(source) : undefined}
         deleting={del.deletingId !== null}
       />
 

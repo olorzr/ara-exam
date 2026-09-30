@@ -11,10 +11,13 @@ const row = (over: Partial<SourceListRow> = {}): SourceListRow => ({
   updated_at: '2026-09-30T00:00:00Z', problem_count: 23, ...over,
 });
 
-const draw = (rows: SourceListRow[], opts: { refreshing?: boolean; deleting?: boolean } = {}) => render(
+const draw = (
+  rows: SourceListRow[],
+  opts: { refreshing?: boolean; deleting?: boolean; canDelete?: boolean } = {},
+) => render(
   <SourceTable
     rows={rows} refreshing={opts.refreshing ?? false} deleting={opts.deleting ?? false}
-    onDelete={vi.fn()}
+    onDelete={(opts.canDelete ?? true) ? vi.fn() : undefined}
   />,
 );
 
@@ -48,5 +51,12 @@ describe('SourceTable', () => {
   it('평소에는 지울 수 있다', () => {
     draw([row()]);
     expect((screen.getByRole('button', { name: /지우기/ }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('지우기를 안 넘기면(원장이 아니면) 지우기 칸을 헤더째 그리지 않는다', () => {
+    draw([row()], { canDelete: false });
+    expect(screen.queryByRole('button', { name: /지우기/ })).toBeNull();
+    expect(screen.queryByText('지우기')).toBeNull();
+    expect(screen.getAllByRole('columnheader')).toHaveLength(8);
   });
 });

@@ -6,6 +6,8 @@ import {
   PASSWORD_MIN_LENGTH,
   MIDDLE_SCHOOL_GRADES,
   HIGH_SCHOOL_GRADES,
+  ADMIN_EMAIL,
+  isAdminEmail,
 } from './constants';
 
 describe('constants', () => {
@@ -33,5 +35,14 @@ describe('constants', () => {
   it('고등 학년이 3개이다', () => {
     expect(HIGH_SCHOOL_GRADES).toHaveLength(3);
     expect(HIGH_SCHOOL_GRADES).toContain('고1');
+  });
+});
+
+describe('isAdminEmail', () => {
+  it('관리자 이메일만 true 다', () => {
+    expect(isAdminEmail(ADMIN_EMAIL)).toBe(true);
+    expect(isAdminEmail('someone@araeducation.co.kr')).toBe(false);
+    expect(isAdminEmail(null)).toBe(false);
+    expect(isAdminEmail(undefined)).toBe(false);
   });
 });

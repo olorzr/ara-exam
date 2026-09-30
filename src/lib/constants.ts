@@ -31,8 +31,22 @@ export const SEMESTER_OPTIONS = ['1학기', '2학기'] as const;
 /** 외부지문 카테고리 레벨명 */
 export const EXTERNAL_LEVEL = '외부지문 및 프린트' as const;
 
-/** 관리자 이메일 */
+/**
+ * 관리자(원장) 이메일.
+ * ⚠️ DB 정책 두 곳이 같은 리터럴을 든다 — 바꾸면 함께 고칠 것:
+ *    sql/03(감사 로그 읽기) · sql/57(올라간 기출 삭제).
+ */
 export const ADMIN_EMAIL = 'ara0723@araeducation.co.kr';
+
+/**
+ * 로그인 이메일이 관리자(원장) 계정인지 판정한다.
+ * 감사 로그 메뉴, 올라간 기출 삭제 단추가 이 판정을 쓴다 — 권위는 DB 정책이고 이건 화면 게이트다.
+ * @param email - 로그인 사용자 이메일 (null/undefined 허용)
+ * @returns 관리자면 true
+ */
+export function isAdminEmail(email: string | null | undefined): boolean {
+  return email === ADMIN_EMAIL;
+}
 
 /** 로그인을 허용할 이메일 도메인 (이 도메인 계정만 사용 가능) */
 export const ALLOWED_EMAIL_DOMAIN = 'araeducation.co.kr';

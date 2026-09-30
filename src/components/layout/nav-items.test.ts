@@ -1,13 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildNavSections,
-  isAdminEmail,
   isNavItemActive,
   isNavSectionActive,
   type NavItem,
   type NavSection,
 } from './nav-items';
-import { ADMIN_EMAIL } from '@/lib/constants';
 
 /** 구간 목록에서 href 로 항목을 찾는다 */
 function findItem(sections: NavSection[], href: string): NavItem {
@@ -146,14 +144,5 @@ describe('buildNavSections', () => {
     expect(admin.id).toBe('admin');
     expect(admin.footer).toBe(true);
     expect(admin.items.map((i) => i.href)).toEqual(['/admin/audit']);
-  });
-});
-
-describe('isAdminEmail', () => {
-  it('관리자 이메일만 true 다', () => {
-    expect(isAdminEmail(ADMIN_EMAIL)).toBe(true);
-    expect(isAdminEmail('someone@araeducation.co.kr')).toBe(false);
-    expect(isAdminEmail(null)).toBe(false);
-    expect(isAdminEmail(undefined)).toBe(false);
   });
 });

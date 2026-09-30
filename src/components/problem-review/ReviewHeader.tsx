@@ -19,13 +19,16 @@ interface ReviewHeaderProps {
   source: ProblemSource;
   problemCount: number;
   onTextbook: (textbook: string) => Promise<void>;
-  /** 출처를 통째로 지운다 — 잘못 읽힌 기출을 검수 중에 걷어내는 길 */
-  onDelete: () => void;
-  deleting: boolean;
+  /**
+   * 출처를 통째로 지운다 — 잘못 읽힌 기출을 걷어내는 길. **원장만 넘긴다**(sql/57).
+   * 안 넘기면 삭제 단추를 그리지 않는다.
+   */
+  onDelete?: () => void;
+  deleting?: boolean;
 }
 
 export default function ReviewHeader({
-  source, problemCount, onTextbook, onDelete, deleting,
+  source, problemCount, onTextbook, onDelete, deleting = false,
 }: ReviewHeaderProps) {
   const textSource = source.ocr_meta?.textSource;
 
@@ -49,16 +52,18 @@ export default function ReviewHeader({
         {/* 교과서가 있어야 단원 칸이 뜬다 — 여기서 고칠 수 있어야 옛 출처도 분류된다 */}
         <SourceTextbookPicker source={source} onChange={onTextbook} />
         {/* 읽기가 통째로 어긋난 기출은 고치는 것보다 지우고 다시 적재하는 편이 빠르다 */}
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onDelete}
-          disabled={deleting}
-          className="text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600"
-        >
-          <Trash2 className="h-4 w-4" />
-          <span className="ml-1">{deleting ? '지우는 중…' : '삭제'}</span>
-        </Button>
+        {onDelete && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onDelete}
+            disabled={deleting}
+            className="text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600"
+          >
+            <Trash2 className="h-4 w-4" />
+            <span className="ml-1">{deleting ? '지우는 중…' : '삭제'}</span>
+          </Button>
+        )}
       </div>
     </div>
   );

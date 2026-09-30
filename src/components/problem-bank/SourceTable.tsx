@@ -13,7 +13,11 @@ interface SourceTableProps {
   refreshing: boolean;
   /** 지우는 중인 출처가 있으면 지우기 단추를 전부 잠근다 */
   deleting: boolean;
-  onDelete: (row: SourceListRow) => void;
+  /**
+   * 출처를 통째로 지운다. **원장만 넘긴다**(sql/57 이 DB 에서 같은 선을 긋는다).
+   * 안 넘기면 지우기 칸을 헤더째 그리지 않는다 — 빈 열도, 눌러도 막히는 단추도 두지 않는다.
+   */
+  onDelete?: (row: SourceListRow) => void;
 }
 
 /** 칸이 비었을 때 찍는 자리표시 */
@@ -41,7 +45,7 @@ function uploadedCell(iso: string): string {
 /**
  * '올라간 기출' 목록 표.
  *
- * 줄 전체를 링크로 감싸지 않는다 — 표 줄은 링크가 될 수 없고, 그 안에 지우기 단추가 있다.
+ * 줄 전체를 링크로 감싸지 않는다 — 표 줄은 링크가 될 수 없고, 그 안에 (원장에게는) 지우기 단추가 있다.
  * 제목 칸만 시험지 화면으로 가는 링크다(문제지 목록과 같은 규약).
  * 좁은 화면에서는 표가 가로로 넘친다 — 칸을 접어 숨기면 무엇으로 찾았는지가 사라진다.
  */
@@ -63,7 +67,9 @@ export default function SourceTable({ rows, refreshing, deleting, onDelete }: So
             <th scope="col" className="px-3 py-2 font-medium">시험</th>
             <th scope="col" className="px-3 py-2 text-right font-medium">문항</th>
             <th scope="col" className="px-3 py-2 font-medium">올린 날</th>
-            <th scope="col" className="w-10 px-2 py-2"><span className="sr-only">지우기</span></th>
+            {onDelete && (
+              <th scope="col" className="w-10 px-2 py-2"><span className="sr-only">지우기</span></th>
+            )}
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
@@ -103,17 +109,19 @@ export default function SourceTable({ rows, refreshing, deleting, onDelete }: So
                   )}
                 </td>
                 <td className="whitespace-nowrap px-3 py-2 text-gray-500">{uploadedCell(row.created_at)}</td>
-                <td className="px-2 py-1 text-right">
-                  <button
-                    type="button"
-                    onClick={() => onDelete(row)}
-                    disabled={deleting || refreshing}
-                    className="rounded p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-40"
-                    aria-label={`${row.title} 지우기`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </td>
+                {onDelete && (
+                  <td className="px-2 py-1 text-right">
+                    <button
+                      type="button"
+                      onClick={() => onDelete(row)}
+                      disabled={deleting || refreshing}
+                      className="rounded p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-40"
+                      aria-label={`${row.title} 지우기`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </td>
+                )}
               </tr>
             );
           })}
