@@ -17,6 +17,8 @@
  *    같은 이유로 `|` 는 **앞뒤를 공백으로 띄운다**: 한 어절 용어가 기호와 붙으면 못 찾는다.
  */
 
+import { decodeHtmlEntities } from '@/lib/html-entities';
+
 /** 줄바꿈으로 볼 블록 태그 (표 관련은 앞 단계에서 이미 처리한다) */
 const BLOCK_END = /<\/(p|div|h[1-6]|li|blockquote|table|thead|tbody)>/gi;
 
@@ -25,17 +27,6 @@ const TABLE_CELL = /<(td|th)\b[^>]*>([\s\S]*?)<\/\1>/gi;
 
 /** 제목 태그를 몇 단으로 볼 것인가 (TipTap 은 h3·h4 만 낸다) */
 const HEADING_OPEN = /<h([1-6])\b[^>]*>/gi;
-
-/** 이름 있는 엔티티 — TipTap 이 내는 것만 */
-const ENTITIES: [RegExp, string][] = [
-  [/&nbsp;/g, ' '],
-  [/&lt;/g, '<'],
-  [/&gt;/g, '>'],
-  [/&quot;/g, '"'],
-  [/&#39;/g, "'"],
-  // ⚠️ &amp; 는 **마지막**이다. 먼저 풀면 `&amp;lt;` 가 `<` 로 두 번 풀린다
-  [/&amp;/g, '&'],
-];
 
 /**
  * 표 한 칸의 속을 한 줄로. 칸 안의 문단·줄바꿈은 **공백**이다 — 줄을 나누면 칸이 흩어진다.
@@ -57,7 +48,7 @@ function cellText(inner: string): string {
  * @returns 줄 단위 평문
  */
 export function htmlToPlainText(html: string): string {
-  let text = html
+  const text = html
     // ① 칸 먼저 — 안쪽 `</p>` 가 줄바꿈이 되기 전에 한 줄로 접는다
     .replace(TABLE_CELL, (_m, _tag, inner: string) => `| ${cellText(inner)} `)
     // ② 행 끝에 닫는 기호를 두고 줄을 바꾼다
@@ -68,11 +59,8 @@ export function htmlToPlainText(html: string): string {
     .replace(BLOCK_END, '\n')
     .replace(/<[^>]*>/g, '');
 
-  for (const [pattern, value] of ENTITIES) {
-    text = text.replace(pattern, value);
-  }
-
-  return text
+  // 엔티티는 태그를 다 걷은 **뒤에** 푼다 — 먼저 풀면 `&lt;b&gt;` 가 태그로 잡혀 사라진다
+  return decodeHtmlEntities(text)
     .split('\n')
     .map((line) => line.replace(/[ \t]+/g, ' ').trim())
     .filter((line, i, lines) => line !== '' || lines[i - 1] !== '')

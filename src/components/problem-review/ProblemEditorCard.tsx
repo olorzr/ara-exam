@@ -29,6 +29,9 @@ const QUESTION_TYPES: QuestionType[] = ['객관식', '주관식', '서술형'];
 /** 국어는 5지선다다 — 입력 칸은 늘 다섯 개 */
 const CHOICE_SLOTS = 5;
 
+/** 태그(`<u>`)나 엔티티(`&lt;`)가 든 선지 — 입력칸 글자와 인쇄 모양이 달라 미리보기를 붙인다 */
+const HTML_MARKUP = /[<&]/;
+
 /**
  * 선지 칸 하나를 고친 새 배열.
  *
@@ -280,8 +283,9 @@ export default function ProblemEditorCard({
                     aria-label={`${i + 1}번 선지`}
                   />
                   {/* 선지는 글 상자로 고치므로 밑줄이 <u> 태그 그대로 보인다.
-                      인쇄에 어떻게 나가는지 한 줄로 미리 보여 준다 */}
-                  {(choices[i] ?? '').includes('<') && (
+                      인쇄에 어떻게 나가는지 한 줄로 미리 보여 준다.
+                      엔티티만 든 선지(`&lt;제1곡&gt;`)도 여기서 `<제1곡>` 으로 알아본다 */}
+                  {HTML_MARKUP.test(choices[i] ?? '') && (
                     <p
                       className="px-1 text-xs text-gray-500"
                       dangerouslySetInnerHTML={{ __html: sanitizeInlineHTML(choices[i] ?? '') }}

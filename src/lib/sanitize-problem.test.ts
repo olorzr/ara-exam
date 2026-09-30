@@ -89,6 +89,10 @@ describe('sanitizeInlineHTML', () => {
     expect(out).not.toContain('<table');
     expect(out).toContain('가');
   });
+
+  it('엔티티로 적은 꺾쇠를 그대로 둔다 — 미리보기가 HTML 로 그려 <제1곡> 으로 보인다', () => {
+    expect(sanitizeInlineHTML('&lt;제1곡&gt;에서는')).toBe('&lt;제1곡&gt;에서는');
+  });
 });
 
 describe('프로필 격리', () => {

@@ -7,16 +7,11 @@ import PassageBodyView from '@/components/problem-bank/PassageBodyView';
 import PassageWorksLine from '@/components/problem-bank/PassageWorksLine';
 import type { PassageHead } from '@/lib/problem-bank/detail-queries';
 import { sourceLabel, type SourceLabelInput } from '@/lib/problem-bank/source-label';
+import { excerptHtml } from '@/lib/html-excerpt';
 import type { Passage } from '@/types/problem-bank';
 
 /** 본문에서 보여 줄 미리보기 길이 */
 const EXCERPT_LENGTH = 120;
-
-/** 태그를 걷어낸 미리보기 글 */
-function excerpt(html: string): string {
-  const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-  return text.length > EXCERPT_LENGTH ? `${text.slice(0, EXCERPT_LENGTH)}…` : text;
-}
 
 /**
  * 본문까지 받아 온 지문인가.
@@ -117,7 +112,7 @@ export default function PassageGroupCard({
               ? <ChevronDown className="h-3.5 w-3.5 shrink-0" />
               : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
             <span className="line-clamp-1">
-              {open ? '본문 접기' : excerpt(passage.html) || '본문 보기'}
+              {open ? '본문 접기' : excerptHtml(passage.html, EXCERPT_LENGTH) || '본문 보기'}
             </span>
           </button>
         )}

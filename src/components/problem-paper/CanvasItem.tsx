@@ -3,15 +3,11 @@
 import { ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, GripVertical, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { areaPathLabel } from '@/lib/problem-bank/area-tree';
+import { excerptHtml } from '@/lib/html-excerpt';
 import type { ArchiveRow } from '@/hooks/useProblemArchive';
 
 /** 카드에서 보여 줄 발문 길이 */
 const EXCERPT_LENGTH = 70;
-
-function excerpt(html: string): string {
-  const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-  return text.length > EXCERPT_LENGTH ? `${text.slice(0, EXCERPT_LENGTH)}…` : text;
-}
 
 interface CanvasItemProps {
   row: ArchiveRow | undefined;
@@ -84,7 +80,7 @@ export default function CanvasItem({
           </div>
         )}
         <p className="text-sm text-gray-800">
-          {row ? excerpt(row.stem_html) : '(불러오지 못한 문항)'}
+          {row ? excerptHtml(row.stem_html, EXCERPT_LENGTH) : '(불러오지 못한 문항)'}
         </p>
         {row && (
           <p className="mt-0.5 text-xs text-gray-500">

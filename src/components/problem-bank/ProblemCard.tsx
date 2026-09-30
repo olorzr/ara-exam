@@ -8,16 +8,11 @@ import { areaPathLabel } from '@/lib/problem-bank/area-tree';
 import { sourceLabel } from '@/lib/problem-bank/source-label';
 import { parseGrammarPath } from '@/lib/problem-bank/grammar-tree';
 import { unitPathLabel } from '@/lib/problem-bank/unit-tree';
+import { excerptHtml } from '@/lib/html-excerpt';
 import type { Problem, ProblemSource } from '@/types/problem-bank';
 
 /** 목록 카드에서 보여 줄 발문 길이 */
 const EXCERPT_LENGTH = 90;
-
-/** 태그를 걷어낸 미리보기 글 */
-function excerpt(html: string): string {
-  const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-  return text.length > EXCERPT_LENGTH ? `${text.slice(0, EXCERPT_LENGTH)}…` : text;
-}
 
 interface ProblemCardProps {
   problem: Problem & { source: ProblemSource };
@@ -135,7 +130,7 @@ export default function ProblemCard({
           {!problem.answer && <Badge className="bg-amber-500 text-white">정답 없음</Badge>}
         </div>
 
-        <p className="mt-1 text-sm text-gray-800">{excerpt(problem.stem_html)}</p>
+        <p className="mt-1 text-sm text-gray-800">{excerptHtml(problem.stem_html, EXCERPT_LENGTH)}</p>
 
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-500">
           <span>{sourceLabel(problem.source)}</span>

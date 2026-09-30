@@ -29,3 +29,5 @@ export {
   HIGH_SCHOOL_GRADES,
   EXTERNAL_LEVEL,
 } from './constants';
+export { HTML_ENTITIES, decodeHtmlEntities } from './html-entities';
+export { htmlToExcerptText, excerptHtml } from './html-excerpt';
