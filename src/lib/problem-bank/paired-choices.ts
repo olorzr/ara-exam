@@ -16,7 +16,7 @@ export function pairedChoices(stemHtml: string, choices: readonly string[]) {
 }
 
 /** 원문 선지가 2~4열 표로 인쇄되고 발문 끝에 열 머리글이 있는 경우. */
-const MATRIX_HEADER = /<p>\s*(㉠[\s　]+㉡[\s　]+㉢|A[\s　]+B(?:[\s　]+C[\s　]+D)?)\s*<\/p>(?=(?:<\/blockquote>)?\s*$)/u;
+const MATRIX_HEADER = /<p>\s*(㉠[\s　]+㉡[\s　]+㉢|ⓐ[\s　]+ⓑ[\s　]+ⓒ|A[\s　]+B(?:[\s　]+C[\s　]+D)?)\s*<\/p>(?=(?:<\/blockquote>)?\s*$)/u;
 const CELL_BREAK = /<br\s*\/?\s*>/iu;
 
 export function matrixChoices(stemHtml: string, choices: readonly string[]) {
