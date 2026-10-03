@@ -76,6 +76,21 @@ describe('정답 선지 표시', () => {
     expect(table?.querySelector('tbody tr:nth-child(3)')?.textContent).toContain('정답');
     expect(container.querySelector('.pb-q__stem')?.textContent).not.toContain('㉮');
   });
+
+  it('㉠·㉡·㉢ 세 열 선지는 원문처럼 행렬로 그린다', () => {
+    const { container } = render(
+      <ProblemBodyView problem={problem({
+        stem_html: '<p>물음</p><p>㉠　　㉡　　㉢</p>',
+        choices: Array.from({ length: 5 }, (_, i) => `가${i}<br>나${i}<br>다${i}`),
+        answer: '2',
+      })} imageUrls={new Map()} />,
+    );
+    const table = container.querySelector('.pb-q__paired-choices');
+    expect(table?.querySelectorAll('thead th')).toHaveLength(4);
+    expect(table?.querySelectorAll('tbody tr')).toHaveLength(5);
+    expect(table?.querySelector('tbody tr:nth-child(2)')?.textContent).toContain('정답');
+    expect(container.querySelector('.pb-q__stem')?.textContent).not.toContain('㉠');
+  });
 });
 
 describe('옛한글 글꼴 클래스', () => {

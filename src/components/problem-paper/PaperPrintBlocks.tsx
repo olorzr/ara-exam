@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { sanitizeInlineHTML, sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import { choiceGlyph } from '@/lib/problem-bank/choices';
 import { renderFiguresInHtml, unplacedFigures } from '@/lib/problem-bank/figure-render';
-import { pairedChoices } from '@/lib/problem-bank/paired-choices';
+import { matrixChoices, pairedChoices } from '@/lib/problem-bank/paired-choices';
 import { correctChoiceIndices, splitsExplanation } from '@/lib/problem-paper/answers';
 import type { PaperBlock } from '@/lib/problem-paper/blocks';
 import { boxPartClassName } from '@/lib/problem-paper/box-parts';
@@ -14,6 +14,7 @@ import type { PaperItemSnapshot, PaperSettings } from '@/types/problem-bank';
 import { PrintImage, SourceLine, TeacherAnswer } from './PaperPrintParts';
 import { OmrSlotLabel, withOmrSheetBreak } from './PaperOmrMarks';
 import PairedChoiceTable from '@/components/problem-bank/PairedChoiceTable';
+import MatrixChoiceTable from '@/components/problem-bank/MatrixChoiceTable';
 
 /**
  * 인쇄 블록을 실제 React 노드로 그린다.
@@ -225,6 +226,7 @@ function StemWithFigures({
 function ProblemBlock({ number, snapshot, settings, imageUrls, showAnswers, slot = null }: ProblemBlockProps) {
   const objective = snapshot.question_type === '객관식' && snapshot.choices.length > 0;
   const paired = objective ? pairedChoices(snapshot.stem_html, snapshot.choices) : null;
+  const matrix = objective && !paired ? matrixChoices(snapshot.stem_html, snapshot.choices) : null;
   // 발문·선지의 옛한글은 **고딕**이다(지문만 명조 — CLAUDE.md 2026-09-15)
   const yetHangul = hasYetHangul([snapshot.stem_html, ...snapshot.choices].join(''));
   // 교사용에서 표시할 정답 선지. 객관식이 아니면 빈 배열이라 아무 선지도 안 걸린다.
@@ -244,7 +246,7 @@ function ProblemBlock({ number, snapshot, settings, imageUrls, showAnswers, slot
         <div className="pb-q__stem">
           {/* 끝에 붙은 빈 문단을 걷어낸다 — 그대로 두면 선지 앞에 빈 줄이 생긴다 */}
           <StemWithFigures
-            html={stripTrailingEmptyParagraphs(sanitizeProblemHTML(paired?.stemHtml ?? snapshot.stem_html))}
+            html={stripTrailingEmptyParagraphs(sanitizeProblemHTML(paired?.stemHtml ?? matrix?.stemHtml ?? snapshot.stem_html))}
             paths={snapshot.figure_paths}
             imageUrls={imageUrls}
             number={number}
@@ -254,6 +256,8 @@ function ProblemBlock({ number, snapshot, settings, imageUrls, showAnswers, slot
 
       {objective && paired ? (
         <PairedChoiceTable rows={paired.rows} answerIndices={answerIndices} />
+      ) : objective && matrix ? (
+        <MatrixChoiceTable headers={matrix.headers} rows={matrix.rows} answerIndices={answerIndices} />
       ) : objective ? (
         <div className="pb-q__choices">
           {snapshot.choices.map((choice, i) => {

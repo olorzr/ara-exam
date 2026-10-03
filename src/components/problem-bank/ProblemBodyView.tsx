@@ -3,12 +3,13 @@
 import { choiceGlyph } from '@/lib/problem-bank/choices';
 import { correctChoiceIndices } from '@/lib/problem-paper/answers';
 import { renderFiguresInHtml, unplacedFigures } from '@/lib/problem-bank/figure-render';
-import { pairedChoices } from '@/lib/problem-bank/paired-choices';
+import { matrixChoices, pairedChoices } from '@/lib/problem-bank/paired-choices';
 import { stripTrailingEmptyParagraphs } from '@/lib/problem-paper/html-trim';
 import { sanitizeInlineHTML, sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import { hasYetHangul } from '@/lib/yet-hangul';
 import type { Problem } from '@/types/problem-bank';
 import PairedChoiceTable from './PairedChoiceTable';
+import MatrixChoiceTable from './MatrixChoiceTable';
 
 /** 그리는 데 필요한 만큼만 */
 export type ProblemBody = Pick<
@@ -42,6 +43,7 @@ export default function ProblemBodyView({ problem, imageUrls }: ProblemBodyViewP
   const asImage = problem.render_mode === 'image' && Boolean(problem.image_path);
   const objective = !asImage && problem.question_type === '객관식' && problem.choices.length > 0;
   const paired = objective ? pairedChoices(problem.stem_html, problem.choices) : null;
+  const matrix = objective && !paired ? matrixChoices(problem.stem_html, problem.choices) : null;
   const answer = problem.answer.trim();
   /**
    * 정답 선지 자리.
@@ -72,7 +74,7 @@ export default function ProblemBodyView({ problem, imageUrls }: ProblemBodyViewP
           {!asImage && (
             <div className="pb-q__stem">
               <BodyWithFigures
-                html={stripTrailingEmptyParagraphs(sanitizeProblemHTML(paired?.stemHtml ?? problem.stem_html))}
+                html={stripTrailingEmptyParagraphs(sanitizeProblemHTML(paired?.stemHtml ?? matrix?.stemHtml ?? problem.stem_html))}
                 paths={problem.figure_paths}
                 urls={imageUrls}
               />
@@ -88,7 +90,11 @@ export default function ProblemBodyView({ problem, imageUrls }: ProblemBodyViewP
           <PairedChoiceTable rows={paired.rows} answerIndices={answerIndices} />
         )}
 
-        {objective && !paired && (
+        {objective && matrix && (
+          <MatrixChoiceTable headers={matrix.headers} rows={matrix.rows} answerIndices={answerIndices} />
+        )}
+
+        {objective && !paired && !matrix && (
           <div className="pb-q__choices">
             {problem.choices.map((choice, i) => {
               const isAnswer = answerIndices.includes(i);

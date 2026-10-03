@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pairedChoices } from './paired-choices';
+import { matrixChoices, pairedChoices } from './paired-choices';
 
 describe('pairedChoices', () => {
   it('keeps the two source columns aligned without repeating their labels in every row', () => {
@@ -14,5 +14,28 @@ describe('pairedChoices', () => {
 
   it('does not reinterpret ordinary multiline choices', () => {
     expect(pairedChoices('<p>질문</p>', ['가<br>나'])).toBeNull();
+  });
+});
+
+describe('matrixChoices', () => {
+  it('keeps the three source columns aligned', () => {
+    const stem = '<blockquote data-box="보기"><p>자료</p></blockquote><p>㉠　　㉡　　㉢</p>';
+    const choices = Array.from({ length: 5 }, (_, i) => `가${i}<br>나${i}<br>다${i}`);
+    expect(matrixChoices(stem, choices)).toEqual({
+      stemHtml: '<blockquote data-box="보기"><p>자료</p></blockquote>',
+      headers: ['㉠', '㉡', '㉢'],
+      rows: choices.map((_, i) => [`가${i}`, `나${i}`, `다${i}`]),
+    });
+  });
+
+  it('removes a four-column header inside the source box', () => {
+    const stem = '<blockquote data-box="보기"><p>자료</p><p>A B C D</p></blockquote>';
+    const choices = Array(5).fill('불황<br>거시<br>사용<br>미시');
+    expect(matrixChoices(stem, choices)?.stemHtml).toBe('<blockquote data-box="보기"><p>자료</p></blockquote>');
+    expect(matrixChoices(stem, choices)?.headers).toEqual(['A', 'B', 'C', 'D']);
+  });
+
+  it('leaves unrelated multiline choices alone', () => {
+    expect(matrixChoices('<p>질문</p>', Array(5).fill('가<br>나<br>다'))).toBeNull();
   });
 });
