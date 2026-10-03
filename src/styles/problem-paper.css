@@ -190,13 +190,12 @@
 }
 
 /*
- * 말머리 없는 맨 blockquote — 안전망. OCR 기본값(normalize-html.ts)과 정화기가 말머리를 붙이거나
- * 지우므로 저장값에 남는 일은 드물지만, 남으면 브라우저 기본(40px 들여쓰기)으로 찍혀 상자였다는
- * 흔적이 사라진다. 편집기(.pb-editor)와 같은 모양의 왼쪽 선으로 '묶인 글' 임은 보이게 한다.
+ * 말머리 없는 인용 상자 — 원문에는 제목 없는 사각형 상자도 있다.
+ * 왼쪽 선만 그리면 2020.09 3번, 2019.09 11번 같은 문항이 원본과 달라진다.
  */
 .pb-sheet blockquote:not([data-box]) {
-  border-left: 1.5px solid #9ca3af;
-  padding: 0 0 0 8px;
+  border: 1px solid #9ca3af;
+  padding: 6px 8px;
   margin: 4px 0;
 }
 
@@ -314,6 +313,28 @@
   margin-right: 3px;
   color: #5BBFB7;
   font-weight: 700;
+}
+
+/* 원문에서 ㉮·㉯가 두 열인 선지는 머리글과 값의 대응을 유지한다. */
+.pb-sheet .pb-q__paired-choices {
+  width: auto;
+  margin: 4px 0 0 20px;
+}
+.pb-sheet .pb-q__paired-choices th,
+.pb-sheet .pb-q__paired-choices td {
+  border: 0;
+  background: transparent;
+  padding: 1px 16px;
+  text-align: center;
+  white-space: nowrap;
+}
+.pb-sheet .pb-q__paired-choices th:not(:first-child) {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.pb-sheet .pb-q__paired-choices td:first-child {
+  padding-left: 0;
+  padding-right: 4px;
 }
 
 /*
