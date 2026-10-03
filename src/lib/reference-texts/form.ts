@@ -1,5 +1,7 @@
-import { REFERENCE_TEXT_BODY_MAX } from './constants';
-import type { ReferenceText } from '@/types/reference-text';
+import { normalizeGrammarPaths } from '@/lib/problem-bank/grammar-tree';
+import type { ReferenceText, ReferenceUnit } from '@/types/reference-text';
+import { REFERENCE_NOTE_MAX, REFERENCE_TEXT_BODY_MAX } from './constants';
+import { isReferenceUnit, normalizeReferenceUnits, stringsEqual, unitsEqual } from './units';
 
 /**
  * 작품 전문 편집 화면의 입력값과 그 검사 (순수 함수).
@@ -14,9 +16,22 @@ export interface ReferenceTextDraft {
   author: string;
   /** 평문 본문 */
   body: string;
+  /** 실린 교과서 단원들 (sql/60) */
+  units: ReferenceUnit[];
+  /** 문법 분류 경로 문자열들 ('단어 > 품사 > 명사') */
+  grammar_paths: string[];
+  /** 판본 메모 */
+  note: string;
 }
 
-export const EMPTY_REFERENCE_DRAFT: ReferenceTextDraft = { title: '', author: '', body: '' };
+export const EMPTY_REFERENCE_DRAFT: ReferenceTextDraft = {
+  title: '', author: '', body: '', units: [], grammar_paths: [], note: '',
+};
+
+/** 화면 값의 칸 이름 — 저장이 끝난 뒤 칸마다 가려 맞출 때(편집기의 `settle`) 순회한다 */
+export const REFERENCE_DRAFT_KEYS = [
+  'title', 'author', 'body', 'units', 'grammar_paths', 'note',
+] as const satisfies readonly (keyof ReferenceTextDraft)[];
 
 /** 빈 줄이 셋 이상 이어지는 자리 */
 const EXTRA_BLANK_LINES = /\n{3,}/g;
@@ -53,6 +68,10 @@ export function referenceDraftBlocker(draft: ReferenceTextDraft): string | null 
   if (draft.body.length > REFERENCE_TEXT_BODY_MAX) {
     return `본문이 너무 길어요 (${REFERENCE_TEXT_BODY_MAX.toLocaleString()}자까지).`;
   }
+  // 입력칸이 maxLength 로 막지만 붙여 넣기·옛 값은 넘을 수 있다 — DB CHECK 에 막히기 전에 알린다
+  if (draft.note.trim().length > REFERENCE_NOTE_MAX) {
+    return `판본 메모가 너무 길어요 (${REFERENCE_NOTE_MAX}자까지).`;
+  }
   return null;
 }
 
@@ -61,6 +80,9 @@ export interface ReferenceTextPayload {
   title: string;
   author: string;
   body: string;
+  units: ReferenceUnit[];
+  grammar_paths: string[];
+  note: string;
 }
 
 /**
@@ -73,6 +95,10 @@ export function toReferenceTextPayload(draft: ReferenceTextDraft): ReferenceText
     title: draft.title.trim(),
     author: draft.author.trim(),
     body: normalizeBody(draft.body),
+    // ⚠️ DB 는 모양만 검사하고 다듬지 않는다(sql/60) — 겹침·빈 단원·상한은 여기서 정리한다
+    units: normalizeReferenceUnits(draft.units),
+    grammar_paths: normalizeGrammarPaths(draft.grammar_paths),
+    note: draft.note.trim(),
   };
 }
 
@@ -82,7 +108,35 @@ export function toReferenceTextPayload(draft: ReferenceTextDraft): ReferenceText
  * @returns 화면 입력값
  */
 export function draftFromReferenceText(row: ReferenceText): ReferenceTextDraft {
-  return { title: row.title, author: row.author, body: row.body };
+  return {
+    title: row.title,
+    author: row.author,
+    body: row.body,
+    // JSON 칸이라 런타임에 한 번 더 좁힌다 — 모양이 어긋난 원소가 화면을 깨지 않게
+    units: Array.isArray(row.units) ? row.units.filter(isReferenceUnit) : [],
+    grammar_paths: Array.isArray(row.grammar_paths) ? row.grammar_paths : [],
+    note: row.note ?? '',
+  };
+}
+
+/**
+ * 한 칸이 같은가 — 배열 칸은 내용으로 비교한다.
+ *
+ * ⚠️ 참조로 비교하면 안 된다: 저장 뒤 정규화된 **새 배열**이 오므로, 손대지 않은 단원 칸이
+ *    '저장 중에 고친 칸' 으로 잘못 잡혀 `dirty` 가 영영 안 풀린다.
+ * @param key - 칸 이름
+ * @param a - 한쪽
+ * @param b - 다른 쪽
+ * @returns 같으면 true
+ */
+export function draftFieldEquals(
+  key: (typeof REFERENCE_DRAFT_KEYS)[number],
+  a: ReferenceTextDraft,
+  b: ReferenceTextDraft,
+): boolean {
+  if (key === 'units') return unitsEqual(a.units, b.units);
+  if (key === 'grammar_paths') return stringsEqual(a.grammar_paths, b.grammar_paths);
+  return a[key] === b[key];
 }
 
 /**
@@ -92,5 +146,5 @@ export function draftFromReferenceText(row: ReferenceText): ReferenceTextDraft {
  * @returns 같으면 true
  */
 export function referenceDraftEquals(a: ReferenceTextDraft, b: ReferenceTextDraft): boolean {
-  return a.title === b.title && a.author === b.author && a.body === b.body;
+  return REFERENCE_DRAFT_KEYS.every((key) => draftFieldEquals(key, a, b));
 }

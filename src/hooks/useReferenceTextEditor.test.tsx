@@ -61,7 +61,7 @@ describe('useReferenceTextEditor — 새로 만들기', () => {
     await act(async () => { await result.current.save(); });
 
     expect(insertReferenceText).toHaveBeenCalledWith({
-      title: '봄봄', author: '', body: '장인님!\n\n다음',
+      title: '봄봄', author: '', body: '장인님!\n\n다음', units: [], grammar_paths: [], note: '',
     });
     expect(result.current.draft.title).toBe('봄봄');
     expect(result.current.dirty).toBe(false);
@@ -110,10 +110,47 @@ describe('useReferenceTextEditor — 새로 만들기', () => {
   });
 });
 
+describe('useReferenceTextEditor — 분류 칸', () => {
+  const unit = { grade: '중2', textbook: '천재(노미숙)', semester: '1학기', unit_path: ['1. 문학'] };
+
+  it('저장하면 단원·문법이 다듬어진 값으로 굳고 고친 것이 없어진다', async () => {
+    const { result } = renderHook(() => useReferenceTextEditor(opts));
+    act(() => result.current.patch({
+      title: '봄봄', body: '본문', units: [unit, { ...unit, textbook: '천재 (노미숙)' }],
+      grammar_paths: ['단어>품사'], note: ' 교학사 ',
+    }));
+    await act(async () => { await result.current.save(); });
+
+    expect(insertReferenceText).toHaveBeenCalledWith(expect.objectContaining({
+      units: [unit], grammar_paths: ['단어 > 품사'], note: '교학사',
+    }));
+    expect(result.current.draft.units).toEqual([unit]);
+    expect(result.current.draft.grammar_paths).toEqual(['단어 > 품사']);
+    expect(result.current.dirty).toBe(false);
+  });
+
+  it('⚠️ 저장하는 사이 붙인 단원을 덮지 않는다 — 배열 칸도 칸마다 가린다', async () => {
+    const saving = deferred<{ id: string; updated_at: string }>();
+    insertReferenceText.mockReturnValue(saving.promise);
+
+    const { result } = renderHook(() => useReferenceTextEditor(opts));
+    act(() => result.current.patch({ title: '봄봄', body: '본문', units: [unit] }));
+    let running!: Promise<void>;
+    act(() => { running = result.current.save(); });
+
+    const second = { ...unit, textbook: '비상(김진수)' };
+    act(() => result.current.patch({ units: [unit, second] }));
+    await act(async () => { saving.resolve({ id: 'r1', updated_at: 't1' }); await running; });
+
+    expect(result.current.draft.units).toEqual([unit, second]);
+    expect(result.current.dirty).toBe(true);
+  });
+});
+
 describe('useReferenceTextEditor — 고치기', () => {
   const existing = {
     id: 'r1', title: '봄봄', author: '김유정', body: '본문',
-    char_count: 2, user_id: 'u', updated_by: null,
+    char_count: 2, units: [], grammar_paths: [], note: '', user_id: 'u', updated_by: null,
     created_at: 'c', updated_at: 't0',
   };
 
@@ -121,7 +158,9 @@ describe('useReferenceTextEditor — 고치기', () => {
     fetchReferenceText.mockResolvedValue(existing);
     const { result } = renderHook(() => useReferenceTextEditor({ ...opts, id: 'r1' }));
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.draft).toEqual({ title: '봄봄', author: '김유정', body: '본문' });
+    expect(result.current.draft).toEqual({
+      title: '봄봄', author: '김유정', body: '본문', units: [], grammar_paths: [], note: '',
+    });
     expect(result.current.dirty).toBe(false);
   });
 

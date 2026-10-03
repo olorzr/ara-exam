@@ -1,22 +1,14 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ArrowUpDown } from 'lucide-react';
 import FacetTree from '@/components/problem-bank/FacetTree';
-import { OptionSelect, type SelectOption } from '@/components/ui/option-select';
+import WorkTreeOrderSelect from '@/components/problem-bank/WorkTreeOrderSelect';
 import type { WorkFacet } from '@/lib/problem-bank/facets';
 import type { ProblemFilters } from '@/lib/problem-bank/filters';
 import {
-  buildWorkTree, isWorkTreeOrder, workFilterPatch, workKey,
-  WORK_AXIS_CLEARED, type WorkTreeOrder,
+  buildWorkTree, workFilterPatch, workKey, WORK_AXIS_CLEARED, type WorkTreeOrder,
 } from '@/lib/problem-bank/work-tree';
-import { readWorkTreeOrder, writeWorkTreeOrder } from '@/lib/problem-bank/work-tree-pref';
-
-/** 정렬 선택지 — 값은 `WorkTreeOrder`, 이름은 선생님이 읽는 말 */
-const ORDER_OPTIONS: SelectOption[] = [
-  { value: 'author', label: '지은이순 (ㄱ~ㅎ)' },
-  { value: 'title', label: '작품명순 (ㄱ~ㅎ)' },
-];
+import { readWorkTreeOrder } from '@/lib/problem-bank/work-tree-pref';
 
 interface WorkTreePanelProps {
   filters: ProblemFilters;
@@ -58,25 +50,12 @@ export default function WorkTreePanel({ filters, works, onChange }: WorkTreePane
     onChange(workFilterPatch(facet));
   };
 
-  const handleOrder = (value: string) => {
-    if (!isWorkTreeOrder(value)) return;
-    setOrder(value);
-    writeWorkTreeOrder(value);
-  };
-
   return (
     <div className="rounded-lg border border-gray-200 p-2">
       <div className="flex items-center justify-between gap-2 px-2 py-1">
         <div className="flex items-center gap-2">
           <p className="text-xs font-medium text-gray-500">작품</p>
-          <OptionSelect
-            value={order}
-            options={ORDER_OPTIONS}
-            className="h-8 w-[128px] text-xs"
-            ariaLabel="작품 트리 정렬"
-            triggerIcon={<ArrowUpDown className="h-3 w-3 mr-1" />}
-            onChange={handleOrder}
-          />
+          <WorkTreeOrderSelect value={order} onChange={setOrder} />
         </div>
         {filters.work_title && (
           <button

@@ -23,13 +23,13 @@ src/
 │       │   ├── builder/     # 개념지 (목록 + [id] 편집기)
 │       │   └── view/        # 시험지/답안지/단어장 보기
 │       ├── print-sheets/    # 학교 프린트 시험지 (목록 · upload 스캔 올리기 · new 직접 입력 · [bundleId] 편집)
-│       ├── reference-texts/ # 작품 전문 (목록 · [id] 편집, 'new' 면 새로 올리기)
+│       ├── reference-texts/ # 작품 전문 (왼쪽 교과서·작품·문법 패널 + 목록 · [id] 편집, 'new' 면 새로 올리기)
 │       └── problems/         # 문제 은행 (archive 아카이브 · sources 올라간 기출 ·
 │                             #            papers 문제지 조합 · quiz O,X·단답형)
 ├── components/
 │   ├── layout/              # 앱 셸 (AppShell·Sidebar·nav-items — 좌측 사이드바 네비게이션)
 │   ├── print-scan/          # 학교 프린트 스캔 (스캔 정보 폼·쪽 묶기·묶음 폼·목록 줄·원본 쪽 패널·쪽 크게 보기)
-│   ├── reference-texts/     # 작품 전문 (목록 줄·편집 폼·파일 가져오기)
+│   ├── reference-texts/     # 작품 전문 (목록 줄·편집 폼·파일 가져오기·분류 섹션·단원/작품 고르기·왼쪽 패널)
 │   ├── words/               # 단어 입력 관련 분리 컴포넌트
 │   └── ui/                  # Shadcn UI 컴포넌트
 ├── lib/                     # 유틸리티, 설정
@@ -308,10 +308,17 @@ src/
 - 점수: 신호 무게(`MATCH_WEIGHTS`) 합 + 종류 덤(`KIND_BONUS`), `MATCH_MIN_SCORE` 미만은 안 붙인다
 
 ## lib/reference-texts (작품 전문)
-- 역할: 작품 원문 CRUD 와 파일 가져오기(`.txt`·PDF 글자 레이어)
-- 의존: lib/supabase, lib/problem-bank/queries(escapeIlike), lib/pdf(openPdfSource·readPageText)
-- 주요 파일: constants.ts, form.ts(입력값·검사·정규화), queries.ts, save.ts(낙관적 동시성),
+- 역할: 작품 원문 CRUD 와 파일 가져오기(`.txt`·PDF 글자 레이어), 분류(교과서 단원 여럿·문법·판본 메모, sql/60)와
+  왼쪽 패널 트리(교과서 · 단원 / 작품 / 문법)
+- 의존: lib/supabase, lib/pg-array-literal, lib/problem-bank(queries.escapeIlike·unit-tree·grammar-tree·
+  grammar-browse-tree·grammar-counts·work-tree·school-exam-tree 의 FacetTreeNode), lib/category-name,
+  lib/category-tree(naturalCompare), lib/pdf(openPdfSource·readPageText)
+- 주요 파일: constants.ts, form.ts(입력값·검사·정규화), queries.ts(`applyReferenceQuery` — 축 조건 한 곳),
+  save.ts(낙관적 동시성), units.ts(단원 다듬기·열쇠·토글), filters.ts(축), facets.ts(트리 재료 조회),
+  unit-browse-tree.ts(학년›교과서›학기›대단원›소단원), browse-trees.ts(작품·문법 트리 — 문제 은행 빌더 재사용),
   import-text.ts(순수: 잇기·판정), import.ts(브라우저: 파일 읽기)
+- 훅: useReferenceTexts(목록 — 검색어·축 거울), useReferenceTextFacets(트리 재료, 실패 시 이전 트리 유지),
+  useReferenceTextEditor(편집 — 배열 칸도 `settle` 이 칸마다 가린다), useLazyLoad(고르기 창 목록을 처음 열 때 한 번)
 - ⚠️ 본문은 **평문**이다 — 정화할 마크업이 없고 화면은 텍스트 노드로 그린다
 - ⚠️ 배럴(`index.ts`)은 pdf.js 를 끌어온다. 조회만 필요한 쪽은 `./queries` 를 파일 경로로 가져갈 것
 

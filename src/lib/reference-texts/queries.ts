@@ -1,7 +1,9 @@
 import { supabase } from '@/lib/supabase';
+import { pgArrayLiteral } from '@/lib/pg-array-literal';
 import { escapeIlike } from '@/lib/problem-bank/queries';
 import type { ReferenceText, ReferenceTextListItem } from '@/types/reference-text';
 import { REFERENCE_TEXT_LIST_LIMIT, REFERENCE_TEXT_PICK_LIMIT } from './constants';
+import type { ReferenceTextQuery } from './filters';
 
 /**
  * 작품 전문 조회 (sql/30).
@@ -13,20 +15,56 @@ import { REFERENCE_TEXT_LIST_LIMIT, REFERENCE_TEXT_PICK_LIMIT } from './constant
 
 // ⚠️ 한 줄로 둘 것 — `+` 로 이으면 리터럴 타입이 string 으로 넓어져 PostgREST 의 행 타입
 //    추론이 통째로 풀린다. `ReferenceTextListItem` 과 **1:1** 로 맞춰 둘 것
-export const REFERENCE_TEXT_LIST_COLUMNS = 'id,title,author,char_count,user_id,updated_by,created_at,updated_at';
+export const REFERENCE_TEXT_LIST_COLUMNS = 'id,title,author,char_count,units,grammar_paths,note,user_id,updated_by,created_at,updated_at';
+
+/** 조건을 걸 수 있는 요청 — PostgREST 필터 빌더의 필요한 부분만(`applySourceAxes` 와 같은 규약) */
+interface ReferenceQueryFilterable<T> {
+  eq(column: string, value: string): T;
+  contains(column: string, value: string): T;
+  overlaps(column: string, value: string): T;
+}
+
+/**
+ * 왼쪽 패널의 축 조건을 건다 — 목록과 검색이 **이 한 곳**을 탄다.
+ *
+ * ⚠️ 단원(jsonb)은 **JSON 문자열**로 넘긴다. postgrest-js 의 `contains` 는 문자열이면
+ *    `cs.` 뒤에 그대로 싣고, 배열이면 따옴표 없이 이어 붙인다 — 배열을 주면 쉼표 든 단원
+ *    이름(`1. 나를 깨우는, 문학`)이 쪼개져 0건이 된다(2026-09-27 의 그 문제).
+ * ⚠️ 문법 배열은 `pgArrayLiteral` 로 넘긴다(같은 이유). 상위 검색이라 `&&` 다(sql/21).
+ * ⚠️ '분류 없음' 은 빈 값과의 같음이다(`units=eq.[]`, `grammar_paths=eq.{}`).
+ * @param request - 필터 빌더
+ * @param query - 조건 (`toReferenceTextQuery` 가 만든 값)
+ * @returns 조건을 건 빌더
+ */
+export function applyReferenceQuery<T extends ReferenceQueryFilterable<T>>(
+  request: T, query: ReferenceTextQuery,
+): T {
+  let next = request;
+  if (query.unit) next = next.contains('units', JSON.stringify([query.unit]));
+  if (query.unitsEmpty) next = next.eq('units', '[]');
+  if (query.title !== undefined) next = next.eq('title', query.title);
+  if (query.grammar_paths && query.grammar_paths.length > 0) {
+    next = next.overlaps('grammar_paths', pgArrayLiteral(query.grammar_paths));
+  }
+  if (query.grammarEmpty) next = next.eq('grammar_paths', '{}');
+  return next;
+}
 
 /**
  * 전문 목록 (최근 고친 것부터).
  * @param limit - 최대 줄 수
+ * @param query - 왼쪽 패널의 축 조건 (없으면 전체)
  * @returns 목록 (본문은 빠져 있다)
  * @throws 조회 실패 시
  */
 export async function fetchReferenceTextList(
   limit: number = REFERENCE_TEXT_LIST_LIMIT,
+  query: ReferenceTextQuery = {},
 ): Promise<ReferenceTextListItem[]> {
-  const { data, error } = await supabase
+  const request = supabase
     .from('reference_texts')
-    .select(REFERENCE_TEXT_LIST_COLUMNS)
+    .select(REFERENCE_TEXT_LIST_COLUMNS);
+  const { data, error } = await applyReferenceQuery(request, query)
     .order('updated_at', { ascending: false })
     .limit(limit);
   if (error) throw error;
@@ -57,6 +95,7 @@ export async function fetchReferenceText(id: string): Promise<ReferenceText | nu
  * @param term - 검색어 (빈 값이면 아무것도 찾지 않는다)
  * @param field - 어느 칸을 볼 것인가
  * @param limit - 최대 줄 수
+ * @param query - 왼쪽 패널의 축 조건 — 검색어와 **함께** 걸린다 (없으면 전체)
  * @returns 목록
  * @throws 조회 실패 시
  */
@@ -64,13 +103,15 @@ export async function searchReferenceTexts(
   term: string,
   field: 'title' | 'author',
   limit: number = REFERENCE_TEXT_PICK_LIMIT,
+  query: ReferenceTextQuery = {},
 ): Promise<ReferenceTextListItem[]> {
   const keyword = term.trim();
   if (keyword === '') return [];
-  const { data, error } = await supabase
+  const request = supabase
     .from('reference_texts')
     .select(REFERENCE_TEXT_LIST_COLUMNS)
-    .ilike(field, `%${escapeIlike(keyword)}%`)
+    .ilike(field, `%${escapeIlike(keyword)}%`);
+  const { data, error } = await applyReferenceQuery(request, query)
     .order('updated_at', { ascending: false })
     .limit(limit);
   if (error) throw error;

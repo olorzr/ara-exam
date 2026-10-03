@@ -4,12 +4,24 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
-  EMPTY_REFERENCE_DRAFT, draftFromReferenceText, referenceDraftBlocker, referenceDraftEquals,
-  toReferenceTextPayload, type ReferenceTextDraft,
+  EMPTY_REFERENCE_DRAFT, REFERENCE_DRAFT_KEYS, draftFieldEquals, draftFromReferenceText,
+  referenceDraftBlocker, referenceDraftEquals, toReferenceTextPayload, type ReferenceTextDraft,
 } from '@/lib/reference-texts/form';
 import { fetchReferenceText } from '@/lib/reference-texts/queries';
 import { insertReferenceText, updateReferenceText } from '@/lib/reference-texts/save';
 import { useUnsavedGuard } from './useUnsavedGuard';
+
+/**
+ * 한 칸을 옮긴다 — 칸 이름이 합집합이면 `next[key] = saved[key]` 가 타입에서 막혀 제네릭으로 감싼다.
+ * @param target - 받을 값
+ * @param source - 줄 값
+ * @param key - 칸 이름
+ */
+function copyField<K extends keyof ReferenceTextDraft>(
+  target: ReferenceTextDraft, source: ReferenceTextDraft, key: K,
+): void {
+  target[key] = source[key];
+}
 
 export interface ReferenceTextEditorOptions {
   /** 편집할 전문 id. 'new' 면 새로 만든다 */
@@ -110,16 +122,20 @@ export function useReferenceTextEditor(opts: ReferenceTextEditorOptions) {
    *    보낸 뒤로 손대지 않은 칸만 정규화된 값(공백 정리 등)으로 맞추고, 그 사이 고친 칸은
    *    사람이 친 그대로 둔다. '저장된 값' 은 **DB 에 실제로 들어간 것**이라 언제나 payload 이고,
    *    그래서 저장 중에 고친 칸이 있으면 '저장하지 않은 내용' 으로 제대로 남는다.
+   * ⚠️ 단원·문법 칸은 배열이라 **내용으로** 비교한다(`draftFieldEquals`). 참조로 비교하면
+   *    보낸 뒤 손대지 않은 칸도 '고친 칸' 으로 잡혀 정규화값으로 안 맞춰진다.
    * @param sent - 보낼 때의 화면 값
    * @param saved - DB 에 실제로 들어간 값
    */
   const settle = useCallback((sent: ReferenceTextDraft, saved: ReferenceTextDraft) => {
     setSavedDraft(saved);
-    setDraft((prev) => ({
-      title: prev.title === sent.title ? saved.title : prev.title,
-      author: prev.author === sent.author ? saved.author : prev.author,
-      body: prev.body === sent.body ? saved.body : prev.body,
-    }));
+    setDraft((prev) => {
+      const next: ReferenceTextDraft = { ...prev };
+      for (const key of REFERENCE_DRAFT_KEYS) {
+        if (draftFieldEquals(key, prev, sent)) copyField(next, saved, key);
+      }
+      return next;
+    });
   }, []);
 
   /**

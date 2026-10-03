@@ -28,6 +28,16 @@
 - UPDATE 는 `.eq('updated_at', 불러올 때의 값)` 으로 **낙관적 동시성**을 건다(0행이면 남이 먼저 고친 것)
 - 목록은 `REFERENCE_TEXT_LIST_COLUMNS`(본문 제외)로만 읽는다 — 전문 한 편이 수만 자다
 - 검색은 칸마다 `ilike` 를 따로 돌려 합친다(`.or()` 금지 — 이스케이프가 인용을 통과하며 풀린다)
+- 분류 칸(sql/60): `units JSONB`(실린 교과서 단원 여럿, `[{grade, textbook, semester, unit_path}]` 최대 8) ·
+  `grammar_paths TEXT[]`(최대 5, problems 와 같은 모양) · `note TEXT`(판본 메모, 200자). 모양은 CHECK
+  (`exam.reference_units_valid`)가 막고 **다듬지는 않는다** — 앱이 `normalizeReferenceUnits` 로 다듬어 보낸다
+- 왼쪽 패널의 축은 목록·검색 조회에 `applyReferenceQuery` 한 곳에서 건다(검색어와 함께 걸린다):
+  - 단원: `units=cs.[{…}]` — ⚠️ **JSON 문자열**로 넘긴다(배열을 넘기면 postgrest-js 가 따옴표 없이 이어
+    쉼표 든 단원 이름이 쪼개진다). 대단원만 든 원소로 찾으면 그 아래 소단원 단원까지 걸린다(jsonb 포함)
+  - 작품: `title=eq.…` · 문법: `grammar_paths=ov.{…}`(`pgArrayLiteral`, 고른 마디와 그 아래 경로)
+  - 분류 없음: `units=eq.[]` · `grammar_paths=eq.{}`
+- 트리 재료는 `fetchReferenceTextFacets` 가 `id,title,author,units,grammar_paths` 를 1,000줄씩 끝까지 읽는다
+  (첫 쪽부터 실패하면 던져 훅이 이전 트리를 남긴다)
 
 ### 참고자료 조회 (문제 만들기 화면)
 - 후보 찾기는 `concept_sheets`·`passages`·`reference_texts` 를 **신호마다 한 쿼리씩** 병렬로 돌린다.

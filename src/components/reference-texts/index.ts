@@ -1,3 +1,13 @@
+export { default as BrowseTreeFrame } from './BrowseTreeFrame';
+export { default as ReferenceClassifySection } from './ReferenceClassifySection';
+export { default as ReferenceSidePanel } from './ReferenceSidePanel';
 export { default as ReferenceTextForm } from './ReferenceTextForm';
 export { default as ReferenceTextImport } from './ReferenceTextImport';
 export { default as ReferenceTextList } from './ReferenceTextList';
+export { default as ReferenceUnitsField } from './ReferenceUnitsField';
+export { default as ReferenceWorkPickDialog } from './ReferenceWorkPickDialog';
+export { default as ReferenceWorkTreePanel } from './ReferenceWorkTreePanel';
+export { default as UnitPickBody } from './UnitPickBody';
+export { default as UnitPickSheet } from './UnitPickSheet';
+export { default as WorkPickBody } from './WorkPickBody';
+export type { PickedWork } from './WorkPickBody';

@@ -15,6 +15,8 @@ interface GrammarTagPickerProps {
   /** 이 문항이 문법 영역인가 — 칸을 처음부터 펼칠지 정한다 */
   suggested: boolean;
   onChange: (paths: string[]) => void;
+  /** 상한 안내에 쓸 이름 — 문항이 아닌 곳(작품 전문)에서 바꾼다. 기본 '문항' */
+  subjectLabel?: string;
 }
 
 /**
@@ -29,7 +31,7 @@ interface GrammarTagPickerProps {
  *    영역을 문법으로 바꾸는 순간 칸이 저절로 나타나야 한다.
  */
 export default function GrammarTagPicker({
-  value, suggested, onChange,
+  value, suggested, onChange, subjectLabel = '문항',
 }: GrammarTagPickerProps) {
   const [draft, setDraft] = useState<string[]>([]);
   const [opened, setOpened] = useState(false);
@@ -87,7 +89,7 @@ export default function GrammarTagPicker({
 
       {full ? (
         <p className="text-xs text-gray-400">
-          한 문항에 {GRAMMAR_MAX_TAGS}개까지 붙일 수 있어요. 빼고 다시 고르세요.
+          한 {subjectLabel}에 {GRAMMAR_MAX_TAGS}개까지 붙일 수 있어요. 빼고 다시 고르세요.
         </p>
       ) : (
         <div className="space-y-1">

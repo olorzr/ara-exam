@@ -320,9 +320,33 @@
 - ⚠️ PDF 가져오기는 `readPageText` 를 쓴다(`extractPageText` 아님) — 그쪽의 쪽당 200자 문턱은
   기출 OCR 용이라 시집처럼 쪽이 짧은 글이 통째로 빈다
 - `char_count` 는 DB 트리거가 채운다 — 목록이 무거운 본문을 읽지 않고 길이를 보여 주려는 값이다
-- 코드에서의 사용: `ReferenceText`, `ReferenceTextListItem`, `useReferenceTextEditor`
-- 관련 파일: sql/30_reference_texts.sql, src/lib/reference-texts/, src/types/reference-text.ts,
-  src/app/(main)/reference-texts/, src/components/reference-texts/
+- 분류(sql/60, 2026-10-03): **교과서 단원 여럿**(`units`) · **문법**(`grammar_paths`) · **판본 메모**(`note`).
+  작품은 제목·지은이 칸 그 자체이고 '문제 은행에서 작품 고르기' 로 기출과 같은 표기를 채운다.
+  ⚠️ **학교 축은 없다**(원장님 결정)
+- 판본 메모: 같은 작품이 교과서마다 본문이 조금 다르면 **판본마다 따로 올려** 각각 그 교과서 단원만 붙이고
+  이 칸에 적어 가른다. 거의 같으면 한 편에 단원을 여럿 붙인다. 작품 트리에서는 한 잎에 `(2)` 로 모인다
+- 코드에서의 사용: `ReferenceText`, `ReferenceTextListItem`, `useReferenceTextEditor`, `useReferenceTexts`,
+  `useReferenceTextFacets`
+- 관련 파일: sql/30_reference_texts.sql, sql/60_reference_texts_classification.sql, src/lib/reference-texts/,
+  src/types/reference-text.ts, src/app/(main)/reference-texts/, src/components/reference-texts/
+
+## 전문 단원 (ReferenceUnit)
+- 정의: 작품 전문이 실린 교과서 단원 하나 — `{ grade, textbook, semester, unit_path }`(sql/60 `units` 의 원소)
+- 카테고리 관리(중등·고등)의 **이름 스냅샷**이다(id 아님) — 문항 `unit_path` 와 같은 규약. 문항은 교과서·학년·학기를
+  출처 행에 두지만 전문에는 출처가 없어 원소가 함께 든다. `unit_path` 는 [대단원] 또는 [대단원, 소단원]
+- 전문 하나에 **최대 8개**(`REFERENCE_UNITS_MAX` = DB 검사 함수의 상한). 겹침·빈 단원은 보내기 전에 걷는다
+- 코드에서의 사용: `ReferenceUnit`, `unitFromCategory`, `unitKey`(JSON 열쇠), `unitLabel`, `normalizeReferenceUnits`,
+  `toggleReferenceUnit`
+- 관련 파일: src/lib/reference-texts/units.ts, src/components/reference-texts/UnitPickBody.tsx
+
+## 전문 훑기 축 (ReferenceBrowseAxis)
+- 정의: 작품 전문 목록을 지금 무엇으로 훑고 있는가 — 왼쪽 패널 세 탭(교과서 · 단원 / 작품 / 문법)의 잎 값
+- **한 번에 하나**다(세 탭은 대안 경로 — 아카이브가 트리를 누를 때 다른 축을 비우는 것과 같은 판단). '분류 없음' 도
+  불리언 칸이 아니라 갈래(`unit-none`·`grammar-none`)다. 검색어는 축과 따로 함께 걸린다
+- 잎 id = `axisKey(축)` 이라 강조가 축에서 바로 나온다(작품은 `workKey`, 문법은 `grammarNodeKey` 그대로)
+- 코드에서의 사용: `ReferenceBrowseAxis`, `toReferenceTextQuery`, `axisKey`, `tabForAxis`, `describeAxis`
+- 관련 파일: src/lib/reference-texts/filters.ts, browse-trees.ts, unit-browse-tree.ts,
+  src/components/reference-texts/ReferenceSidePanel.tsx
 
 ## 문항 (Problem)
 - 정의: 발문·선지·정답을 가진 문제 하나. 단어 시험지의 '문항'과는 다른 개념이다.

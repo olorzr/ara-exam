@@ -7,12 +7,16 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import type { ReferenceTextEditorState } from '@/hooks/useReferenceTextEditor';
 import { REFERENCE_TEXT_BODY_MAX } from '@/lib/reference-texts/constants';
+import ReferenceClassifySection from './ReferenceClassifySection';
 import ReferenceTextImport from './ReferenceTextImport';
+import ReferenceWorkPickDialog from './ReferenceWorkPickDialog';
 
 /**
  * 작품 전문 편집 폼.
  *
  * 본문은 **평문**이라 서식 도구가 없다 — 줄바꿈만 그대로 지킨다(시는 행갈이가 곧 내용이다).
+ * 제목·지은이는 손으로 적거나 문제 은행 작품에서 고른다. 분류(단원·문법·판본 메모)는
+ * `ReferenceClassifySection` 이 맡는다.
  */
 
 interface ReferenceTextFormProps {
@@ -60,6 +64,11 @@ export default function ReferenceTextForm({ editor, backHref }: ReferenceTextFor
       </div>
 
       <section className="space-y-3 rounded-lg border border-gray-200 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-gray-800">작품</h2>
+          {/* 고르면 기출과 같은 표기가 들어가 문제 만들기의 자동 매칭이 지문을 찾는다 */}
+          <ReferenceWorkPickDialog onPick={({ title, author }) => patch({ title, author })} />
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
             <Label htmlFor="ref-title">작품 제목</Label>
@@ -80,7 +89,11 @@ export default function ReferenceTextForm({ editor, backHref }: ReferenceTextFor
             />
           </div>
         </div>
+      </section>
 
+      <ReferenceClassifySection draft={draft} patch={patch} />
+
+      <section className="space-y-3 rounded-lg border border-gray-200 p-4">
         <div className="space-y-1">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Label htmlFor="ref-body">본문</Label>

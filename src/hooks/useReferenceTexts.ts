@@ -5,6 +5,9 @@ import { toast } from 'sonner';
 import {
   REFERENCE_SEARCH_DEBOUNCE_MS, REFERENCE_TEXT_LIST_LIMIT,
 } from '@/lib/reference-texts/constants';
+import {
+  ALL_REFERENCE_TEXTS, toReferenceTextQuery, type ReferenceBrowseAxis,
+} from '@/lib/reference-texts/filters';
 import { fetchReferenceTextList, searchReferenceTexts } from '@/lib/reference-texts/queries';
 import { deleteReferenceText } from '@/lib/reference-texts/save';
 import type { ReferenceTextListItem } from '@/types/reference-text';
@@ -17,6 +20,8 @@ import type { ReferenceTextListItem } from '@/types/reference-text';
  * ⚠️ 그래서 **검색은 서버가 한다**(코덱스 리뷰 3R). 받아 둔 목록에서 거르면 상한을 넘긴 순간
  *    **옛 작품이 제목을 정확히 쳐도 없는 것처럼 보이고**, 이 화면에는 페이지 넘기기가 없어
  *    고치거나 지울 길이 아예 사라진다. 글자마다 물으면 왕복이 너무 늘어 잠깐 기다렸다 묻는다.
+ * 왼쪽 패널의 축(교과서 단원·작품·문법)도 같은 이유로 **서버에서** 건다 — 검색어와 함께 걸린다.
+ * 트리를 누르면 기다리지 않고 바로 묻는다(타이핑이 아니다).
  */
 export function useReferenceTexts() {
   const [rows, setRows] = useState<ReferenceTextListItem[]>([]);
@@ -24,6 +29,7 @@ export function useReferenceTexts() {
   const [empty, setEmpty] = useState(false);
   const [loading, setLoading] = useState(true);
   const [search, setSearchValue] = useState('');
+  const [axis, setAxisValue] = useState<ReferenceBrowseAxis>(ALL_REFERENCE_TEXTS);
   const [busyId, setBusyId] = useState<string | null>(null);
   const aliveRef = useRef(true);
   /** 지우기가 겹치지 않게 하는 잠금. ⚠️ state 가 아니라 ref 다 — 화면의 disabled 는 렌더 뒤다 */
@@ -39,25 +45,34 @@ export function useReferenceTexts() {
    *    입력칸과 목록이 어긋난 채로 남는다.
    */
   const searchRef = useRef('');
+  /**
+   * 지금 축의 거울 — 검색어 거울과 같은 이유다. 지우는 사이·디바운스가 도는 사이 축이
+   * 바뀌어도 다시 읽기가 **지금 축**으로 묻는다.
+   */
+  const axisRef = useRef<ReferenceBrowseAxis>(ALL_REFERENCE_TEXTS);
 
   /**
-   * 목록을 읽는다. 검색어가 있으면 제목·지은이를 따로 물어 합친다.
+   * 목록을 **지금 조건**(검색어 거울 + 축 거울)으로 읽는다. 검색어가 있으면 제목·지은이를
+   * 따로 물어 합친다.
    *
+   * ⚠️ 인자로 조건을 받지 않는다 — 닫아 둔 값으로 물으면 늦게 도는 호출(지운 뒤·디바운스)이
+   *    옛 조건으로 새 결과를 덮는다. 언제 불러도 거울을 읽는다.
    * ⚠️ `.or()` 를 쓰지 않는다 — 이스케이프가 인용을 통과하며 풀린다(저장소 공통 규약).
-   * @param keyword - 검색어 (빈 값이면 최근 목록)
    */
-  const load = useCallback(async (keyword: string) => {
+  const load = useCallback(async () => {
     queryIdRef.current += 1;
     const id = queryIdRef.current;
+    const term = searchRef.current.trim();
+    const currentAxis = axisRef.current;
+    const query = toReferenceTextQuery(currentAxis);
     try {
-      const term = keyword.trim();
       let list: ReferenceTextListItem[];
       if (term === '') {
-        list = await fetchReferenceTextList();
+        list = await fetchReferenceTextList(REFERENCE_TEXT_LIST_LIMIT, query);
       } else {
         const [byTitle, byAuthor] = await Promise.all([
-          searchReferenceTexts(term, 'title', REFERENCE_TEXT_LIST_LIMIT),
-          searchReferenceTexts(term, 'author', REFERENCE_TEXT_LIST_LIMIT),
+          searchReferenceTexts(term, 'title', REFERENCE_TEXT_LIST_LIMIT, query),
+          searchReferenceTexts(term, 'author', REFERENCE_TEXT_LIST_LIMIT, query),
         ]);
         // 제목이 맞은 것을 앞에 둔다 — 작품명으로 찾는 일이 대부분이다
         const merged = new Map<string, ReferenceTextListItem>();
@@ -68,8 +83,8 @@ export function useReferenceTexts() {
       }
       if (!aliveRef.current || id !== queryIdRef.current) return;
       setRows(list);
-      // 검색 중에는 '아예 없음' 을 판정하지 않는다 — 그건 검색 결과가 없는 것뿐이다
-      if (term === '') setEmpty(list.length === 0);
+      // 검색·축이 걸려 있으면 '아예 없음' 을 판정하지 않는다 — 그 조건에 없는 것뿐이다
+      if (term === '' && currentAxis.kind === 'all') setEmpty(list.length === 0);
     } catch (e) {
       if (aliveRef.current) {
         toast.error(e instanceof Error ? e.message : '전문 목록을 불러오지 못했어요.');
@@ -83,7 +98,7 @@ export function useReferenceTexts() {
     // ⚠️ 효과 본문에서 true 로 되돌린다 — StrictMode 의 setup → cleanup → setup 뒤에
     //    꺼진 채로 남으면 이 화면의 기능이 조용히 통째로 죽는다
     aliveRef.current = true;
-    load('');
+    load();
     return () => {
       aliveRef.current = false;
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -95,31 +110,50 @@ export function useReferenceTexts() {
     searchRef.current = value;
     setSearchValue(value);
     if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => load(value), REFERENCE_SEARCH_DEBOUNCE_MS);
+    timerRef.current = setTimeout(() => { void load(); }, REFERENCE_SEARCH_DEBOUNCE_MS);
   }, [load]);
 
-  const remove = useCallback(async (row: ReferenceTextListItem) => {
-    if (busyRef.current) return;
+  /**
+   * 축을 바꾼다 — 트리를 누른 것이라 기다리지 않고 바로 묻는다.
+   * 기다리던 검색 타이머는 지운다(같은 조건을 두 번 물을 까닭이 없다 — 거울을 읽으니 검색어도 실린다).
+   */
+  const setAxis = useCallback((next: ReferenceBrowseAxis) => {
+    axisRef.current = next;
+    setAxisValue(next);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    void load();
+  }, [load]);
+
+  /**
+   * 전문 하나를 지운다(확인을 묻는다).
+   * @param row - 지울 줄
+   * @returns 실제로 지웠으면 true — 왼쪽 트리를 다시 읽을지 부르는 쪽이 정한다
+   */
+  const remove = useCallback(async (row: ReferenceTextListItem): Promise<boolean> => {
+    if (busyRef.current) return false;
     if (!window.confirm(
       `"${row.title}" 전문을 지울까요?\n`
       + '되돌릴 수 없고, 문제 만들기에서 참고자료로 쓸 수 없게 됩니다.',
-    )) return;
+    )) return false;
 
     busyRef.current = true;
     setBusyId(row.id);
+    let deleted = false;
     try {
       await deleteReferenceText(row.id);
+      deleted = true;
       toast.success('전문을 지웠어요.');
       // 지운 뒤에는 **보고 있던 조건 그대로** 다시 읽는다 — 지역에서 행만 빼면 상한 너머의
       // 다음 작품이 올라오지 않아 목록이 한 줄씩 줄어든 채로 남는다.
-      // ⚠️ 닫아 둔 값이 아니라 **지금 검색어**다(지우는 사이에 바뀌었을 수 있다)
-      await load(searchRef.current);
+      // ⚠️ 닫아 둔 값이 아니라 **지금 검색어·축**이다(지우는 사이에 바뀌었을 수 있다)
+      await load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '지우지 못했어요.');
     } finally {
       busyRef.current = false;
       if (aliveRef.current) setBusyId(null);
     }
+    return deleted;
   }, [load]);
 
   return {
@@ -129,7 +163,9 @@ export function useReferenceTexts() {
     busyId,
     search,
     setSearch,
-    reload: () => load(searchRef.current),
+    axis,
+    setAxis,
+    reload: load,
     remove,
   };
 }
