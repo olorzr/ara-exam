@@ -1,7 +1,7 @@
 'use client';
 
 import { choiceGlyph } from '@/lib/problem-bank/choices';
-import { correctChoiceIndices } from '@/lib/problem-paper/answers';
+import { correctChoiceIndices, formatAnswer } from '@/lib/problem-paper/answers';
 import { renderFiguresInHtml, unplacedFigures } from '@/lib/problem-bank/figure-render';
 import { hasTabulatedChoices, matrixChoices, pairedChoices } from '@/lib/problem-bank/paired-choices';
 import { stripTrailingEmptyParagraphs } from '@/lib/problem-paper/html-trim';
@@ -117,13 +117,10 @@ export default function ProblemBodyView({ problem, imageUrls }: ProblemBodyViewP
       </div>
 
       {/* 객관식은 위에서 선지에 표시했다 — 여기서 또 적으면 두 번 말하는 셈이다 */}
-      {(!objective || tabulated) && (
+      {(!objective || tabulated || answerIndices.length === 0) && (
         <p className="mt-2 text-sm">
           <span className="font-semibold text-gray-500">정답 </span>
-          {answer
-            ? tabulated && answerIndices.length > 0
-              ? answerIndices.map((index) => choiceGlyph(index)).join(', ')
-              : answer
+          {answer ? formatAnswer(problem.question_type, answer, problem.choices.length)
             : <span className="text-amber-600">미입력</span>}
         </p>
       )}

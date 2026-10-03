@@ -50,6 +50,8 @@ interface ProblemHtmlEditorProps {
   ariaLabel?: string;
   /** 지문 편집기인가 — 옛한글이 들어오면 명조로 그린다(발문·선지는 고딕) */
   serif?: boolean;
+  /** 원본의 (가) 글자를 유지한 채 구역만 표시하는 지문 */
+  literalPassageLabels?: boolean;
 }
 
 /**
@@ -62,7 +64,7 @@ interface ProblemHtmlEditorProps {
  *    남아 있을 수 있어, 편집기에 넣기 **전에** 막는다(개념지에서 실제로 겪은 경로다).
  */
 export default function ProblemHtmlEditor({
-  value, onChange, minHeight = 120, ariaLabel, serif = false,
+  value, onChange, minHeight = 120, ariaLabel, serif = false, literalPassageLabels = false,
 }: ProblemHtmlEditorProps) {
   /**
    * 우리가 마지막으로 밖에 내보낸 HTML.
@@ -124,7 +126,7 @@ export default function ProblemHtmlEditor({
   const yetClass = hasYetHangul(value) ? ` ${serif ? 'yet-hangul-serif' : 'yet-hangul'}` : '';
 
   return (
-    <div className={`pb-editor rounded-md border border-gray-200${yetClass}`}>
+    <div className={`pb-editor rounded-md border border-gray-200${yetClass}${literalPassageLabels ? ' pb-editor--literal-passage-labels' : ''}`}>
       <ProblemEditorToolbar editor={editor} />
       <EditorContent editor={editor} className="px-3 py-2" style={{ minHeight }} />
     </div>

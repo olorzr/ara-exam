@@ -96,6 +96,14 @@ describe('formatAnswer', () => {
     expect(formatAnswer('객관식', '3,1', FIVE)).toBe('①, ③');
   });
 
+  it('대안 정답은 둘 다 칠하라는 뜻으로 표시하지 않는다', () => {
+    expect(correctChoiceIndices('객관식', '1or2', FIVE)).toEqual([]);
+    expect(formatAnswer('객관식', '1or2', FIVE)).toBe('① 또는 ②');
+    expect(formatAnswer('객관식', '4or5', FIVE)).toBe('④ 또는 ⑤');
+    expect(formatAnswer('객관식', '1or4', 3)).toBe('1or4');
+    expect(formatAnswer('객관식', '1or4', 0)).toBe('① 또는 ④');
+  });
+
   it('주관식은 적어 둔 답 그대로', () => {
     expect(formatAnswer('주관식', ' 은유 ', FIVE)).toBe('은유');
     expect(formatAnswer('주관식', '1,3', FIVE)).toBe('1,3');

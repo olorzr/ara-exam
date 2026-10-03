@@ -22,6 +22,9 @@ const ANSWER_SEPARATOR = ',';
 /** 복수 정답을 사람에게 보일 때 잇는 글자 — 좁은 격자 칸에서도 둘로 읽힌다 */
 const ANSWER_JOINER = ', ';
 
+/** 원본 답지의 `1or2`처럼 둘 중 어느 한 답도 인정하는 표기. */
+const ALTERNATIVE_ANSWER_RE = /^([1-5])or([1-5])$/i;
+
 /**
  * 객관식 정답이 가리키는 선지 자리 — **여럿일 수 있다**.
  *
@@ -82,6 +85,13 @@ export function formatAnswer(
   answer: string,
   choiceCount: number,
 ): string {
+  const alternative = answer.trim().match(ALTERNATIVE_ANSWER_RE);
+  if (questionType === '객관식' && alternative) {
+    if (choiceCount > 0 && (Number(alternative[1]) > choiceCount || Number(alternative[2]) > choiceCount)) {
+      return answer.trim();
+    }
+    return `${choiceGlyph(Number(alternative[1]) - 1)} 또는 ${choiceGlyph(Number(alternative[2]) - 1)}`;
+  }
   const indices = correctChoiceIndices(questionType, answer, choiceCount);
   if (indices.length > 0) return indices.map(choiceGlyph).join(ANSWER_JOINER);
   return answer.trim() || MISSING_ANSWER_LABEL;

@@ -1,5 +1,6 @@
 import { splitHtmlBlocks } from '@/lib/print/split-html-blocks';
 import { unplacedFigures } from '@/lib/problem-bank/figure-render';
+import { hasLiteralPassageLabels, hasSourceAccuratePassageLayout } from '@/lib/problem-bank/source-accurate-passages';
 import { sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import { hasYetHangul } from '@/lib/yet-hangul';
 import { explanationHtml, splitsExplanation } from './answers';
@@ -39,15 +40,19 @@ export type PaperBlock =
     figures?: string[];
     first: boolean;
     last: boolean;
+    /** 원본 대조가 끝난 지문 — 앱의 기본 바깥 틀을 더하지 않는다 */
+    sourceAccurate?: boolean;
+    /** (가)가 본문 글자에 있으므로 CSS 말머리는 숨긴다 */
+    literalLabels?: boolean;
     /**
      * 터뜨린 구역 상자의 조각일 때 그 상자 — 그리는 쪽이 `<blockquote data-box>` 틀을 두른다.
      * 상자를 통째로 한 블록에 두면 3,000자 (가) 지문이 한 쪽을 넘겨 깨알같이 줄어든다(box-parts.ts)
      */
     box?: BoxPart;
   }
-  | { kind: 'passage-image'; key: string; path: string; label: string }
+  | { kind: 'passage-image'; key: string; path: string; label: string; sourceAccurate?: boolean }
   /** 지문 본문 제자리에 끼울 그림 한 장 — 문단 조각들 사이에 낀다. 상자 안이면 같은 틀을 두른다 */
-  | { kind: 'passage-figure'; key: string; path: string; label: string; box?: BoxPart }
+  | { kind: 'passage-figure'; key: string; path: string; label: string; box?: BoxPart; sourceAccurate?: boolean; literalLabels?: boolean }
   | { kind: 'problem'; key: string; number: number; snapshot: PaperItemSnapshot }
   /**
    * 교사용에서 **따로 흘려 보내는** 해설 조각.
@@ -104,6 +109,8 @@ export function buildPaperBlocks(
     const passage = items[group.start].passage;
 
     if (passage) {
+      const layout = hasSourceAccuratePassageLayout(passage.id)
+        ? { sourceAccurate: true, literalLabels: hasLiteralPassageLabels(passage.html) } : {};
       blocks.push({
         kind: 'passage-header',
         key: `ph-${group.start}`,
@@ -116,6 +123,7 @@ export function buildPaperBlocks(
           key: `pi-${group.start}`,
           path: passage.image_path,
           label: passage.title || passage.label,
+          ...layout,
         });
       } else {
         const figures = passage.figure_paths ?? [];
@@ -128,10 +136,10 @@ export function buildPaperBlocks(
           .map((piece, i): PaperBlock => {
             const box = piece.box ? { box: piece.box } : {};
             return piece.figurePath
-              ? { kind: 'passage-figure', key: `pf-${group.start}-${i}`, path: piece.figurePath, label, ...box }
+              ? { kind: 'passage-figure', key: `pf-${group.start}-${i}`, path: piece.figurePath, label, ...box, ...layout }
               : {
                 kind: 'passage-part', key: `pp-${group.start}-${i}`, html: piece.html,
-                serif, figures, first: false, last: false, ...box,
+                serif, figures, first: false, last: false, ...box, ...layout,
               };
           });
 
@@ -144,6 +152,7 @@ export function buildPaperBlocks(
             key: `pf-${group.start}-x${index}`,
             path,
             label,
+            ...layout,
           });
         }
 

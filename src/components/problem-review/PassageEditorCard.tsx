@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import ProblemHtmlEditor from '@/components/problem-editor/ProblemHtmlEditor';
+import { hasLiteralPassageLabels, hasSourceAccuratePassageLayout } from '@/lib/problem-bank/source-accurate-passages';
 import PassageWorksEditor from './PassageWorksEditor';
 import PassageContinueButton from './PassageContinueButton';
 import FigureStrip from './FigureStrip';
@@ -272,7 +273,9 @@ export default function PassageEditorCard({
 
         <div className="space-y-1">
           <Label className="text-xs text-gray-500">본문</Label>
-          <ProblemHtmlEditor value={html} onChange={setHtml} minHeight={200} serif ariaLabel="지문 본문" />
+          <ProblemHtmlEditor value={html} onChange={setHtml} minHeight={200} serif
+            literalPassageLabels={hasSourceAccuratePassageLayout(passage.id) && hasLiteralPassageLabels(html)}
+            ariaLabel="지문 본문" />
         </div>
 
         <FigureStrip

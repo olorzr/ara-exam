@@ -789,6 +789,12 @@
   transform: none;
   padding: 0;
 }
+.pb-editor--literal-passage-labels .ProseMirror blockquote:is(
+  [data-box='가'], [data-box='나'], [data-box='다'], [data-box='라'], [data-box='마'],
+  [data-box='바'], [data-box='사'], [data-box='아'], [data-box='자'], [data-box='차']
+)::before {
+  content: none;
+}
 .pb-editor .ProseMirror blockquote[data-box='A'],
 .pb-editor .ProseMirror blockquote[data-box='B'],
 .pb-editor .ProseMirror blockquote[data-box='C'],

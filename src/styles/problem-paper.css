@@ -92,6 +92,14 @@
   margin-bottom: 6px;
 }
 
+/* 문제은행의 원문 지문은 HTML 안의 blockquote·표·code 만 원본 상자로 그린다.
+ * 바깥 지문 조각에까지 사각 테두리를 씌우면, 점선으로만 구분된 원문에 가짜 상자가 생기고
+ * 실제 상자는 이중 테두리가 된다. 지문으로 만든 퀴즈의 별도 틀은 그대로 둔다. */
+.pb-passage-part--unframed {
+  border: 0;
+  padding: 0;
+}
+
 /*
  * 구역 상자 — `data-box` 값이 곧 말머리다(정화가 허용 목록만 통과시킨다).
  * 값의 종류에 따라 인쇄 모양이 셋이다. 한글 대괄호 구간만 (가)와 구별하려고 괄호까지 저장한다.
@@ -153,6 +161,20 @@
   transform: none;
   padding: 0;
   margin-bottom: 2px;
+}
+
+/* 원본의 (가)는 문단의 실제 글자다. 구역 구조만 더하고 글자·공백은 그대로 보인다. */
+.pb-sheet .pb-passage-part--literal-labels blockquote:is(
+  [data-box='가'], [data-box='나'], [data-box='다'], [data-box='라'], [data-box='마'],
+  [data-box='바'], [data-box='사'], [data-box='아'], [data-box='자'], [data-box='차']
+)::before {
+  content: none;
+}
+.pb-sheet .pb-passage-part--unframed blockquote:is(
+  [data-box='가'], [data-box='나'], [data-box='다'], [data-box='라'], [data-box='마'],
+  [data-box='바'], [data-box='사'], [data-box='아'], [data-box='자'], [data-box='차']
+) {
+  margin-top: 0;
 }
 
 /* [A][B] — 지문 안 한 구간을 가리키는 표시. 왼쪽 세로선과 라벨 */

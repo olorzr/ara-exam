@@ -67,7 +67,7 @@ export function renderPaperBlocks({
 
       case 'passage-part': {
         // 옛한글 지문은 명조로 — 판정은 blocks.ts 가 지문 전체로 한 번 해서 모든 조각에 싣는다
-        const className = `pb-passage-part${block.first ? ' pb-passage-part--first' : ''}${
+        const className = `pb-passage-part${block.sourceAccurate ? ' pb-passage-part--unframed' : ''}${block.literalLabels ? ' pb-passage-part--literal-labels' : ''}${block.first ? ' pb-passage-part--first' : ''}${
           block.last ? ' pb-passage-part--last' : ''
         }${block.serif ? ' yet-hangul-serif' : ''}`;
         // 〈보기〉 상자·표 안에 남은 그림 자리표시자를 여기서 끼운다 — 구조를 자르지 않는다
@@ -79,7 +79,7 @@ export function renderPaperBlocks({
         return (
           <div key={block.key} className={className}>
             <blockquote
-              data-box={block.box.label}
+              data-box={block.box.label ?? undefined}
               className={boxPartClassName(block.box)}
               dangerouslySetInnerHTML={body}
             />
@@ -90,10 +90,10 @@ export function renderPaperBlocks({
       case 'passage-figure': {
         const image = <PrintImage path={block.path} urls={imageUrls} alt={`${block.label || '지문'} 자료`} />;
         return (
-          <div key={block.key} className="pb-passage-part pb-figure">
+          <div key={block.key} className={`pb-passage-part pb-figure${block.sourceAccurate ? ' pb-passage-part--unframed' : ''}${block.literalLabels ? ' pb-passage-part--literal-labels' : ''}`}>
             {/* 상자 안 그림도 같은 틀에 담는다 — 안 그러면 상자 윤곽이 그림 자리에서 끊긴다 */}
             {block.box
-              ? <blockquote data-box={block.box.label} className={boxPartClassName(block.box)}>{image}</blockquote>
+              ? <blockquote data-box={block.box.label ?? undefined} className={boxPartClassName(block.box)}>{image}</blockquote>
               : image}
           </div>
         );
@@ -101,7 +101,7 @@ export function renderPaperBlocks({
 
       case 'passage-image':
         return (
-          <div key={block.key} className="pb-passage-part pb-passage-part--first pb-passage-part--last">
+          <div key={block.key} className={`pb-passage-part pb-passage-part--first pb-passage-part--last${block.sourceAccurate ? ' pb-passage-part--unframed' : ''}`}>
             <PrintImage path={block.path} urls={imageUrls} alt={block.label || '지문'} />
           </div>
         );

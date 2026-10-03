@@ -35,6 +35,21 @@ describe('splitPassagePieces', () => {
     ]);
   });
 
+  it('원본 (가) 글자가 있는 지문도 글자를 유지하며 구역별로 나눈다', () => {
+    const pieces = splitPassagePieces(
+      '<blockquote data-box="가"><p>(가) 첫 문단</p><p>이어지는 문단</p></blockquote>'
+      + '<blockquote data-box="나"><p>(나) 다음 문단</p></blockquote>', [],
+    );
+    expect(pieces.map((piece) => piece.html)).toEqual([
+      '<p>(가) 첫 문단</p>', '<p>이어지는 문단</p>', '<p>(나) 다음 문단</p>',
+    ]);
+    expect(pieces.map((piece) => piece.box)).toEqual([
+      { label: '가', first: true, last: false },
+      { label: '가', first: false, last: true },
+      { label: '나', first: true, last: true },
+    ]);
+  });
+
   it('자식이 하나뿐인 상자는 그 조각이 처음이자 끝이다', () => {
     const [piece] = splitPassagePieces('<blockquote data-box="보기"><p>x</p></blockquote>', []);
     expect(piece.box).toEqual({ label: '보기', first: true, last: true });
@@ -95,9 +110,15 @@ describe('splitPassagePieces', () => {
       .toEqual(['<p>a</p>', '<p>b</p>']);
   });
 
-  it('말머리 없는 맨 blockquote·허용 목록 밖 말머리는 터뜨리지 않는다', () => {
+  it('말머리 없는 실제 상자도 문단마다 나누되 테두리만 이어서 그리도록 표시한다', () => {
     const bare = '<blockquote><p>a</p><p>b</p></blockquote>';
-    expect(splitPassagePieces(bare, [])).toEqual([{ html: bare }]);
+    expect(splitPassagePieces(bare, [])).toEqual([
+      { html: '<p>a</p>', box: { label: null, first: true, last: false } },
+      { html: '<p>b</p>', box: { label: null, first: false, last: true } },
+    ]);
+  });
+
+  it('허용 목록 밖 말머리는 터뜨리지 않는다', () => {
     const odd = '<blockquote data-box="활동지"><p>a</p><p>b</p></blockquote>';
     expect(splitPassagePieces(odd, [])).toEqual([{ html: odd }]);
   });

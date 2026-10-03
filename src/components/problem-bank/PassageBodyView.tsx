@@ -1,13 +1,14 @@
 'use client';
 
 import { sanitizeProblemHTML } from '@/lib/sanitize-problem';
+import { hasLiteralPassageLabels, hasSourceAccuratePassageLayout } from '@/lib/problem-bank/source-accurate-passages';
 import { hasYetHangul } from '@/lib/yet-hangul';
 import { BodyWithFigures } from './ProblemBodyView';
 import type { Passage } from '@/types/problem-bank';
 
 /** 그리는 데 필요한 만큼만 — 목록 조회가 컬럼을 좁혀 오는 자리도 있다 */
 export type PassageBody = Pick<
-  Passage, 'html' | 'render_mode' | 'image_path' | 'title' | 'label'
+  Passage, 'id' | 'html' | 'render_mode' | 'image_path' | 'title' | 'label'
 > & {
   /** 본문 제자리에 끼울 그림들. 옛 스냅샷·좁힌 조회에는 없을 수 있다 */
   figure_paths?: string[];
@@ -57,10 +58,15 @@ export default function PassageBodyView({
   // 옛한글 지문은 블록째 명조로 그린다 — 글꼴이 없으면 첫가끝 자모가 깨진 네모로 나온다.
   // 정화기는 class 를 허용하지 않으므로 **바깥 래퍼**에만 붙인다(CLAUDE.md 2026-09-15)
   const yetHangul = hasYetHangul(passage.html);
+  const sourceAccurate = hasSourceAccuratePassageLayout(passage.id);
+  const literalLabels = sourceAccurate && hasLiteralPassageLabels(passage.html);
 
   return (
     <div className={`pb-sheet pb-sheet--screen${yetHangul ? ' yet-hangul-serif' : ''}`}>
-      <div className="pb-passage-part pb-passage-part--first pb-passage-part--last">
+      <div className={`pb-passage-part pb-passage-part--first pb-passage-part--last${
+        sourceAccurate ? ' pb-passage-part--unframed' : ''
+      }${literalLabels ? ' pb-passage-part--literal-labels' : ''
+      }`}>
         <BodyWithFigures
           html={sanitizeProblemHTML(passage.html)}
           paths={passage.figure_paths ?? []}

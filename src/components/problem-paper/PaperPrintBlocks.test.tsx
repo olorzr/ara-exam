@@ -283,7 +283,7 @@ describe('구역 상자 조각', () => {
    */
   const withPassage = (html: string, figure_paths: string[] = []) => [snapshot({
     passage: {
-      id: 'P1', label: '', title: '춘향전', author: '', html,
+      id: '1d58d606-4f29-5025-8047-b4e9a6c17289', label: '', title: '춘향전', author: '', html,
       render_mode: 'text', image_path: '', figure_paths,
     },
   })];
@@ -297,6 +297,17 @@ describe('구역 상자 조각', () => {
       'pb-box-part pb-box-part--first', 'pb-box-part', 'pb-box-part pb-box-part--last',
     ]);
     expect(frames.map((f) => f.innerHTML)).toEqual(['<p>1</p>', '<p>2</p>', '<p>3</p>']);
+  });
+
+  it('본문의 (가) 글자와 옛 문제지 스냅샷의 CSS 말머리를 구별한다', () => {
+    const literal = draw(withPassage('<blockquote data-box="가"><p>(가) 원문</p></blockquote>'), false);
+    expect(literal.querySelector('.pb-passage-part--literal-labels blockquote[data-box="가"]')?.textContent)
+      .toBe('(가) 원문');
+
+    const snapshot = draw(withPassage('<blockquote data-box="가"><p>원문</p></blockquote>'), false);
+    expect(snapshot.querySelector('.pb-passage-part--literal-labels')).toBeNull();
+    expect(snapshot.querySelector('.pb-passage-part--unframed blockquote[data-box="가"]')?.textContent)
+      .toBe('원문');
   });
 
   it('상자 안 그림도 같은 틀 안에 그린다 — 윤곽이 그림 위에서 끊기면 안 된다', () => {
@@ -313,8 +324,25 @@ describe('구역 상자 조각', () => {
     const container = draw(withPassage('<p>a</p><p>b</p>'), false);
 
     expect(container.querySelectorAll('.pb-box-part')).toHaveLength(0);
+    expect(container.querySelectorAll('.pb-passage-part--unframed')).toHaveLength(2);
     expect(Array.from(container.querySelectorAll('.pb-passage-part')).map((el) => el.innerHTML))
       .toEqual(['<p>a</p>', '<p>b</p>']);
+  });
+
+  it('검수하지 않은 기존 지문의 인쇄 틀은 유지한다', () => {
+    const [item] = withPassage('<p>기존 지문</p>');
+    const container = draw([{ ...item, passage: { ...item.passage!, id: 'legacy-passage' } }], false);
+    expect(container.querySelector('.pb-passage-part--unframed')).toBeNull();
+  });
+
+  it('제목 없는 원문 상자는 인쇄 쪽이 갈려도 한 겹 테두리로 이어진다', () => {
+    const container = draw(withPassage('<p>지시문</p><blockquote><p>가</p><p>나</p></blockquote>'), false);
+    const frames = Array.from(container.querySelectorAll('.pb-passage-part--unframed > blockquote:not([data-box])'));
+
+    expect(frames).toHaveLength(2);
+    expect(frames.map((frame) => frame.className)).toEqual([
+      'pb-box-part pb-box-part--first', 'pb-box-part pb-box-part--last',
+    ]);
   });
 
   it('상자 안 상자는 그대로 둔다', () => {

@@ -16,6 +16,7 @@ function problem(over: Partial<ProblemBody> = {}): ProblemBody {
 
 function passage(over: Partial<PassageBody> = {}): PassageBody {
   return {
+    id: '1d58d606-4f29-5025-8047-b4e9a6c17289',
     html: '<p>소나기가 그쳤다</p>', render_mode: 'text', image_path: '', title: '', label: '',
     ...over,
   };
@@ -59,6 +60,16 @@ describe('정답 선지 표시', () => {
         problem={problem({ choices: ['가', '나', '다'], answer: '1,0' })} imageUrls={new Map()}
       />,
     );
+    expect(markedOf(container)).toEqual([]);
+  });
+
+  it('텍스트 문항의 대안 정답을 두 선지 아래에 명확히 표시한다', () => {
+    const { container } = render(
+      <ProblemBodyView problem={problem({
+        answer: '1or2', choices: ['하나', '둘', '셋', '넷', '다섯'], render_mode: 'text',
+      })} imageUrls={new Map()} />,
+    );
+    expect(container.textContent).toContain('정답 ① 또는 ②');
     expect(markedOf(container)).toEqual([]);
   });
 
@@ -155,5 +166,22 @@ describe('옛한글 글꼴 클래스', () => {
       />,
     );
     expect(sheetOf(container)).not.toContain('yet-hangul');
+  });
+});
+
+describe('원문 지문 상자', () => {
+  it('지문 전체에 가짜 틀을 두르지 않고 원문 상자만 남긴다', () => {
+    const { container } = render(<PassageBodyView passage={passage({
+      html: '<p>지시문</p><blockquote><p>실제 상자</p></blockquote><p><code>단어 상자</code></p>',
+    })} />);
+
+    expect(container.querySelector('.pb-passage-part--unframed')).not.toBeNull();
+    expect(container.querySelectorAll('blockquote:not([data-box])')).toHaveLength(1);
+    expect(container.querySelectorAll('code')).toHaveLength(1);
+  });
+
+  it('이번 검수 밖의 기존 지문은 표시 규칙을 바꾸지 않는다', () => {
+    const { container } = render(<PassageBodyView passage={passage({ id: 'legacy-passage' })} />);
+    expect(container.querySelector('.pb-passage-part--unframed')).toBeNull();
   });
 });

@@ -7,7 +7,7 @@ import { isEmptyParagraph } from './html-trim';
  * 지문 HTML → 인쇄 조각 (DOM 파싱, 브라우저 전용 — 없으면 통째로 한 조각).
  *
  * 인쇄 엔진의 블록 하나는 **쪽을 넘겨 쪼갤 수 없는 최소 단위**다. 그래서 지문은 최상위
- * 요소 하나가 한 조각인데, **최상위 구역 상자(`blockquote[data-box]`)만은 자식 단위로
+ * 요소 하나가 한 조각인데, **최상위 상자(`blockquote`)는 자식 단위로
  * 터뜨린다.** 상자 하나에 지문 전체가 담기면(대원국제중 시험지는 지문마다 테두리를 두르고,
  * OCR 이 그 테두리를 `(가)` 상자로 읽었다) 3,000자가 한 블록이 되어 한 쪽을 넘기고,
  * 인쇄 엔진이 `transform: scale()` 로 통째로 줄여 **깨알같이** 찍었다(2026-09-27 춘향전).
@@ -20,8 +20,8 @@ import { isEmptyParagraph } from './html-trim';
 
 /** 터뜨린 구역 상자의 표시 — 그리는 쪽이 이 값으로 상자 틀을 두른다 */
 export interface BoxPart {
-  /** `data-box` 값(괄호 없음). `boxKind` 를 지난 값만 온다 */
-  label: string;
+  /** `data-box` 값(괄호 없음). 말머리 없는 실제 상자는 null */
+  label: string | null;
   /** 이 상자의 첫 조각 — 말머리·윗선은 여기에만 */
   first: boolean;
   /** 이 상자의 마지막 조각 — 아랫선은 여기에만 */
@@ -46,12 +46,14 @@ const INLINE_TAGS = new Set(['STRONG', 'EM', 'U', 'S', 'CODE', 'SPAN', 'BR']);
  * ⚠️ 정렬 같은 속성이 붙은 상자를 터뜨리면 틀을 다시 두를 때 그 속성이 사라진다.
  *    운영 데이터에는 없는 모양이라(2026-09-27) 예전처럼 통째로 둔다.
  * @param el - 최상위 요소
- * @returns 말머리 또는 null
+ * @returns 허용된 말머리, 말머리 없는 상자는 null, 나눌 수 없으면 undefined
  */
-function explodableLabel(el: Element): string | null {
-  if (el.tagName !== 'BLOCKQUOTE' || el.attributes.length !== 1) return null;
+function explodableLabel(el: Element): string | null | undefined {
+  if (el.tagName !== 'BLOCKQUOTE') return undefined;
+  if (el.attributes.length === 0) return null;
+  if (el.attributes.length !== 1) return undefined;
   const label = el.getAttribute('data-box');
-  return label !== null && boxKind(label) ? label : null;
+  return label !== null && boxKind(label) ? label : undefined;
 }
 
 /**
@@ -122,7 +124,7 @@ function trimEdges(pieces: PassagePiece[]): PassagePiece[] {
  * @param figures - 지문 그림 경로들
  * @returns 상자 표시를 단 조각들
  */
-function explodeBox(box: Element, label: string, figures: readonly string[]): PassagePiece[] {
+function explodeBox(box: Element, label: string | null, figures: readonly string[]): PassagePiece[] {
   const inner = trimEdges(childPieces(box).flatMap((html) => withFigure(html, figures)));
   return inner.map((piece, i) => ({
     ...piece,
@@ -147,7 +149,7 @@ export function splitPassagePieces(html: string, figures: readonly string[]): Pa
   const pieces: PassagePiece[] = [];
   for (const el of Array.from(host.children)) {
     const label = explodableLabel(el);
-    const exploded = label ? explodeBox(el, label, figures) : [];
+    const exploded = label !== undefined ? explodeBox(el, label, figures) : [];
     if (exploded.length > 0) pieces.push(...exploded);
     else pieces.push(...withFigure(el.outerHTML, figures));
   }

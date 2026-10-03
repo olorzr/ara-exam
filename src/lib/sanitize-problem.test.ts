@@ -68,6 +68,8 @@ describe('sanitizeProblemHTML', () => {
   it('style 은 좁은 화이트리스트만 통과한다', () => {
     expect(sanitizeProblemHTML('<p style="text-align: center">가운데</p>'))
       .toContain('text-align: center');
+    expect(sanitizeProblemHTML('<blockquote style="background-color: #e5e5e5"><p>원문 메모</p></blockquote>'))
+      .toContain('background-color: #e5e5e5');
     expect(sanitizeProblemHTML('<p style="position: fixed; inset: 0">덮개</p>'))
       .not.toContain('position');
   });
