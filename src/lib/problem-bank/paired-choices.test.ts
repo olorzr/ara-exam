@@ -52,6 +52,13 @@ describe('matrixChoices', () => {
     });
   });
 
+  it('keeps two meaning-extension examples aligned under ㉠ and ㉡', () => {
+    const stem = '<blockquote data-box="보기"><p>대화</p></blockquote><p>㉠　　㉡</p>';
+    const choices = Array(5).fill('물은 낮은 곳으로 흐른다.<br>환경에 대한 관심도가 낮다.');
+    expect(matrixChoices(stem, choices)?.headers).toEqual(['㉠', '㉡']);
+    expect(matrixChoices(stem, choices)?.rows[0]).toHaveLength(2);
+  });
+
   it('keeps Middle Korean answer forms aligned in three columns', () => {
     const stem = '<p>물음</p><p>㉮　　㉯　　㉰</p>';
     const choices = Array(5).fill('니이라<br>바이라<br>다락라');
