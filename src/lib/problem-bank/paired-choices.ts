@@ -29,3 +29,12 @@ export function matrixChoices(stemHtml: string, choices: readonly string[]) {
   if (rows.some((row) => row.length !== headers.length || row.some((cell) => !cell))) return null;
   return { stemHtml: stemHtml.replace(interview ? INTERVIEW_HEADER : MATRIX_HEADER, ''), headers, rows };
 }
+
+/** 선지 다섯 개가 이미 본문 표의 행이나 칸에 적힌 경우를 찾는다. */
+export function hasTabulatedChoices(stemHtml: string, choices: readonly string[]) {
+  const glyphs = ['①', '②', '③', '④', '⑤'];
+  if (choices.length !== 5 || choices.some((choice, i) => choice !== glyphs[i])) return false;
+
+  return [...stemHtml.matchAll(/<table\b[^>]*>[\s\S]*?<\/table>/giu)]
+    .some(([table]) => glyphs.every((glyph) => table.includes(glyph)));
+}

@@ -91,6 +91,34 @@ describe('정답 선지 표시', () => {
     expect(table?.querySelector('tbody tr:nth-child(2)')?.textContent).toContain('정답');
     expect(container.querySelector('.pb-q__stem')?.textContent).not.toContain('㉠');
   });
+
+  it('선지가 표 안에 이미 있으면 번호만 다시 나열하지 않는다', () => {
+    const { container } = render(
+      <ProblemBodyView problem={problem({
+        stem_html: '<p>설명 방법은?</p><table><tbody><tr><th>예</th><th>설명 방법</th></tr>'
+          + '<tr><th>①</th><td>정의</td></tr><tr><th>②</th><td>분석</td></tr>'
+          + '<tr><th>③</th><td>예시</td></tr><tr><th>④</th><td>비교</td></tr>'
+          + '<tr><th>⑤</th><td>대조</td></tr></tbody></table>',
+        choices: ['①', '②', '③', '④', '⑤'], answer: '3',
+      })} imageUrls={new Map()} />,
+    );
+    expect(container.querySelectorAll('.pb-q__stem tbody tr')).toHaveLength(6);
+    expect(container.querySelectorAll('.pb-q__choice')).toHaveLength(0);
+    expect(container.textContent).toContain('정답 ③');
+  });
+
+  it('표의 여러 칸에 선지 번호가 흩어진 경우도 번호를 중복하지 않는다', () => {
+    const { container } = render(
+      <ProblemBodyView problem={problem({
+        stem_html: '<p>설명은?</p><table><tbody><tr><th>공통점</th><td>① 설명</td></tr>'
+          + '<tr><th>차이</th><td>② 설명<br>③ 설명</td></tr>'
+          + '<tr><th>차이</th><td>④ 설명<br>⑤ 설명</td></tr></tbody></table>',
+        choices: ['①', '②', '③', '④', '⑤'], answer: '5',
+      })} imageUrls={new Map()} />,
+    );
+    expect(container.querySelectorAll('.pb-q__choice')).toHaveLength(0);
+    expect(container.textContent).toContain('정답 ⑤');
+  });
 });
 
 describe('옛한글 글꼴 클래스', () => {

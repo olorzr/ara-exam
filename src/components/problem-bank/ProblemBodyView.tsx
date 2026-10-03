@@ -3,7 +3,7 @@
 import { choiceGlyph } from '@/lib/problem-bank/choices';
 import { correctChoiceIndices } from '@/lib/problem-paper/answers';
 import { renderFiguresInHtml, unplacedFigures } from '@/lib/problem-bank/figure-render';
-import { matrixChoices, pairedChoices } from '@/lib/problem-bank/paired-choices';
+import { hasTabulatedChoices, matrixChoices, pairedChoices } from '@/lib/problem-bank/paired-choices';
 import { stripTrailingEmptyParagraphs } from '@/lib/problem-paper/html-trim';
 import { sanitizeInlineHTML, sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import { hasYetHangul } from '@/lib/yet-hangul';
@@ -44,6 +44,8 @@ export default function ProblemBodyView({ problem, imageUrls }: ProblemBodyViewP
   const objective = !asImage && problem.question_type === '객관식' && problem.choices.length > 0;
   const paired = objective ? pairedChoices(problem.stem_html, problem.choices) : null;
   const matrix = objective && !paired ? matrixChoices(problem.stem_html, problem.choices) : null;
+  const tabulated = objective && !paired && !matrix
+    ? hasTabulatedChoices(problem.stem_html, problem.choices) : false;
   const answer = problem.answer.trim();
   /**
    * 정답 선지 자리.
@@ -94,7 +96,7 @@ export default function ProblemBodyView({ problem, imageUrls }: ProblemBodyViewP
           <MatrixChoiceTable headers={matrix.headers} rows={matrix.rows} answerIndices={answerIndices} />
         )}
 
-        {objective && !paired && !matrix && (
+        {objective && !paired && !matrix && !tabulated && (
           <div className="pb-q__choices">
             {problem.choices.map((choice, i) => {
               const isAnswer = answerIndices.includes(i);
@@ -115,10 +117,14 @@ export default function ProblemBodyView({ problem, imageUrls }: ProblemBodyViewP
       </div>
 
       {/* 객관식은 위에서 선지에 표시했다 — 여기서 또 적으면 두 번 말하는 셈이다 */}
-      {!objective && (
+      {(!objective || tabulated) && (
         <p className="mt-2 text-sm">
           <span className="font-semibold text-gray-500">정답 </span>
-          {answer || <span className="text-amber-600">미입력</span>}
+          {answer
+            ? tabulated && answerIndices.length > 0
+              ? answerIndices.map((index) => choiceGlyph(index)).join(', ')
+              : answer
+            : <span className="text-amber-600">미입력</span>}
         </p>
       )}
 

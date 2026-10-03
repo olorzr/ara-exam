@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { sanitizeInlineHTML, sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import { choiceGlyph } from '@/lib/problem-bank/choices';
 import { renderFiguresInHtml, unplacedFigures } from '@/lib/problem-bank/figure-render';
-import { matrixChoices, pairedChoices } from '@/lib/problem-bank/paired-choices';
+import { hasTabulatedChoices, matrixChoices, pairedChoices } from '@/lib/problem-bank/paired-choices';
 import { correctChoiceIndices, splitsExplanation } from '@/lib/problem-paper/answers';
 import type { PaperBlock } from '@/lib/problem-paper/blocks';
 import { boxPartClassName } from '@/lib/problem-paper/box-parts';
@@ -227,6 +227,8 @@ function ProblemBlock({ number, snapshot, settings, imageUrls, showAnswers, slot
   const objective = snapshot.question_type === '객관식' && snapshot.choices.length > 0;
   const paired = objective ? pairedChoices(snapshot.stem_html, snapshot.choices) : null;
   const matrix = objective && !paired ? matrixChoices(snapshot.stem_html, snapshot.choices) : null;
+  const tabulated = objective && !paired && !matrix
+    ? hasTabulatedChoices(snapshot.stem_html, snapshot.choices) : false;
   // 발문·선지의 옛한글은 **고딕**이다(지문만 명조 — CLAUDE.md 2026-09-15)
   const yetHangul = hasYetHangul([snapshot.stem_html, ...snapshot.choices].join(''));
   // 교사용에서 표시할 정답 선지. 객관식이 아니면 빈 배열이라 아무 선지도 안 걸린다.
@@ -258,7 +260,7 @@ function ProblemBlock({ number, snapshot, settings, imageUrls, showAnswers, slot
         <PairedChoiceTable rows={paired.rows} answerIndices={answerIndices} />
       ) : objective && matrix ? (
         <MatrixChoiceTable headers={matrix.headers} rows={matrix.rows} answerIndices={answerIndices} />
-      ) : objective ? (
+      ) : objective && !tabulated ? (
         <div className="pb-q__choices">
           {snapshot.choices.map((choice, i) => {
             const isAnswer = answerIndices.includes(i);
@@ -272,7 +274,7 @@ function ProblemBlock({ number, snapshot, settings, imageUrls, showAnswers, slot
             );
           })}
         </div>
-      ) : !showAnswers && (
+      ) : !objective && !showAnswers && (
         // 답 쓰는 자리는 **줄을 긋지 않고 비워 둔다**(2026-09-27 사용자 결정) — 18px 짜리
         // 줄에 글씨를 맞춰 넣기가 답답하다는 제보다. 서술형은 더 넓다.
         // 교사용에는 그리지 않는다 — 쓸 사람이 없다
