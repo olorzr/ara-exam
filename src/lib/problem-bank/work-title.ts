@@ -127,8 +127,8 @@ export const WORK_JOIN = ' · ';
 const FIELD_SEP = '\u0000';
 const ROW_SEP = '\u0001';
 
-/** 한 지문에 실릴 수 있는 작품 수 — DB 의 CHECK(6)와 같아야 한다 */
-export const WORKS_MAX = 6;
+/** 한 지문에 실릴 수 있는 작품 수 — DB 의 CHECK(8)과 같아야 한다 */
+export const WORKS_MAX = 8;
 
 /**
  * 나눌 때 받아 주는 이음 기호들.

@@ -144,6 +144,16 @@ describe('normalizePassageWorks', () => {
     const many = Array.from({ length: WORKS_MAX + 2 }, (_, i) => work({ title: `작품${i}` }));
     expect(normalizePassageWorks(many)).toHaveLength(WORKS_MAX);
   });
+
+  it('한 지문의 시조 일곱 편을 마지막 작품까지 보존한다', () => {
+    const titles = [
+      '이 몸이 죽어 가서', '흥망이 유수하니', '선인교 나린 물이',
+      '눈 마자 휘어진 대를', '이런들 어떠하며', '백설이 잦아진 골에', '오백 년 도읍지를',
+    ];
+    const works = titles.map((title, i) => work({ label: '가나다라마바사'[i], title, author: '' }));
+    expect(normalizePassageWorks(works).map(({ title }) => title)).toEqual(titles);
+    expect(normalizeWorkTitles(titles)).toEqual(titles);
+  });
 });
 
 describe('worksKey', () => {
