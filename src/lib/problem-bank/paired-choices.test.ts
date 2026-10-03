@@ -52,6 +52,12 @@ describe('matrixChoices', () => {
     });
   });
 
+  it('keeps Middle Korean answer forms aligned in three columns', () => {
+    const stem = '<p>물음</p><p>㉮　　㉯　　㉰</p>';
+    const choices = Array(5).fill('니이라<br>바이라<br>다락라');
+    expect(matrixChoices(stem, choices)?.headers).toEqual(['㉮', '㉯', '㉰']);
+  });
+
   it('removes a four-column header inside the source box', () => {
     const stem = '<blockquote data-box="보기"><p>자료</p><p>A B C D</p></blockquote>';
     const choices = Array(5).fill('불황<br>거시<br>사용<br>미시');
