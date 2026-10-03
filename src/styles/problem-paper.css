@@ -46,6 +46,16 @@
   text-decoration-thickness: 1px;
 }
 
+/* 원문에서 단어나 구절만 네모로 둘러싼 표시. 밑줄과 구별한다. */
+.pb-sheet code {
+  border: 1px solid currentColor;
+  border-radius: 0;
+  background: transparent;
+  padding: 0 2px;
+  font: inherit;
+  white-space: normal;
+}
+
 /* 지문 안 가로 구분선 */
 .pb-sheet hr {
   border: 0;
