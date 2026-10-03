@@ -50,6 +50,14 @@ describe('UnitPickBody', () => {
     expect(screen.getByText(/8개까지 붙일 수 있어요/)).toBeTruthy();
   });
 
+  it('⚠️ 대단원이 빈 카테고리는 그리지 않는다 — 눌러도 붙일 단원이 없는 체크 상자가 된다', async () => {
+    renderBody([], [category(), category({ id: 'cat-0', publisher: '빈교과서', chapter: '', sub_chapter: '' })]);
+    await open('중등');
+    await open('중2');
+    expect(screen.getByText('천재(노미숙)')).toBeTruthy();
+    expect(screen.queryByText('빈교과서')).toBeNull();
+  });
+
   it('검색하면 맞는 단원만 남기고 펼쳐 보인다', () => {
     renderBody([], [category(), category({ id: 'cat-2', publisher: '비상(김진수)', chapter: '3. 소설', sub_chapter: '' })]);
     fireEvent.change(screen.getByLabelText('단원 검색'), { target: { value: '소설' } });

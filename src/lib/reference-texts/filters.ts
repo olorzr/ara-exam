@@ -1,8 +1,7 @@
 import { formatGrammarPath, grammarPathsUnder } from '@/lib/problem-bank/grammar-tree';
 import { GRAMMAR_SELF_LEAF, grammarNodeKey } from '@/lib/problem-bank/grammar-browse-tree';
+import { unitPathLabel } from '@/lib/problem-bank/unit-tree';
 import { workKey } from '@/lib/problem-bank/work-tree';
-import type { ReferenceUnit } from '@/types/reference-text';
-import { unitKey, unitLabel } from './units';
 
 /**
  * 작품 전문 목록을 **무엇으로 훑고 있는가** (순수 함수).
@@ -16,11 +15,26 @@ import { unitKey, unitLabel } from './units';
  * ⚠️ 주소(URL)에 남기지 않는다 — 이 화면은 원래 주소 상태가 없다. 필요해지면 그때 더한다.
  */
 
+/**
+ * 단원 트리에서 고를 수 있는 **범위** — 학년만 · 교과서까지 · 학기까지 · 대단원(·소단원)까지.
+ *
+ * 빠진 칸은 '그 아래 전부' 다. jsonb 포함(`units @> [{…}]`)은 준 칸만 맞춰 보므로, 칸을 덜 주면
+ * 그 범위의 단원이 모두 걸린다(교과서 폴더의 `(전체)` 잎이 `{grade, textbook}` 만 준다).
+ * ⚠️ 빈 문자열은 '빠짐' 이 아니라 **'미지정인 것만'** 이다(학기 미지정 폴더) — 그래서 칸을
+ *    `undefined` 로 비운다. `JSON.stringify` 가 `undefined` 칸을 빼고 보낸다.
+ */
+export interface ReferenceUnitScope {
+  grade: string;
+  textbook?: string;
+  semester?: string;
+  unit_path?: string[];
+}
+
 /** 지금 걸린 축 */
 export type ReferenceBrowseAxis =
   | { kind: 'all' }
-  /** 이 단원이 붙은 전문 — 대단원만 든 단원이면 그 아래 소단원 단원까지(jsonb 포함) */
-  | { kind: 'unit'; unit: ReferenceUnit }
+  /** 이 범위의 단원이 붙은 전문 — 대단원만 주면 그 아래 소단원 단원까지(jsonb 포함) */
+  | { kind: 'unit'; unit: ReferenceUnitScope }
   /** 단원이 하나도 없는 전문 */
   | { kind: 'unit-none' }
   /** 이 제목의 전문 (판본이 여럿이면 함께 나온다) */
@@ -41,8 +55,8 @@ export const REFERENCE_SIDE_TABS: readonly ReferenceSideTab[] = ['units', 'works
 
 /** 조회에 넘길 조건 (`applyReferenceQuery` 가 PostgREST 필터로 옮긴다) */
 export interface ReferenceTextQuery {
-  /** `units @> [unit]` */
-  unit?: ReferenceUnit;
+  /** `units @> [unit]` — 준 칸만 맞춘다 */
+  unit?: ReferenceUnitScope;
   /** `units = '[]'` */
   unitsEmpty?: true;
   /** `title = …` */
@@ -56,6 +70,33 @@ export interface ReferenceTextQuery {
 /** '분류 없음' 잎의 열쇠 — 트리와 강조가 같은 값을 쓴다 */
 export const UNIT_NONE_KEY = 'unit:none';
 export const GRAMMAR_NONE_KEY = 'grammar:none';
+
+/**
+ * 범위 하나를 가리키는 열쇠 — 빠진 칸(`null`)과 빈 칸(`''`, 미지정)을 가른다.
+ *
+ * ⚠️ `JSON.stringify` 로 만든다. 교과서·단원 이름은 자유 텍스트라 구분자로 이으면 겹친다.
+ * @param scope - 범위
+ * @returns 열쇠
+ */
+export function unitScopeKey(scope: ReferenceUnitScope): string {
+  return JSON.stringify([
+    scope.grade, scope.textbook ?? null, scope.semester ?? null, scope.unit_path ?? null,
+  ]);
+}
+
+/**
+ * 범위를 한 줄로 — 목록 위 요약 줄.
+ * @param scope - 범위
+ * @returns '중2 천재(노미숙) 전체' · '중2 천재(노미숙) 1학기 1. 문학 > (1) 시'
+ */
+export function unitScopeLabel(scope: ReferenceUnitScope): string {
+  const parts = [scope.grade || '학년 미지정'];
+  if (scope.textbook !== undefined) parts.push(scope.textbook);
+  if (scope.semester !== undefined) parts.push(scope.semester || '학기 미지정');
+  const path = unitPathLabel(scope.unit_path ?? []);
+  parts.push(path || '전체');
+  return parts.join(' ');
+}
 
 /**
  * 축을 조회 조건으로.
@@ -84,7 +125,7 @@ export function toReferenceTextQuery(axis: ReferenceBrowseAxis): ReferenceTextQu
  */
 export function axisKey(axis: ReferenceBrowseAxis): string {
   switch (axis.kind) {
-    case 'unit': return `unit:${unitKey(axis.unit)}`;
+    case 'unit': return `unit:${unitScopeKey(axis.unit)}`;
     case 'unit-none': return UNIT_NONE_KEY;
     case 'work': return workKey({ title: axis.title });
     case 'grammar': return grammarPathsUnder(axis.path).length > 1
@@ -113,7 +154,7 @@ export function tabForAxis(axis: ReferenceBrowseAxis): ReferenceSideTab {
  */
 export function describeAxis(axis: ReferenceBrowseAxis): string {
   switch (axis.kind) {
-    case 'unit': return unitLabel(axis.unit);
+    case 'unit': return unitScopeLabel(axis.unit);
     case 'unit-none': return '교과서 단원을 안 붙인 전문';
     case 'work': return `작품 · ${axis.title}`;
     case 'grammar': return `문법 · ${formatGrammarPath(axis.path)}`;

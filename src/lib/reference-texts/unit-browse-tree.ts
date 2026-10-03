@@ -1,8 +1,9 @@
 import { naturalCompare } from '@/lib/category-tree';
 import type { FacetTreeNode } from '@/lib/problem-bank/school-exam-tree';
-import type { ReferenceUnit } from '@/types/reference-text';
 import type { ReferenceFacetRow } from './facets';
-import { UNIT_NONE_KEY, axisKey, type ReferenceBrowseAxis } from './filters';
+import {
+  UNIT_NONE_KEY, axisKey, type ReferenceBrowseAxis, type ReferenceUnitScope,
+} from './filters';
 
 /**
  * 작품 전문의 교과서 · 단원 트리 (순수 함수).
@@ -13,8 +14,9 @@ import { UNIT_NONE_KEY, axisKey, type ReferenceBrowseAxis } from './filters';
  *
  * ⚠️ 건수는 **전문 수**다(단원 수가 아니다). 한 전문이 같은 대단원의 소단원 둘에 붙어 있으면
  *    대단원 폴더에서는 한 번만 센다 — `(n)` 이 그 폴더를 눌렀을 때 나오는 목록 길이와 맞아야 한다.
- * ⚠️ 소단원이 있는 대단원에는 맨 앞에 `(전체)` 잎을 단다. 값은 대단원만 든 단원이라
- *    jsonb 포함 검색이 그 아래 소단원 단원까지 함께 건다(문법 트리의 `(전체)` 와 같은 수).
+ * ⚠️ **폴더마다**(학년·교과서·학기·소단원이 있는 대단원) 맨 앞에 `(전체)` 잎을 단다 — 폴더는
+ *    누르면 펼쳐질 뿐이라, 이 잎이 없으면 '이 교과서 전부' 를 볼 길이 없다(코덱스 리뷰). 값은 그 폴더까지의
+ *    칸만 든 범위라 jsonb 포함 검색이 그 아래 단원을 모두 건다(문법 트리의 `(전체)` 와 같은 수).
  * ⚠️ 잎의 id 는 `axisKey` 와 **같은 값**이다 — 강조를 축에서 바로 끌어낸다.
  */
 
@@ -65,11 +67,17 @@ const compareGrades = (a: string, b: string): number =>
 /** 이름과 건수 — 색만으로 알리지 않도록 숫자를 늘 적는다 */
 const labelWith = (name: string, count: number): string => `${name} (${count})`;
 
-/** 단원 잎 하나 */
-function unitLeaf(unit: ReferenceUnit, label: string, count: number): FacetTreeNode<ReferenceBrowseAxis> {
+/** 범위 잎 하나 (단원 잎이거나 폴더의 `(전체)` 잎) */
+function unitLeaf(
+  unit: ReferenceUnitScope, label: string, count: number,
+): FacetTreeNode<ReferenceBrowseAxis> {
   const axis: ReferenceBrowseAxis = { kind: 'unit', unit };
   return { id: axisKey(axis), label: labelWith(label, count), children: [], value: axis };
 }
+
+/** 폴더 맨 앞의 `(전체)` 잎 — 그 폴더까지의 칸만 든 범위 */
+const selfLeaf = (scope: ReferenceUnitScope, bucket: Bucket): FacetTreeNode<ReferenceBrowseAxis> =>
+  unitLeaf(scope, UNIT_SELF_LEAF, bucket.ids.size);
 
 /** 정렬된 갈래 목록 */
 function sortedEntries(bucket: Bucket, compare: (a: string, b: string) => number): [string, Bucket][] {
@@ -84,18 +92,18 @@ function sortedEntries(bucket: Bucket, compare: (a: string, b: string) => number
  * @returns 트리 노드
  */
 function majorNode(
-  scope: Pick<ReferenceUnit, 'grade' | 'textbook' | 'semester'>,
+  scope: Required<Pick<ReferenceUnitScope, 'grade' | 'textbook' | 'semester'>>,
   major: string,
   bucket: Bucket,
 ): FacetTreeNode<ReferenceBrowseAxis> {
-  const self: ReferenceUnit = { ...scope, unit_path: [major] };
+  const self: ReferenceUnitScope = { ...scope, unit_path: [major] };
   if (bucket.children.size === 0) return unitLeaf(self, major, bucket.ids.size);
 
   return {
     id: `unit-tree:${JSON.stringify([scope.grade, scope.textbook, scope.semester, major])}`,
     label: labelWith(major, bucket.ids.size),
     children: [
-      unitLeaf(self, UNIT_SELF_LEAF, bucket.ids.size),
+      selfLeaf(self, bucket),
       ...sortedEntries(bucket, compareNames).map(([sub, subBucket]) =>
         unitLeaf({ ...scope, unit_path: [major, sub] }, sub, subBucket.ids.size)),
     ],
@@ -133,18 +141,27 @@ export function buildReferenceUnitTree(
     .map(([grade, gradeBucket]) => ({
       id: `unit-tree:${JSON.stringify([grade])}`,
       label: labelWith(grade || UNKNOWN_GRADE, gradeBucket.ids.size),
-      children: sortedEntries(gradeBucket, (a, b) => a.localeCompare(b, 'ko'))
-        .map(([textbook, textbookBucket]) => ({
-          id: `unit-tree:${JSON.stringify([grade, textbook])}`,
-          label: labelWith(textbook, textbookBucket.ids.size),
-          children: sortedEntries(textbookBucket, compareNames)
-            .map(([semester, semesterBucket]) => ({
-              id: `unit-tree:${JSON.stringify([grade, textbook, semester])}`,
-              label: labelWith(semester || UNKNOWN_SEMESTER, semesterBucket.ids.size),
-              children: sortedEntries(semesterBucket, compareNames)
-                .map(([major, majorBucket]) => majorNode({ grade, textbook, semester }, major, majorBucket)),
-            })),
-        })),
+      children: [
+        selfLeaf({ grade }, gradeBucket),
+        ...sortedEntries(gradeBucket, (a, b) => a.localeCompare(b, 'ko'))
+          .map(([textbook, textbookBucket]) => ({
+            id: `unit-tree:${JSON.stringify([grade, textbook])}`,
+            label: labelWith(textbook, textbookBucket.ids.size),
+            children: [
+              selfLeaf({ grade, textbook }, textbookBucket),
+              ...sortedEntries(textbookBucket, compareNames)
+                .map(([semester, semesterBucket]) => ({
+                  id: `unit-tree:${JSON.stringify([grade, textbook, semester])}`,
+                  label: labelWith(semester || UNKNOWN_SEMESTER, semesterBucket.ids.size),
+                  children: [
+                    selfLeaf({ grade, textbook, semester }, semesterBucket),
+                    ...sortedEntries(semesterBucket, compareNames)
+                      .map(([major, majorBucket]) => majorNode({ grade, textbook, semester }, major, majorBucket)),
+                  ],
+                })),
+            ],
+          })),
+      ],
     }));
 
   // 아직 단원을 안 붙인 전문도 이 탭에서 찾을 수 있어야 한다 — 붙이러 들어가는 길이다

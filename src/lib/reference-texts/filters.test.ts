@@ -47,6 +47,22 @@ describe('tabForAxis', () => {
   });
 });
 
+describe('범위 축 (학년·교과서·학기까지)', () => {
+  it('⚠️ 빠진 칸은 조회에서 빠져 그 아래 전부가 걸린다 — 빈 칸(미지정)과는 다르다', () => {
+    const textbookOnly = toReferenceTextQuery({ kind: 'unit', unit: { grade: '중2', textbook: '천재(노미숙)' } });
+    expect(JSON.stringify([textbookOnly.unit])).toBe('[{"grade":"중2","textbook":"천재(노미숙)"}]');
+    expect(axisKey({ kind: 'unit', unit: { grade: '중2', textbook: '천재', semester: '' } }))
+      .not.toBe(axisKey({ kind: 'unit', unit: { grade: '중2', textbook: '천재' } }));
+  });
+
+  it('요약 줄은 범위 끝에 "전체" 를 붙인다', () => {
+    expect(describeAxis({ kind: 'unit', unit: { grade: '중2', textbook: '천재(노미숙)' } }))
+      .toBe('중2 천재(노미숙) 전체');
+    expect(describeAxis({ kind: 'unit', unit: { grade: '중2', textbook: '천재', semester: '' } }))
+      .toBe('중2 천재 학기 미지정 전체');
+  });
+});
+
 describe('describeAxis', () => {
   it('목록 위 요약 줄에 쓸 이름', () => {
     expect(describeAxis(ALL_REFERENCE_TEXTS)).toBe('');

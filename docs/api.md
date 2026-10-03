@@ -33,7 +33,8 @@
   (`exam.reference_units_valid`)가 막고 **다듬지는 않는다** — 앱이 `normalizeReferenceUnits` 로 다듬어 보낸다
 - 왼쪽 패널의 축은 목록·검색 조회에 `applyReferenceQuery` 한 곳에서 건다(검색어와 함께 걸린다):
   - 단원: `units=cs.[{…}]` — ⚠️ **JSON 문자열**로 넘긴다(배열을 넘기면 postgrest-js 가 따옴표 없이 이어
-    쉼표 든 단원 이름이 쪼개진다). 대단원만 든 원소로 찾으면 그 아래 소단원 단원까지 걸린다(jsonb 포함)
+    쉼표 든 단원 이름이 쪼개진다). 준 칸만 맞춰 보므로(jsonb 포함) `{grade, textbook}` 만 주면 그 교과서 전부,
+    대단원만 든 원소로 찾으면 그 아래 소단원 단원까지 걸린다
   - 작품: `title=eq.…` · 문법: `grammar_paths=ov.{…}`(`pgArrayLiteral`, 고른 마디와 그 아래 경로)
   - 분류 없음: `units=eq.[]` · `grammar_paths=eq.{}`
 - 트리 재료는 `fetchReferenceTextFacets` 가 `id,title,author,units,grammar_paths` 를 1,000줄씩 끝까지 읽는다

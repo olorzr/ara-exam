@@ -37,26 +37,50 @@ describe('buildReferenceUnitTree', () => {
     const semester = child(child(child(tree, '중2 (2)').children, '천재(노미숙) (2)').children, '1학기 (2)');
     const major = child(semester.children, '1. 문학 (2)');
     expect(major.children.map((n) => n.label)).toEqual(['(전체) (2)', '(1) 시 (2)', '(2) 소설 (1)']);
+    expect(semester.children[0].label).toBe('(전체) (2)');
   });
 
-  it('(전체) 잎은 대단원만 든 단원이라 그 아래 소단원까지 걸린다', () => {
+  it('대단원의 (전체) 잎은 대단원만 든 범위라 그 아래 소단원까지 걸린다', () => {
     const tree = buildReferenceUnitTree([row('a', { units: [unit()] })]);
-    const major = tree[0].children[0].children[0].children[0];
+    const semester = child(child(child(tree, '중2 (1)').children, '천재(노미숙) (1)').children, '1학기 (1)');
+    const major = child(semester.children, '1. 문학 (1)');
     expect(major.children[0].value).toEqual({ kind: 'unit', unit: unit({ unit_path: ['1. 문학'] }) });
+  });
+
+  it('⚠️ 학년·교과서·학기 폴더에도 맨 앞에 (전체) 잎이 있다 — 교과서 하나를 통째로 볼 수 있어야 한다', () => {
+    const tree = buildReferenceUnitTree([
+      row('a', { units: [unit()] }),
+      row('b', { units: [unit({ unit_path: ['2. 비문학'] })] }),
+    ]);
+    const grade = child(tree, '중2 (2)');
+    expect(grade.children[0]).toMatchObject({ label: '(전체) (2)', value: { kind: 'unit', unit: { grade: '중2' } } });
+    const textbook = child(grade.children, '천재(노미숙) (2)');
+    expect(textbook.children[0].value).toEqual({ kind: 'unit', unit: { grade: '중2', textbook: '천재(노미숙)' } });
+    const semester = child(textbook.children, '1학기 (2)');
+    expect(semester.children[0].value).toEqual({
+      kind: 'unit', unit: { grade: '중2', textbook: '천재(노미숙)', semester: '1학기' },
+    });
   });
 
   it('소단원이 없는 대단원은 그 자체가 잎이다', () => {
     const tree = buildReferenceUnitTree([row('a', { units: [unit({ unit_path: ['3. 소설'] })] })]);
-    const leaf = tree[0].children[0].children[0].children[0];
-    expect(leaf.label).toBe('3. 소설 (1)');
+    const semester = child(child(child(tree, '중2 (1)').children, '천재(노미숙) (1)').children, '1학기 (1)');
+    const leaf = child(semester.children, '3. 소설 (1)');
     expect(leaf.children).toEqual([]);
     expect(leaf.value).toEqual({ kind: 'unit', unit: unit({ unit_path: ['3. 소설'] }) });
   });
 
-  it('잎 id 는 축 열쇠와 같다 — 고른 잎의 강조가 축에서 바로 나온다', () => {
-    const tree = buildReferenceUnitTree([row('a', { units: [unit()] })]);
-    const leaf = tree[0].children[0].children[0].children[0].children[1];
-    expect(leaf.id).toBe(axisKey(leaf.value as ReferenceBrowseAxis));
+  it('잎 id 는 축 열쇠와 같고 서로 겹치지 않는다 — 고른 잎의 강조가 축에서 바로 나온다', () => {
+    const tree = buildReferenceUnitTree([row('a', { units: [unit(), unit({ semester: '' })] })]);
+    const leaves: FacetTreeNode<ReferenceBrowseAxis>[] = [];
+    const walk = (nodes: FacetTreeNode<ReferenceBrowseAxis>[]) => nodes.forEach((n) => {
+      if (n.value) leaves.push(n);
+      walk(n.children);
+    });
+    walk(tree);
+    for (const leaf of leaves) expect(leaf.id).toBe(axisKey(leaf.value as ReferenceBrowseAxis));
+    // 학기 '' 폴더의 (전체) 와 교과서 (전체) 는 다른 범위다
+    expect(new Set(leaves.map((l) => l.id)).size).toBe(leaves.length);
   });
 
   it('중학교가 고등학교보다 먼저, 단원은 자연순, 학기 미지정은 맨 뒤', () => {
@@ -66,9 +90,9 @@ describe('buildReferenceUnitTree', () => {
       row('c', { units: [unit({ grade: '중3', semester: '' })] }),
     ]);
     expect(tree.map((n) => n.label)).toEqual(['중3 (2)', '고1 (1)']);
-    const semesters = tree[0].children[0].children;
-    expect(semesters.map((n) => n.label)).toEqual(['1학기 (1)', '학기 미지정 (1)']);
-    expect(semesters[0].children.map((n) => n.label)).toEqual(['2. 중간 (1)', '10. 끝 (1)']);
+    const semesters = tree[0].children[1].children;
+    expect(semesters.map((n) => n.label)).toEqual(['(전체) (2)', '1학기 (1)', '학기 미지정 (1)']);
+    expect(semesters[1].children.map((n) => n.label)).toEqual(['(전체) (1)', '2. 중간 (1)', '10. 끝 (1)']);
   });
 
   it('단원을 안 붙인 전문은 맨 끝 "분류 없음" 잎으로 찾는다', () => {

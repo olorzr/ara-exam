@@ -344,7 +344,11 @@
 - **한 번에 하나**다(세 탭은 대안 경로 — 아카이브가 트리를 누를 때 다른 축을 비우는 것과 같은 판단). '분류 없음' 도
   불리언 칸이 아니라 갈래(`unit-none`·`grammar-none`)다. 검색어는 축과 따로 함께 걸린다
 - 잎 id = `axisKey(축)` 이라 강조가 축에서 바로 나온다(작품은 `workKey`, 문법은 `grammarNodeKey` 그대로)
-- 코드에서의 사용: `ReferenceBrowseAxis`, `toReferenceTextQuery`, `axisKey`, `tabForAxis`, `describeAxis`
+- 단원 축의 값은 **범위**(`ReferenceUnitScope`)다 — 학년만 · 교과서까지 · 학기까지 · 대단원(·소단원)까지.
+  빠진 칸(`undefined`)은 '그 아래 전부', 빈 칸(`''`)은 '미지정인 것만' 이다. 단원 트리는 **폴더마다** 맨 앞에
+  `(전체)` 잎을 달아 그 범위를 고르게 한다(교과서 하나를 통째로 보는 길)
+- 코드에서의 사용: `ReferenceBrowseAxis`, `ReferenceUnitScope`, `toReferenceTextQuery`, `axisKey`, `unitScopeKey`,
+  `tabForAxis`, `describeAxis`
 - 관련 파일: src/lib/reference-texts/filters.ts, browse-trees.ts, unit-browse-tree.ts,
   src/components/reference-texts/ReferenceSidePanel.tsx
 

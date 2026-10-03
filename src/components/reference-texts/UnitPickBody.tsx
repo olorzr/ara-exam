@@ -43,9 +43,12 @@ export default function UnitPickBody({
   const [full, setFull] = useState(false);
 
   const keyword = query.trim().toLowerCase();
+  // ⚠️ 대단원이 빈 카테고리(교과서만 등록된 옛 자리)는 **아예 빼고** 그린다 — 그리면 체크 상자가
+  //    뜨는데 눌러도 붙일 단원이 없어 아무 일도 안 일어난다(코덱스 리뷰)
   const filtered = useMemo(
     () => (categories ?? []).filter(
-      (c) => !keyword || formatCategoryLabel(c).toLowerCase().includes(keyword),
+      (c) => c.chapter.trim() !== ''
+        && (!keyword || formatCategoryLabel(c).toLowerCase().includes(keyword)),
     ),
     [categories, keyword],
   );
@@ -62,8 +65,8 @@ export default function UnitPickBody({
 
   const toggle = (categoryId: string) => {
     const category = categories?.find((c) => c.id === categoryId);
-    // 대단원이 없는 카테고리는 단원이 아니다(교과서만 등록된 자리)
-    if (!category || !category.chapter) return;
+    // 트리에서 이미 뺐지만 한 번 더 막는다 — 대단원이 없으면 단원이 아니다
+    if (!category || !category.chapter.trim()) return;
     const next = toggleReferenceUnit(value, unitFromCategory(category));
     setFull(next === null);
     if (next) onChange(next);
