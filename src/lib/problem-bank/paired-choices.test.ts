@@ -18,6 +18,13 @@ describe('pairedChoices', () => {
 });
 
 describe('matrixChoices', () => {
+  it('keeps interview section, analysis, and strategy in three columns', () => {
+    const stem = '<p>질문</p><p>질문 분석　답변 전략</p>';
+    const choices = Array(5).fill('[A]<br>ⓑ<br>㉯');
+    expect(matrixChoices(stem, choices)?.headers).toEqual(['구간', '질문 분석', '답변 전략']);
+    expect(matrixChoices(stem, choices)?.rows[0]).toEqual(['[A]', 'ⓑ', '㉯']);
+  });
+
   it('keeps dictionary headword and example columns aligned', () => {
     const stem = '<p>질문</p><figure data-figure="1"></figure><p>ⓐ　ⓑ　ⓒ</p>';
     const choices = Array.from({ length: 5 }, (_, i) => `<strong>밭게</strong> 부<br>㉠<br>㉡${i}`);

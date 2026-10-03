@@ -17,13 +17,15 @@ export function pairedChoices(stemHtml: string, choices: readonly string[]) {
 
 /** 원문 선지가 2~4열 표로 인쇄되고 발문 끝에 열 머리글이 있는 경우. */
 const MATRIX_HEADER = /<p>\s*(㉠[\s　]+㉡[\s　]+㉢|ⓐ[\s　]+ⓑ[\s　]+ⓒ|A[\s　]+B(?:[\s　]+C[\s　]+D)?)\s*<\/p>(?=(?:<\/blockquote>)?\s*$)/u;
+const INTERVIEW_HEADER = /<p>\s*질문 분석[\s　]+답변 전략\s*<\/p>(?=(?:<\/blockquote>)?\s*$)/u;
 const CELL_BREAK = /<br\s*\/?\s*>/iu;
 
 export function matrixChoices(stemHtml: string, choices: readonly string[]) {
   const match = MATRIX_HEADER.exec(stemHtml);
-  if (!match || choices.length !== 5) return null;
-  const headers = match[1].trim().split(/[\s　]+/u);
+  const interview = !match && INTERVIEW_HEADER.test(stemHtml);
+  if ((!match && !interview) || choices.length !== 5) return null;
+  const headers = interview ? ['구간', '질문 분석', '답변 전략'] : match![1].trim().split(/[\s　]+/u);
   const rows = choices.map((choice) => choice.split(CELL_BREAK).map((cell) => cell.trim()));
   if (rows.some((row) => row.length !== headers.length || row.some((cell) => !cell))) return null;
-  return { stemHtml: stemHtml.replace(MATRIX_HEADER, ''), headers, rows };
+  return { stemHtml: stemHtml.replace(interview ? INTERVIEW_HEADER : MATRIX_HEADER, ''), headers, rows };
 }
