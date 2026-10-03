@@ -18,6 +18,16 @@ describe('pairedChoices', () => {
 });
 
 describe('matrixChoices', () => {
+  it('keeps the two source columns aligned outside the 보기 box', () => {
+    const stem = '<blockquote data-box="보기"><p>자료</p></blockquote><p>A B</p>';
+    const choices = Array.from({ length: 5 }, (_, i) => `진양성${i}<br>진음성${i}`);
+    expect(matrixChoices(stem, choices)).toEqual({
+      stemHtml: '<blockquote data-box="보기"><p>자료</p></blockquote>',
+      headers: ['A', 'B'],
+      rows: choices.map((_, i) => [`진양성${i}`, `진음성${i}`]),
+    });
+  });
+
   it('keeps the three source columns aligned', () => {
     const stem = '<blockquote data-box="보기"><p>자료</p></blockquote><p>㉠　　㉡　　㉢</p>';
     const choices = Array.from({ length: 5 }, (_, i) => `가${i}<br>나${i}<br>다${i}`);

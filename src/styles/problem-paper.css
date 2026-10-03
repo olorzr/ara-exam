@@ -411,6 +411,12 @@
 }
 .pb-sheet th { background: #f3f4f6; font-weight: 700; }
 
+/* 원문에서 한시와 풀이를 나란히 적고 칸선을 그리지 않은 [B] 대조표. */
+.pb-sheet blockquote[data-box='보기'] blockquote[data-box='B'] td {
+  border: 0;
+  padding: 1px 6px 1px 0;
+}
+
 /* ── 교사용 (문항 밑의 정답·해설) ─────────────────── */
 
 /*

@@ -707,6 +707,10 @@
   padding: 3px 6px;
 }
 .pb-editor .ProseMirror th { background: #f3f4f6; font-weight: 600; }
+.pb-editor .ProseMirror blockquote[data-box='보기'] blockquote[data-box='B'] td {
+  border: 0;
+  padding: 1px 6px 1px 0;
+}
 
 /*
  * 그림 자리표시자.
