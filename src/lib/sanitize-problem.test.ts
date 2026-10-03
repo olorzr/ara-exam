@@ -27,7 +27,7 @@ describe('sanitizeProblemHTML', () => {
   });
 
   it('구역 세 종류의 말머리를 모두 통과시킨다', () => {
-    for (const label of ['보기 1', '자료', '조건', '마', 'C', 'E']) {
+    for (const label of ['보기 1', '자료', '조건', '마', 'C', 'E', '[가]', '[나]']) {
       expect(sanitizeProblemHTML(`<blockquote data-box="${label}">글</blockquote>`))
         .toContain(`data-box="${label}"`);
     }

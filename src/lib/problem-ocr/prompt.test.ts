@@ -102,7 +102,10 @@ describe('buildProblemOcrPrompt', () => {
     expect(prompt).toContain('data-box="보기"');
     expect(prompt).toContain('data-box="가"');
     expect(prompt).toContain('data-box="A"');
+    expect(prompt).toContain('data-box="[가]"');
+    expect(prompt).toContain('data-box="[나]"');
     expect(prompt).toContain('괄호를 넣지 않는다');
+    expect(prompt).toContain('대괄호를 값에 그대로 넣는다');
     // ㉠·ⓐ 를 구역으로 오해하면 지문 한 덩어리가 통째로 상자에 들어간다
     expect(prompt).toContain('구역이 아니다');
   });

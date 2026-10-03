@@ -84,10 +84,10 @@
 
 /*
  * 구역 상자 — `data-box` 값이 곧 말머리다(정화가 허용 목록만 통과시킨다).
- * 값의 종류에 따라 인쇄 모양이 셋이다. 괄호는 여기서 붙이므로 값에는 넣지 않는다.
+ * 값의 종류에 따라 인쇄 모양이 셋이다. 한글 대괄호 구간만 (가)와 구별하려고 괄호까지 저장한다.
  *   보기·자료·조건 → 〈보기〉 테두리 상자
  *   가~차          → (가) 머리글만
- *   A~E            → [A] 왼쪽 세로선
+ *   A~E, [가], [나] → [A]·[가] 왼쪽 세로선
  * ⚠️ 허용 말머리(src/lib/box-labels.ts)를 넓히면 아래 선택자 목록도 같이 넓혀야 한다.
  *    편집기 쪽(app/globals.css 의 .pb-editor)도 같은 목록이다.
  */
@@ -150,7 +150,9 @@
 .pb-sheet blockquote[data-box='B'],
 .pb-sheet blockquote[data-box='C'],
 .pb-sheet blockquote[data-box='D'],
-.pb-sheet blockquote[data-box='E'] {
+.pb-sheet blockquote[data-box='E'],
+.pb-sheet blockquote[data-box='[가]'],
+.pb-sheet blockquote[data-box='[나]'] {
   --pb-box-open: '[';
   --pb-box-close: ']';
   border: 0;
@@ -162,12 +164,19 @@
 .pb-sheet blockquote[data-box='B']::before,
 .pb-sheet blockquote[data-box='C']::before,
 .pb-sheet blockquote[data-box='D']::before,
-.pb-sheet blockquote[data-box='E']::before {
+.pb-sheet blockquote[data-box='E']::before,
+.pb-sheet blockquote[data-box='[가]']::before,
+.pb-sheet blockquote[data-box='[나]']::before {
   top: 0;
   left: -26px;
   transform: none;
   background: transparent;
   padding: 0;
+}
+.pb-sheet blockquote[data-box='[가]'],
+.pb-sheet blockquote[data-box='[나]'] {
+  --pb-box-open: '';
+  --pb-box-close: '';
 }
 
 /*

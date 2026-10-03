@@ -5,6 +5,12 @@ describe('normalizeBoxLabel', () => {
   it('시험지 표기의 괄호를 벗긴다', () => {
     expect(normalizeBoxLabel('(가)')).toBe('가');
     expect(normalizeBoxLabel('[A]')).toBe('A');
+    expect(normalizeBoxLabel('[가]')).toBe('[가]');
+    expect(normalizeBoxLabel('［가］')).toBe('[가]');
+    expect(normalizeBoxLabel('［나］')).toBe('[나]');
+    expect(normalizeBoxLabel('[ 가 ]')).toBe('[가]');
+    expect(normalizeBoxLabel('［가]')).toBe('[가]');
+    expect(normalizeBoxLabel('[나］')).toBe('[나]');
     expect(normalizeBoxLabel('〈보기〉')).toBe('보기');
     expect(normalizeBoxLabel('【자료】')).toBe('자료');
   });
@@ -35,6 +41,7 @@ describe('isBoxLabel / boxKind', () => {
     expect(boxKind('보기 2')).toBe('box');
     expect(boxKind('나')).toBe('paren');
     expect(boxKind('C')).toBe('bracket');
+    expect(boxKind('[가]')).toBe('bracket');
     expect(boxKind('(가)')).toBeNull();
   });
 
@@ -55,6 +62,12 @@ describe('normalizeBoxAttributes', () => {
   it('본문 안 data-box 값을 다듬는다', () => {
     expect(normalizeBoxAttributes('<blockquote data-box="(가)"><p>글</p></blockquote>'))
       .toBe('<blockquote data-box="가"><p>글</p></blockquote>');
+    expect(normalizeBoxAttributes('<blockquote data-box="[가]"><p>글</p></blockquote>'))
+      .toBe('<blockquote data-box="[가]"><p>글</p></blockquote>');
+    expect(normalizeBoxAttributes('<blockquote data-box="［가］"><p>글</p></blockquote>'))
+      .toBe('<blockquote data-box="[가]"><p>글</p></blockquote>');
+    expect(normalizeBoxAttributes('<blockquote data-box="[ 가 ]"><p>글</p></blockquote>'))
+      .toBe('<blockquote data-box="[가]"><p>글</p></blockquote>');
   });
 
   it('작은따옴표도 다룬다', () => {
@@ -109,6 +122,7 @@ describe('BOX_LABEL_OPTIONS', () => {
   it('편집기 선택지는 인쇄 모양을 그대로 보여 준다', () => {
     expect(BOX_LABEL_OPTIONS[0]).toEqual({ value: '보기', label: '〈보기〉' });
     expect(BOX_LABEL_OPTIONS.map((o) => o.value)).toContain('A');
+    expect(BOX_LABEL_OPTIONS.map((o) => o.value)).toContain('[가]');
     expect(BOX_LABEL_OPTIONS.every((o) => isBoxLabel(o.value))).toBe(true);
   });
 });

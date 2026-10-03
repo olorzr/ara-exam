@@ -789,7 +789,9 @@
 .pb-editor .ProseMirror blockquote[data-box='B'],
 .pb-editor .ProseMirror blockquote[data-box='C'],
 .pb-editor .ProseMirror blockquote[data-box='D'],
-.pb-editor .ProseMirror blockquote[data-box='E'] {
+.pb-editor .ProseMirror blockquote[data-box='E'],
+.pb-editor .ProseMirror blockquote[data-box='[가]'],
+.pb-editor .ProseMirror blockquote[data-box='[나]'] {
   --pb-box-open: '[';
   --pb-box-close: ']';
   border: 0;
@@ -801,12 +803,19 @@
 .pb-editor .ProseMirror blockquote[data-box='B']::before,
 .pb-editor .ProseMirror blockquote[data-box='C']::before,
 .pb-editor .ProseMirror blockquote[data-box='D']::before,
-.pb-editor .ProseMirror blockquote[data-box='E']::before {
+.pb-editor .ProseMirror blockquote[data-box='E']::before,
+.pb-editor .ProseMirror blockquote[data-box='[가]']::before,
+.pb-editor .ProseMirror blockquote[data-box='[나]']::before {
   top: 0;
   left: -26px;
   transform: none;
   background: transparent;
   padding: 0;
+}
+.pb-editor .ProseMirror blockquote[data-box='[가]'],
+.pb-editor .ProseMirror blockquote[data-box='[나]'] {
+  --pb-box-open: '';
+  --pb-box-close: '';
 }
 
 /* 상자가 아닌 맨 blockquote 도 보이게 — OCR 이 말머리 없이 낼 때가 있다 */

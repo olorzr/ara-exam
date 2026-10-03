@@ -4,9 +4,10 @@
  * 국어 시험지에는 세 종류가 나온다:
  *  - `〈보기〉`·`〈자료〉`·`〈조건〉` (번호가 붙기도 한다: 〈보기 1〉) — 테두리 상자
  *  - `(가) (나) (다)` … `(차)` — 글을 여러 편 싣고 가르는 표시
- *  - `[A] [B]` — 지문 안의 한 구간을 가리키는 표시
+ *  - `[A] [B]`·`[가] [나]` — 지문 안의 한 구간을 가리키는 표시
  *
- * ⚠️ 값은 **괄호 없이 말머리만** 담는다. 괄호는 인쇄 CSS 가 종류에 따라 붙인다
+ * ⚠️ 값은 보통 **괄호 없이 말머리만** 담는다. 다만 `(가)`와 `[가]`를
+ *    구별하기 위해 한글 대괄호 구간은 `[가]` 형태 그대로 저장한다.
  *    (`problem-paper.css` 의 `blockquote[data-box]::before`).
  * ⚠️ 자유 문자열을 허용하면 인쇄 CSS 의 `content` 로 임의 문구가 들어가므로
  *    아래 목록만 통과시킨다. 목록을 넓히면 **인쇄 CSS 선택자도 같이** 넓혀야 한다.
@@ -26,6 +27,7 @@ const PAREN_LABELS = ['가', '나', '다', '라', '마', '바', '사', '아', '�
 
 /** [A]~[E] 로 그리는 말머리 */
 const BRACKET_LABELS = ['A', 'B', 'C', 'D', 'E'] as const;
+const HANGUL_BRACKET_LABELS = ['[가]', '[나]'] as const;
 
 /** 인쇄 모양 — CSS 선택자 묶음과 1:1 이다 */
 export type BoxKind = 'box' | 'paren' | 'bracket';
@@ -54,7 +56,8 @@ const toAscii = (c: string): string => String.fromCharCode(c.charCodeAt(0) - 0xF
 export function isBoxLabel(value: string): boolean {
   return BOX_WORD_RE.test(value)
     || (PAREN_LABELS as readonly string[]).includes(value)
-    || (BRACKET_LABELS as readonly string[]).includes(value);
+    || (BRACKET_LABELS as readonly string[]).includes(value)
+    || (HANGUL_BRACKET_LABELS as readonly string[]).includes(value);
 }
 
 /**
@@ -65,20 +68,25 @@ export function isBoxLabel(value: string): boolean {
 export function boxKind(value: string): BoxKind | null {
   if (BOX_WORD_RE.test(value)) return 'box';
   if ((PAREN_LABELS as readonly string[]).includes(value)) return 'paren';
-  if ((BRACKET_LABELS as readonly string[]).includes(value)) return 'bracket';
+  if ((BRACKET_LABELS as readonly string[]).includes(value)
+    || (HANGUL_BRACKET_LABELS as readonly string[]).includes(value)) return 'bracket';
   return null;
 }
 
 /**
  * 시험지 표기를 허용 말머리로 다듬는다.
  *
- * `(가)` → `가`, `[A]` → `A`, `〈보기 1〉` → `보기 1`, `보기1` → `보기 1`.
+ * `(가)` → `가`, `[가]` → `[가]`, `[A]` → `A`, `〈보기 1〉` → `보기 1`.
  * `ⓐ`·`㉠` 은 구역 표시가 아니라 본문 기호이므로 null 이다.
  * @param raw - 모델이 낸 값
  * @returns 허용 말머리. 못 다듬으면 null
  */
 export function normalizeBoxLabel(raw: string): string | null {
   let value = (raw ?? '').normalize('NFC').trim();
+  // `(가)`는 작품 구분, `[가]`는 왼쪽 세로선 구간이다. 전각 OCR 괄호도
+  // 벗기기 전에 ASCII 대괄호로 바꿔야 `(가)`로 잘못 저장되지 않는다.
+  const hangulBracket = value.match(/^(?:\[|［)\s*([가나])\s*(?:\]|］)$/);
+  if (hangulBracket) return `[${hangulBracket[1]}]`;
   value = value.replace(OUTER_BRACKETS, '').trim();
   value = value.replace(FULLWIDTH_RE, toAscii);
   // 한 글자 라벨은 사이 공백이 의미 없다: '보 기' → '보기'
@@ -135,4 +143,5 @@ export const BOX_LABEL_OPTIONS: { value: string; label: string }[] = [
   ...BOX_WORDS.map((w) => ({ value: w, label: `〈${w}〉` })),
   ...PAREN_LABELS.map((w) => ({ value: w, label: `(${w})` })),
   ...BRACKET_LABELS.map((w) => ({ value: w, label: `[${w}]` })),
+  ...HANGUL_BRACKET_LABELS.map((w) => ({ value: w, label: w })),
 ];
