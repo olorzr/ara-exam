@@ -58,6 +58,12 @@ describe('matrixChoices', () => {
     expect(matrixChoices(stem, choices)?.headers).toEqual(['㉮', '㉯', '㉰']);
   });
 
+  it('keeps four indirect-quotation forms aligned', () => {
+    const stem = '<p>물음</p><p>ⓐ　ⓑ　ⓒ　ⓓ</p>';
+    const choices = Array(5).fill('오늘<br>있으라고<br>자기의<br>남기라고');
+    expect(matrixChoices(stem, choices)?.headers).toEqual(['ⓐ', 'ⓑ', 'ⓒ', 'ⓓ']);
+  });
+
   it('removes a four-column header inside the source box', () => {
     const stem = '<blockquote data-box="보기"><p>자료</p><p>A B C D</p></blockquote>';
     const choices = Array(5).fill('불황<br>거시<br>사용<br>미시');
