@@ -3,6 +3,7 @@ import {
   PROBLEM_BANK_BUCKET,
   passageFigurePath,
   passageRegionPath,
+  paperCoverPath,
   problemFigurePath,
   problemRegionPath,
   sourceAnswerKeyPath,
@@ -74,5 +75,11 @@ describe('figure paths', () => {
     expect(() => problemFigurePath(ID, 0)).toThrow();
     expect(() => problemFigurePath(ID, 10)).toThrow();
     expect(() => problemFigurePath(ID, 1.5)).toThrow();
+  });
+
+  it('표지 그림은 문제지 폴더에 한 번만 쓰는 이름으로 둔다', () => {
+    expect(paperCoverPath(ID, 'abc123def456')).toBe(`papers/${ID}/cover-abc123def456.jpg`);
+    expect(() => paperCoverPath('문제지 하나', 'abc123def456')).toThrow();
+    expect(() => paperCoverPath(ID, 'cover.jpg')).toThrow();
   });
 });

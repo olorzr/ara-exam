@@ -4,8 +4,10 @@ import { useMemo } from 'react';
 import { A4Document, CompactPageHeader } from '@/components/print';
 import ExamPrintHeader from '@/components/exam/ExamPrintHeader';
 import { buildPaperBlocks } from '@/lib/problem-paper/blocks';
+import type { PaperCover } from '@/lib/problem-paper/cover';
 import { buildOmrAnswerKey, omrSheetCountOf } from '@/lib/problem-paper/omr-payload';
 import type { PaperItemSnapshot, ProblemPaper } from '@/types/problem-bank';
+import { renderCoverSlot } from './PaperCoverPage';
 import { renderPaperBlocks } from './PaperPrintBlocks';
 
 interface ProblemPaperViewProps {
@@ -25,6 +27,16 @@ interface ProblemPaperViewProps {
    * 선생님이 든 종이와 학생이 든 종이가 달라진다(학교 프린트 문답과 같은 규약).
    */
   showAnswers?: boolean;
+  /** 중철 제본(A3 가로 양면)으로 그린다 */
+  booklet?: boolean;
+  /** 표지 (없으면 null) */
+  cover?: PaperCover | null;
+  /** 그림 표지의 서명 URL */
+  coverImageUrl?: string;
+  /** 그림 표지를 끝내 못 받았는가 — 표지 자리에 인쇄되는 안내를 그린다 */
+  coverImageFailed?: boolean;
+  /** 표지를 읽지 못했을 때 표지 자리에 찍을 안내 (있으면 표지 대신 이것) */
+  coverNotice?: string;
 }
 
 /**
@@ -34,7 +46,8 @@ interface ProblemPaperViewProps {
  * 지문은 문단 단위 블록이라 단·쪽을 넘어 흘러가고, 문항은 하나가 한 블록이다.
  */
 export default function ProblemPaperView({
-  paper, items, imageUrls, showAnswers = false,
+  paper, items, imageUrls, showAnswers = false, booklet = false, cover = null, coverImageUrl,
+  coverImageFailed = false, coverNotice,
 }: ProblemPaperViewProps) {
   // OMR 문제지만 90A 답안지 안내를 붙인다 — 학생 종이에만(교사용은 채점하는 종이라 칸 안내가 필요 없다).
   // 장 수는 성적 시스템과 같은 규칙(버블로 채점하는 마지막 번호)으로 잰다
@@ -55,10 +68,16 @@ export default function ProblemPaperView({
 
   // 제목으로 두 인쇄물을 가른다 — 같은 제목이면 책상에 나란히 놓였을 때 구분이 안 된다
   const title = showAnswers ? `${paper.title} - 교사용` : paper.title;
+  const coverPage = renderCoverSlot({
+    cover, paperTitle: paper.title, suffix: showAnswers ? ' - 교사용' : '',
+    imageUrl: coverImageUrl, imageFailed: coverImageFailed, notice: coverNotice,
+  });
 
   return (
     <A4Document
       blocks={blocks}
+      booklet={booklet}
+      coverPage={coverPage}
       columns={paper.settings.columns}
       // `--paper` 가 문항 사이를 넓힌다(다른 `.pb-sheet` 문서는 그대로). A4Document 가 이 클래스를
       // 측정 컨테이너와 낱장 양쪽에 붙이므로 넓힌 만큼이 배정에도 들어간다

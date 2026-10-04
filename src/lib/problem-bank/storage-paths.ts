@@ -150,6 +150,23 @@ export function newFigureToken(): string {
 }
 
 /**
+ * 문제지 **그림 표지** 경로.
+ *
+ * ⚠️ 그림 경로와 같은 **한 번만 쓰는 이름**이다(`capturedFigurePath` 와 같은 근거). 표지를
+ *    바꿔 올릴 때 같은 이름을 쓰면, 버킷에 UPDATE 정책이 없어(sql/17) 올리기가 실패한다.
+ *    옛 파일은 지우지 않는다 — 이미 그 경로를 들고 있는 다른 탭의 인쇄가 깨지지 않게.
+ * @param paperId - 문제지 id (UUID)
+ * @param token - 한 번만 쓰는 이름 (`newFigureToken`)
+ * @returns 버킷 기준 경로
+ */
+export function paperCoverPath(paperId: string, token: string): string {
+  if (!/^[0-9a-z]{6,16}$/.test(token)) {
+    throw new Error(`표지 그림 이름이 잘못됐어요: ${token}`);
+  }
+  return `papers/${assertSafe(paperId, '문제지 id')}/cover-${token}.jpg`;
+}
+
+/**
  * 출처 하나가 쓰는 모든 경로의 접두사. 출처를 지울 때 통째로 정리하는 데 쓴다.
  * @param sourceId - 출처 id (UUID)
  * @returns 버킷 기준 폴더 경로

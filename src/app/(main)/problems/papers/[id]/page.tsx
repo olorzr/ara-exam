@@ -3,29 +3,36 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { AlertTriangle, ArrowLeft, Printer } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import ProblemPaperView from '@/components/problem-paper/ProblemPaperView';
 import ProblemAnswerKeyView from '@/components/problem-paper/ProblemAnswerKeyView';
-import PaperGradeSyncButton from '@/components/problem-paper/PaperGradeSyncButton';
+import PaperCoverAlerts from '@/components/problem-paper/PaperCoverAlerts';
+import PaperCoverDialog from '@/components/problem-paper/PaperCoverDialog';
+import { PaperPrintLayoutNotice } from '@/components/problem-paper/PaperPrintLayoutToggle';
+import PaperViewToolbar, { type PaperViewMode } from '@/components/problem-paper/PaperViewToolbar';
 import { supabase } from '@/lib/supabase';
 import { useImagesReady } from '@/hooks/useImagesReady';
+import { usePaperCover } from '@/hooks/usePaperCover';
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls';
 import {
   imagePathsOf, renumberedImageItems, renumberedPrintConfirmMessage,
 } from '@/lib/problem-paper/blocks';
+import {
+  readPaperPrintLayout, writePaperPrintLayout, type PaperPrintLayout,
+} from '@/lib/problem-paper/print-layout-pref';
 import { normalizePaperSettings } from '@/lib/problem-paper/settings';
 import type { PaperItemSnapshot, ProblemPaper } from '@/types/problem-bank';
 
-type ViewMode = 'paper' | 'teacher' | 'key';
+/** 번호 어긋남 안내를 확인하기 전에는 중철로 그리지 않는다(아래 `bookletBlocked`) */
+/** 표지를 못 읽은 채 Cmd/Ctrl+P 로 뽑으면 표지 자리에 찍히는 말 */
+const COVER_FETCH_FAILED_NOTICE =
+  '표지를 불러오지 못했어요. 화면 위쪽에서 \'다시 시도\' 를 누르거나 \'표지 없이 인쇄\' 를 고른 뒤 다시 인쇄해 주세요.';
 
-const VIEW_LABELS: { mode: ViewMode; label: string }[] = [
-  { mode: 'paper', label: '문제지' },
-  { mode: 'teacher', label: '교사용' },
-  { mode: 'key', label: '답지' },
-];
+const BOOKLET_BLOCKED_REASON =
+  '이미지 문항의 번호 어긋남 안내를 확인하면 중철 제본으로 바뀌어요. 그전에는 낱장으로 보여 줘요.';
 
 /**
  * 저장된 문제지 보기·인쇄 (`/problems/papers/[id]`).
@@ -39,7 +46,15 @@ export default function ProblemPaperViewPage() {
   const [paper, setPaper] = useState<ProblemPaper | null>(null);
   const [items, setItems] = useState<PaperItemSnapshot[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [mode, setMode] = useState<ViewMode>('paper');
+  const [mode, setMode] = useState<PaperViewMode>('paper');
+  // 인쇄 방식은 기억해 둔 값으로 시작한다 — 효과에서 읽으면 set-state-in-effect 에 걸린다
+  const [printLayout, setPrintLayout] = useState<PaperPrintLayout>(readPaperPrintLayout);
+  const [coverOpen, setCoverOpen] = useState(false);
+  const coverState = usePaperCover(paperId);
+  const { cover } = coverState;
+  /** 표지를 못 읽었지만 표지 없이 가기로 했는가 */
+  const [skipCover, setSkipCover] = useState(false);
+  const coverUnknown = coverState.failed && !skipCover;
   /**
    * 문항 본문을 인쇄하는 모드인가.
    *
@@ -60,6 +75,22 @@ export default function ProblemPaperViewPage() {
   // 이미지에는 원본 시험지의 번호가 그대로 찍혀 있다 — 자리가 바뀌면 두 번호가 함께 보인다
   const renumbered = useMemo(() => renumberedImageItems(items), [items]);
 
+  // 표지 그림은 **따로** 서명·확인한다 — 문항 이미지와 한 묶음으로 두면 답지 모드에서도
+  // 화면에 없는 문항 그림 때문에 인쇄가 막히거나 엉뚱한 경고가 뜬다
+  const coverPath = cover?.kind === 'image' ? cover.imagePath : '';
+  const coverImages = useSignedImageUrls(useMemo(() => (coverPath ? [coverPath] : []), [coverPath]));
+  const coverImageUrl = coverPath ? coverImages.urls.get(coverPath) : undefined;
+  const coverReady = useImagesReady(useMemo(() => (coverImageUrl ? [coverImageUrl] : []), [coverImageUrl]));
+  // `failed` 는 앞 그림의 결과를 들고 있을 수 있어 **지금 URL** 이 실패했는지로 본다
+  const coverBroken = Boolean(coverPath) && (
+    coverImages.missing.length > 0
+    || (Boolean(coverImageUrl) && !coverReady.loading && coverReady.failed.includes(coverImageUrl ?? ''))
+  );
+  // 그림 표지가 아직 안 왔거나 깨졌으면 첫 장이 빈 종이로 나간다 — 인쇄를 막는다
+  // 표지를 못 읽었는데 '표지 없이' 를 고르지 않았어도 막는다 — 있는 표지가 빠진 채 나간다(코덱스 1R)
+  const coverBlocked = coverState.loading || coverUnknown
+    || (Boolean(coverPath) && (coverImages.loading || coverReady.loading || coverBroken));
+
   /**
    * 번호 어긋남을 **사람이 확인했는가.**
    *
@@ -69,6 +100,15 @@ export default function ProblemPaperViewPage() {
    *    인쇄 자체를 막지는 않는다(급할 때 뽑아 손으로 고치는 길까지 막힌다, 사용자 결정).
    */
   const [renumberAcked, setRenumberAcked] = useState(false);
+  /**
+   * 중철은 번호 어긋남 안내를 **확인한 뒤에만** 켠다.
+   *
+   * ⚠️ 그 안내는 확인 전에는 일부러 인쇄물에 찍힌다(바로 위 주석). 낱장에서는 앞에 한 장이
+   *    붙을 뿐이지만 중철에서는 그 한 장 때문에 **모든 면이 한 면씩 밀려 책자 전체가 어긋난다.**
+   *    확인창을 지나면 같은 커밋에서 중철로 바뀌고, 아래 효과가 그 뒤에 인쇄한다.
+   */
+  const bookletBlocked = printsProblems && renumbered.length > 0 && !renumberAcked;
+  const booklet = printLayout === 'booklet' && !bookletBlocked;
   /** 확인창을 통과해 인쇄를 잇는 중인가 — 안내를 인쇄물에서 뺀 **뒤에** 인쇄해야 한다 */
   const printAfterAckRef = useRef(false);
 
@@ -90,6 +130,19 @@ export default function ProblemPaperViewPage() {
     printAfterAckRef.current = true;
     setRenumberAcked(true);
   };
+
+  const changePrintLayout = (next: PaperPrintLayout) => {
+    setPrintLayout(next);
+    writePaperPrintLayout(next);
+  };
+
+  const printLabel = (() => {
+    if (coverState.loading) return '표지 준비 중…';
+    if (coverUnknown || coverBroken) return '표지 확인 필요';
+    if (coverPath && (coverImages.loading || coverReady.loading)) return '표지 준비 중…';
+    if (printsProblems && (images.loading || ready.loading)) return '이미지 준비 중…';
+    return booklet ? '인쇄 (A3 중철)' : '인쇄';
+  })();
 
   useEffect(() => {
     let alive = true;
@@ -116,7 +169,11 @@ export default function ProblemPaperViewPage() {
     return () => { alive = false; };
   }, [paperId]);
 
-  if (!loaded) {
+  // ⚠️ 표지(그림 표지는 그림까지)를 다 받을 때까지 문서를 그리지 않는다 — 단추만 잠그면 그 짧은
+  //    틈에 Cmd/Ctrl+P 로 뽑은 인쇄물에서 표지가 빠지거나 '불러오는 중' 이 표지로 나가고, 중철 면
+  //    배정까지 한 쪽씩 밀린다(코덱스 2R·3R). 못 받았으면(깨짐) 인쇄되는 안내로 그린다
+  const coverImagePending = Boolean(coverPath) && (coverImages.loading || coverReady.loading);
+  if (!loaded || coverState.loading || coverImagePending) {
     return (
       <div className="flex justify-center py-16">
         <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
@@ -139,47 +196,31 @@ export default function ProblemPaperViewPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2" data-no-print>
-        <Link
-          href="/problems/papers"
-          className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
-        >
-          <ArrowLeft className="h-4 w-4" /> 목록
-        </Link>
-        <span className="ml-2 font-semibold text-gray-900">{paper.title}</span>
-        <span className="text-sm text-gray-500">{items.length}문항</span>
-        {paper.settings.omr && (
-          <span
-            className="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary"
-            title="학원 성적 시스템에 시험으로 등록되고 90A 답안지로 채점해요"
-          >
-            OMR 채점
-          </span>
-        )}
+      <PaperViewToolbar
+        paper={paper}
+        itemCount={items.length}
+        mode={mode}
+        onModeChange={setMode}
+        printLayout={printLayout}
+        onPrintLayoutChange={changePrintLayout}
+        cover={cover}
+        onCoverClick={() => setCoverOpen(true)}
+        printLabel={printLabel}
+        printDisabled={(printsProblems && imagesBlocked) || coverBlocked}
+        onPrint={handlePrint}
+      />
 
-        <div className="ml-auto flex items-center gap-1">
-          {paper.settings.omr && <PaperGradeSyncButton paperId={paper.id} />}
-          {VIEW_LABELS.map((v) => (
-            <Button
-              key={v.mode} type="button" size="sm"
-              variant={mode === v.mode ? 'default' : 'outline'}
-              onClick={() => setMode(v.mode)}
-            >
-              {v.label}
-            </Button>
-          ))}
-          <Button
-            type="button" size="sm"
-            onClick={handlePrint}
-            disabled={printsProblems && imagesBlocked}
-          >
-            <Printer className="h-3.5 w-3.5" />
-            <span className="ml-1">
-              {printsProblems && (images.loading || ready.loading) ? '이미지 준비 중…' : '인쇄'}
-            </span>
-          </Button>
-        </div>
-      </div>
+      {printLayout === 'booklet' && (
+        <PaperPrintLayoutNotice blockedReason={bookletBlocked ? BOOKLET_BLOCKED_REASON : undefined} />
+      )}
+
+      <PaperCoverAlerts
+        fetchFailed={coverUnknown}
+        imageBroken={coverBroken}
+        onRetryFetch={coverState.reload}
+        onSkipCover={() => setSkipCover(true)}
+        onRetryImage={coverImages.reload}
+      />
 
       {printsProblems && brokenCount > 0 && (
         <div
@@ -226,9 +267,30 @@ export default function ProblemPaperViewPage() {
         <ProblemPaperView
           paper={paper} items={items} imageUrls={images.urls}
           showAnswers={mode === 'teacher'}
+          booklet={booklet} cover={cover} coverImageUrl={coverImageUrl}
+          coverImageFailed={coverBroken}
+          coverNotice={coverUnknown ? COVER_FETCH_FAILED_NOTICE : undefined}
         />
       )}
-      {mode === 'key' && <ProblemAnswerKeyView paper={paper} items={items} />}
+      {mode === 'key' && (
+        <ProblemAnswerKeyView
+          paper={paper} items={items}
+          booklet={booklet} cover={cover} coverImageUrl={coverImageUrl}
+          coverImageFailed={coverBroken}
+          coverNotice={coverUnknown ? COVER_FETCH_FAILED_NOTICE : undefined}
+        />
+      )}
+
+      <PaperCoverDialog
+        open={coverOpen}
+        paperTitle={paper.title}
+        cover={cover}
+        coverImageUrl={coverImageUrl}
+        busy={coverState.saving}
+        onClose={() => setCoverOpen(false)}
+        onSave={coverState.save}
+        onRemove={coverState.remove}
+      />
     </div>
   );
 }

@@ -1,0 +1,133 @@
+/* =========================================================
+   문제지 표지 (PaperCoverPage) — A4CoverSheet 안에 들어간다.
+
+   표지는 쪽 배정 밖의 고정 한 장이라 여기 px 는 측정과 무관하다(꾸밈 값).
+   낱장 크기 자체는 A4CoverSheet 가 상수로 준다.
+   ========================================================= */
+
+.pb-cover {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+
+/* ---- 간단 표지 ---- */
+.pb-cover--simple {
+  padding: 72px 76px 60px;
+}
+
+.pb-cover__brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11pt;
+  font-weight: 700;
+  color: #4b5563;
+  letter-spacing: 2px;
+  padding-bottom: 14px;
+  border-bottom: 3px solid #81d8d0;
+}
+
+.pb-cover__main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 18px;
+}
+
+.pb-cover__title {
+  margin: 0;
+  font-family: 'Gmarket Sans', sans-serif;
+  font-size: 34pt;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #111827;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+
+.pb-cover__subtitle {
+  margin: 0;
+  font-size: 15pt;
+  line-height: 1.5;
+  color: #4b5563;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+  white-space: pre-line;
+}
+
+.pb-cover__accent {
+  width: 72px;
+  height: 6px;
+  border-radius: 3px;
+  background: #81d8d0;
+}
+
+.pb-cover__names {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 14px;
+  row-gap: 18px;
+  align-items: end;
+  width: 62%;
+  margin: 0 0 0 auto;
+  font-size: 12pt;
+  color: #374151;
+}
+.pb-cover__name-row {
+  display: contents;
+}
+.pb-cover__names dt {
+  font-weight: 700;
+}
+.pb-cover__names dd {
+  margin: 0;
+  height: 26px;
+  border-bottom: 1px solid #9ca3af;
+}
+
+/* ---- 그림 표지 ---- */
+.pb-cover--image {
+  align-items: center;
+  justify-content: center;
+}
+
+/*
+ * ⚠️ `.pb-cover` 를 앞에 붙여 (0,2,0) 으로 둔다 — 표지 낱장에도 `.pb-sheet` 가 붙어 있어
+ *    problem-paper.css 의 `.pb-sheet img { height: auto }`(0,1,1) 가 이기면 A4 보다 길쭉한 그림이
+ *    종이 밖으로 넘쳐 잘린다(코덱스 4R).
+ */
+.pb-cover .pb-cover__image {
+  display: block;
+  max-width: 100%;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.pb-cover__pending {
+  font-size: 11pt;
+  color: #9ca3af;
+}
+
+/* ---- 표지를 못 읽었을 때 그 자리에 찍는 안내(인쇄물에도 나간다) ---- */
+.pb-cover--notice {
+  align-items: center;
+  justify-content: center;
+  padding: 0 96px;
+}
+
+.pb-cover__notice {
+  margin: 0;
+  padding: 18px 22px;
+  border: 2px solid #f59e0b;
+  border-radius: 8px;
+  font-size: 13pt;
+  line-height: 1.6;
+  color: #92400e;
+  text-align: center;
+  word-break: keep-all;
+}

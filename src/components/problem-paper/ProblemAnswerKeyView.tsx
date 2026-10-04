@@ -6,7 +6,9 @@ import ExamPrintHeader from '@/components/exam/ExamPrintHeader';
 import {
   buildAnswerRows, explanationEntries, MISSING_ANSWER_LABEL,
 } from '@/lib/problem-paper/answers';
+import type { PaperCover } from '@/lib/problem-paper/cover';
 import type { PaperItemSnapshot, ProblemPaper } from '@/types/problem-bank';
+import { renderCoverSlot } from './PaperCoverPage';
 
 /** 한 줄에 담을 문항 수 — 줄 하나가 인쇄 블록 하나다(쪽이 갈려도 줄은 안 쪼개진다) */
 const ITEMS_PER_ROW = 5;
@@ -14,6 +16,16 @@ const ITEMS_PER_ROW = 5;
 interface ProblemAnswerKeyViewProps {
   paper: ProblemPaper;
   items: PaperItemSnapshot[];
+  /** 중철 제본(A3 가로 양면)으로 그린다 */
+  booklet?: boolean;
+  /** 표지 (없으면 null) — 문제지와 같은 표지에 ' - 답지' 꼬리 */
+  cover?: PaperCover | null;
+  /** 그림 표지의 서명 URL */
+  coverImageUrl?: string;
+  /** 그림 표지를 끝내 못 받았는가 — 표지 자리에 인쇄되는 안내를 그린다 */
+  coverImageFailed?: boolean;
+  /** 표지를 읽지 못했을 때 표지 자리에 찍을 안내 (있으면 표지 대신 이것) */
+  coverNotice?: string;
 }
 
 /**
@@ -26,7 +38,10 @@ interface ProblemAnswerKeyViewProps {
  * 정답이 비어 있으면 빈칸이 아니라 **'미입력'** 이라고 찍는다 —
  * 빈칸으로 두면 인쇄물에서 "정답이 없는 문항"과 "인쇄가 빠진 것"을 구분할 수 없다.
  */
-export default function ProblemAnswerKeyView({ paper, items }: ProblemAnswerKeyViewProps) {
+export default function ProblemAnswerKeyView({
+  paper, items, booklet = false, cover = null, coverImageUrl,
+  coverImageFailed = false, coverNotice,
+}: ProblemAnswerKeyViewProps) {
   const title = `${paper.title} - 답지`;
   const rows = useMemo(() => buildAnswerRows(items), [items]);
   const explanations = useMemo(() => explanationEntries(items), [items]);
@@ -86,9 +101,16 @@ export default function ProblemAnswerKeyView({ paper, items }: ProblemAnswerKeyV
     return out;
   }, [rows, explanations]);
 
+  const coverPage = renderCoverSlot({
+    cover, paperTitle: paper.title, suffix: ' - 답지',
+    imageUrl: coverImageUrl, imageFailed: coverImageFailed, notice: coverNotice,
+  });
+
   return (
     <A4Document
       blocks={blocks}
+      booklet={booklet}
+      coverPage={coverPage}
       columns={1}
       className="pb-sheet"
       firstPageHeader={

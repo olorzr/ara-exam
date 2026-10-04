@@ -1,0 +1,103 @@
+/* =========================================================
+   중철 제본 인쇄 (BookletStack) + 표지 낱장(A4CoverSheet)
+
+   A3 가로 한 면(.booklet-side)에 A4 낱장 두 장을 나란히 앉힌다.
+   면·낱장의 크기는 src/lib/print/constants.ts 값으로 컴포넌트가 인라인 style 로 준다 —
+   여기에 px 를 적지 않는다(측정값과 조용히 어긋난다).
+
+   ⚠️ 용지 크기(@page size: A3 landscape)는 여기 없다. 전역 @page(print-a4.css)를 선택자로
+      좁힐 수 없어 BookletStack 이 중철일 때만 <style> 로 덮는다.
+   ⚠️ 측정 컨테이너(.a4-measure)는 이 구조 밖의 형제라 아래 zoom 이 쪽 배정에 영향을 주지 않는다.
+   ========================================================= */
+
+.booklet-leaf {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.booklet-leaf__caption {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/*
+ * ⚠️ nowrap + overflow:hidden 은 빼지 말 것 — 서브픽셀로 오른쪽 낱장이 아랫줄로 감기면
+ *    면이 두 쪽 높이가 되어 인쇄에서 쪽이 하나 늘고, 그 뒤 모든 짝이 어긋난다.
+ */
+.booklet-side {
+  position: relative;
+  display: flex;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.booklet-slot {
+  flex: none;
+  display: flex;
+}
+
+/* 면 안의 낱장은 종이의 절반이다 — 낱장마다의 그림자·모서리를 지운다 */
+.booklet-side .a4-sheet {
+  flex: none;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+.booklet-blank {
+  background: #fff;
+}
+
+@media screen {
+  /* A3 한 면이 화면에서 A4 낱장 한 장 폭으로 보이게 반으로 줄인다 */
+  .booklet-side {
+    zoom: 0.5;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.1);
+    border-radius: 4px;
+  }
+  /* 접는 선 — 화면에서만 */
+  .booklet-side::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    border-left: 2px dashed #d1d5db;
+  }
+  .booklet-blank {
+    background: repeating-linear-gradient(45deg, #fafafa, #fafafa 12px, #f3f4f6 12px, #f3f4f6 24px);
+  }
+}
+
+@media print {
+  .booklet-leaf {
+    display: block;
+    gap: 0;
+  }
+
+  .booklet-side {
+    zoom: 1;
+    box-shadow: none;
+    border-radius: 0;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    break-after: page;
+    page-break-after: always;
+  }
+  .booklet-side--last {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  /*
+   * 면 안의 두 낱장 사이에서 쪽을 넘기지 않는다. print-a4.css 의 `.a4-sheet { break-after: page }`
+   * 는 (0,1,0) 이고 이 선택자는 (0,2,0) 이라 선언 순서와 무관하게 이긴다.
+   */
+  .booklet-side .a4-sheet {
+    break-after: auto;
+    page-break-after: auto;
+  }
+}

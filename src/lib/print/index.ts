@@ -1,3 +1,4 @@
+export * from './booklet';
 export * from './constants';
 export * from './paginate';
 export * from './sheet-columns';

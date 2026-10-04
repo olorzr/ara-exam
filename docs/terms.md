@@ -577,6 +577,21 @@
 - 코드에서의 사용: `GrammarFacet`, `fetchGrammarFacets`, `tallyGrammarCounts`, `useProblemArchive().grammarCounts`
 - 관련 파일: src/lib/problem-bank/grammar-counts.ts, src/lib/problem-bank/facets.ts
 
+## 중철 제본 인쇄 (booklet)
+- 정의: A3 가로 용지 한 면에 A4 두 쪽을 나란히 앉혀 양면으로 뽑고, 겹쳐 반으로 접어 가운데를 철하는 책자 인쇄.
+  쪽 수는 4의 배수로 올리고 남는 자리는 끝에 빈 면으로 둔다
+- 면 배정(0-based, `total` = 4의 배수로 올린 쪽 수, 장 k): 앞면 `[total-1-2k, 2k]`, 뒷면 `[2k+1, total-2-2k]`
+- 프린터는 **양면 · 짧은 면 뒤집기**(A3 가로에서는 짧은 변이 좌우다). 거꾸로 나오면 '긴 면' 이 맞는 드라이버다
+- 코드에서의 사용: `bookletSheets`, `BookletStack`, `A4Document` 의 `booklet`, `PaperPrintLayout`(`'single' | 'booklet'`)
+- 관련 파일: src/lib/print/booklet.ts, src/components/print/BookletStack.tsx, src/styles/print-booklet.css, src/lib/problem-paper/print-layout-pref.ts
+
+## 문제지 표지 (PaperCover)
+- 정의: 문제지 인쇄물의 첫 장. **간단 표지**(`simple` — 학원 이름·제목·부제·이름 칸을 앱이 그린다)와
+  **그림 표지**(`image` — 선생님이 만든 그림을 올려 그대로 쓴다). 행이 없으면 표지 없음
+- 쪽 번호(`n / N`)에 세지 않는다. 중철에서는 1쪽 자리(1장 앞면 오른쪽)에 온다
+- 코드에서의 사용: `PaperCover`, `normalizePaperCover`, `coverTitleFor`, `usePaperCover`, `PaperCoverPage`, `A4CoverSheet`
+- 관련 파일: src/lib/problem-paper/cover.ts, src/lib/problem-paper/cover-queries.ts, src/components/problem-paper/PaperCoverDialog.tsx, sql/61_problem_paper_covers.sql
+
 ## 선택지 (SelectOption)
 - 정의: 고르는 칸의 **값과 보여 줄 이름 한 쌍**(`{ value: '__all__', label: '유형 전체' }`)
 - ⚠️ base-ui 의 `Select.Value` 는 `Select.Root` 에 `items`(값→이름 지도)가 없으면 고른 **값을

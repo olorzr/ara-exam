@@ -115,8 +115,12 @@ src/
   - `src/hooks/useA4Pagination.ts` — 숨김 컨테이너 실측 + 재측정(fonts.ready / ResizeObserver / img load / beforeprint)
   - `src/hooks/useConceptSheetBlocks.ts` — 개념지 블록 상태 + 표 열 폭 맞춤(배치 전) + 남은 자리를 채우는 표 재분할(패스당 표 하나, 최대 32)
   - `src/components/print/{A4Document,A4Sheet,CompactPageHeader}.tsx` — 측정 컨테이너 + 낱장 렌더
+  - `src/components/print/A4CoverSheet.tsx` — 표지 한 장(여백·머리글·푸터 없음, 쪽 번호에 안 센다). `A4Document` 의 `coverPage` 가 그린다
+  - `src/lib/print/booklet.ts` — 순수 계산: 중철 제본 면 배정(`bookletSheets` — 장마다 앞·뒷면의 [왼쪽, 오른쪽] 쪽)
+  - `src/components/print/BookletStack.tsx` — 중철 제본 렌더: A3 가로 한 면에 A4 두 쪽, `<style>` 로 `@page` 를 A3 가로로 덮는다. `A4Document booklet` 이 그린다(`breakAfterLast` 와 타입으로 배타)
   - `src/styles/print-a4.css` — 낱장·푸터·페이지 브레이크 CSS (globals.css 에서 @import)
-- 소비자: `components/exam/{ExamPaperView,MultipleChoiceView,MultipleChoiceAnswerView,WordBookView}.tsx`, `components/exam-builder/ExamSheetRenderer.tsx`
+  - `src/styles/print-booklet.css` — 중철 면·빈 면·화면 축소(zoom 0.5, 측정 무관)·면 안 쪽 넘김 억제
+- 소비자: `components/exam/{ExamPaperView,MultipleChoiceView,MultipleChoiceAnswerView,WordBookView}.tsx`, `components/exam-builder/ExamSheetRenderer.tsx`, `components/problem-paper/{ProblemPaperView,ProblemAnswerKeyView}.tsx`(표지·중철을 쓰는 유일한 소비자)
 - 블록 단위: 시험지=문항 1개, 객관식 답안지=5문항 1줄, 단어장=단어 1줄, 개념지=본문 HTML 최상위 요소 1개
 - 개념지 단 수: 본문 글자 수 300 초과면 2단이지만, **열 3개 이상인 표가 하나라도 있으면 1단**으로 되돌린다(2단 칸 ≈328px 에 넓은 표가 안 들어간다). 표 셀은 `overflow-wrap: anywhere` + 박스 묶음 줄바꿈 허용으로 칸을 넘지 않는다
 
@@ -415,7 +419,15 @@ src/
 - 역할: 문제지 조합 규칙(지문 묶음 연속성)과 인쇄 블록 조립
 - 의존: lib/print(splitHtmlBlocks), lib/shuffle
 - 주요 파일: compose.ts, dnd.ts, blocks.ts, box-parts.ts, answers.ts, bulk-add.ts, html-trim.ts,
-  settings.ts, shuffle-groups.ts
+  settings.ts, shuffle-groups.ts, cover.ts, cover-image.ts, cover-queries.ts, print-layout-pref.ts
+- **표지**(2026-10-04): 곁표 `exam.problem_paper_covers`(sql/61, 문제지 1:1, 행이 없으면 표지 없음).
+  간단 표지(제목·부제·이름 칸)와 그림 표지(올린 그림을 JPEG 로 다시 인코딩해 `papers/{id}/cover-{token}.jpg`)
+  둘이다. `usePaperCover` 가 읽고 쓰고 `PaperCoverDialog` 가 고르며 `PaperCoverPage` 가 그린다.
+  문제지·교사용·답지 셋에 같은 표지가 붙고 제목 꼬리만 다르다(`coverTitleFor`).
+  문제지 본문은 불변 스냅샷이라 칸을 더하지 않고 곁표에 둔다
+- **인쇄 방식**(2026-10-04): 낱장 / 중철 제본(A3 가로 양면). 화면 선택이고 localStorage 에
+  기억한다(`print-layout-pref.ts`, 저장 설정 아님). 번호 어긋남 안내를 확인하기 전에는 중철로
+  그리지 않는다 — 그 안내가 인쇄물에 찍혀 면이 한 면씩 밀리기 때문이다
 - 배점은 인쇄하지 않는다(2026-09-08). `PaperSettings.showScore` 키는 RPC 화이트리스트
   호환용으로만 남아 있고 렌더러는 보지 않는다
 - 출처는 **기본으로 찍는다**(2026-09-19). `DEFAULT_PAPER_SETTINGS.showSource` 가 true 이고

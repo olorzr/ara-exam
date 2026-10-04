@@ -7,9 +7,12 @@ import {
   type SplitRequestHandler,
 } from '@/hooks/useA4Pagination';
 import { A4_WIDTH_PX, CONTENT_WIDTH, getColumnWidth } from '@/lib/print/constants';
+import type { PagePlan } from '@/lib/print/paginate';
+import A4CoverSheet from './A4CoverSheet';
 import A4Sheet, { A4Footer } from './A4Sheet';
+import BookletStack from './BookletStack';
 
-interface A4DocumentProps {
+interface A4DocumentBaseProps {
   /** 페이지에 채울 최소 단위들. 순서가 곧 문서 순서다 (재배열하지 않는다) */
   blocks: ReactNode[];
   columns?: 1 | 2;
@@ -20,8 +23,11 @@ interface A4DocumentProps {
   /** 매 페이지·매 컬럼 상단에 반복되는 헤더 (단어장 컬럼 헤더) */
   columnHeader?: ReactNode;
   showPageNumber?: boolean;
-  /** 마지막 낱장 뒤에도 페이지를 넘긴다 — '전체 출력'에서 시트 사이를 가를 때 */
-  breakAfterLast?: boolean;
+  /**
+   * 표지 한 장(본문 앞). 실측 배정 밖의 고정 한 장이라 **쪽 번호를 세지 않는다**.
+   * 측정이 끝나기 전 폴백에는 그리지 않는다.
+   */
+  coverPage?: ReactNode;
   /** 블록별 '행 단위로 더 쪼갤 수 있음' 표시 (개념지의 표). 참조가 안정적이어야 한다 */
   splittable?: readonly boolean[];
   /** 배치 직전 손질 훅 — 블록을 갱신했으면 true (개념지 표 열 폭 맞춤) */
@@ -31,6 +37,23 @@ interface A4DocumentProps {
   /** 타이포그래피 스코프 클래스 (측정 컨테이너와 낱장 양쪽에 붙는다) */
   className?: string;
 }
+
+/**
+ * 중철 제본은 '인쇄 작업 전체' 를 A3 면으로 바꾸므로, 문서를 이어 붙이는 `breakAfterLast`
+ * (개념지 '전체 출력')와 함께 쓸 수 없다 — 타입으로 막는다.
+ */
+type A4DocumentProps = A4DocumentBaseProps & (
+  | {
+    booklet?: false;
+    /** 마지막 낱장 뒤에도 페이지를 넘긴다 — '전체 출력'에서 시트 사이를 가를 때 */
+    breakAfterLast?: boolean;
+  }
+  | {
+    /** 중철 제본 — A3 가로 한 면에 A4 두 쪽씩, 장마다 앞·뒷면을 차례로 그린다 */
+    booklet: true;
+    breakAfterLast?: never;
+  }
+);
 
 /**
  * 블록들을 실측해 A4 낱장 여러 장으로 나눠 그린다.
@@ -46,6 +69,8 @@ export default function A4Document({
   columnHeader,
   showPageNumber = true,
   breakAfterLast = false,
+  booklet = false,
+  coverPage,
   splittable,
   onBeforePaginate,
   onSplitRequest,
@@ -70,7 +95,39 @@ export default function A4Document({
     );
   };
 
-  const pages = layout.pages.length > 0 ? layout.pages : [{ columns: [[]] as number[][] }];
+  const pages: PagePlan[] = layout.pages.length > 0 ? layout.pages : [{ columns: [[]] }];
+
+  /** 본문 낱장 하나 — 낱장 모드와 중철 모드가 같은 마크업을 쓴다 */
+  const renderPage = (page: PagePlan, pageIndex: number) => (
+    <A4Sheet
+      key={pageIndex}
+      className={className}
+      header={pageIndex === 0 ? firstPageHeader : laterPageHeader}
+      page={pageIndex + 1}
+      total={pages.length}
+      showPageNumber={showPageNumber}
+      isLast={pageIndex === pages.length - 1 && !breakAfterLast}
+    >
+      <div className="a4-cols">
+        {page.columns.map((column, columnIndex) => (
+          <div
+            key={columnIndex}
+            className={`a4-col ${columnIndex > 0 && column.length > 0 ? 'a4-col--divided' : ''}`.trim()}
+            style={{ width: columnWidth }}
+          >
+            {columnHeader && column.length > 0 ? (
+              <div className="a4-col__header">{columnHeader}</div>
+            ) : null}
+            {column.map(renderBlock)}
+          </div>
+        ))}
+      </div>
+    </A4Sheet>
+  );
+
+  const cover = coverPage
+    ? [<A4CoverSheet key="cover" className={className}>{coverPage}</A4CoverSheet>]
+    : [];
 
   return (
     <>
@@ -108,32 +165,11 @@ export default function A4Document({
 
       <div className="a4-stack">
         {layout.ready ? (
-          pages.map((page, pageIndex) => (
-            <A4Sheet
-              key={pageIndex}
-              className={className}
-              header={pageIndex === 0 ? firstPageHeader : laterPageHeader}
-              page={pageIndex + 1}
-              total={pages.length}
-              showPageNumber={showPageNumber}
-              isLast={pageIndex === pages.length - 1 && !breakAfterLast}
-            >
-              <div className="a4-cols">
-                {page.columns.map((column, columnIndex) => (
-                  <div
-                    key={columnIndex}
-                    className={`a4-col ${columnIndex > 0 && column.length > 0 ? 'a4-col--divided' : ''}`.trim()}
-                    style={{ width: columnWidth }}
-                  >
-                    {columnHeader && column.length > 0 ? (
-                      <div className="a4-col__header">{columnHeader}</div>
-                    ) : null}
-                    {column.map(renderBlock)}
-                  </div>
-                ))}
-              </div>
-            </A4Sheet>
-          ))
+          booklet ? (
+            <BookletStack pages={[...cover, ...pages.map(renderPage)]} />
+          ) : (
+            [...cover, ...pages.map(renderPage)]
+          )
         ) : (
           // 측정 전(첫 페인트 직전)·측정 실패 시 폴백.
           // 페이지를 나누지 못하더라도 내용이 사라지지는 않게 전부 흘려서 그린다.

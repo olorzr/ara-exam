@@ -202,4 +202,65 @@ describe('A4Document', () => {
     );
     expect(screen.getAllByText('빈 시험지').length).toBeGreaterThan(0);
   });
+
+  describe('표지·중철', () => {
+    const bodySheets = (container: HTMLElement) =>
+      Array.from(container.querySelectorAll<HTMLElement>('.a4-stack .a4-sheet:not(.a4-sheet--cover)'));
+
+    it('표지는 맨 앞 한 장이고 쪽 번호를 세지 않는다', () => {
+      const total = blocksPerPage(FIRST_HEADER_H) + 1;
+      const { container } = render(
+        <A4Document
+          blocks={Array.from({ length: total }, (_, i) => <div key={i} data-h={BLOCK_H}>문항 {i + 1}</div>)}
+          firstPageHeader={<div data-h={FIRST_HEADER_H}>전체 헤더</div>}
+          laterPageHeader={<div data-h={LATER_HEADER_H}>컴팩트 헤더</div>}
+          coverPage={<div>표지 내용</div>}
+        />,
+      );
+      const first = container.querySelector('.a4-stack')!.firstElementChild!;
+      expect(first.classList.contains('a4-sheet--cover')).toBe(true);
+      expect(first.textContent).toBe('표지 내용');
+      expect(first.querySelector('.a4-footer')).toBeNull();
+      const body = bodySheets(container);
+      expect(body).toHaveLength(2);
+      expect(body.map((s) => s.querySelector('.a4-footer__page')?.textContent)).toEqual(['1 / 2', '2 / 2']);
+    });
+
+    it('중철 — 3쪽은 한 장 두 면, 블록이 유실되지 않고 빈 면이 하나', () => {
+      const total = blocksPerPage(FIRST_HEADER_H) + blocksPerPage(LATER_HEADER_H) + 1;
+      const { container } = render(
+        <A4Document
+          booklet
+          blocks={Array.from({ length: total }, (_, i) => <div key={i} data-h={BLOCK_H}>문항 {i + 1}</div>)}
+          firstPageHeader={<div data-h={FIRST_HEADER_H}>전체 헤더</div>}
+          laterPageHeader={<div data-h={LATER_HEADER_H}>컴팩트 헤더</div>}
+        />,
+      );
+      expect(container.querySelectorAll('.a4-stack .booklet-side')).toHaveLength(2);
+      expect(container.querySelectorAll('.a4-stack .booklet-blank')).toHaveLength(1);
+      const sheetsInStack = bodySheets(container);
+      expect(sheetsInStack).toHaveLength(3);
+      const pagesSeen = sheetsInStack.map((s) => s.querySelector('.a4-footer__page')?.textContent).sort();
+      expect(pagesSeen).toEqual(['1 / 3', '2 / 3', '3 / 3']);
+      const blocksSeen = container.querySelectorAll('.a4-stack .a4-block');
+      expect(blocksSeen).toHaveLength(total);
+    });
+
+    it('중철 + 표지 — 표지가 1쪽이 되어 1장 앞면 오른쪽에 온다', () => {
+      const total = blocksPerPage(FIRST_HEADER_H) + blocksPerPage(LATER_HEADER_H) + 1;
+      const { container } = render(
+        <A4Document
+          booklet
+          coverPage={<div>표지 내용</div>}
+          blocks={Array.from({ length: total }, (_, i) => <div key={i} data-h={BLOCK_H}>문항 {i + 1}</div>)}
+          firstPageHeader={<div data-h={FIRST_HEADER_H}>전체 헤더</div>}
+          laterPageHeader={<div data-h={LATER_HEADER_H}>컴팩트 헤더</div>}
+        />,
+      );
+      const first = container.querySelector('.a4-stack .booklet-side')!;
+      expect(first.querySelector('[data-slot="right"] .a4-sheet--cover')).not.toBeNull();
+      expect(first.querySelector('[data-slot="left"] .a4-footer__page')?.textContent).toBe('3 / 3');
+      expect(container.querySelectorAll('.a4-stack .booklet-blank')).toHaveLength(0);
+    });
+  });
 });
