@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.9.41] - 2026-10-08
+
+### Security
+- Next.js 를 16.1.6 → 16.3.8 로 올렸습니다(rewrites 경유 HTTP 요청 밀반입 취약점 등 보안 수정). `npm audit fix` 로 치명(critical) 2건을 포함해 41건이던 취약점 경고를 11건(모두 high, 개발 도구·`shadcn` CLI·`pdfjs-dist` 6.x·`xlsx` — 수정판이 메이저 업그레이드이거나 없음)으로 줄였습니다. 화면 동작은 바뀌지 않습니다.
+
 ## [0.9.40] - 2026-10-04
 
 ### Added
