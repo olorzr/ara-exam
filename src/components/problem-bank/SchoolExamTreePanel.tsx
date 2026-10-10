@@ -8,6 +8,13 @@ import {
   schoolExamKey, type SchoolExamFacet,
 } from '@/lib/problem-bank/school-exam-tree';
 
+/**
+ * 학교급(고등·중등·모의고사)만 펼쳐 두고 **학교부터는 접어 둔다**(2026-10-10 사용자 요청 —
+ * "학교별까지만 보이고 나머진 접어 달라, 없애는 게 아니라"). 창비 업체 기출로 고교가 100곳 가까이
+ * 되자 학교마다 학년도가 펼쳐져 목록이 끝없이 길어졌다. 학년도 단계는 그대로 있고 학교를 누르면 열린다.
+ */
+const SCHOOL_EXAM_EXPANDED_DEPTH = 1;
+
 interface SchoolExamTreePanelProps {
   filters: ProblemFilters;
   /** 아카이브에 실제로 있는 기출 갈래 (학교 기출 + 모의고사) */
@@ -74,6 +81,7 @@ export default function SchoolExamTreePanel({
           nodes={nodes}
           onSelect={handleSelect}
           selectedId={selectedId}
+          defaultExpandedDepth={SCHOOL_EXAM_EXPANDED_DEPTH}
           emptyText="읽어 둔 기출이 아직 없어요."
         />
       </div>
