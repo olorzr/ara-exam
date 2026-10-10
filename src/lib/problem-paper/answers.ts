@@ -13,6 +13,22 @@ import type { PaperItemSnapshot, QuestionType } from '@/types/problem-bank';
 /** 정답이 비었을 때 찍는 문구 — 빈칸으로 두면 인쇄물에서 누락과 구분되지 않는다 */
 export const MISSING_ANSWER_LABEL = '미입력';
 
+/**
+ * 주관식·서술형 정답 자리에 빠른 정답 격자가 찍는 문구(2026-10-10, 사용자 결정).
+ * 서술형 답은 문장이라 격자 한 칸에 넣으면 그 줄이 통째로 늘어나 채점할 때 번호를 눈으로 따라가기
+ * 어렵다 — 격자는 "몇 번이 몇 번" 만 보여 주고 답 글자는 아래 해설 구역에 둔다.
+ */
+export const SEE_EXPLANATION_LABEL = '해설 참조';
+
+/**
+ * 정답을 **어떻게 그릴지** — 선지 기호(원문자는 글자 속 숫자가 작아 크게 찍는다) · 적힌 글 · 미입력.
+ * 교사용·답지가 같은 판정으로 글자 크기를 정해야 같은 문항의 정답이 두 인쇄물에서 다르게 보이지 않는다.
+ */
+export type AnswerStyle = 'choice' | 'text' | 'missing';
+
+/** 빠른 정답 격자 한 칸의 종류 — 그릴 모양 셋 + '아래 해설 구역을 보라'(주관식·서술형) */
+export type AnswerRowKind = AnswerStyle | 'reference';
+
 /** 객관식 정답 한 토막은 **자리 번호**로 저장된다(`'3'` = 셋째 선지) */
 const CHOICE_ANSWER_RE = /^[1-9]$/;
 
@@ -97,28 +113,60 @@ export function formatAnswer(
   return answer.trim() || MISSING_ANSWER_LABEL;
 }
 
+/**
+ * 저장된 정답이 `formatAnswer` 로 **선지 기호**가 되는가, 적힌 글 그대로인가, 비었는가.
+ * @param questionType - 문항 유형
+ * @param answer - 저장된 정답 문자열
+ * @param choiceCount - 이 문항의 선지 수 (0 이면 범위를 검사하지 않는다)
+ * @returns 그릴 모양
+ */
+export function answerStyle(
+  questionType: QuestionType,
+  answer: string,
+  choiceCount: number,
+): AnswerStyle {
+  const formatted = formatAnswer(questionType, answer, choiceCount);
+  if (formatted === MISSING_ANSWER_LABEL) return 'missing';
+  // 기호로 바뀌었으면 적힌 글(`'3'`)과 다르다 — `①, ③`·`① 또는 ②` 모두 여기 든다
+  return questionType === '객관식' && formatted !== answer.trim() ? 'choice' : 'text';
+}
+
+/** 주관식·서술형 정답은 격자에 적지 않고 해설 구역으로 보낸다 — 답이 **있을 때만**(빈 답은 '미입력') */
+function refersToExplanation(item: PaperItemSnapshot): boolean {
+  return item.question_type !== '객관식' && item.answer.trim() !== '';
+}
+
 /** 빠른 정답 격자 한 칸 */
 export interface AnswerRow {
   number: number;
-  /** 미입력이면 '미입력' — 빈칸이면 누락과 구분되지 않는다 */
+  /** 미입력이면 '미입력', 주관식·서술형이면 '해설 참조' — 빈칸이면 누락과 구분되지 않는다 */
   answer: string;
   question_type: QuestionType;
+  kind: AnswerRowKind;
 }
 
 /**
  * 빠른 정답 줄을 만든다.
  *
  * 번호는 **문제지에서의 자리**(1부터)다 — 원본 시험지 번호를 쓰면 문제지에 찍힌 번호와
- * 어긋난다.
+ * 어긋난다. 주관식·서술형은 답 글자 대신 **'해설 참조'** 를 찍고(`refersToExplanation`), 그 답은
+ * `explanationEntries` 가 해설 구역에 싣는다 — 두 함수가 같은 판정을 써야 '해설 참조' 가
+ * 가리키는 자리가 반드시 있다.
  * @param items - 문제지 항목 (order_index 순서)
  * @returns 자리 순서대로의 줄
  */
 export function buildAnswerRows(items: readonly PaperItemSnapshot[]): AnswerRow[] {
-  return items.map((item, i) => ({
-    number: i + 1,
-    answer: formatAnswer(item.question_type, item.answer, item.choices.length),
-    question_type: item.question_type,
-  }));
+  return items.map((item, i) => {
+    if (refersToExplanation(item)) {
+      return { number: i + 1, answer: SEE_EXPLANATION_LABEL, question_type: item.question_type, kind: 'reference' };
+    }
+    return {
+      number: i + 1,
+      answer: formatAnswer(item.question_type, item.answer, item.choices.length),
+      question_type: item.question_type,
+      kind: answerStyle(item.question_type, item.answer, item.choices.length),
+    };
+  });
 }
 
 /**
@@ -173,15 +221,21 @@ export interface ExplanationEntry {
   /** 문제지에서의 자리 (빠른 정답 격자와 같은 번호) */
   number: number;
   answer: string;
+  question_type: QuestionType;
+  /** 정답을 그릴 모양 — 선지 기호면 크게 찍는다 */
+  kind: AnswerStyle;
+  /** 해설이 없으면 빈 문자열 — 주관식 답만 실으러 온 덩어리다 */
   explanation_html: string;
 }
 
 /**
- * 해설이 **있는** 문항만 골라 낸다.
+ * 해설이 **있는** 문항과 **주관식·서술형 답이 있는** 문항을 골라 낸다.
  *
- * ⚠️ 해설 없는 문항을 '해설 없음' 으로 끼워 넣지 않는다. 기출은 해설이 안 달린 문항이
+ * ⚠️ 그 밖의 문항을 '해설 없음' 으로 끼워 넣지 않는다. 기출은 해설이 안 달린 문항이
  *    흔해서, 넣으면 답지 몇 쪽이 '해설 없음' 으로 채워지고 정작 읽을 해설이 묻힌다 —
- *    모든 문항의 답은 위쪽 **빠른 정답 격자**가 이미 보여 준다.
+ *    객관식 답은 위쪽 **빠른 정답 격자**가 이미 보여 준다.
+ * ⚠️ 주관식·서술형은 격자가 '해설 참조' 라고 적으므로(`buildAnswerRows`) 해설이 없어도
+ *    **답을 들고 여기 와야** 한다 — 안 그러면 '참조' 할 곳이 없다.
  * @param items - 문제지 항목
  * @returns 자리 순서대로의 해설 목록 (없으면 빈 배열)
  */
@@ -190,10 +244,12 @@ export function explanationEntries(items: readonly PaperItemSnapshot[]): Explana
   items.forEach((item, i) => {
     // ⚠️ 정화 **뒤**에 본다 — 지워질 태그만 든 해설은 '해설' 띠만 불러내고 빈 줄을 찍는다
     const html = explanationHtml(item.explanation_html);
-    if (!html) return;
+    if (!html && !refersToExplanation(item)) return;
     out.push({
       number: i + 1,
       answer: formatAnswer(item.question_type, item.answer, item.choices.length),
+      question_type: item.question_type,
+      kind: answerStyle(item.question_type, item.answer, item.choices.length),
       explanation_html: html,
     });
   });

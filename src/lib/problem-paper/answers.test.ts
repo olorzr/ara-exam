@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
-  buildAnswerRows, correctChoiceIndices, EXPLANATION_INLINE_MAX_CHARS, explanationEntries,
-  explanationHtml, explanationTextLength, formatAnswer, MISSING_ANSWER_LABEL, splitsExplanation,
+  answerStyle, buildAnswerRows, correctChoiceIndices, EXPLANATION_INLINE_MAX_CHARS,
+  explanationEntries, explanationHtml, explanationTextLength, formatAnswer, MISSING_ANSWER_LABEL,
+  SEE_EXPLANATION_LABEL, splitsExplanation,
 } from './answers';
 import type { PaperItemSnapshot } from '@/types/problem-bank';
 
@@ -136,6 +137,44 @@ describe('buildAnswerRows', () => {
   it('배점은 담지 않는다', () => {
     expect(buildAnswerRows([snap({ score: 3 })])[0]).not.toHaveProperty('score');
   });
+
+  /** 원문자는 글자 속 숫자가 작아 격자에서 크게 찍는다 — 그 판정이 `kind` 다 */
+  it('선지 기호는 choice, 선지로 못 읽는 답은 text, 빈 답은 missing', () => {
+    expect(buildAnswerRows([snap({ answer: '3' })])[0].kind).toBe('choice');
+    expect(buildAnswerRows([snap({ answer: '1,3' })])[0].kind).toBe('choice');
+    expect(buildAnswerRows([snap({ answer: '1or2' })])[0].kind).toBe('choice');
+    expect(buildAnswerRows([snap({ answer: '1,6' })])[0].kind).toBe('text');
+    expect(buildAnswerRows([snap({ answer: '  ' })])[0].kind).toBe('missing');
+  });
+
+  /**
+   * 서술형 답은 문장이라 격자 한 칸에 넣으면 그 줄이 통째로 늘어난다(2026-10-10 사용자:
+   * "주관식은 해설 참조라고 해 주고 밑에 해설 부분에다가 놔 줘") — 답 글자는 해설 구역으로 보낸다
+   */
+  it("주관식·서술형은 '해설 참조' 로 찍는다", () => {
+    const rows = buildAnswerRows([
+      snap({ question_type: '주관식', answer: '은유' }),
+      snap({ question_type: '서술형', answer: '화자는 떠나는 이를 붙잡지 않는다.' }),
+    ]);
+    expect(rows.map((r) => r.answer)).toEqual([SEE_EXPLANATION_LABEL, SEE_EXPLANATION_LABEL]);
+    expect(rows.map((r) => r.kind)).toEqual(['reference', 'reference']);
+  });
+
+  /** 참조할 답이 없는데 '해설 참조' 라고 하면 거짓이다 — 빈 답은 유형과 무관하게 '미입력' */
+  it("주관식이라도 답이 비었으면 '미입력' 이다", () => {
+    const [row] = buildAnswerRows([snap({ question_type: '서술형', answer: ' ' })]);
+    expect(row.answer).toBe(MISSING_ANSWER_LABEL);
+    expect(row.kind).toBe('missing');
+  });
+});
+
+describe('answerStyle', () => {
+  it('객관식 기호만 choice 다 — 주관식 답이 숫자여도 글이다', () => {
+    expect(answerStyle('객관식', '3', FIVE)).toBe('choice');
+    expect(answerStyle('객관식', '1or4', 3)).toBe('text');
+    expect(answerStyle('주관식', '3', FIVE)).toBe('text');
+    expect(answerStyle('서술형', '', FIVE)).toBe('missing');
+  });
 });
 
 describe('explanationEntries', () => {
@@ -145,15 +184,37 @@ describe('explanationEntries', () => {
       snap({ answer: '2', explanation_html: '<p>까닭</p>' }),
       snap({ explanation_html: '   ' }),
     ]);
-    expect(entries).toEqual([{ number: 2, answer: '②', explanation_html: '<p>까닭</p>' }]);
+    expect(entries).toEqual([{
+      number: 2, answer: '②', question_type: '객관식', kind: 'choice', explanation_html: '<p>까닭</p>',
+    }]);
   });
 
   /**
-   * 해설 없는 문항을 '해설 없음' 으로 끼워 넣으면 답지 몇 쪽이 그 말로 채워지고
-   * 정작 읽을 해설이 묻힌다 — 모든 답은 위쪽 빠른 정답 격자가 이미 보여 준다.
+   * 해설 없는 객관식 문항을 '해설 없음' 으로 끼워 넣으면 답지 몇 쪽이 그 말로 채워지고
+   * 정작 읽을 해설이 묻힌다 — 객관식 답은 위쪽 빠른 정답 격자가 이미 보여 준다.
    */
   it('해설이 하나도 없으면 빈 배열 (자리를 만들지 않는다)', () => {
     expect(explanationEntries([snap(), snap()])).toEqual([]);
+  });
+
+  /** 격자가 '해설 참조' 라고 적었으면 참조할 자리가 **반드시** 있어야 한다 — 해설이 없어도 답을 들고 온다 */
+  it("주관식·서술형 답은 해설이 없어도 싣는다 — 격자의 '해설 참조' 가 가리키는 자리", () => {
+    const items = [
+      snap({ question_type: '주관식', answer: '은유' }),
+      snap({ question_type: '서술형', answer: '', explanation_html: '' }),
+      snap({ question_type: '서술형', answer: '화자는 떠나는 이를 붙잡지 않는다.', explanation_html: '<p>마지막 연.</p>' }),
+    ];
+    const entries = explanationEntries(items);
+    expect(entries).toEqual([
+      { number: 1, answer: '은유', question_type: '주관식', kind: 'text', explanation_html: '' },
+      {
+        number: 3, answer: '화자는 떠나는 이를 붙잡지 않는다.', question_type: '서술형', kind: 'text',
+        explanation_html: '<p>마지막 연.</p>',
+      },
+    ]);
+    // 불변식: '해설 참조' 줄마다 같은 번호의 해설 덩어리가 있다
+    const refs = buildAnswerRows(items).filter((r) => r.kind === 'reference').map((r) => r.number);
+    expect(refs.every((n) => entries.some((e) => e.number === n))).toBe(true);
   });
 
   /** 옛 스냅샷에는 이 키가 아예 없을 수 있다 */

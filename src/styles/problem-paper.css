@@ -512,7 +512,15 @@
   color: #1f2937;
   overflow-wrap: anywhere;
 }
+/*
+ * 선지 기호(①②③)는 원문자라 **글자 속 숫자가 글자 크기의 절반**쯤이다 — 10pt 로 찍으면 숫자가
+ * 5pt 짜리가 되어 "눈이 빠진다"(2026-10-10 사용자). 번호(11pt)는 그대로 두고 기호만 키운다.
+ * 이 수정자는 기출 답지 격자만 쓴다 — O,X·단답형 답지는 'O'·낱말이라 그대로다.
+ */
+.pb-answer-value--choice { font-size: 16pt; line-height: 1.15; }
 .pb-answer-value--missing { color: #b45309; font-weight: 500; }
+/* '해설 참조' — 답이 아니라 안내라 답 글자보다 가볍게 */
+.pb-answer-value--reference { color: #4b5563; font-weight: 500; font-size: 9.5pt; }
 
 /*
  * 답지의 해설 한 덩어리. 빠른 정답 격자와 **같은 번호 칸**(.pb-answer-num)을 써서
@@ -528,12 +536,19 @@
 }
 .pb-key-exp__body { flex: 1; font-size: 9.5pt; }
 .pb-key-exp__body p { margin: 0 0 2pt; }
+/*
+ * 해설 머리의 정답 줄. 주관식·서술형 답은 **문장**이라 줄을 바꿔야 한다 — nowrap 을 걸면
+ * 서술형 답 한 줄이 쪽 밖으로 나간다. nowrap 은 '정답' 꼬리표에만 둔다.
+ */
 .pb-key-exp__answer {
+  display: block;
   font-weight: 700;
   color: #2F8F86;
-  margin-right: 5px;
-  white-space: nowrap;
+  margin: 0 0 2pt;
+  overflow-wrap: anywhere;
 }
+.pb-key-exp__answer--choice { font-size: 14pt; line-height: 1.2; }
+.pb-key-exp__answer-label { margin-right: 5px; white-space: nowrap; }
 
 /* ── 화면에서 읽을 때 ─────────────────────────────── */
 /*

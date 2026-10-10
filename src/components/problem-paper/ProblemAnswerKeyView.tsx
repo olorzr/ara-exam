@@ -3,9 +3,7 @@
 import { useMemo, type ReactNode } from 'react';
 import { A4Document, CompactPageHeader } from '@/components/print';
 import ExamPrintHeader from '@/components/exam/ExamPrintHeader';
-import {
-  buildAnswerRows, explanationEntries, MISSING_ANSWER_LABEL,
-} from '@/lib/problem-paper/answers';
+import { buildAnswerRows, explanationEntries } from '@/lib/problem-paper/answers';
 import type { PaperCover } from '@/lib/problem-paper/cover';
 import type { PaperItemSnapshot, ProblemPaper } from '@/types/problem-bank';
 import { renderCoverSlot } from './PaperCoverPage';
@@ -37,6 +35,10 @@ interface ProblemAnswerKeyViewProps {
  *
  * 정답이 비어 있으면 빈칸이 아니라 **'미입력'** 이라고 찍는다 —
  * 빈칸으로 두면 인쇄물에서 "정답이 없는 문항"과 "인쇄가 빠진 것"을 구분할 수 없다.
+ *
+ * 주관식·서술형은 격자에 **'해설 참조'** 라고만 적고 답 글자는 아래 해설 구역에 둔다
+ * (2026-10-10, 사용자 결정 — "그래야 빠른 정답은 보기 편하지"). 선지 기호는 원문자라 숫자가
+ * 작아 격자에서 크게 찍는다(`.pb-answer-value--choice`).
  */
 export default function ProblemAnswerKeyView({
   paper, items, booklet = false, cover = null, coverImageUrl,
@@ -58,11 +60,7 @@ export default function ProblemAnswerKeyView({
           {chunk.map((row) => (
             <div key={row.number} className="pb-answer-cell">
               <span className="pb-answer-num">{row.number}</span>
-              <span
-                className={`pb-answer-value${
-                  row.answer === MISSING_ANSWER_LABEL ? ' pb-answer-value--missing' : ''
-                }`}
-              >
+              <span className={`pb-answer-value pb-answer-value--${row.kind}`}>
                 {row.answer}
               </span>
             </div>
@@ -71,8 +69,11 @@ export default function ProblemAnswerKeyView({
       );
     }
 
-    // ⚠️ 해설이 하나도 없으면 제목 줄도 내지 않는다 — 기출은 해설이 안 달린 문항이 흔해서,
-    //    빈 '해설' 띠만 찍히면 "해설이 인쇄에서 빠졌나" 로 읽힌다
+    // ⚠️ 실을 것이 하나도 없으면 제목 줄도 내지 않는다 — 기출은 해설이 안 달린 문항이 흔해서,
+    //    빈 '해설' 띠만 찍히면 "해설이 인쇄에서 빠졌나" 로 읽힌다.
+    //    주관식 답이 들었으면 제목에 그것도 밝힌다 — 격자의 '해설 참조' 가 여기를 가리킨다
+    const hasSubjective = explanations.some((e) => e.question_type !== '객관식');
+    const bandTitle = hasSubjective ? '해설 · 주관식 정답' : '해설';
     explanations.forEach((entry, i) => {
       out.push(
         // 해설 한 덩어리가 한 블록 — 번호·정답·본문이 갈리면 어느 문항 것인지 알 수 없다.
@@ -81,17 +82,23 @@ export default function ProblemAnswerKeyView({
         <div key={`exp-${entry.number}`}>
           {i === 0 && (
             <div className="section-bar section-bar--mint">
-              <span>해설</span>
+              <span>{bandTitle}</span>
             </div>
           )}
           <div className="pb-key-exp">
             <span className="pb-answer-num">{entry.number}</span>
             <div className="pb-key-exp__body">
-              <span className="pb-key-exp__answer">정답 {entry.answer}</span>
-              <div
-                // `explanationEntries` 가 정화한 값만 담아 준다 — 여기서 또 하지 않는다
-                dangerouslySetInnerHTML={{ __html: entry.explanation_html }}
-              />
+              {/* 서술형 답은 문장이라 줄을 바꾼다 — 꼬리표만 한 덩이로 둔다 */}
+              <div className={`pb-key-exp__answer pb-key-exp__answer--${entry.kind}`}>
+                <span className="pb-key-exp__answer-label">정답</span>
+                {entry.answer}
+              </div>
+              {entry.explanation_html && (
+                <div
+                  // `explanationEntries` 가 정화한 값만 담아 준다 — 여기서 또 하지 않는다
+                  dangerouslySetInnerHTML={{ __html: entry.explanation_html }}
+                />
+              )}
             </div>
           </div>
         </div>,
