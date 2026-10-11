@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import type { CategoryLevel } from '@/types';
-import { EXTERNAL_LEVEL, SEMESTER_OPTIONS } from '@/lib/constants';
+import { EXTERNAL_LEVEL } from '@/lib/constants';
+import { semesterOptionsFor } from '@/lib/semester';
 import { UNSPECIFIED_OPTION } from '@/lib/external-category';
 import { schoolOptionLabel } from '@/lib/category-master';
 import { Label } from '@/components/ui/label';
@@ -78,7 +79,7 @@ export default function CategoryForm(props: CategoryFormProps) {
                 <Label>학기</Label>
                 <OptionSelect
                   value={semester}
-                  options={SEMESTER_OPTIONS}
+                  options={semesterOptionsFor(level)}
                   placeholder="학기 선택"
                   disabled={!s.publisherId}
                   className="w-full"

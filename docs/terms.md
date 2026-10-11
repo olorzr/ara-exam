@@ -1,7 +1,7 @@
 # 도메인 용어 정의
 
 ## 카테고리 (Category)
-- 정의: 단어를 분류하는 계층 구조 (중등/고등 > 학년 > 출판사 > 대단원 > 소단원)
+- 정의: 단어를 분류하는 계층 구조 (중등/고등 > 학년 > 출판사 > 학기 > 대단원 > 소단원). 학기 구분 없는 교과서(고등 선택과목)는 학기 층 없이 출판사 > 대단원
 - 코드에서의 사용: `Category` 타입, `categories` 테이블
 - 관련 파일: `src/types/index.ts`, `sql/01_schema.sql`
 
@@ -44,6 +44,13 @@
 - 코드에서의 사용: `EXTERNAL_LEVEL` 상수, `CategoryLevel` 타입, `buildExternalTree`
 - 관련 파일: `src/lib/constants.ts`, `src/types/index.ts`, `src/lib/category-tree.ts`, `src/components/words/CategoryForm.tsx`
 - ⚠️ **카테고리 관리(`/categories`)에 외부지문 탭은 없다**(2026-09-14). 학교는 관리자시스템이 원본이고, 프린트는 `학교 프린트 시험지` 업로드가 `ensureSchoolMaterial` 로 자동 등록한다 — 앱에 프린트 이름을 고치거나 지우는 화면은 없다(이름 변경 전파는 DB 트리거 `exam.sync_school_material_name` 뿐)
+
+## 학기 — 교과서 학기 ↔ 시험 학기 (semester)
+- 정의: 이 저장소의 `semester` 칸은 **두 가지 뜻**이다. 섞으면 한쪽 화면이 조용히 빈다
+  - **교과서 학기** — 교과서 권이 어느 학기 것인가. `major_chapters`·`categories`·`concept_sheets`·`reference_texts.units[].semester`. 값은 `'1학기'`·`'2학기'`·**`''` = 학기 구분 없음**(2026-10-11). 고등 선택과목(문학·화법과 언어·독서와 작문)은 한 권을 학교마다 1학기에도 2학기에도 쓰므로 `''` 로 둔다. 공통국어·중등 국어는 학기별 권이다
+  - **시험 학기** — 그 시험을 **본** 학기. `problem_sources`·`print_bundles`·ara-system `school_exam_scopes`. 학기 구분 없는 교과서로 2학기에 본 시험이면 출처 학기는 `'2학기'` 다
+- 코드에서의 사용: 교과서 학기 선택지·변환은 `src/lib/semester.ts`(`semesterOptionsFor` — 고등만 `'학기 구분 없음'`, `toStoredSemester` — 표시값 → `''`). `getMajorChapters` 는 `undefined` 가 '전체', `''` 는 '학기 구분 없음만' 이다. 트리(`category-tree.ts`·`reference-texts/unit-browse-tree.ts`)는 `''` 교과서의 대단원을 학기 폴더 없이 교과서 바로 아래 둔다. 검수 화면의 단원 칸(`fetchUnitTree`)은 학기로 거르지 않는다 — 가진 학기가 시험 학기이기 때문이다
+- 관련 파일: `src/lib/semester.ts`, `src/lib/category-tree.ts`, `src/lib/problem-bank/unit-master.ts`, `sql/63_major_chapters_semesterless.sql`
 
 ## 년도 / 학년 (외부지문의 year · grade)
 - 정의: 프린트/작품명이 어느 **학년도**의 어느 **학년** 것인지. 같은 이름의 프린트를 해마다 따로 둘 수 있게 하는 구분자다. 중등/고등 교과 카테고리는 `year` 를 쓰지 않는다(학기가 그 역할)

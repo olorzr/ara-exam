@@ -83,7 +83,7 @@ describe('buildReferenceUnitTree', () => {
     expect(new Set(leaves.map((l) => l.id)).size).toBe(leaves.length);
   });
 
-  it('중학교가 고등학교보다 먼저, 단원은 자연순, 학기 미지정은 맨 뒤', () => {
+  it('중학교가 고등학교보다 먼저, 단원은 자연순, 학기 폴더가 학기 없는 대단원보다 앞', () => {
     const tree = buildReferenceUnitTree([
       row('a', { units: [unit({ grade: '고1' })] }),
       row('b', { units: [unit({ grade: '중3', unit_path: ['10. 끝'] }), unit({ grade: '중3', unit_path: ['2. 중간'] })] }),
@@ -91,8 +91,22 @@ describe('buildReferenceUnitTree', () => {
     ]);
     expect(tree.map((n) => n.label)).toEqual(['중3 (2)', '고1 (1)']);
     const semesters = tree[0].children[1].children;
-    expect(semesters.map((n) => n.label)).toEqual(['(전체) (2)', '1학기 (1)', '학기 미지정 (1)']);
+    expect(semesters.map((n) => n.label)).toEqual(['(전체) (2)', '1학기 (1)', '1. 문학 (1)']);
     expect(semesters[1].children.map((n) => n.label)).toEqual(['(전체) (1)', '2. 중간 (1)', '10. 끝 (1)']);
+  });
+
+  it('학기 구분 없는 교과서(고등 선택과목)는 학기 폴더 없이 대단원이 교과서 바로 아래 온다', () => {
+    const elective = (over: Partial<ReferenceUnit> = {}) =>
+      unit({ grade: '고2', textbook: '문학 비상', semester: '', unit_path: ['1. 나를 깨우는, 문학'], ...over });
+    const tree = buildReferenceUnitTree([
+      row('a', { units: [elective()] }),
+      row('b', { units: [elective({ unit_path: ['2. 다양한 빛깔로 만나는, 문학'] })] }),
+    ]);
+    const textbook = child(child(tree, '고2 (2)').children, '문학 비상 (2)');
+    expect(textbook.children.map((n) => n.label))
+      .toEqual(['(전체) (2)', '1. 나를 깨우는, 문학 (1)', '2. 다양한 빛깔로 만나는, 문학 (1)']);
+    // 범위에는 semester: '' 를 그대로 실어 학기 구분 없는 단원만 정확히 건다
+    expect(textbook.children[1].value).toEqual({ kind: 'unit', unit: elective() });
   });
 
   it('단원을 안 붙인 전문은 맨 끝 "분류 없음" 잎으로 찾는다', () => {

@@ -28,23 +28,29 @@ export function matchTextbookName(
   return names.find((n) => compareKey(n) === key) ?? null;
 }
 
-/** 어느 교과서의 단원을 읽을지 */
+/**
+ * 어느 교과서의 단원을 읽을지.
+ *
+ * ⚠️ **학기는 받지 않는다**(2026-10-11). 부르는 쪽이 가진 학기는 기출 출처의 **시험 학기**인데
+ *    마스터의 학기는 **교과서 권의 학기**라 둘은 다른 값이다. 시험 학기로 거르면
+ *    ① 학기 구분 없는 교과서(고등 선택과목, 저장값 `''`)는 어느 시험에서도 안 걸려 단원 칸이 통째로 사라지고
+ *    ② 1학기 시험에 2학기 단원 작품이 실린 문항(창비 공통국어에 실제로 있다)을 고칠 단원이 목록에 없다.
+ *    학년·교과서로만 읽고 두 학기는 `buildUnitTree` 가 이름으로 합친다 — 아카이브 단원 트리도 학기를 안 건다.
+ */
 export interface UnitTreeQuery {
   /** '중1'~'고3'. '' 면 두 학교급의 같은 이름 교과서를 모두 본다 */
   grade: string;
-  /** '1학기' | '2학기' | '' (''=두 학기 모두) */
-  semester: string;
   /** 교과서 이름(= exam.publishers.name). '' 면 트리를 만들지 않는다 */
   textbook: string;
 }
 
 /**
  * 교과서 단원 트리를 읽는다.
- * @param query - 학년·학기·교과서
+ * @param query - 학년·교과서
  * @returns 대단원 › 소단원 트리. 교과서를 안 골랐거나 못 읽으면 빈 배열
  */
 export async function fetchUnitTree(query: UnitTreeQuery): Promise<AreaTreeNode[]> {
-  const { grade, semester, textbook } = query;
+  const { grade, textbook } = query;
   if (!textbook.trim()) return [];
 
   try {
@@ -56,7 +62,7 @@ export async function fetchUnitTree(query: UnitTreeQuery): Promise<AreaTreeNode[
     if (matched.length === 0) return [];
 
     const majors = (await Promise.all(
-      matched.map((p) => getMajorChapters(p.id, grade || undefined, semester || undefined)),
+      matched.map((p) => getMajorChapters(p.id, grade || undefined)),
     )).flat();
     if (majors.length === 0) return [];
 

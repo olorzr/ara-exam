@@ -31,7 +31,8 @@ interface UnitTreePanelProps {
  *    트리가 쓴다), 여기서 저장되는 것은 단원 **이름**이고 학기는 출처 행에 있다.
  *    1·2학기에 같은 이름의 대단원이 등록된 경우가 실제로 있어(2026-09-08 운영 데이터
  *    2건, 미래엔(신유식) 중2) 두 폴더가 같은 결과를 낸다 — 같은 단원을 두 학기에
- *    걸쳐 등록한 것이라 결과가 같은 편이 맞다.
+ *    걸쳐 등록한 것이라 결과가 같은 편이 맞다. 여기 학기는 교과서 권의 학기이고, 학기 구분 없는
+ *    교과서(고등 선택과목)는 학기 폴더 없이 교과서 바로 아래 대단원이 온다(`category-tree.ts`).
  */
 export default function UnitTreePanel({ filters, onChange }: UnitTreePanelProps) {
   const [categories, setCategories] = useState<Category[]>([]);

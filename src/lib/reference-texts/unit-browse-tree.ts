@@ -9,7 +9,8 @@ import {
  * 작품 전문의 교과서 · 단원 트리 (순수 함수).
  *
  * **학년 › 교과서 › 학기 › 대단원 › 소단원** — 카테고리 관리·문제 은행 교과서 트리와 같은 층이라
- * 선생님이 이미 아는 모양이다. 마스터 전체가 아니라 **실제로 붙은 단원**으로만 만든다(전문이
+ * 선생님이 이미 아는 모양이다. 학기가 빈 단원(학기 구분 없는 교과서 — 고등 선택과목)은 학기 폴더 없이
+ * 대단원이 교과서 바로 아래 온다(`category-tree.ts` 와 같은 모양). 학기 폴더가 있으면 그쪽이 앞이다. 마스터 전체가 아니라 **실제로 붙은 단원**으로만 만든다(전문이
  * 없는 단원 폴더를 수백 개 늘어놓으면 찾을 것이 묻힌다).
  *
  * ⚠️ 건수는 **전문 수**다(단원 수가 아니다). 한 전문이 같은 대단원의 소단원 둘에 붙어 있으면
@@ -27,7 +28,6 @@ export const UNIT_SELF_LEAF = '(전체)';
 export const UNIT_NONE_LABEL = '분류 없음';
 
 const UNKNOWN_GRADE = '학년 미지정';
-const UNKNOWN_SEMESTER = '학기 미지정';
 
 /** 이름 → 그 아래 전문 id 들과 하위 갈래 */
 interface Bucket {
@@ -111,6 +111,37 @@ function majorNode(
 }
 
 /**
+ * 교과서 폴더 아래 — 학기 폴더들, 그다음 학기 구분 없는 대단원들.
+ * 학기 `''` 갈래는 폴더를 만들지 않고 대단원을 바로 올린다. 범위 값에는 `semester: ''` 를 그대로
+ * 실어 jsonb 포함 검색이 '학기 구분 없는' 단원만 정확히 건다.
+ * @param grade - 학년
+ * @param textbook - 교과서
+ * @param bucket - 그 교과서의 갈래
+ * @returns 노드 목록
+ */
+function textbookChildren(
+  grade: string, textbook: string, bucket: Bucket,
+): FacetTreeNode<ReferenceBrowseAxis>[] {
+  const folders: FacetTreeNode<ReferenceBrowseAxis>[] = [];
+  const flat: FacetTreeNode<ReferenceBrowseAxis>[] = [];
+  for (const [semester, semesterBucket] of sortedEntries(bucket, compareNames)) {
+    const scope = { grade, textbook, semester };
+    const majors = sortedEntries(semesterBucket, compareNames)
+      .map(([major, majorBucket]) => majorNode(scope, major, majorBucket));
+    if (semester === '') {
+      flat.push(...majors);
+      continue;
+    }
+    folders.push({
+      id: `unit-tree:${JSON.stringify([grade, textbook, semester])}`,
+      label: labelWith(semester, semesterBucket.ids.size),
+      children: [selfLeaf(scope, semesterBucket), ...majors],
+    });
+  }
+  return [...folders, ...flat];
+}
+
+/**
  * 전문들의 단원으로 트리를 만든다.
  * @param rows - 패싯 (전문별 분류 칸)
  * @returns 학년 폴더부터 시작하는 트리 (+ 맨 끝 '분류 없음' 잎)
@@ -149,16 +180,7 @@ export function buildReferenceUnitTree(
             label: labelWith(textbook, textbookBucket.ids.size),
             children: [
               selfLeaf({ grade, textbook }, textbookBucket),
-              ...sortedEntries(textbookBucket, compareNames)
-                .map(([semester, semesterBucket]) => ({
-                  id: `unit-tree:${JSON.stringify([grade, textbook, semester])}`,
-                  label: labelWith(semester || UNKNOWN_SEMESTER, semesterBucket.ids.size),
-                  children: [
-                    selfLeaf({ grade, textbook, semester }, semesterBucket),
-                    ...sortedEntries(semesterBucket, compareNames)
-                      .map(([major, majorBucket]) => majorNode({ grade, textbook, semester }, major, majorBucket)),
-                  ],
-                })),
+              ...textbookChildren(grade, textbook, textbookBucket),
             ],
           })),
       ],

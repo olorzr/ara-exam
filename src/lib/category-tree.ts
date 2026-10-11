@@ -14,6 +14,7 @@ export interface CategoryTreeNode {
 /**
  * 카테고리 배열을 계층 트리 구조로 변환한다.
  * 중등/고등: level > grade > publisher > semester > chapter > sub_chapter
+ *   (학기가 빈 '학기 구분 없는' 교과서는 semester 층 없이 publisher > chapter)
  * 외부지문: level > school > year > grade > material
  */
 export function buildCategoryTree(categories: Category[]): CategoryTreeNode[] {
@@ -84,53 +85,77 @@ function buildSchoolLevelTree(level: string, cats: Category[]): CategoryTreeNode
         id: `${level}-${grade}`,
         label: grade,
         type: 'grade' as const,
-        children: Object.entries(byPub).map(([pub, pubCats]) => {
-          const bySemester = groupBy(pubCats, (c) => c.semester || '미지정');
-
-          return {
-            id: `${level}-${grade}-${pub}`,
-            label: pub,
-            type: 'publisher' as const,
-            children: Object.entries(bySemester).map(([sem, semCats]) => {
-              const byChapter = groupBy(semCats, (c) => c.chapter);
-
-              return {
-                id: `${level}-${grade}-${pub}-${sem}`,
-                label: sem,
-                type: 'semester' as const,
-                children: Object.entries(byChapter).map(([ch, chCats]) => {
-                  const hasSubChapters = chCats.some((c) => c.sub_chapter);
-
-                  if (!hasSubChapters && chCats.length === 1) {
-                    return {
-                      id: chCats[0].id,
-                      label: ch,
-                      type: 'chapter' as const,
-                      children: [],
-                      category: chCats[0],
-                    };
-                  }
-
-                  return {
-                    id: `${level}-${grade}-${pub}-${sem}-${ch}`,
-                    label: ch,
-                    type: 'chapter' as const,
-                    children: chCats.map((cat) => ({
-                      id: cat.id,
-                      label: cat.sub_chapter || '(전체)',
-                      type: 'sub_chapter' as const,
-                      children: [],
-                      category: cat,
-                    })),
-                  };
-                }),
-              };
-            }),
-          };
-        }),
+        children: Object.entries(byPub).map(([pub, pubCats]) => ({
+          id: `${level}-${grade}-${pub}`,
+          label: pub,
+          type: 'publisher' as const,
+          children: publisherChildren(`${level}-${grade}-${pub}`, pubCats),
+        })),
       };
     }),
   };
+}
+
+/**
+ * 출판사(교과서) 아래 — 학기 폴더 › 대단원.
+ *
+ * 학기가 빈 행은 **학기 구분 없는 교과서**(고등 선택과목 — 문학·화법과 언어 등, `semester.ts`)라
+ * 학기 폴더 없이 대단원을 출판사 바로 아래 둔다. 예전에는 '미지정' 폴더 하나를 더 거쳐야 했다.
+ * 노드 id 는 학기 자리가 비어 `…-출판사--대단원` 이 된다(학기 폴더 아래 대단원과 겹치지 않는다).
+ * @param prefix - 출판사 노드 id
+ * @param pubCats - 그 출판사의 카테고리
+ * @returns 학기 폴더들 + (학기 없는) 대단원들
+ */
+function publisherChildren(prefix: string, pubCats: Category[]): CategoryTreeNode[] {
+  const bySemester = groupBy(pubCats, (c) => c.semester);
+
+  return Object.entries(bySemester).flatMap(([sem, semCats]) => {
+    const chapters = chapterNodes(`${prefix}-${sem}`, semCats);
+    if (sem === '') return chapters;
+    return [{
+      id: `${prefix}-${sem}`,
+      label: sem,
+      type: 'semester' as const,
+      children: chapters,
+    }];
+  });
+}
+
+/**
+ * 대단원 노드들 — 소단원이 없는 대단원 하나는 그 자체가 고를 수 있는 잎, 아니면 폴더.
+ * @param prefix - 부모(학기 또는 출판사) 노드 id
+ * @param cats - 그 아래 카테고리
+ * @returns 대단원 노드
+ */
+function chapterNodes(prefix: string, cats: Category[]): CategoryTreeNode[] {
+  const byChapter = groupBy(cats, (c) => c.chapter);
+
+  return Object.entries(byChapter).map(([ch, chCats]) => {
+    const hasSubChapters = chCats.some((c) => c.sub_chapter);
+
+    if (!hasSubChapters && chCats.length === 1) {
+      return {
+        id: chCats[0].id,
+        label: ch,
+        type: 'chapter' as const,
+        children: [],
+        category: chCats[0],
+      };
+    }
+
+    return {
+      id: `${prefix}-${ch}`,
+      label: ch,
+      type: 'chapter' as const,
+      children: chCats.map((cat) => ({
+        id: cat.id,
+        label: cat.sub_chapter || '(전체)',
+        type: 'sub_chapter' as const,
+        children: [],
+        category: cat,
+      })),
+    };
+  });
 }
 
 /**
@@ -163,12 +188,19 @@ export function naturalCompare(a: string, b: string): number {
   return 0;
 }
 
-/** children 배열을 label 기준 자연순 정렬한다 */
+/**
+ * children 배열을 label 기준 자연순 정렬한다.
+ * 학기 폴더는 언제나 그 옆의 대단원보다 앞이다 — 한 교과서에 학기 폴더와 학기 없는 대단원이
+ * 섞이면(정상 데이터에는 없다) 라벨순으로만 세울 때 '1. 문학' 과 '1학기' 가 한 줄에 엉킨다.
+ */
 function sortChildren(nodes: CategoryTreeNode[]): CategoryTreeNode[] {
   return nodes
     .map((node) => ({ ...node, children: sortChildren(node.children) }))
-    .sort((a, b) => naturalCompare(a.label, b.label));
+    .sort((a, b) => folderRank(a) - folderRank(b) || naturalCompare(a.label, b.label));
 }
+
+/** 학기 폴더를 앞으로 */
+const folderRank = (node: CategoryTreeNode): number => (node.type === 'semester' ? 0 : 1);
 
 /**
  * 같은 키끼리 묶는다.

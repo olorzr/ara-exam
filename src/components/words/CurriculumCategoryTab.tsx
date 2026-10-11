@@ -5,7 +5,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { OptionSelect } from '@/components/ui/option-select';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { MIDDLE_SCHOOL_GRADES, HIGH_SCHOOL_GRADES, SEMESTER_OPTIONS } from '@/lib/constants';
+import { MIDDLE_SCHOOL_GRADES, HIGH_SCHOOL_GRADES } from '@/lib/constants';
+import { semesterOptionsFor, toStoredSemester } from '@/lib/semester';
 import { MasterListPanel } from '@/components/words';
 import type { Publisher, MajorChapter, SubChapter } from '@/types';
 import * as cm from '@/lib/category-master';
@@ -25,6 +26,8 @@ export default function CurriculumCategoryTab() {
   const [subChapters, setSubChapters] = useState<SubChapter[]>([]);
 
   const gradeOptions = level === '중등' ? MIDDLE_SCHOOL_GRADES : HIGH_SCHOOL_GRADES;
+  // 고등만 '학기 구분 없음'(선택과목). 화면 값을 저장값으로 바꾸는 자리는 아래 셋 — 조회·재조회·추가
+  const storedSemester = toStoredSemester(semester);
 
   const loadPublishers = useCallback(async () => {
     setPublishers(await cm.getPublishers(level));
@@ -46,7 +49,7 @@ export default function CurriculumCategoryTab() {
         setChapters([]); setSelectedChapterId(''); setSubChapters([]);
         return;
       }
-      const data = await cm.getMajorChapters(selectedPubId, grade, semester);
+      const data = await cm.getMajorChapters(selectedPubId, grade, toStoredSemester(semester));
       setChapters(data);
       setSelectedChapterId('');
       setSubChapters([]);
@@ -82,9 +85,9 @@ export default function CurriculumCategoryTab() {
   };
 
   // --- Chapter CRUD ---
-  const reloadChapters = () => cm.getMajorChapters(selectedPubId, grade, semester).then(setChapters);
+  const reloadChapters = () => cm.getMajorChapters(selectedPubId, grade, storedSemester).then(setChapters);
   const handleAddChapter = async (name: string) => {
-    const { error } = await cm.createMajorChapter(name, selectedPubId, grade, semester);
+    const { error } = await cm.createMajorChapter(name, selectedPubId, grade, storedSemester);
     if (error) { toast.error('이미 존재하는 대단원입니다.'); return; }
     toast.success('대단원이 추가되었습니다.');
     reloadChapters();
@@ -134,7 +137,10 @@ export default function CurriculumCategoryTab() {
             options={['중등', '고등']}
             className="w-32"
             ariaLabel="구분"
-            onChange={(v) => setLevel(v as '중등' | '고등')}
+            onChange={(v) => {
+              // 학년·학기는 학교급마다 선택지가 다르다 — 남기면 중등에 '학기 구분 없음' 이 걸린 채 남는다
+              setLevel(v as '중등' | '고등'); setGrade(''); setSemester('');
+            }}
           />
         </div>
         <div className="space-y-2">
@@ -152,15 +158,20 @@ export default function CurriculumCategoryTab() {
           <Label>학기</Label>
           <OptionSelect
             value={semester}
-            options={SEMESTER_OPTIONS}
+            options={semesterOptionsFor(level)}
             placeholder="학기 선택"
             disabled={!grade}
-            className="w-32"
+            className="w-40"
             ariaLabel="학기"
             onChange={setSemester}
           />
         </div>
       </div>
+      {level === '고등' && (
+        <p className="text-xs text-muted-foreground">
+          문학·화법과 언어처럼 한 권을 학교마다 1학기에도 2학기에도 쓰는 선택과목은 학기를 &lsquo;학기 구분 없음&rsquo;으로 등록하세요.
+        </p>
+      )}
 
       <Card>
         <CardContent className="pt-6">

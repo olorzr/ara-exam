@@ -7,8 +7,11 @@ import { levelFromGrade } from '@/lib/problem-bank/source-form';
 import { fetchUnitTree } from '@/lib/problem-bank/unit-master';
 import type { ProblemSource } from '@/types/problem-bank';
 
-/** 트리를 고르는 데 필요한 출처 정보만 */
-export type TreeSource = Pick<ProblemSource, 'grade' | 'semester' | 'textbook'>;
+/**
+ * 트리를 고르는 데 필요한 출처 정보만.
+ * 출처의 학기(시험 학기)는 넣지 않는다 — 교과서 단원은 학기로 거르지 않는다(`UnitTreeQuery` 참조).
+ */
+export type TreeSource = Pick<ProblemSource, 'grade' | 'textbook'>;
 
 /**
  * 저장된 출처로 영역·단원 트리를 읽는다 (검수·편집 화면 공용).
@@ -29,7 +32,6 @@ export function useSourceTrees(source: TreeSource | null): {
   const [unitTree, setUnitTree] = useState<AreaTreeNode[]>([]);
 
   const grade = source?.grade ?? '';
-  const semester = source?.semester ?? '';
   const textbook = source?.textbook ?? '';
   const ready = source !== null;
 
@@ -48,11 +50,11 @@ export function useSourceTrees(source: TreeSource | null): {
   useEffect(() => {
     if (!ready) return undefined;
     let alive = true;
-    fetchUnitTree({ grade, semester, textbook })
+    fetchUnitTree({ grade, textbook })
       .then((tree) => { if (alive) setUnitTree(tree); })
       .catch(() => { if (alive) setUnitTree([]); });
     return () => { alive = false; };
-  }, [ready, grade, semester, textbook]);
+  }, [ready, grade, textbook]);
 
   return { areaTree, unitTree };
 }

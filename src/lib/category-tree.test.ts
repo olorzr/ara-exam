@@ -97,6 +97,51 @@ describe('buildCategoryTree — 중등/고등', () => {
   });
 });
 
+describe('buildCategoryTree — 학기 구분 없는 교과서 (고등 선택과목)', () => {
+  const elective = (overrides: Partial<Category> = {}): Category =>
+    makeCategory({ level: '고등', grade: '고2', publisher: '문학 비상', semester: '', ...overrides });
+
+  it('학기가 빈 대단원은 학기 폴더 없이 출판사 바로 아래 온다', () => {
+    const tree = buildCategoryTree([
+      elective({ id: 'a', chapter: '1. 나를 깨우는, 문학' }),
+      elective({ id: 'b', chapter: '2. 다양한 빛깔로 만나는, 문학' }),
+    ]);
+    const publisher = findByPath(tree, ['고등', '고2', '문학 비상']);
+    expect(publisher?.children.map((n) => n.label)).toEqual(['1. 나를 깨우는, 문학', '2. 다양한 빛깔로 만나는, 문학']);
+    expect(publisher?.children.every((n) => n.type === 'chapter')).toBe(true);
+    expect(findByPath(tree, ['고등', '고2', '문학 비상', '미지정'])).toBeUndefined();
+    expect(publisher?.children[0].category?.id).toBe('a');
+  });
+
+  it('소단원이 있는 대단원도 출판사 바로 아래 폴더가 되고 id 가 학기 폴더 아래 것과 겹치지 않는다', () => {
+    const tree = buildCategoryTree([
+      elective({ id: 'a', chapter: '1. 단원', sub_chapter: '(1) 소단원' }),
+      elective({ id: 'b', chapter: '1. 단원', sub_chapter: '' }),
+    ]);
+    const chapter = findByPath(tree, ['고등', '고2', '문학 비상', '1. 단원']);
+    expect(chapter?.id).toBe('고등-고2-문학 비상--1. 단원');
+    expect(chapter?.children.map((n) => n.label)).toEqual(['(1) 소단원', '(전체)']);
+  });
+
+  it('공통국어처럼 학기가 있는 교과서는 학기 폴더를 그대로 둔다', () => {
+    const tree = buildCategoryTree([
+      makeCategory({ id: 'a', level: '고등', grade: '고1', publisher: '공통국어 창비', semester: '1학기' }),
+      makeCategory({ id: 'b', level: '고등', grade: '고1', publisher: '공통국어 창비', semester: '2학기' }),
+    ]);
+    const publisher = findByPath(tree, ['고등', '고1', '공통국어 창비']);
+    expect(publisher?.children.map((n) => [n.type, n.label])).toEqual([['semester', '1학기'], ['semester', '2학기']]);
+  });
+
+  it('한 교과서에 학기 폴더와 학기 없는 대단원이 섞이면 학기 폴더가 앞이다', () => {
+    const tree = buildCategoryTree([
+      elective({ id: 'a', chapter: '1. 문학' }),
+      elective({ id: 'b', chapter: '2. 문법', semester: '1학기' }),
+    ]);
+    const publisher = findByPath(tree, ['고등', '고2', '문학 비상']);
+    expect(publisher?.children.map((n) => [n.type, n.label])).toEqual([['semester', '1학기'], ['chapter', '1. 문학']]);
+  });
+});
+
 describe('buildCategoryTree — 이름이 자바스크립트 예약 속성일 때', () => {
   // ⚠️ 코덱스 리뷰: 묶는 그릇이 평범한 객체면 이 이름들이 **물려받은 속성**으로 잡혀
   //    `acc[key].push` 가 함수가 아니라 터지고, 개념지 목록이 통째로 안 그려졌다.

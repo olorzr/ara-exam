@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import type { CategoryLevel, Publisher, MajorChapter, SubChapter, SchoolMaterial, SelectableSchool } from '@/types';
 import { EXTERNAL_LEVEL, MIDDLE_SCHOOL_GRADES, HIGH_SCHOOL_GRADES } from '@/lib/constants';
 import { EXTERNAL_GRADE_OPTIONS, buildYearOptions, toStoredValue } from '@/lib/external-category';
+import { NO_SEMESTER_OPTION, toStoredSemester } from '@/lib/semester';
 import {
   getPublishers, getMajorChapters, getSubChapters,
   getSelectableSchools, getSchoolMaterials,
@@ -52,6 +53,19 @@ export function useCategoryFormState(props: CategoryFormProps) {
   const [subChapterId, setSubChapterId] = useState('');
   const [schoolId, setSchoolId] = useState('');
   const [materialId, setMaterialId] = useState('');
+  /**
+   * '학기 구분 없음' 자동 고르기의 세대. 사람이 학기·학년·구분·출판사를 다시 만지면 올라가서,
+   * 늦게 돌아온 조회가 사람이 고른 학기를 덮지 않는다.
+   */
+  const autoSemesterSeq = useRef(0);
+  /**
+   * 지금 폼에 걸린 구분·학년·출판사·학기. 자동 고르기 응답이 돌아왔을 때 **그 사이 값이 바뀌었는지**를 본다 —
+   * 임시저장 불러오기는 이 훅의 핸들러를 거치지 않고 부모가 값을 통째로 바꿔서 세대만으로는 못 잡는다(코덱스 1R).
+   */
+  const currentRef = useRef({ level, grade, publisher, semester });
+  useEffect(() => {
+    currentRef.current = { level, grade, publisher, semester };
+  }, [level, grade, publisher, semester]);
 
   // 외부지문은 학교가 중학교일 수도 고등학교일 수도 있어 중등·고등 학년을 모두 제공한다
   const gradeOptions: readonly string[] =
@@ -93,7 +107,8 @@ export function useCategoryFormState(props: CategoryFormProps) {
   useEffect(() => {
     (async () => {
       if (!publisherId || !grade || !semester) { setChapters([]); return; }
-      setChapters(await getMajorChapters(publisherId, grade, semester));
+      // 화면 값('학기 구분 없음')을 저장값('')으로 — 그대로 넘기면 그 글자로 .eq 를 걸어 빈 목록이 된다
+      setChapters(await getMajorChapters(publisherId, grade, toStoredSemester(semester)));
     })();
   }, [publisherId, grade, semester]);
 
@@ -154,6 +169,7 @@ export function useCategoryFormState(props: CategoryFormProps) {
   }, [chapter, visibleMaterials, materialId]);
 
   const handleLevelChange = (v: CategoryLevel) => {
+    autoSemesterSeq.current += 1;
     onLevelChange(v);
     onYearChange(''); onGradeChange(''); onPublisherChange(''); onSemesterChange('');
     onChapterChange(''); onSubChapterChange(''); onSchoolNameChange('');
@@ -167,6 +183,7 @@ export function useCategoryFormState(props: CategoryFormProps) {
   };
 
   const handleGradeChange = (v: string) => {
+    autoSemesterSeq.current += 1;
     onGradeChange(v);
     if (level === EXTERNAL_LEVEL) {
       // 외부지문은 학년이 바뀌면 프린트 선택만 초기화된다(출판사/학기를 쓰지 않음)
@@ -179,14 +196,27 @@ export function useCategoryFormState(props: CategoryFormProps) {
   };
 
   const handlePublisherSelect = (pubId: string) => {
+    const seq = ++autoSemesterSeq.current;
     setPublisherId(pubId);
     const pub = publishers.find((p) => p.id === pubId);
     onPublisherChange(pub?.name ?? '');
     onSemesterChange(''); onChapterChange(''); onSubChapterChange('');
     setChapterId(''); setSubChapterId('');
+    if (level !== '고등' || !grade) return;
+    // 고등 선택과목(대단원이 전부 '학기 구분 없음')은 학기를 저절로 고른다 — 1학기를 고르면
+    // 대단원 칸이 비어 고장처럼 보인다. 그 사이 사람이 학기를 골랐으면 덮지 않는다(세대 대조)
+    const pubName = pub?.name ?? '';
+    getMajorChapters(pubId, grade).then((all) => {
+      if (autoSemesterSeq.current !== seq) return;
+      // 같은 교과서이고 학기가 아직 비어 있을 때만 — 그 사이 사람이 고르거나 임시저장을 불러왔으면 손대지 않는다
+      const now = currentRef.current;
+      if (now.level !== level || now.grade !== grade || now.publisher !== pubName || now.semester !== '') return;
+      if (all.length > 0 && all.every((c) => c.semester === '')) onSemesterChange(NO_SEMESTER_OPTION);
+    }).catch(() => undefined); // 못 읽으면 그냥 사람이 고른다
   };
 
   const handleSemesterChange = (v: string) => {
+    autoSemesterSeq.current += 1;
     onSemesterChange(v);
     onChapterChange(''); onSubChapterChange('');
     setChapterId(''); setSubChapterId('');

@@ -58,8 +58,9 @@ describe('범위 축 (학년·교과서·학기까지)', () => {
   it('요약 줄은 범위 끝에 "전체" 를 붙인다', () => {
     expect(describeAxis({ kind: 'unit', unit: { grade: '중2', textbook: '천재(노미숙)' } }))
       .toBe('중2 천재(노미숙) 전체');
-    expect(describeAxis({ kind: 'unit', unit: { grade: '중2', textbook: '천재', semester: '' } }))
-      .toBe('중2 천재 학기 미지정 전체');
+    // 학기 구분 없는 교과서('')는 학기 칸을 적지 않는다 — 트리에도 학기 폴더가 없다
+    expect(describeAxis({ kind: 'unit', unit: { grade: '고2', textbook: '문학 비상', semester: '', unit_path: ['1. 문학'] } }))
+      .toBe('고2 문학 비상 1. 문학');
   });
 });
 

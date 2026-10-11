@@ -20,8 +20,9 @@ import { workKey } from '@/lib/problem-bank/work-tree';
  *
  * 빠진 칸은 '그 아래 전부' 다. jsonb 포함(`units @> [{…}]`)은 준 칸만 맞춰 보므로, 칸을 덜 주면
  * 그 범위의 단원이 모두 걸린다(교과서 폴더의 `(전체)` 잎이 `{grade, textbook}` 만 준다).
- * ⚠️ 빈 문자열은 '빠짐' 이 아니라 **'미지정인 것만'** 이다(학기 미지정 폴더) — 그래서 칸을
- *    `undefined` 로 비운다. `JSON.stringify` 가 `undefined` 칸을 빼고 보낸다.
+ * ⚠️ 빈 문자열은 '빠짐' 이 아니라 **'빈 값인 것만'** 이다 — 학기 `''` 은 학기 구분 없는 교과서(고등
+ *    선택과목, `semester.ts`)다. 그래서 '그 아래 전부' 는 칸을 `undefined` 로 비운다.
+ *    `JSON.stringify` 가 `undefined` 칸을 빼고 보낸다.
  */
 export interface ReferenceUnitScope {
   grade: string;
@@ -92,7 +93,8 @@ export function unitScopeKey(scope: ReferenceUnitScope): string {
 export function unitScopeLabel(scope: ReferenceUnitScope): string {
   const parts = [scope.grade || '학년 미지정'];
   if (scope.textbook !== undefined) parts.push(scope.textbook);
-  if (scope.semester !== undefined) parts.push(scope.semester || '학기 미지정');
+  // 학기 구분 없는 교과서('')는 학기 칸을 적지 않는다 — 트리에도 학기 폴더가 없다
+  if (scope.semester) parts.push(scope.semester);
   const path = unitPathLabel(scope.unit_path ?? []);
   parts.push(path || '전체');
   return parts.join(' ');
