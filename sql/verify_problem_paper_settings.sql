@@ -15,6 +15,9 @@
 --
 -- [2026-09-29] **OMR 채점 설정**(sql/54)도 본다. 계약: 불리언 true 일 때만 켜지고 나머지는 전부 꺼짐
 -- (앱 `normalizePaperSettings` 의 `value.omr === true` 와 1:1 거울 — 옛 문제지가 성적 시스템에 저절로 오르면 안 된다).
+--
+-- [2026-10-11] 항목 스냅샷에 **작품 목록**(sql/68)이 실리는지도 본다 — 문항 `work_titles`(배열)와
+-- 지문 `works`(배열, 작품마다 label). 빠지면 문제지가 (가)(나) 지문을 통째로 인쇄한다(오류 없이).
 DO $verify$
 DECLARE
   v_problem    UUID;
@@ -33,6 +36,8 @@ DECLARE
   v_has_semester BOOLEAN;
   v_semester   TEXT;
   v_labels     TEXT;
+  v_works_problem UUID;
+  v_snap       JSONB;
 BEGIN
   SELECT id INTO v_problem FROM exam.problems LIMIT 1;
   SELECT user_id INTO v_user FROM exam.problems WHERE user_id IS NOT NULL LIMIT 1;
@@ -199,6 +204,42 @@ BEGIN
     IF SQLERRM <> 'ROLLBACK_VERIFY' THEN RAISE; END IF;
     RAISE NOTICE '학기 검증용 문제지는 되돌렸다';
   END;
+
+  -- 항목 스냅샷에 작품 목록이 실리는가 (sql/68) — 작품이 두 편 이상인 지문의 문항으로 돌린다
+  SELECT p.id INTO v_works_problem
+    FROM exam.problems p JOIN exam.passages ps ON ps.id = p.passage_id
+   WHERE jsonb_array_length(ps.works) >= 2 LIMIT 1;
+  IF v_works_problem IS NULL THEN
+    RAISE NOTICE '작품이 두 편 이상인 지문이 없어 작품 스냅샷 검사는 건너뛴다';
+  ELSE
+  BEGIN
+    PERFORM set_config('request.jwt.claims', json_build_object(
+      'sub', v_user::text, 'role', 'authenticated', 'email', 'verify@araeducation.co.kr'
+    )::text, true);
+    v_id := exam.create_problem_paper('검증용 임시 문제지 작품', ARRAY[v_works_problem], '{}'::jsonb);
+    SELECT i.snapshot INTO v_snap FROM exam.problem_paper_items i WHERE i.paper_id = v_id;
+
+    IF jsonb_typeof(v_snap -> 'work_titles') IS DISTINCT FROM 'array' THEN
+      RAISE EXCEPTION '문항 스냅샷에 work_titles 배열이 없다 — sql/68 이 적용되지 않았다';
+    END IF;
+    IF jsonb_typeof(v_snap -> 'passage' -> 'works') IS DISTINCT FROM 'array'
+       OR jsonb_array_length(v_snap -> 'passage' -> 'works') < 2
+       OR NOT (v_snap -> 'passage' -> 'works' -> 0) ? 'label' THEN
+      RAISE EXCEPTION '지문 스냅샷에 works(두 편 이상, label 포함)가 없다 — sql/68 이 적용되지 않았다';
+    END IF;
+    IF v_snap -> 'work_titles' IS DISTINCT FROM
+       (SELECT to_jsonb(work_titles) FROM exam.problems WHERE id = v_works_problem) THEN
+      RAISE EXCEPTION '스냅샷 work_titles 가 문항 값과 다르다: %', v_snap -> 'work_titles';
+    END IF;
+    RAISE NOTICE '작품 스냅샷 확인: 문항 work_titles=% · 지문 works %편',
+      v_snap -> 'work_titles', jsonb_array_length(v_snap -> 'passage' -> 'works');
+
+    RAISE EXCEPTION 'ROLLBACK_VERIFY';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM <> 'ROLLBACK_VERIFY' THEN RAISE; END IF;
+    RAISE NOTICE '작품 검증용 문제지는 되돌렸다';
+  END;
+  END IF;
 
   -- 되돌아갔는지는 **말로 하지 않고 검사한다** — NOTICE 만 내면 뒷정리가 깨져도
   -- '완료' 로 끝나고, 검증용 문제지가 선생님 목록에 남는다

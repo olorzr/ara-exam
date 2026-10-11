@@ -2,6 +2,7 @@ import { grammarPathsUnder } from './grammar-tree';
 import { QUESTION_KIND_TYPES, parseQuestionKind, type QuestionKindFilter } from './question-kind';
 import { gradesForSchoolLevel, parseSchoolLevel, type SchoolLevelFilter } from './school-level';
 import type { ProblemQuery } from './queries';
+import { GRAMMAR_SOLO_PASSAGE_AREAS, soloApplies, soloAxisOf } from './solo-filter';
 
 /**
  * 아카이브 필터 ↔ 주소 쿼리 변환 (순수 함수).
@@ -47,13 +48,20 @@ export interface ProblemFilters {
    *    `(가)(나)` 를 함께 묻는 문항도 두 작품 어느 쪽으로 훑어도 나온다.
    */
   work_title: string;
+  /**
+   * '그 작품만 · 그 문법만' — 작품 축이면 그 작품 하나만 묻는 문항, 문법 축이면 문학·독서 지문에
+   * 딸리지 않은 문항으로 좁힌다(solo-filter.ts). 축이 없으면 아무 조건도 만들지 않는다.
+   * ⚠️ 트리의 축 바꾸기 패치(`*_AXES_CLEARED`)는 이 칸을 건드리지 않는다 — 켜 둔 채 작품을
+   *    바꿔 가며 훑는 것이 보통이다. '조건 지우기'(`EMPTY_FILTERS`)만 끈다.
+   */
+  solo: boolean;
   search: string;
   page: number;
 }
 
 export const EMPTY_FILTERS: ProblemFilters = {
   source_type: '', school_name: '', year: '', school_level: '', grade: '', semester: '', exam_type: '', textbook: '',
-  area_path: [], unit_path: [], grammar_path: [], question_kind: '', work_title: '',
+  area_path: [], unit_path: [], grammar_path: [], question_kind: '', work_title: '', solo: false,
   search: '', page: 0,
 };
 
@@ -118,6 +126,7 @@ export function filtersToQueryString(filters: ProblemFilters): string {
   if (filters.grammar_path.length > 0) params.set('gram', filters.grammar_path.join(AREA_SEPARATOR));
   if (filters.question_kind) params.set('kind', filters.question_kind);
   if (filters.work_title) params.set('work', filters.work_title);
+  if (filters.solo) params.set('solo', '1');
   if (filters.search) params.set('q', filters.search);
   if (filters.page > 0) params.set('page', String(filters.page + 1));
   const query = params.toString();
@@ -148,10 +157,26 @@ export function filtersFromParams(params: URLSearchParams): ProblemFilters {
     grammar_path: grammar ? grammar.split(AREA_SEPARATOR).filter(Boolean) : [],
     question_kind: parseQuestionKind(params.get('kind')),
     work_title: params.get('work') ?? '',
+    solo: params.get('solo') === '1',
     search: params.get('q') ?? '',
     // 주소는 사람이 읽는 1-based, 내부는 0-based
     page: Number.isFinite(rawPage) && rawPage > 1 ? rawPage - 1 : 0,
   };
+}
+
+/**
+ * '그 작품만 · 그 문법만'(solo-filter.ts) 조건 — 축이 있을 때만, 그리고 **체크박스 이름이 말하는 축
+ * 하나만** 건다. 작품·문법 칸을 둘 다 골랐을 때 둘 다 걸면 이름('이 작품만 묻는 문항')이 말하지 않은
+ * 조건(문학 지문 문항 빼기)까지 걸려 맞는 문항이 사라진다(코덱스 1R).
+ * @param filters - 화면 필터
+ * @returns 조회 조건 한 칸, 또는 빈 객체
+ */
+function soloEntry(filters: ProblemFilters): Pick<ProblemQuery, 'only_work' | 'passage_areas'> {
+  if (!filters.solo) return {};
+  const axis = soloAxisOf(filters);
+  if (axis === 'work') return { only_work: true };
+  if (axis === 'grammar') return { passage_areas: [...GRAMMAR_SOLO_PASSAGE_AREAS] };
+  return {};
 }
 
 /**
@@ -182,6 +207,7 @@ export function toProblemQuery(filters: ProblemFilters): ProblemQuery {
       ? { question_types: [...QUESTION_KIND_TYPES[filters.question_kind]] } : {}),
     // 작품명은 자유 텍스트다 — '미지정만' 을 허용하면 그런 이름의 작품과 겹친다
     ...axisEntry('work_title', filters.work_title),
+    ...soloEntry(filters),
     ...(filters.search.trim() ? { search: filters.search.trim() } : {}),
     page: filters.page,
   };
@@ -197,6 +223,8 @@ export function hasActiveFilters(filters: ProblemFilters): boolean {
     filters.source_type || filters.school_name || filters.year || filters.school_level || filters.grade
     || filters.semester || filters.exam_type || filters.textbook || filters.area_path.length > 0
     || filters.unit_path.length > 0 || filters.grammar_path.length > 0
-    || filters.question_kind || filters.work_title || filters.search,
+    || filters.question_kind || filters.work_title || filters.search
+    // 축 없이 켜져만 있는 칸은 조건이 아니다 — 그것 때문에 '조건 지우기' 가 뜨면 눌러도 목록이 그대로다
+    || soloApplies(filters),
   );
 }

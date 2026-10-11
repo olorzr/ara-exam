@@ -71,6 +71,26 @@ describe('fetchProblemPage — 배열 컬럼 조건의 URL 표기', () => {
   });
 });
 
+describe("fetchProblemPage — '그 작품만 · 그 문법만'", () => {
+  it('작품 하나만 묻는 문항은 배열 같음(eq)으로 건다 — 포함(cs)이면 (가)(나) 를 함께 묻는 문항도 걸린다', async () => {
+    await fetchProblemPage({ work_title: '소녀, 두드리다', only_work: true });
+    expect(lastParam('work_titles')).toBe('eq.{"소녀, 두드리다"}');
+  });
+
+  it('지문 대영역은 글자 칸 in 이다 — 빈 값(지문 없음)이 뒤에 붙는다', async () => {
+    await fetchProblemPage({ grammar_paths: ['음운'], passage_areas: ['화법과 언어', ''] });
+    expect(lastParam('passage_area')).toBe('in.(화법과 언어,)');
+  });
+
+  it('켜지 않으면 예전 그대로다', async () => {
+    await fetchProblemPage({ work_title: '동백꽃' });
+    expect(lastParam('work_titles')).toBe('cs.{"동백꽃"}');
+    expect(lastParam('passage_area')).toBeNull();
+    await fetchProblemPage({ passage_areas: [] });
+    expect(lastParam('passage_area')).toBeNull();
+  });
+});
+
 describe('fetchProblemPage — 학교급', () => {
   it('학년 여럿은 출처 임베드의 학년에 in 으로 건다', async () => {
     await fetchProblemPage({ grades: ['중1', '중2', '중3'] });

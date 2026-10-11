@@ -8,6 +8,7 @@ import type { SourceFacets, WorkFacet } from '@/lib/problem-bank/facets';
 import { buildFilterAxes } from '@/lib/problem-bank/filter-axes';
 import { grammarSelectOptions } from '@/lib/problem-bank/grammar-browse-tree';
 import { hasActiveFilters, type ProblemFilters } from '@/lib/problem-bank/filters';
+import { soloToggleLabel } from '@/lib/problem-bank/solo-filter';
 
 /** 문법 선택지는 마스터라 안 바뀐다 — 렌더마다 새로 만들 것 없다 */
 const MASTER_GRAMMAR_OPTIONS = grammarSelectOptions();
@@ -40,6 +41,8 @@ export default function ProblemFilterBar({
   workFacets, total, onChange, onReset,
 }: ProblemFilterBarProps) {
   const axes = buildFilterAxes({ filters, facets, areaFacets, unitFacets, workFacets, grammarOptions });
+  // 작품·문법 축이 걸렸을 때만 그린다 — 축이 없으면 아무 조건도 못 만드는 칸이다(solo-filter.ts)
+  const soloLabel = soloToggleLabel(filters);
 
   return (
     <div className="space-y-3 rounded-lg border border-gray-200 p-4">
@@ -67,6 +70,17 @@ export default function ProblemFilterBar({
             className="h-9 pl-8 text-sm"
           />
         </div>
+
+        {soloLabel && (
+          <label className="flex items-center gap-1.5 text-sm text-gray-700">
+            <input
+              type="checkbox" checked={filters.solo}
+              onChange={(e) => onChange({ solo: e.target.checked, page: 0 })}
+              className="h-4 w-4 accent-[color:var(--primary)]"
+            />
+            {soloLabel}
+          </label>
+        )}
 
         {hasActiveFilters(filters) && (
           <Button type="button" variant="outline" size="sm" onClick={onReset}>

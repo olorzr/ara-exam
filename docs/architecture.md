@@ -357,7 +357,9 @@ src/
 ## lib/problem-bank
 - 역할: 아카이브 조회·쓰기, Storage 경로·서명, 영역·단원 마스터 읽기, 필터·패싯
 - 의존: lib/supabase, lib/supabase-public(읽기 전용), lib/category-master(단원 마스터)
-- 주요 파일: queries.ts(아카이브 목록 + 출처 칸 조건 `applySourceAxes` — 올라간 기출 목록과 한 벌),
+- 주요 파일: queries.ts(아카이브 목록 — 필터 체인 `runProblemQuery` 한 벌), source-axes.ts(출처 칸 조건
+  `applySourceAxes` — 올라간 기출 목록과 한 벌), solo-filter.ts('그 작품만 · 그 문법만' — 작품 축은 `work_titles` 같음,
+  문법 축은 지문 대영역 복제 칸 `passage_area`(sql/67) in), passage-shape.ts(지문 저장이 딸린 문항 행을 움직이는가),
   source-list.ts·source-list-filters.ts(올라간 기출 목록 — 칸 규칙은 `buildFilterAxes` 를 빌려 쓴다),
   source-queries.ts(한 출처를 통째로 — 시험지 화면),
   facets.ts(트리·선택지 재료 — `exam.archive_facets()` RPC 한 번, sql/66)·facets-payload.ts(응답 검사)·
@@ -421,13 +423,16 @@ src/
 ## lib/problem-paper
 - 역할: 문제지 조합 규칙(지문 묶음 연속성)과 인쇄 블록 조립
 - 의존: lib/print(splitHtmlBlocks), lib/shuffle
-- 주요 파일: compose.ts, dnd.ts, blocks.ts, box-parts.ts, answers.ts, bulk-add.ts, html-trim.ts,
-  settings.ts, shuffle-groups.ts, cover.ts, cover-image.ts, cover-queries.ts, print-layout-pref.ts
+- 주요 파일: compose.ts, dnd.ts, blocks.ts, passage-blocks.ts(지문 묶음 블록), box-parts.ts, answers.ts, bulk-add.ts,
+  html-trim.ts, settings.ts, shuffle-groups.ts, cover.ts, cover-image.ts, cover-queries.ts, print-layout-pref.ts,
+  trim-works.ts(복합 지문에서 묻지 않는 작품 구역 빼기)
 - **표지**(2026-10-04): 곁표 `exam.problem_paper_covers`(sql/61, 문제지 1:1, 행이 없으면 표지 없음).
   간단 표지(제목·부제·이름 칸)와 그림 표지(올린 그림을 JPEG 로 다시 인코딩해 `papers/{id}/cover-{token}.jpg`)
   둘이다. `usePaperCover` 가 읽고 쓰고 `PaperCoverDialog` 가 고르며 `PaperCoverPage` 가 그린다.
   문제지·교사용·답지 셋에 같은 표지가 붙고 제목 꼬리만 다르다(`coverTitleFor`).
   문제지 본문은 불변 스냅샷이라 칸을 더하지 않고 곁표에 둔다
+- **묻는 작품만 인쇄**(2026-10-12): 문제지 보기 화면의 선택(localStorage, 기본 켜짐). 스냅샷의 지문 `works`·문항
+  `work_titles`(sql/68)로 묻지 않는 (가)(나) 최상위 상자를 뺀다. 확실하지 않으면(옛 스냅샷·범위 표시·상자 없음) 지문 전체
 - **인쇄 방식**(2026-10-04): 낱장 / 중철 제본(A3 가로 양면). 화면 선택이고 localStorage 에
   기억한다(`print-layout-pref.ts`, 저장 설정 아님). 번호 어긋남 안내를 확인하기 전에는 중철로
   그리지 않는다 — 그 안내가 인쇄물에 찍혀 면이 한 면씩 밀리기 때문이다

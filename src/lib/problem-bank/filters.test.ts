@@ -28,7 +28,7 @@ describe('filters ↔ 주소', () => {
       semester: '1학기', exam_type: '중간', textbook: '천재(노미숙)', area_path: ['문학', '현대시'],
       unit_path: ['1. 문학', '(1) 시'], grammar_path: ['단어', '품사'],
       question_kind: 'subjective' as const,
-      work_title: '동백꽃', search: '심상', page: 2,
+      work_title: '동백꽃', solo: true, search: '심상', page: 2,
     };
     const back = filtersFromParams(new URLSearchParams(filtersToQueryString(source).slice(1)));
     expect(back).toEqual(source);
@@ -38,6 +38,15 @@ describe('filters ↔ 주소', () => {
     const back = filtersFromParams(new URLSearchParams('school=상현중&verified=1'));
     expect(back).toEqual({ ...EMPTY_FILTERS, school_name: '상현중' });
     expect(filtersToQueryString(back)).toBe('?school=%EC%83%81%ED%98%84%EC%A4%91');
+  });
+
+  it("'그 작품만 · 그 문법만' 은 solo=1 로 싣고 되읽는다 — 꺼져 있으면 싣지 않는다", () => {
+    const q = filtersToQueryString({ ...EMPTY_FILTERS, work_title: '서시', solo: true });
+    expect(new URLSearchParams(q.slice(1)).get('solo')).toBe('1');
+    expect(filtersFromParams(new URLSearchParams(q.slice(1))).solo).toBe(true);
+    expect(filtersToQueryString({ ...EMPTY_FILTERS, work_title: '서시' })).not.toContain('solo');
+    // 모르는 값은 꺼짐
+    expect(filtersFromParams(new URLSearchParams('solo=yes')).solo).toBe(false);
   });
 
   it('작품은 work 로 싣고 되읽는다', () => {
@@ -186,6 +195,34 @@ describe('toProblemQuery', () => {
     expect(toProblemQuery({ ...EMPTY_FILTERS, semester: '1학기' }).semester).toBe('1학기');
     expect(toProblemQuery(EMPTY_FILTERS).semester).toBeUndefined();
   });
+
+  it("작품 축 + '그 작품만' → 그 작품 하나만 묻는 문항(only_work)", () => {
+    const q = toProblemQuery({ ...EMPTY_FILTERS, work_title: '서시', solo: true });
+    expect(q.work_title).toBe('서시');
+    expect(q.only_work).toBe(true);
+    expect('passage_areas' in q).toBe(false);
+  });
+
+  it("문법 축 + '그 문법만' → 지문이 없거나 화법과 언어 지문인 문항", () => {
+    const q = toProblemQuery({ ...EMPTY_FILTERS, grammar_path: ['음운'], solo: true });
+    // '' 를 뒤에 두어야 URL 이 운영에서 확인된 꼴(in.(화법과 언어,))이 된다
+    expect(q.passage_areas).toEqual(['화법과 언어', '']);
+    expect('only_work' in q).toBe(false);
+  });
+
+  it('작품·문법을 둘 다 골랐으면 체크박스 이름이 말하는 작품 축 하나만 건다', () => {
+    const q = toProblemQuery({ ...EMPTY_FILTERS, work_title: '서시', grammar_path: ['음운'], solo: true });
+    expect(q.only_work).toBe(true);
+    expect('passage_areas' in q).toBe(false);
+  });
+
+  it('축 없이 켜져만 있으면 아무 조건도 만들지 않는다', () => {
+    expect(toProblemQuery({ ...EMPTY_FILTERS, solo: true })).toEqual({ page: 0 });
+    // 꺼져 있으면 축이 있어도 예전 그대로다
+    const q = toProblemQuery({ ...EMPTY_FILTERS, work_title: '서시', grammar_path: ['음운'] });
+    expect('only_work' in q).toBe(false);
+    expect('passage_areas' in q).toBe(false);
+  });
 });
 
 describe('hasActiveFilters', () => {
@@ -200,6 +237,11 @@ describe('hasActiveFilters', () => {
     expect(hasActiveFilters({ ...EMPTY_FILTERS, work_title: '동백꽃' })).toBe(true);
     expect(hasActiveFilters({ ...EMPTY_FILTERS, question_kind: 'objective' })).toBe(true);
     expect(hasActiveFilters({ ...EMPTY_FILTERS, school_level: '중등' })).toBe(true);
+  });
+
+  it("'그 작품만' 은 축이 있을 때만 조건이다 — 숨은 칸 때문에 '조건 지우기' 가 뜨지 않는다", () => {
+    expect(hasActiveFilters({ ...EMPTY_FILTERS, solo: true })).toBe(false);
+    expect(hasActiveFilters({ ...EMPTY_FILTERS, solo: true, grammar_path: ['음운'] })).toBe(true);
   });
 
   it('쪽 번호만으로는 조건이 아니다', () => {

@@ -240,7 +240,7 @@
 - 관련 파일: src/lib/problem-bank/work-title.ts, src/components/problem-review/PassageWorksEditor.tsx, src/components/problem-review/ProblemWorksField.tsx, sql/33_problem_bank_multi_works.sql
 
 ## 작품명 (work title)
-- 정의: 작품 한 편의 제목. 아카이브 왼쪽 '작품' 탭의 축이고, 문항 조회는 `work_titles` 배열 포함(`contains`)으로 건다 — `(가)(나)` 를 함께 묻는 문항이 **두 작품 어느 쪽으로 훑어도** 나온다
+- 정의: 작품 한 편의 제목. 아카이브 왼쪽 '작품' 탭의 축이고, 문항 조회는 `work_titles` 배열 포함(`contains`)으로 건다 — `(가)(나)` 를 함께 묻는 문항이 **두 작품 어느 쪽으로 훑어도** 나온다 ('그 작품만' 을 켜면 배열 같음(`eq`)이라 그 작품 하나만 묻는 문항만 — [그 작품만 · 그 문법만](#그-작품만--그-문법만-solo-filter))
 - 지은이는 **지문의 작품에만** 있다 — 작품 트리가 `갈래 › 지은이 › 작품` 이라 문항의 지은이는 제목으로 되찾는다(`work-counts.ts` 의 `collectWorkAuthors`). 갈래도 같은 방식으로 지문에서 되찾는다
 - 표기 정규화는 `normalizeWorkTitle` ↔ DB `exam.normalize_work_title` **1:1 거울**이다 — 감싸는 기호(「」『』〈〉"")만 양끝에서 벗긴다. 한쪽만 바꾸면 같은 작품이 두 폴더로 갈라진다
 - 지문 → 문항 전파는 **DB 트리거**가 한다(sql/33 `passages_sync_work_titles`). 사람이 문항에 좁혀 적은 작품명은 **자리로 이름만** 따라가고 좁힘 자체는 보존된다
@@ -366,6 +366,27 @@
   `tabForAxis`, `describeAxis`
 - 관련 파일: src/lib/reference-texts/filters.ts, browse-trees.ts, unit-browse-tree.ts,
   src/components/reference-texts/ReferenceSidePanel.tsx
+
+## 그 작품만 · 그 문법만 (solo filter)
+- 정의: 아카이브·문제지 조합 필터 줄의 체크 하나(`ProblemFilters.solo`, 주소 `solo=1`). **축마다 뜻이 다르다**(2026-10-12):
+  - 작품 축 — 그 작품 **하나만 묻는** 문항(`work_titles = {작품}`, 같음). (가)(나) 를 함께 묻는 문항은 빠지고, 복합 지문이어도 발문이 그 작품만 묻는 문항은 남는다
+  - 문법 축 — 문학·독서 지문에 딸리지 **않은** 문항(`passage_area` 가 `'화법과 언어'` 또는 `''`). 지문 없는 문항과 문법 설명글·대화문·「훈민정음」 지문의 문항이 남는다
+- 축이 없으면 아무 조건도 만들지 않고 칸도 안 그린다. 트리를 눌러 축을 바꿔도 켜진 채 남는다. 작품·문법을 둘 다 골랐으면 작품 축 하나만 건다(칸 이름이 그렇게 말한다)
+- ⚠️ 왼쪽 트리의 `(n)` 건수는 이 체크를 반영하지 않는다(전역 패싯이다) — 필터 줄의 'N개' 가 반영한다
+- 코드에서의 사용: `soloApplies`·`soloToggleLabel`·`GRAMMAR_SOLO_PASSAGE_AREAS`, `ProblemQuery.only_work`·`passage_areas`
+- 관련 파일: src/lib/problem-bank/solo-filter.ts, src/lib/problem-bank/queries.ts, sql/67_problem_bank_passage_area.sql
+
+## 지문 대영역 복제 (passage_area)
+- 정의: 문항 행에 복제해 둔 **딸린 지문**의 대영역(`passages.area_path[1]`, 지문 없으면 `''`). 문항의 `area_path` 는 그 물음의 영역이라 지문을 가리지 못한다
+- DB 트리거가 채운다 — 앱에서 보내지 말 것(`aa_passage_area_problems`, 지문 쪽 `passages_sync_area`). 어느 영역이 '문법 전용' 인가는 SQL 이 아니라 TS(`solo-filter.ts`)가 정한다
+- 관련 파일: sql/67_problem_bank_passage_area.sql, src/lib/problem-bank/passage-shape.ts(검수 화면이 지문 대영역을 바꾸면 딸린 문항을 다시 읽는다)
+
+## 묻는 작품만 인쇄 (trim works)
+- 정의: 문제지 보기 화면의 체크 '복합 지문은 묻는 작품만'(기본 켜짐, localStorage `ara-paper-trim-works`). (가)(나) 지문에서 그 묶음 문항들이 묻는 작품(`work_titles` 합집합)에 없는 작품의 **최상위 구역 상자**를 빼고 인쇄한다
+- **확실할 때만 뺀다** — 스냅샷에 `works` 가 없거나(sql/68 이전 문제지), 표시가 `(가)`~`(차)` 하나씩이 아니거나(`가~라`), 상자가 최상위에 하나씩 없거나, 작품 상자 안에 다른 (가)~(차) 상자가 있거나, 한 문항이라도 '지문 전체' 를 물으면 지문 전체를 찍는다. 뺀 구역의 그림은 인쇄 준비(서명) 확인에서도 빠진다. 작품으로 등록되지 않은 구역·머리 문단·〈보기〉는 늘 남긴다
+- 문제지 **저장 설정이 아니다** — 같은 문제지를 지문 전체로도 뽑는다
+- 코드에서의 사용: `trimPassageToAskedWorks`·`trimmableGroupCount`, `buildPaperBlocks(…, { trimWorks })`, `PaperPassageSnapshot.works?`·`PaperItemSnapshot.work_titles?`
+- 관련 파일: src/lib/problem-paper/trim-works.ts, src/lib/problem-paper/passage-blocks.ts, src/lib/problem-paper/print-layout-pref.ts, sql/68_problem_paper_snapshot_works.sql
 
 ## 문항 (Problem)
 - 정의: 발문·선지·정답을 가진 문제 하나. 단어 시험지의 '문항'과는 다른 개념이다.

@@ -14,23 +14,8 @@ import {
 import { countTaggedUnits, setSourceTextbook } from '@/lib/problem-bank/mutations-source';
 import { sourcePagePath } from '@/lib/problem-bank/storage-paths';
 import { signProblemFiles } from '@/lib/problem-bank/storage';
-import { joinWorkTitles, normalizePassageWorks } from '@/lib/problem-bank/work-title';
-import type { Passage, PassageWork, Problem, ProblemSource } from '@/types/problem-bank';
-
-/**
- * 딸린 문항까지 움직이는 변경인가 — **작품명 목록이 달라졌을 때만** 그렇다.
- *
- * ⚠️ 지은이·구분 표시까지 견주면 안 된다(코덱스 리뷰). DB 전파 트리거는 제목 목록이 같으면
- *    문항을 **한 행도 건드리지 않는데**, 화면이 '바뀌었다' 고 보면 멀쩡한 문항 카드를 전부
- *    다시 읽고 마운트해 **저장하지 않은 발문이 사라진다.**
- * ⚠️ 보낼 값은 다듬어진 뒤 저장되므로 여기서도 다듬어 견준다 — 아니면 `(가)` → `가` 같은
- *    표기 차이만으로 '바뀌었다' 가 된다.
- */
-function workTitlesDiffer(next: readonly PassageWork[], prev: readonly PassageWork[]): boolean {
-  const titles = (works: readonly PassageWork[]) =>
-    joinWorkTitles(normalizePassageWorks(works).map((w) => w.title));
-  return titles(next) !== titles(prev);
-}
+import { passageShapeChanged } from '@/lib/problem-bank/passage-shape';
+import type { Passage, Problem, ProblemSource } from '@/types/problem-bank';
 
 /**
  * 검수 화면의 상태.
@@ -109,7 +94,8 @@ export function useProblemReview(sourceId: string) {
   /**
    * 지문을 저장한다.
    *
-   * ⚠️ **작품명을 바꾸면 딸린 문항까지 움직인다.** DB 트리거(`passages_sync_work_titles`)가
+   * ⚠️ **작품명·대영역을 바꾸면 딸린 문항까지 움직인다.** DB 트리거(`passages_sync_work_titles`·
+   *    `passages_sync_area`, sql/67)가
    *    같은 트랜잭션에서 그 문항들의 `work_titles` 를 따라 바꾸고, 그 UPDATE 가
    *    `updated_at` 트리거를 건드린다. 화면이 옛 버전을 들고 있으면 이후 그 문항의
    *    저장·검수가 **아무도 안 고쳤는데 충돌로 튕긴다** — 지문 삭제(removePassage)와
@@ -130,23 +116,23 @@ export function useProblemReview(sourceId: string) {
   const savePassage = useCallback(async (id: string, patch: PassagePatch): Promise<boolean> => {
     const target = passages.find((p) => p.id === id);
     if (!target) return false;
-    const titlesChanged = patch.works !== undefined
-      && workTitlesDiffer(patch.works, target.works ?? []);
+    // 작품명 목록이나 대영역이 바뀌면 트리거가 딸린 문항 행까지 옮긴다(passage-shape.ts)
+    const shapeChanged = passageShapeChanged(patch, target);
     try {
       const saved = await updatePassage(id, target.updated_at, patch);
       setPassages((list) => list.map((p) => (
         p.id === id ? { ...p, ...patch, ...saved } as Passage : p
       )));
 
-      if (titlesChanged) {
+      if (shapeChanged) {
         // 트리거는 이 UPDATE 와 한 트랜잭션이라, 응답을 받은 시점에는 이미 반영돼 있다
         let fresh: Problem[];
         try {
           fresh = await fetchProblemsOfSource(sourceId);
         } catch {
-          // 작품명은 이미 저장됐고 딸린 문항의 버전도 서버에서 올라갔다. 화면만 못 따라온
+          // 지문은 이미 저장됐고 딸린 문항의 버전도 서버에서 올라갔다. 화면만 못 따라온
           // 상태라 그 문항의 다음 저장이 충돌로 튕긴다 — 무엇을 해야 하는지 정확히 알린다
-          toast.error('작품은 저장했지만 딸린 문항을 다시 읽지 못했어요. 새로고침해 주세요.');
+          toast.error('지문은 저장했지만 딸린 문항을 다시 읽지 못했어요. 새로고침해 주세요.');
           return true;
         }
 

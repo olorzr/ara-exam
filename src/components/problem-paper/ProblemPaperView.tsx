@@ -29,6 +29,11 @@ interface ProblemPaperViewProps {
   showAnswers?: boolean;
   /** 중철 제본(A3 가로 양면)으로 그린다 */
   booklet?: boolean;
+  /**
+   * (가)(나) 복합 지문에서 담은 문항이 묻지 않는 작품의 구역을 빼고 그린다(trim-works.ts).
+   * 확실하지 않은 지문은 그대로 전체를 그린다.
+   */
+  trimWorks?: boolean;
   /** 표지 (없으면 null) */
   cover?: PaperCover | null;
   /** 그림 표지의 서명 URL */
@@ -46,8 +51,8 @@ interface ProblemPaperViewProps {
  * 지문은 문단 단위 블록이라 단·쪽을 넘어 흘러가고, 문항은 하나가 한 블록이다.
  */
 export default function ProblemPaperView({
-  paper, items, imageUrls, showAnswers = false, booklet = false, cover = null, coverImageUrl,
-  coverImageFailed = false, coverNotice,
+  paper, items, imageUrls, showAnswers = false, booklet = false, trimWorks = false, cover = null,
+  coverImageUrl, coverImageFailed = false, coverNotice,
 }: ProblemPaperViewProps) {
   // OMR 문제지만 90A 답안지 안내를 붙인다 — 학생 종이에만(교사용은 채점하는 종이라 칸 안내가 필요 없다).
   // 장 수는 성적 시스템과 같은 규칙(버블로 채점하는 마지막 번호)으로 잰다
@@ -57,13 +62,13 @@ export default function ProblemPaperView({
   );
   const blocks = useMemo(
     () => renderPaperBlocks({
-      blocks: buildPaperBlocks(items, showAnswers),
+      blocks: buildPaperBlocks(items, showAnswers, { trimWorks }),
       settings: paper.settings,
       imageUrls,
       showAnswers,
       omrSheetCount: omrSheets,
     }),
-    [items, paper.settings, imageUrls, showAnswers, omrSheets],
+    [items, paper.settings, imageUrls, showAnswers, omrSheets, trimWorks],
   );
 
   // 제목으로 두 인쇄물을 가른다 — 같은 제목이면 책상에 나란히 놓였을 때 구분이 안 된다

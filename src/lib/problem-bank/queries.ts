@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { pgArrayLiteral } from '@/lib/pg-array-literal';
+import { applySourceAxes, type SourceAxisQuery } from './source-axes';
 import type { Problem, ProblemSource, QuestionType } from '@/types/problem-bank';
 
 /**
@@ -51,19 +52,11 @@ export type ProblemRow = Problem & { source: ProblemSource };
 /** 목록 조회 결과 */
 export type ProblemPage = QueryPage<ProblemRow>;
 
-/** 목록 조회 조건 */
-export interface ProblemQuery {
-  source_type?: string;
-  school_name?: string;
-  year?: string;
-  grade?: string;
-  /** 학년 **여럿** — 하나라도 맞으면 걸린다(`in`). 학교급 필터가 편 값이다 */
-  grades?: string[];
-  /** 학기 ('1학기'·'2학기') */
-  semester?: string;
-  exam_type?: string;
-  /** 교과서 (출처의 textbook) */
-  textbook?: string;
+/**
+ * 목록 조회 조건. 출처 칸(유형·학교·학년도·학년·학기·시험·교과서·학교급)은 `SourceAxisQuery`
+ * (source-axes.ts) 에서 물려받는다 — 올라간 기출 목록과 같은 규칙을 쓴다.
+ */
+export interface ProblemQuery extends SourceAxisQuery {
   /** 영역 이름 경로 — 배열 포함(@>) 으로 찾는다 */
   area_path?: string[];
   /** 교과서 단원 경로 — 대단원만 주면 그 아래 소단원 문항까지 걸린다 */
@@ -79,6 +72,18 @@ export interface ProblemQuery {
    *    `(가)(나)` 를 함께 묻는 문항도 두 작품 어느 쪽으로 훑어도 나온다.
    */
   work_title?: string;
+  /**
+   * 작품 **그 하나만** 묻는 문항으로 좁힌다 — `work_titles` 가 `{작품}` 과 **정확히 같은** 행만.
+   * (가)(나) 를 함께 묻는 문항은 목록이 둘이라 빠지고, 복합 지문이어도 발문이 한 작품만
+   * 묻는 문항은 남는다(사용자 결정 2026-10-11). `work_title` 이 없으면 아무 뜻이 없다.
+   */
+  only_work?: boolean;
+  /**
+   * **딸린 지문**의 대영역 — 하나라도 맞으면 걸린다(`in`). `''` 은 지문이 없거나 영역이 빈 문항.
+   * ⚠️ 문항의 `area_path` 가 아니다(그것은 그 물음의 영역이다). sql/67 의 복제 컬럼
+   *    `passage_area` 를 본다 — 무엇을 넣을지는 `solo-filter.ts` 가 정한다.
+   */
+  passage_areas?: string[];
   /**
    * 문항 유형 — **하나라도 맞으면** 걸린다(`in`).
    * 갈래('주관식')를 저장값 둘('주관식'·'서술형')로 펴는 일은 `filters.ts` 가 끝내고 넘긴다.
@@ -98,47 +103,6 @@ export interface ProblemQuery {
  */
 export function escapeIlike(value: string): string {
   return value.replace(/[\\%_]/g, (m) => `\\${m}`);
-}
-
-/** 출처 칸 가운데 **값 하나로 같음(eq)** 을 거는 것들 — 아카이브와 출처 목록이 같은 목록을 쓴다 */
-export const SOURCE_EQ_AXES = [
-  'source_type', 'school_name', 'year', 'grade', 'semester', 'exam_type', 'textbook',
-] as const;
-
-/** 출처 칸 조건만 모은 모양 */
-export type SourceAxisQuery = Pick<ProblemQuery, (typeof SOURCE_EQ_AXES)[number] | 'grades'>;
-
-/** 조건을 걸 수 있는 요청 — PostgREST 필터 빌더의 필요한 부분만 */
-interface SourceAxisFilterable<T> {
-  eq(column: string, value: string): T;
-  in(column: string, values: readonly string[]): T;
-}
-
-/**
- * 출처 칸(유형·학교·학년도·학년·학기·시험·교과서·학교급) 조건을 건다.
- *
- * 아카이브는 문항에 붙인 출처 임베드(`source.`)에, 올라간 기출 목록은 출처 표 자체(`''`)에
- * 건다 — **규칙은 한 벌이다.** 둘이 따로 적으면 한쪽만 '미지정' 을 다르게 다뤄 같은 조건이
- * 두 화면에서 다른 개수를 낸다.
- *
- * ⚠️ 있고 없음은 `undefined` 로 가른다. `''` 은 **'미지정인 행만'** 이라는 뜻이라
- *    참거짓으로 거르면 그 조건이 통째로 사라진다(filters.ts 의 UNSPECIFIED_AXIS).
- * @param request - 필터 빌더
- * @param query - 조건 (`toProblemQuery` 가 만든 값)
- * @param prefix - 컬럼 앞머리 (임베드 별칭 `'source.'` 또는 `''`)
- * @returns 조건을 건 빌더
- */
-export function applySourceAxes<T extends SourceAxisFilterable<T>>(
-  request: T, query: SourceAxisQuery, prefix: '' | 'source.',
-): T {
-  let next = request;
-  for (const key of SOURCE_EQ_AXES) {
-    const value = query[key];
-    if (value !== undefined) next = next.eq(`${prefix}${key}`, value);
-  }
-  // 학교급을 편 학년들 — 학년 칸(eq)과 **따로** 건다(둘 다 걸리면 교집합)
-  if (query.grades && query.grades.length > 0) next = next.in(`${prefix}grade`, query.grades);
-  return next;
 }
 
 /** 목록을 늘어놓는 순서 */
@@ -214,7 +178,12 @@ export async function runProblemQuery<Row = ProblemRow>(
   //    빈 문자열('미지정만')은 이 축에 없다 — filters.ts 가 자유 텍스트라 막아 둔다
   // ⚠️ 배열 컬럼 조건은 전부 `pgArrayLiteral` 문자열로 넘긴다 — postgrest-js 는 배열을 따옴표
   //    없이 join 해서 쉼표 든 제목(「소녀, 두드리다」)이 두 원소로 갈려 **0건**이 됐다(2026-09-27)
-  if (query.work_title) request = request.contains('work_titles', pgArrayLiteral([query.work_title]));
+  // '그 작품만' 이면 **같음**(eq)이다 — 포함(cs)으로는 (가)(나) 를 함께 묻는 문항이 걸린다.
+  //    배열 리터럴 표기는 같다(`eq.{"동백꽃"}`) — PostgREST 가 배열 컬럼과 그대로 견준다
+  if (query.work_title) {
+    const titles = pgArrayLiteral([query.work_title]);
+    request = query.only_work ? request.eq('work_titles', titles) : request.contains('work_titles', titles);
+  }
   // 갈래 필터 — 넘어온 유형 가운데 하나면 통과. 빈 배열은 '조건 없음' 이라 걸지 않는다
   if (query.question_types && query.question_types.length > 0) {
     request = request.in('question_type', query.question_types);
@@ -233,6 +202,12 @@ export async function runProblemQuery<Row = ProblemRow>(
     //    이라 두 태그를 넘기면 둘 다 붙은 문항만 나온다. 상위 검색은 고른 마디와 그 아래
     //    경로를 나열해 찾는 것이라 "하나라도 걸리면" 이 맞다(grammar-tree.ts 의 grammarPathsUnder).
     request = request.overlaps('grammar_paths', pgArrayLiteral(query.grammar_paths));
+  }
+  if (query.passage_areas && query.passage_areas.length > 0) {
+    // ⚠️ `pgArrayLiteral` 이 아니다 — `passage_area` 는 배열이 아니라 글자 칸이다. postgrest-js 의
+    //    `in()` 은 쉼표·괄호가 든 값만 따옴표로 감싸므로 `''` 은 `in.(화법과 언어,)` 로 실린다
+    //    (그 꼴이 운영 PostgREST 에서 '빈 값' 으로 읽히는 것을 확인했다 — quiz-references/candidates.ts)
+    request = request.in('passage_area', query.passage_areas);
   }
   if (query.search?.trim()) {
     // .or() 를 쓰지 않는다 — 백슬래시·괄호 이스케이프가 인용을 통과하며 풀린다.

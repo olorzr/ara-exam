@@ -6,6 +6,9 @@
 -- `settings.omr` 로 저장되고, 켜진 문제지만 저장 직후 성적 시스템(ara-system)에 시험으로 등록된다
 -- (`/api/sync-paper-to-grades` → ara-system `integrations/problem-paper`, 그쪽 mig519).
 --
+-- ⛔️ **[2026-10-11] 정식 정의는 이제 sql/68 이다.** 이 파일을 단독으로 다시 돌리면 스냅샷의
+--    `work_titles`·`passage.works` 가 조용히 빠져 새 문제지가 (가)(나) 지문을 통째로 인쇄한다.
+--    아래 '정식 정의' 문장은 당시 기록이다.
 -- ⚠️ **이 파일이 `exam.create_problem_paper` 의 정식 정의다**(sql/17 → 23 → 34 → 35 → 여기).
 --    sql/35 를 나중에 단독으로 다시 돌리면 `omr` 키가 조용히 빠져 **OMR 을 켜고 만든 문제지가
 --    등록되지 않는다**(발신 라우트가 `omr_not_enabled` 로 거절한다). 그 파일 머리에 경고를 적었다.

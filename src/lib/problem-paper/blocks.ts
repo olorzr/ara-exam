@@ -1,13 +1,11 @@
 import { splitHtmlBlocks } from '@/lib/print/split-html-blocks';
-import { unplacedFigures } from '@/lib/problem-bank/figure-render';
-import { hasLiteralPassageLabels, hasSourceAccuratePassageLayout } from '@/lib/problem-bank/source-accurate-passages';
-import { sanitizeProblemHTML } from '@/lib/sanitize-problem';
-import { hasYetHangul } from '@/lib/yet-hangul';
 import { explanationHtml, splitsExplanation } from './answers';
-import { splitPassagePieces, type BoxPart } from './box-parts';
+import type { BoxPart } from './box-parts';
 import { trimEdgeEmptyParagraphs } from './html-trim';
 import type { PaperItemSnapshot } from '@/types/problem-bank';
 import { groupRangeLabel, groupsOf, type PaperItem } from './compose';
+import { passageBlocksOf } from './passage-blocks';
+import { trimmedFigurePaths } from './trim-works';
 
 /**
  * 문제지 스냅샷 → 인쇄 블록 (순수 함수, DOM 파싱 사용).
@@ -87,16 +85,27 @@ function passageHeaderText(range: string): string {
   return `[${range}] 다음 글을 읽고 물음에 답하시오.`;
 }
 
+/** 블록을 나누는 선택 */
+export interface PaperBlockOptions {
+  /**
+   * (가)(나) 복합 지문에서 담은 문항이 묻지 않는 작품의 구역을 뺀다(trim-works.ts).
+   * 인쇄 화면의 선택이다 — 문제지 저장 설정이 아니다(print-trim-pref.ts).
+   */
+  trimWorks?: boolean;
+}
+
 /**
  * 스냅샷 목록을 인쇄 블록으로 바꾼다.
  *
  * 인쇄 설정(단 수·출처 표시)은 블록을 **나누는 규칙에 영향을 주지 않아** 여기서 받지 않는다.
  * 출처 표시는 그리는 쪽(`PaperPrintBlocks`)이 판단한다.
  * @param items - 문제지 항목 (order_index 순서)
+ * @param showAnswers - 교사용인가
+ * @param options - 블록을 나누는 선택(구역 빼기)
  * @returns 순서대로의 블록 목록
  */
 export function buildPaperBlocks(
-  items: readonly PaperItemSnapshot[], showAnswers = false,
+  items: readonly PaperItemSnapshot[], showAnswers = false, options: PaperBlockOptions = {},
 ): PaperBlock[] {
   const paperItems: PaperItem[] = items.map((item, index) => ({
     problemId: String(index),
@@ -109,62 +118,13 @@ export function buildPaperBlocks(
     const passage = items[group.start].passage;
 
     if (passage) {
-      const layout = hasSourceAccuratePassageLayout(passage.id)
-        ? { sourceAccurate: true, literalLabels: hasLiteralPassageLabels(passage.html) } : {};
-      blocks.push({
-        kind: 'passage-header',
-        key: `ph-${group.start}`,
-        text: passageHeaderText(groupRangeLabel(group)),
-      });
-
-      if (passage.render_mode === 'image' && passage.image_path) {
-        blocks.push({
-          kind: 'passage-image',
-          key: `pi-${group.start}`,
-          path: passage.image_path,
-          label: passage.title || passage.label,
-          ...layout,
-        });
-      } else {
-        const figures = passage.figure_paths ?? [];
-        const serif = hasYetHangul(passage.html);
-        const label = passage.title || passage.label;
-        // ⚠️ 최상위 요소 단위로 쪼개되 **구역 상자는 자식 단위로 터뜨린다**(box-parts.ts) — 상자 하나에
-        //    지문 전체가 담기면 한 쪽을 넘겨 통째로 축소된다. 자리표시자에서 문자열을 자르지 않으므로
-        //    표 안의 그림은 그리는 쪽이 끼운다. 경로 없는 그림·가장자리 빈 문단은 거기서 걷는다
-        const parts = splitPassagePieces(sanitizeProblemHTML(passage.html), figures)
-          .map((piece, i): PaperBlock => {
-            const box = piece.box ? { box: piece.box } : {};
-            return piece.figurePath
-              ? { kind: 'passage-figure', key: `pf-${group.start}-${i}`, path: piece.figurePath, label, ...box, ...layout }
-              : {
-                kind: 'passage-part', key: `pp-${group.start}-${i}`, html: piece.html,
-                serif, figures, first: false, last: false, ...box, ...layout,
-              };
-          });
-
-        // ⚠️ 자리표시자가 없는 그림은 **본문 끝에** 붙인다. 화면(`BodyWithFigures`)이
-        //    그렇게 그리는데 인쇄만 빠뜨리면, 선생님이 화면에서 본 그림이 인쇄물에서만
-        //    사라진다 — 가장 알아채기 어려운 결함이다(검수에서 칩만 지운 지문이 그렇다)
-        for (const { index, path } of unplacedFigures(passage.html, figures)) {
-          parts.push({
-            kind: 'passage-figure',
-            key: `pf-${group.start}-x${index}`,
-            path,
-            label,
-            ...layout,
-          });
-        }
-
-        // 상자 윤곽이 단·쪽을 넘어도 이어져 보이도록 위·아래 테두리를 **글 조각의**
-        // 처음·끝에만 표시한다. 그림 블록을 세면 테두리가 그림 위아래에 붙는다
-        const textParts = parts.filter((b) => b.kind === 'passage-part');
-        const firstText = textParts[0];
-        const lastText = textParts[textParts.length - 1];
-        if (firstText?.kind === 'passage-part') firstText.first = true;
-        if (lastText?.kind === 'passage-part') lastText.last = true;
-        blocks.push(...parts);
-      }
+      blocks.push(...passageBlocksOf({
+        passage,
+        group: items.slice(group.start, group.end + 1),
+        start: group.start,
+        headerText: passageHeaderText(groupRangeLabel(group)),
+        trimWorks: options.trimWorks ?? false,
+      }));
     }
 
     for (let i = group.start; i <= group.end; i += 1) {
@@ -211,17 +171,25 @@ export function buildPaperBlocks(
 
 /**
  * 인쇄에 필요한 Storage 경로를 모은다. 서명 URL 을 **한 번에** 받으려고 쓴다.
+ *
+ * ⚠️ 구역을 빼고 인쇄하면(`trimWorks`) 뺀 구역에만 있던 그림은 **필요 없다** — 넣어 두면 인쇄하지도
+ *    않을 그림이 깨졌다고 인쇄 단추가 잠긴다(코덱스 1R). 판정은 인쇄 블록과 **같은 함수**다.
  * @param items - 문제지 항목
+ * @param options - 블록을 나누는 선택 (`buildPaperBlocks` 에 넘기는 것과 같은 값)
  * @returns 중복 없는 경로 목록 (없으면 빈 배열)
  */
-export function imagePathsOf(items: readonly PaperItemSnapshot[]): string[] {
+export function imagePathsOf(
+  items: readonly PaperItemSnapshot[], options: PaperBlockOptions = {},
+): string[] {
+  const skip = options.trimWorks ? trimmedFigurePaths(items) : new Map<string, Set<string>>();
   const paths = new Set<string>();
   for (const item of items) {
     if (item.render_mode === 'image' && item.image_path) paths.add(item.image_path);
     for (const figure of item.figure_paths) if (figure) paths.add(figure);
     const passage = item.passage;
     if (passage?.render_mode === 'image' && passage.image_path) paths.add(passage.image_path);
-    for (const figure of passage?.figure_paths ?? []) if (figure) paths.add(figure);
+    const dropped = passage ? skip.get(passage.id) : undefined;
+    for (const figure of passage?.figure_paths ?? []) if (figure && !dropped?.has(figure)) paths.add(figure);
   }
   return [...paths];
 }

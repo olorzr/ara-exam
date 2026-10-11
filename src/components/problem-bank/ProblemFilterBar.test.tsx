@@ -1,12 +1,12 @@
-import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
 import ProblemFilterBar from './ProblemFilterBar';
 import { EMPTY_SOURCE_FACETS } from '@/lib/problem-bank/facets';
 import { EMPTY_FILTERS, type ProblemFilters } from '@/lib/problem-bank/filters';
 import { grammarSelectOptions } from '@/lib/problem-bank/grammar-browse-tree';
 
 /** 트리거에는 셰브론 아이콘이 섞여 들어와 정확 일치로는 못 본다 */
-function renderBar(filters: Partial<ProblemFilters> = {}) {
+function renderBar(filters: Partial<ProblemFilters> = {}, onChange: (patch: Partial<ProblemFilters>) => void = () => {}) {
   return render(
     <ProblemFilterBar
       filters={{ ...EMPTY_FILTERS, ...filters }}
@@ -16,7 +16,7 @@ function renderBar(filters: Partial<ProblemFilters> = {}) {
       grammarOptions={grammarSelectOptions()}
       workFacets={[]}
       total={0}
-      onChange={() => {}}
+      onChange={onChange}
       onReset={() => {}}
     />,
   );
@@ -70,5 +70,28 @@ describe('ProblemFilterBar', () => {
 
     expect(screen.queryByRole('combobox', { name: '교과서' })).toBeNull();
     expect(screen.queryByRole('combobox', { name: '단원' })).toBeNull();
+  });
+
+  it("'그 작품만' 칸은 작품·문법 축이 걸렸을 때만 그린다", () => {
+    renderBar();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+  });
+
+  it('작품 축이면 작품 이름, 문법 축이면 문법 이름으로 그린다', () => {
+    const { unmount } = renderBar({ work_title: '서시' });
+    expect(screen.getByRole('checkbox', { name: '이 작품만 묻는 문항' })).toBeTruthy();
+    unmount();
+    renderBar({ grammar_path: ['음운'] });
+    expect(screen.getByRole('checkbox', { name: '문학·독서 지문 없는 문항' })).toBeTruthy();
+  });
+
+  it('누르면 첫 쪽으로 돌아가며 켠다 — 켜진 상태도 그대로 보인다', () => {
+    const onChange = vi.fn();
+    const { unmount } = renderBar({ work_title: '서시' }, onChange);
+    fireEvent.click(screen.getByRole('checkbox', { name: '이 작품만 묻는 문항' }));
+    expect(onChange).toHaveBeenCalledWith({ solo: true, page: 0 });
+    unmount();
+    renderBar({ work_title: '서시', solo: true });
+    expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(true);
   });
 });

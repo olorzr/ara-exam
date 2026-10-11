@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { readPaperPrintLayout, writePaperPrintLayout } from './print-layout-pref';
+import {
+  readPaperPrintLayout, readPaperTrimWorks, writePaperPrintLayout, writePaperTrimWorks,
+} from './print-layout-pref';
 
 /**
  * ⚠️ 이 테스트 환경의 `window.localStorage` 는 **메서드가 없는 빈 객체**다(jsdom 28 + vitest 4).
@@ -59,5 +61,30 @@ describe('print-layout-pref', () => {
     });
     expect(readPaperPrintLayout()).toBe('single');
     expect(() => writePaperPrintLayout('booklet')).not.toThrow();
+  });
+
+  it("'묻는 작품만 인쇄' 는 처음에 켜져 있다", () => {
+    expect(readPaperTrimWorks()).toBe(true);
+  });
+
+  it("'묻는 작품만 인쇄' 를 끄면 새로고침해도 꺼져 있다", () => {
+    writePaperTrimWorks(false);
+    expect(readPaperTrimWorks()).toBe(false);
+    writePaperTrimWorks(true);
+    expect(readPaperTrimWorks()).toBe(true);
+  });
+
+  it("'묻는 작품만 인쇄' 의 모르는 값은 켜짐으로 읽는다", () => {
+    window.localStorage.setItem('ara-paper-trim-works', 'yes');
+    expect(readPaperTrimWorks()).toBe(true);
+  });
+
+  it("저장소가 막혀도 '묻는 작품만 인쇄' 는 켜짐으로 돈다", () => {
+    setStorage({
+      getItem: () => { throw new Error('blocked'); },
+      setItem: () => { throw new Error('blocked'); },
+    });
+    expect(readPaperTrimWorks()).toBe(true);
+    expect(() => writePaperTrimWorks(false)).not.toThrow();
   });
 });

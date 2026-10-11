@@ -20,9 +20,8 @@ import { useSignedImageUrls } from '@/hooks/useSignedImageUrls';
 import {
   imagePathsOf, renumberedImageItems, renumberedPrintConfirmMessage,
 } from '@/lib/problem-paper/blocks';
-import {
-  readPaperPrintLayout, writePaperPrintLayout, type PaperPrintLayout,
-} from '@/lib/problem-paper/print-layout-pref';
+import { trimmableGroupCount } from '@/lib/problem-paper/trim-works';
+import { usePaperPrintPrefs } from '@/hooks/usePaperPrintPrefs';
 import { normalizePaperSettings } from '@/lib/problem-paper/settings';
 import type { PaperItemSnapshot, ProblemPaper } from '@/types/problem-bank';
 
@@ -47,8 +46,8 @@ export default function ProblemPaperViewPage() {
   const [items, setItems] = useState<PaperItemSnapshot[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [mode, setMode] = useState<PaperViewMode>('paper');
-  // 인쇄 방식은 기억해 둔 값으로 시작한다 — 효과에서 읽으면 set-state-in-effect 에 걸린다
-  const [printLayout, setPrintLayout] = useState<PaperPrintLayout>(readPaperPrintLayout);
+  // 인쇄 방식·'묻는 작품만 인쇄' 는 브라우저에 기억해 둔 값으로 시작한다
+  const { printLayout, changePrintLayout, trimWorks, changeTrimWorks } = usePaperPrintPrefs();
   const [coverOpen, setCoverOpen] = useState(false);
   const coverState = usePaperCover(paperId);
   const { cover } = coverState;
@@ -67,13 +66,16 @@ export default function ProblemPaperViewPage() {
   // 이미지는 **페이지가 들고 있는다** — 아직 안 왔거나 실패했는지를 알아야 인쇄를 막는다.
   // 이미지로 출제한 문항은 그 이미지가 본문 전체라, 조용히 비워 인쇄하면
   // 문항이 통째로 빠진 시험지가 나간다(코덱스 리뷰 7R)
-  const images = useSignedImageUrls(useMemo(() => imagePathsOf(items), [items]));
+  // '묻는 작품만 인쇄' 로 뺀 구역의 그림은 받지 않는다 — 인쇄하지 않을 그림이 단추를 잠그면 안 된다
+  const images = useSignedImageUrls(useMemo(() => imagePathsOf(items, { trimWorks }), [items, trimWorks]));
   // 서명만으로는 부족하다 — 그 뒤의 이미지 요청이 실패하면 깨진 그림이 인쇄된다
   const ready = useImagesReady(useMemo(() => [...images.urls.values()], [images.urls]));
   const brokenCount = images.missing.length + ready.failed.length;
   const imagesBlocked = images.loading || ready.loading || brokenCount > 0;
   // 이미지에는 원본 시험지의 번호가 그대로 찍혀 있다 — 자리가 바뀌면 두 번호가 함께 보인다
   const renumbered = useMemo(() => renumberedImageItems(items), [items]);
+  // 묻지 않는 (가)(나) 구역을 뺄 수 있는 지문이 하나라도 있어야 체크박스를 낸다 — 옛 문제지(sql/68 전)는 없다
+  const trimmable = useMemo(() => trimmableGroupCount(items) > 0, [items]);
 
   // 표지 그림은 **따로** 서명·확인한다 — 문항 이미지와 한 묶음으로 두면 답지 모드에서도
   // 화면에 없는 문항 그림 때문에 인쇄가 막히거나 엉뚱한 경고가 뜬다
@@ -129,11 +131,6 @@ export default function ProblemPaperViewPage() {
     if (!window.confirm(ask)) return;
     printAfterAckRef.current = true;
     setRenumberAcked(true);
-  };
-
-  const changePrintLayout = (next: PaperPrintLayout) => {
-    setPrintLayout(next);
-    writePaperPrintLayout(next);
   };
 
   const printLabel = (() => {
@@ -208,6 +205,7 @@ export default function ProblemPaperViewPage() {
         printLabel={printLabel}
         printDisabled={(printsProblems && imagesBlocked) || coverBlocked}
         onPrint={handlePrint}
+        trimWorks={trimmable ? { checked: trimWorks, onChange: changeTrimWorks } : undefined}
       />
 
       {printLayout === 'booklet' && (
@@ -266,7 +264,7 @@ export default function ProblemPaperViewPage() {
       {printsProblems && (
         <ProblemPaperView
           paper={paper} items={items} imageUrls={images.urls}
-          showAnswers={mode === 'teacher'}
+          showAnswers={mode === 'teacher'} trimWorks={trimWorks}
           booklet={booklet} cover={cover} coverImageUrl={coverImageUrl}
           coverImageFailed={coverBroken}
           coverNotice={coverUnknown ? COVER_FETCH_FAILED_NOTICE : undefined}

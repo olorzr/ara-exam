@@ -4,7 +4,7 @@ import { buildFilterAxes, type FilterAxis } from './filter-axes';
 import {
   EMPTY_FILTERS, filtersFromParams, filtersToQueryString, toProblemQuery, type ProblemFilters,
 } from './filters';
-import { SOURCE_EQ_AXES, type SourceAxisQuery } from './queries';
+import { SOURCE_EQ_AXES, type SourceAxisQuery } from './source-axes';
 
 /**
  * '올라간 기출' 목록(`/problems/sources`)의 필터 (순수 함수).

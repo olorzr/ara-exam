@@ -47,5 +47,9 @@ export function useImagesReady(urls: string[]): ImagesReady {
     };
   }, [key]);
 
-  return { loading: key !== '' && doneKey !== key, failed };
+  // ⚠️ 실패 목록은 **지금 확인하는 묶음의 결과일 때만** 내준다(코덱스 2R). 확인할 것이 줄거나
+  //    사라지면(문제지에서 구역을 빼 그 그림을 안 찍는다) 옛 실패가 남아 인쇄 단추가 영영 잠긴다.
+  //    새 묶음을 확인하는 동안에는 `loading` 이 참이라 그 사이 빈 목록이어도 단추는 잠겨 있다
+  const current = key !== '' && doneKey === key;
+  return { loading: key !== '' && doneKey !== key, failed: current ? failed : [] };
 }

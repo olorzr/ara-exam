@@ -122,6 +122,43 @@ describe('buildPaperBlocks', () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
+  describe("'묻는 작품만 인쇄'(trimWorks)", () => {
+    const works = [
+      { label: '가', title: '서시', author: '윤동주' },
+      { label: '나', title: '광야', author: '이육사' },
+    ];
+    const html = '<blockquote data-box="가"><p>하늘을 우러러</p></blockquote>'
+      + '<blockquote data-box="나"><p>까마득한 날에</p><figure data-figure="1"></figure></blockquote>';
+    const composite = { ...passage('P1', html), works, figure_paths: ['passages/p1/f1.jpg'] };
+    const asksFirst = snap({ passage: composite, work_titles: ['서시'], work_title: '서시' });
+    const texts = (blocks: ReturnType<typeof buildPaperBlocks>) => blocks
+      .filter((b) => b.kind === 'passage-part').map((b) => (b.kind === 'passage-part' ? b.html : ''));
+
+    it('켜면 묻지 않는 (나) 구역의 글과 그림이 빠진다', () => {
+      const blocks = buildPaperBlocks([asksFirst], false, { trimWorks: true });
+      expect(texts(blocks).join('')).toContain('하늘을 우러러');
+      expect(texts(blocks).join('')).not.toContain('까마득한');
+      // 뺀 구역 안의 그림이 '자리 없는 그림' 으로 지문 끝에 도로 붙으면 안 된다
+      expect(blocks.some((b) => b.kind === 'passage-figure')).toBe(false);
+    });
+
+    it('끄면(기본) 지문 전체를 그린다', () => {
+      const blocks = buildPaperBlocks([asksFirst]);
+      expect(texts(blocks).join('')).toContain('까마득한');
+      expect(blocks.some((b) => b.kind === 'passage-figure')).toBe(true);
+    });
+
+    it('뺀 구역의 그림은 인쇄 준비(서명)에서도 뺀다 — 끄면 그대로 받는다', () => {
+      expect(imagePathsOf([asksFirst], { trimWorks: true })).not.toContain('passages/p1/f1.jpg');
+      expect(imagePathsOf([asksFirst])).toContain('passages/p1/f1.jpg');
+    });
+
+    it('교사용도 같은 규칙이다', () => {
+      const blocks = buildPaperBlocks([asksFirst], true, { trimWorks: true });
+      expect(texts(blocks).join('')).not.toContain('까마득한');
+    });
+  });
+
   it('빈 목록이면 블록도 없다', () => {
     expect(build([])).toEqual([]);
   });

@@ -1,12 +1,7 @@
 'use client';
 
 import { useCallback } from 'react';
-import { joinWorkTitles, normalizePassageWorks } from '@/lib/problem-bank/work-title';
-import type { PassageWork } from '@/types/problem-bank';
-
-/** 딸린 문항까지 움직이는 변경인가 — 제목 목록만 본다(useProblemReview 와 같은 규칙) */
-const titlesOf = (works: readonly PassageWork[]) =>
-  joinWorkTitles(normalizePassageWorks(works).map((w) => w.title));
+import { passageShapeChanged } from '@/lib/problem-bank/passage-shape';
 import type { useProblemReview } from './useProblemReview';
 
 /**
@@ -19,7 +14,7 @@ import type { useProblemReview } from './useProblemReview';
  * 셋의 규칙이 서로 다르다:
  *  - **지문 삭제** — 딸린 문항을 다시 읽으므로 다른 카드가 다 날아간다. 지우는 카드
  *    자신은 어차피 없어지므로 셈에서 뺀다.
- *  - **지문 저장** — 작품**명**을 바꿀 때만, 그리고 **그 지문에 딸린 문항**만 날아간다.
+ *  - **지문 저장** — 작품**명**이나 **대영역**을 바꿀 때만, 그리고 **그 지문에 딸린 문항**만 날아간다.
  *    개수를 부풀려 겁주지 않는다.
  *  - **지문 합치기** — 문항이 지문을 옮겨 가고 한 지문이 사라진다. 좁힐 수 없다.
  */
@@ -49,24 +44,24 @@ export function useReviewGuards(
   /**
    * 지문을 저장한다.
    *
-   * ⚠️ **작품명을 바꾸면 딸린 문항의 작품명까지 DB 트리거가 함께 바꾼다.** 그러면 그
+   * ⚠️ **작품명·대영역을 바꾸면 딸린 문항 행까지 DB 트리거가 함께 바꾼다**(sql/33·67). 그러면 그
    *    문항들의 `updated_at` 이 올라가므로 훅이 본문을 다시 읽고 **그 문항 카드만**
    *    다시 마운트한다 — 거기서 고치던 내용은 사라진다. 상관없는 카드는 그대로 둔다.
+   * ⚠️ 판정은 훅(`useProblemReview.savePassage`)과 **같은 `passageShapeChanged`** 다 — 갈리면
+   *    다시 읽는 경로가 묻지도 않고 고치던 내용을 지운다(코덱스 3R, 대영역이 그랬다).
    */
   const guardedSave = useCallback(async (
     passageId: string,
     patch: Parameters<typeof savePassage>[1],
   ) => {
     const passage = passages.find((p) => p.id === passageId);
-    const titlesChanged = patch.works !== undefined && passage
-      && titlesOf(patch.works) !== titlesOf(passage.works ?? []);
-    if (titlesChanged) {
+    if (passage && passageShapeChanged(patch, passage)) {
       // 실제로 영향받는 것은 **이 지문에 딸린 문항**뿐이다 — 개수를 부풀려 겁주지 않는다
       const affected = problems
         .filter((p) => p.passage_id === passageId && dirtyIds.has(p.id));
       if (affected.length > 0) {
         const ok = window.confirm(
-          '작품명을 바꾸면 딸린 문항의 작품명도 함께 바뀝니다.\n'
+          '작품명이나 영역(문학·독서와 작문·화법과 언어)을 바꾸면 딸린 문항도 함께 바뀝니다.\n'
           + `그 문항을 다시 읽어 오므로 저장하지 않은 수정 ${affected.length}개가 사라집니다. 계속할까요?`,
         );
         if (!ok) return false;

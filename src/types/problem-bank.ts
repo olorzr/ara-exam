@@ -202,6 +202,12 @@ export interface Problem {
    * ⚠️ **DB 트리거가 채운다 — 앱에서 보내지 말 것.** 검색 평문·인쇄 스냅샷이 이 값을 쓴다.
    */
   work_title: string;
+  /**
+   * **딸린 지문**의 대영역(`passages.area_path[1]`, 지문이 없으면 `''`) — 지문 쪽 값의 복제다(sql/67).
+   * '문학·독서 지문 없는 문법 문항' 필터가 이 칸으로 거른다(solo-filter.ts).
+   * ⚠️ **DB 트리거가 채운다 — 앱에서 보내지 말 것.** 보내도 덮인다.
+   */
+  passage_area: string;
   tags: string[];
   page_no: number;
   bbox: Bbox | null;
@@ -269,6 +275,12 @@ export interface PaperPassageSnapshot {
    * ⚠️ **선택값이다** — sql/23 이전에 만든 문제지의 스냅샷에는 이 키가 없다.
    */
   figure_paths?: string[];
+  /**
+   * 지문에 실린 작품들 — (가)(나) 구역 표시(`label`)까지. 묻지 않는 구역을 빼고 인쇄하는 데 쓴다
+   * (problem-paper/trim-works.ts).
+   * ⚠️ **선택값이다** — sql/68(2026-10-11) 전에 만든 문제지에는 없고, 그때는 지문 전체를 인쇄한다.
+   */
+  works?: PassageWork[];
 }
 
 /** 문제지 항목의 출처 스냅샷 (머리말 표시용) */
@@ -304,6 +316,11 @@ export interface PaperItemSnapshot {
   explanation_html: string;
   area_path: string[];
   work_title: string;
+  /**
+   * 이 문항이 묻는 작품 목록 — `work_title` 은 이것을 ' · ' 로 이은 파생 문자열이다.
+   * ⚠️ **선택값이다** — sql/68(2026-10-11) 전에 만든 문제지에는 없다(쓰는 쪽이 `work_title` 로 물러선다).
+   */
+  work_titles?: string[];
   render_mode: RenderMode;
   image_path: string;
   figure_paths: string[];

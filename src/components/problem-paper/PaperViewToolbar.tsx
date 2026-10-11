@@ -31,6 +31,11 @@ interface PaperViewToolbarProps {
   printLabel: string;
   printDisabled: boolean;
   onPrint: () => void;
+  /**
+   * '복합 지문은 묻는 작품만 인쇄' — 뺄 수 있는 지문이 있을 때만 넘긴다(없으면 칸을 그리지 않는다).
+   * 문제지·교사용에 함께 걸린다(problem-paper/trim-works.ts).
+   */
+  trimWorks?: { checked: boolean; onChange: (on: boolean) => void };
 }
 
 function coverLabel(cover: PaperCover | null): string {
@@ -44,7 +49,7 @@ function coverLabel(cover: PaperCover | null): string {
  */
 export default function PaperViewToolbar({
   paper, itemCount, mode, onModeChange, printLayout, onPrintLayoutChange,
-  cover, onCoverClick, printLabel, printDisabled, onPrint,
+  cover, onCoverClick, printLabel, printDisabled, onPrint, trimWorks,
 }: PaperViewToolbarProps) {
   return (
     <div className="flex flex-wrap items-center gap-2" data-no-print>
@@ -85,6 +90,19 @@ export default function PaperViewToolbar({
           <span className="ml-1">{coverLabel(cover)}</span>
         </Button>
         <PaperPrintLayoutToggle value={printLayout} onChange={onPrintLayoutChange} />
+        {trimWorks && (
+          <label
+            className="flex items-center gap-1.5 px-1 text-sm text-gray-600"
+            title="(가)(나) 지문에서 담은 문항이 묻지 않는 작품의 구역을 빼고 인쇄해요"
+          >
+            <input
+              type="checkbox" checked={trimWorks.checked}
+              onChange={(e) => trimWorks.onChange(e.target.checked)}
+              className="h-4 w-4 accent-[color:var(--primary)]"
+            />
+            복합 지문은 묻는 작품만
+          </label>
+        )}
         <Button type="button" size="sm" onClick={onPrint} disabled={printDisabled}>
           <Printer className="h-3.5 w-3.5" />
           <span className="ml-1">{printLabel}</span>

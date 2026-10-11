@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
-import { applySourceAxes, escapeIlike } from './queries';
+import { escapeIlike } from './queries';
+import { applySourceAxes } from './source-axes';
 import { sourceRefetchChunks } from './source-delete';
 import type { SourceListQuery } from './source-list-filters';
 import type { ProblemSource } from '@/types/problem-bank';
