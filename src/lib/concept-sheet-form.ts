@@ -47,6 +47,7 @@ export function generateConceptTitle(cat: BuilderCategory): string {
  *
  * level 인지형이어야 한다 — 외부지문은 출판사/학기를 쓰지 않으므로, 예전처럼
  * `grade` + `publisher` 를 무조건 요구하면 외부지문을 고를 수 있어도 저장이 막힌다.
+ * 고등도 학년은 요구하지 않는다(선택과목 교과서는 학년이 '').
  * `unit` 은 양쪽 모두 필수다. 빠지면 인쇄 제목이 `"2026  국어 "` 처럼 공백만 남는다.
  *
  * @param cat - 빌더 카테고리
@@ -56,7 +57,10 @@ export function isCategoryIncomplete(cat: BuilderCategory): boolean {
   if (cat.level === EXTERNAL_LEVEL) {
     return !cat.schoolName || !cat.unit;
   }
-  return !cat.grade || !cat.publisher || !cat.unit;
+  // 고등은 학년이 비어도 된다 — 학년 구분 없는 선택과목 교과서('선택과목', textbook-grade.ts)의 학년이 ''다.
+  // 중등 국어는 늘 학년별 권이라 그대로 요구한다
+  if (cat.level === '중등' && !cat.grade) return true;
+  return !cat.publisher || !cat.unit;
 }
 
 /**

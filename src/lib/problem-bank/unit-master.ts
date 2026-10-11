@@ -61,9 +61,12 @@ export async function fetchUnitTree(query: UnitTreeQuery): Promise<AreaTreeNode[
     const matched = publishers.filter((p) => compareKey(p.name) === key);
     if (matched.length === 0) return [];
 
-    const majors = (await Promise.all(
-      matched.map((p) => getMajorChapters(p.id, grade || undefined)),
-    )).flat();
+    // ⚠️ 학년은 **시험 학년**이라 교과서 학년과 같은 값이 아니다. 학년이 빈 교과서(고등 선택과목 '선택과목')는
+    //    고2·고3 어느 시험에서도 보여야 하므로, 전부 읽고 '그 학년 또는 빈 학년' 으로 거른다.
+    //    한 출판사에 세 학년이 든 중등 교과서는 그대로 학년으로 걸린다
+    const majors = (await Promise.all(matched.map((p) => getMajorChapters(p.id))))
+      .flat()
+      .filter((m) => !grade || m.grade === grade || m.grade === '');
     if (majors.length === 0) return [];
 
     const subs = await getSubChaptersByMajorIds(majors.map((m) => m.id));

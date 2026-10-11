@@ -2,6 +2,7 @@ import { formatGrammarPath, grammarPathsUnder } from '@/lib/problem-bank/grammar
 import { GRAMMAR_SELF_LEAF, grammarNodeKey } from '@/lib/problem-bank/grammar-browse-tree';
 import { unitPathLabel } from '@/lib/problem-bank/unit-tree';
 import { workKey } from '@/lib/problem-bank/work-tree';
+import { NO_GRADE_OPTION } from '@/lib/textbook-grade';
 
 /**
  * 작품 전문 목록을 **무엇으로 훑고 있는가** (순수 함수).
@@ -91,7 +92,8 @@ export function unitScopeKey(scope: ReferenceUnitScope): string {
  * @returns '중2 천재(노미숙) 전체' · '중2 천재(노미숙) 1학기 1. 문학 > (1) 시'
  */
 export function unitScopeLabel(scope: ReferenceUnitScope): string {
-  const parts = [scope.grade || '학년 미지정'];
+  // 학년이 빈 단원 = 학년 구분 없는 고등 선택과목(트리 폴더 이름과 같다)
+  const parts = [scope.grade || NO_GRADE_OPTION];
   if (scope.textbook !== undefined) parts.push(scope.textbook);
   // 학기 구분 없는 교과서('')는 학기 칸을 적지 않는다 — 트리에도 학기 폴더가 없다
   if (scope.semester) parts.push(scope.semester);

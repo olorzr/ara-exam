@@ -61,6 +61,9 @@ describe('범위 축 (학년·교과서·학기까지)', () => {
     // 학기 구분 없는 교과서('')는 학기 칸을 적지 않는다 — 트리에도 학기 폴더가 없다
     expect(describeAxis({ kind: 'unit', unit: { grade: '고2', textbook: '문학 비상', semester: '', unit_path: ['1. 문학'] } }))
       .toBe('고2 문학 비상 1. 문학');
+    // 학년 구분 없는 교과서('')는 '선택과목' — 트리 폴더 이름과 같다
+    expect(describeAxis({ kind: 'unit', unit: { grade: '', textbook: '문학 비상', semester: '', unit_path: ['1. 문학'] } }))
+      .toBe('선택과목 문학 비상 1. 문학');
   });
 });
 

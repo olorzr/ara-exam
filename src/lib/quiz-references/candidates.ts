@@ -176,7 +176,10 @@ export async function fetchReferenceCandidates(
       //    값이라(`major_chapters` 의 UNIQUE(name, publisher_id, grade, semester)) 학년이 다른
       //    같은 이름 단원이 실제로 있다. 안 좁히면 **다른 학년 개념지**가 붙고, 단원 신호만으로도
       //    문턱을 넘으므로 그 자료가 그대로 문항의 근거가 된다
-      if (signals.grade) request = request.eq('grade', signals.grade);
+      //    다만 학년이 빈 개념지(학년 구분 없는 고등 선택과목 '선택과목')는 고2·고3 어느 시험에도 맞으므로
+      //    함께 건다. 서버에서 거르는 까닭은 조회 상한(limit) 때문이다 — 받아서 거르면 다른 학년 행이 자리를 먹는다.
+      //    `in.(고2,)` 의 빈 원소는 PostgREST 가 '' 로 받는다(2026-10-11 운영 확인)
+      if (signals.grade) request = request.in('grade', [signals.grade, '']);
       const { data, error } = await request;
       if (error) throw error;
       const rows = (data ?? []) as SheetRow[];

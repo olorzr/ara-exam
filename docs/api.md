@@ -100,7 +100,7 @@
 - Body: `{ conceptSheetId: string }` (UUID)
 - Response: `{ ok: true, result }` — result 에 `subtypeId`·`roundNumber`·`created`
 - 에러: 위와 같고, 추가로 200 `{ skipped: true, reason: 'no_marks' }`(마킹된 개념 단어 없음 — 정상)
-- 비고: 폴더는 ara-system 이 만든다(`개념 시험 > 교과서 그룹 > 학년+학기`, 학기 구분 없는 고등 선택과목은 학년만). 외부지문은 출판사가
+- 비고: 폴더는 ara-system 이 만든다(`개념 시험 > 교과서 그룹 > 학년+학기`, 고등 선택과목은 `선택과목` — 학년이 빈 개념지는 `grade: '선택과목'` 으로 보낸다). 외부지문은 출판사가
   비어 있어 **publisher 슬롯에 학교명**을 보낸다 — 안 보내면 전부 '기타' 한 폴더에 뭉친다.
   ⚠️ 채점이 끝난 회차는 ara-system 이 분모·정답을 동결하므로 이름·날짜만 갱신된다
   (**합격 기준만은 갱신된다** — 잘못 넣은 기준을 고치면 지난 합격 판정도 함께 고쳐져야 한다)

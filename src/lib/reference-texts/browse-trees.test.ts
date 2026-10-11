@@ -109,6 +109,16 @@ describe('buildReferenceUnitTree', () => {
     expect(textbook.children[1].value).toEqual({ kind: 'unit', unit: elective() });
   });
 
+  it("학년이 빈 단원(학년 구분 없는 고등 선택과목)은 '선택과목' 폴더로, 고등 다음에 온다", () => {
+    const tree = buildReferenceUnitTree([
+      row('a', { units: [unit({ grade: '', textbook: '문학 비상', semester: '', unit_path: ['1. 문학'] })] }),
+      row('b', { units: [unit({ grade: '고1' })] }),
+    ]);
+    expect(tree.map((n) => n.label)).toEqual(['고1 (1)', '선택과목 (1)']);
+    expect(child(child(tree, '선택과목 (1)').children, '문학 비상 (1)').children.map((n) => n.label))
+      .toEqual(['(전체) (1)', '1. 문학 (1)']);
+  });
+
   it('단원을 안 붙인 전문은 맨 끝 "분류 없음" 잎으로 찾는다', () => {
     const tree = buildReferenceUnitTree([row('a'), row('b'), row('c', { units: [unit()] })]);
     const last = tree[tree.length - 1];

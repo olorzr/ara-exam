@@ -4,6 +4,7 @@ import { requireSession } from '@/lib/require-session';
 import { DEFAULT_PASS_PERCENTAGE, EXTERNAL_LEVEL } from '@/lib/constants';
 import { levelGradeToDivision } from '@/lib/grade-division';
 import { passCountOf } from '@/lib/pass-count';
+import { NO_GRADE_OPTION } from '@/lib/textbook-grade';
 
 /**
  * ara-system 성적 개념 시험 자동 등록 — 발신부.
@@ -103,7 +104,10 @@ export async function POST(request: NextRequest) {
       title: sheet.title || '개념',
       ...(division ? { division } : {}),
       publisher: groupName,
-      grade: sheet.grade ?? '',
+      // 학년이 빈 고등 교과서 = 선택과목 — 시리즈 이름이 되므로 '선택과목' 으로 보낸다. 비워 보내면 학기도 빈
+      // 선택과목 개념지가 ara-system 에서 '기타' 시리즈로 간다(register_concept_exam).
+      // ⚠️ ara-system scripts/backfill-araexam-grades.js 가 이 payload 의 1:1 복제다 — 함께 고칠 것
+      grade: sheet.grade || (sheet.level === '고등' ? NO_GRADE_OPTION : ''),
       semester: sheet.semester ?? '',
       ...(unitTitle ? { unitTitle } : {}),
       answers,

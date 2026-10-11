@@ -49,6 +49,11 @@ describe('isCategoryIncomplete', () => {
     expect(isCategoryIncomplete({ ...middle, unit: '' })).toBe(true);
   });
 
+  it("고등 선택과목 교과서는 학년이 비어도 통과한다 ('선택과목' = 학년 '')", () => {
+    expect(isCategoryIncomplete({ ...middle, level: '고등', grade: '', semester: '' })).toBe(false);
+    expect(isCategoryIncomplete({ ...middle, level: '고등', grade: '', publisher: '' })).toBe(true);
+  });
+
   it('중등/고등은 소단원·학기가 없어도 통과한다 (선택 항목)', () => {
     expect(isCategoryIncomplete({ ...middle, subunit: '', semester: '' })).toBe(false);
   });

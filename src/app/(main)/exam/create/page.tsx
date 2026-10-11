@@ -90,7 +90,8 @@ export default function ExamCreatePage() {
     const chapters = [...new Set(selected.map((c) => c.chapter).filter(Boolean))];
 
     const parts: string[] = [];
-    if (grades.length === 1) parts.push(grades[0]);
+    // 학년이 빈 교과서(고등 선택과목)는 제목에 학년을 적지 않는다 — 출판사 이름이 이미 과목을 품는다
+    if (grades.length === 1 && grades[0]) parts.push(grades[0]);
     if (publishers.length === 1) parts.push(publishers[0]);
     if (chapters.length <= 2) parts.push(...chapters);
     else parts.push(`${chapters[0]} 외 ${chapters.length - 1}개`);

@@ -5,17 +5,18 @@ import type { MajorChapter } from '@/types';
 /**
  * 대단원 목록을 조회한다 (출판사 + 학년 + 학기 필터).
  *
- * ⚠️ 학기는 **`undefined` 여야 '전체'** 다. `''` 는 '학기 구분 없는 교과서만'(고등 선택과목,
- *    `semester.ts`)이라 값으로 건다 — 예전처럼 참거짓으로 가르면 `''` 가 전체로 읽혀,
- *    학기 구분 없음을 고른 화면에 공통국어 1·2학기 대단원까지 섞여 나온다.
+ * ⚠️ 학년·학기는 **`undefined` 여야 '전체'** 다. `''` 는 '학년(학기) 구분 없는 교과서만'(고등 선택과목,
+ *    `textbook-grade.ts`·`semester.ts`)이라 값으로 건다 — 예전처럼 참거짓으로 가르면 `''` 가 전체로 읽혀,
+ *    '선택과목'·'학기 구분 없음' 을 고른 화면에 다른 학년·학기 대단원까지 섞여 나온다.
+ *    화면 값을 넘길 때는 반드시 `toStoredGrade`·`toStoredSemester` 를 거칠 것.
  * @param publisherId - 출판사(교과서) id
- * @param grade - 학년. 비우면 전체
+ * @param grade - 저장값 학년('고2'·''). `undefined` 면 전체
  * @param semester - 저장값 학기('1학기'·'2학기'·''). `undefined` 면 전체
  * @returns 이름순 대단원
  */
 export async function getMajorChapters(publisherId: string, grade?: string, semester?: string): Promise<MajorChapter[]> {
   let query = supabase.from('major_chapters').select('*').eq('publisher_id', publisherId).order('name');
-  if (grade) query = query.eq('grade', grade);
+  if (grade !== undefined) query = query.eq('grade', grade);
   if (semester !== undefined) query = query.eq('semester', semester);
   const { data } = await query;
   return (data as MajorChapter[]) ?? [];

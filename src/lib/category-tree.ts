@@ -1,6 +1,7 @@
 import type { Category } from '@/types';
 import { EXTERNAL_LEVEL } from './constants';
 import { UNSPECIFIED_OPTION } from './external-category';
+import { textbookGradeLabel } from './textbook-grade';
 
 /** 카테고리 트리 노드 타입 */
 export interface CategoryTreeNode {
@@ -14,7 +15,8 @@ export interface CategoryTreeNode {
 /**
  * 카테고리 배열을 계층 트리 구조로 변환한다.
  * 중등/고등: level > grade > publisher > semester > chapter > sub_chapter
- *   (학기가 빈 '학기 구분 없는' 교과서는 semester 층 없이 publisher > chapter)
+ *   (학기가 빈 '학기 구분 없는' 교과서는 semester 층 없이 publisher > chapter,
+ *    학년이 빈 고등 교과서는 grade 폴더 이름이 '선택과목')
  * 외부지문: level > school > year > grade > material
  */
 export function buildCategoryTree(categories: Category[]): CategoryTreeNode[] {
@@ -83,7 +85,8 @@ function buildSchoolLevelTree(level: string, cats: Category[]): CategoryTreeNode
 
       return {
         id: `${level}-${grade}`,
-        label: grade,
+        // 학년이 빈 고등 교과서 = 선택과목(고2·고3 어디서든 배운다) — 이름 없는 폴더가 되지 않게
+        label: textbookGradeLabel(grade, level),
         type: 'grade' as const,
         children: Object.entries(byPub).map(([pub, pubCats]) => ({
           id: `${level}-${grade}-${pub}`,

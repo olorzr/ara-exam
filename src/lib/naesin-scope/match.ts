@@ -42,7 +42,8 @@ export function matchScopeToCategories(
   const pool = categories.filter(
     (c) =>
       c.level === textbook.school_level &&
-      c.grade === textbook.grade &&
+      // 학년이 빈 교과서(고등 선택과목)는 카테고리도 '' 라 그대로 맞는다. 관리자시스템 행은 NULL 일 수 있어 '' 로 접는다
+      c.grade === (textbook.grade ?? '') &&
       stripAllWs(c.publisher) === stripAllWs(textbook.publisher) &&
       (semDigit(c.semester) === null || semDigit(c.semester) === String(slotSemester)),
   );

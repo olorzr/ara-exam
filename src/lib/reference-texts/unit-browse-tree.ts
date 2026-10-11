@@ -1,4 +1,5 @@
 import { naturalCompare } from '@/lib/category-tree';
+import { NO_GRADE_OPTION } from '@/lib/textbook-grade';
 import type { FacetTreeNode } from '@/lib/problem-bank/school-exam-tree';
 import type { ReferenceFacetRow } from './facets';
 import {
@@ -27,7 +28,11 @@ export const UNIT_SELF_LEAF = '(전체)';
 /** 단원을 하나도 안 붙인 전문 */
 export const UNIT_NONE_LABEL = '분류 없음';
 
-const UNKNOWN_GRADE = '학년 미지정';
+/**
+ * 학년이 빈 단원 — 학년 구분 없는 고등 선택과목 교과서('선택과목', `textbook-grade.ts`).
+ * 단원은 카테고리 트리에서 고르는데 중등 교과서는 늘 학년이 있어, 빈 학년은 선택과목뿐이다.
+ */
+const GRADELESS = NO_GRADE_OPTION;
 
 /** 이름 → 그 아래 전문 id 들과 하위 갈래 */
 interface Bucket {
@@ -48,7 +53,7 @@ function enter(parent: Bucket, name: string, id: string): Bucket {
   return bucket;
 }
 
-/** 학년 순서 — 중학교가 먼저, 그다음 고등학교, 모르는 것은 맨 뒤 */
+/** 학년 순서 — 중학교가 먼저, 그다음 고등학교, 빈 학년(선택과목)은 맨 뒤 */
 function gradeRank(grade: string): number {
   if (grade.startsWith('중')) return 0;
   if (grade.startsWith('고')) return 1;
@@ -171,7 +176,7 @@ export function buildReferenceUnitTree(
   const tree: FacetTreeNode<ReferenceBrowseAxis>[] = sortedEntries(root, compareGrades)
     .map(([grade, gradeBucket]) => ({
       id: `unit-tree:${JSON.stringify([grade])}`,
-      label: labelWith(grade || UNKNOWN_GRADE, gradeBucket.ids.size),
+      label: labelWith(grade || GRADELESS, gradeBucket.ids.size),
       children: [
         selfLeaf({ grade }, gradeBucket),
         ...sortedEntries(gradeBucket, (a, b) => a.localeCompare(b, 'ko'))

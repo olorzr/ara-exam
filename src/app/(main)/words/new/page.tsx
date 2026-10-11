@@ -14,6 +14,7 @@ import {
 } from '@/lib/words-save';
 import { toStoredValue } from '@/lib/external-category';
 import { toStoredSemester } from '@/lib/semester';
+import { toStoredGrade } from '@/lib/textbook-grade';
 import type { CategoryLevel } from '@/types';
 import type { WordEntry } from '@/components/words';
 import { CategoryForm, WordEntryTable, DuplicateWordsDialog } from '@/components/words';
@@ -117,12 +118,12 @@ export default function NewWordsPage() {
     setSaving(true);
 
     // 년도/학년의 '미지정' 은 DB 에 빈 문자열로 저장한다(external-category.ts 참조).
-    // 학기의 '학기 구분 없음'(고등 선택과목)도 빈 문자열이다(semester.ts) — 마스터 대단원과 같은 값이라야
-    // 카테고리 트리에서 한자리에 모인다
+    // 학년 '선택과목'·학기 '학기 구분 없음'(고등 선택과목)도 빈 문자열이다(textbook-grade.ts·semester.ts) —
+    // 마스터 대단원과 같은 값이라야 카테고리 트리에서 한자리에 모인다
     const categoryId = await ensureCategoryId({
       level,
       year: toStoredValue(year),
-      grade: toStoredValue(grade),
+      grade: toStoredGrade(toStoredValue(grade)),
       semester: toStoredSemester(semester),
       publisher, chapter, subChapter, schoolName,
     });

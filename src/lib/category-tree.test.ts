@@ -142,6 +142,25 @@ describe('buildCategoryTree — 학기 구분 없는 교과서 (고등 선택과
   });
 });
 
+describe('buildCategoryTree — 학년 구분 없는 교과서 (고등 선택과목)', () => {
+  it("학년이 빈 고등 교과서는 '선택과목' 폴더 아래, 학기 폴더 없이 교과서 › 대단원", () => {
+    const tree = buildCategoryTree([
+      makeCategory({ id: 'a', level: '고등', grade: '', publisher: '문학 비상', semester: '', chapter: '1. 나를 깨우는, 문학' }),
+      makeCategory({ id: 'b', level: '고등', grade: '고1', publisher: '공통국어 창비', semester: '1학기', chapter: '1. 문학' }),
+    ]);
+    const high = findByPath(tree, ['고등']);
+    expect(high?.children.map((n) => n.label)).toEqual(['고1', '선택과목']);
+    const elective = findByPath(tree, ['고등', '선택과목', '문학 비상', '1. 나를 깨우는, 문학']);
+    expect(elective?.category?.id).toBe('a');
+    expect(findByPath(tree, ['고등', '선택과목'])?.id).toBe('고등-');
+  });
+
+  it("중등의 빈 학년은 '선택과목' 이 아니라 '미지정' — 중등에는 선택과목이 없다", () => {
+    const tree = buildCategoryTree([makeCategory({ id: 'a', grade: '' })]);
+    expect(findByPath(tree, ['중등'])?.children.map((n) => n.label)).toEqual(['미지정']);
+  });
+});
+
 describe('buildCategoryTree — 이름이 자바스크립트 예약 속성일 때', () => {
   // ⚠️ 코덱스 리뷰: 묶는 그릇이 평범한 객체면 이 이름들이 **물려받은 속성**으로 잡혀
   //    `acc[key].push` 가 함수가 아니라 터지고, 개념지 목록이 통째로 안 그려졌다.

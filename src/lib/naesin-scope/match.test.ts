@@ -68,6 +68,13 @@ describe('matchScopeToCategories', () => {
     expect(r.matchedIds).toEqual(['b']);
   });
 
+  it("학년 구분 없는 고등 선택과목 교과서('' 또는 관리자시스템 NULL)는 학년이 빈 카테고리와 맞는다", () => {
+    const elective = { ...textbook, school_level: '고등', grade: null, publisher: '문학 비상' };
+    const categories = [cat({ id: 'a', level: '고등', grade: '', semester: '', publisher: '문학 비상', sub_chapter: '' })];
+    const r = matchScopeToCategories(['문학의 즐거움'], elective, 2, categories);
+    expect(r.matchedIds).toEqual(['a']);
+  });
+
   it('level/grade/publisher 가 다르면 후보에서 제외된다', () => {
     const categories = [
       cat({ id: 'a', level: '고등', grade: '고1' }),
