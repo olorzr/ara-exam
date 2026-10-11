@@ -1,31 +1,46 @@
 import { supabase } from '@/lib/supabase';
 import { expandGrammarAncestors } from './grammar-tree';
-import { tallyGrammarCounts } from './grammar-counts';
+import { tallyWeightedGrammarCounts } from './grammar-counts';
 import {
   collectWorkAuthors, collectWorkKinds, tallyWorkCounts, toWorkFacets,
   type PassageWorkRow, type WorkKind,
 } from './work-counts';
-import type { PassageWork } from '@/types/problem-bank';
 import {
   MOCK_EXAM_SOURCE_TYPE, SCHOOL_EXAM_SOURCE_TYPE, schoolExamKey, type SchoolExamFacet,
 } from './school-exam-tree';
 import { collectSchoolsByLevel } from './school-level';
 import type { SchoolLevel } from './source-form';
+import { parseArchiveFacets, type ArchiveFacetsPayload, type SourceFacetRow } from './facets-payload';
+import { cachedArchiveFacets } from './facets-cache';
 
 /**
  * 아카이브 필터 선택지(패싯) 모으기.
  *
- * ⚠️ **1,000행에서 자르면 안 된다.** PostgREST 기본 상한만 믿으면 업로드가 쌓였을 때
- *    그 뒤에만 있는 학교·학년도·교과서·영역·단원이 **선택지에서 조용히 사라진다**
- *    (문항은 목록에 있는데 고를 수가 없다 — 코덱스 리뷰 6R·15R).
- *    한두 컬럼만 읽으므로 끝까지 훑어도 가볍다.
+ * 재료는 `exam.archive_facets()`(sql/66) **한 번의 호출**로 받는다 — jsonb 하나라 PostgREST 1,000행
+ * 상한과 무관하고, 한 탭 안에서는 `facets-cache.ts` 가 몇 분 동안 나눠 쓴다.
+ *
+ * ⚠️ 예전에는 문항 표의 한 열을 1,000행씩 **순서대로** 긁어 여기서 셌다(열마다 19~29번 왕복). 문항이
+ *    29,000개가 되자 아카이브가 수 초씩 멈췄고, 안전판(20,000행)에 영역 열이 이미 걸려 있었다
+ *    (작품 열도 18,810행으로 코앞이었다 — 걸리면 뒤쪽 문항이 트리·건수에서 **조용히** 빠진다, 2026-10-11).
+ *    다시 표를 긁는 길을 만들지 말 것.
+ * ⚠️ 서버는 DISTINCT·GROUP BY 개수만 한다. 세는 규칙(문법 조상 펴기·문학/문법/비문학 표결·지은이 다수결)은
+ *    여기서 부르는 `grammar-counts.ts`·`work-counts.ts` 가 그대로 맡는다 — SQL 에 거울을 두지 않는다.
  */
 
-/** 한 번에 읽는 행 수 (PostgREST 기본 상한) */
-const FACET_CHUNK = 1000;
+/** RPC 를 부르고 응답을 검사한다 */
+async function fetchArchiveFacets(): Promise<ArchiveFacetsPayload> {
+  const { data, error } = await supabase.rpc('archive_facets');
+  if (error) throw error;
+  return parseArchiveFacets(data);
+}
 
-/** 훑을 최대 행 수 — 무한정 훑지 않기 위한 안전판 */
-const FACET_MAX_ROWS = 20_000;
+/**
+ * 아카이브 패싯 재료 — 캐시가 있으면 그것, 없으면 한 번 읽는다.
+ * @returns 출처 조합·영역·단원·문법 묶음·작품 묶음·지문 작품 표
+ */
+export function loadArchiveFacets(): Promise<ArchiveFacetsPayload> {
+  return cachedArchiveFacets(fetchArchiveFacets);
+}
 
 /** 출처에서 모은 선택지 */
 export interface SourceFacets {
@@ -48,33 +63,15 @@ export const EMPTY_SOURCE_FACETS: SourceFacets = {
   schoolsByLevel: { 중등: [], 고등: [] },
 };
 
-/** 패싯 스캔이 읽는 출처 컬럼 */
-interface SourceFacetRow extends SchoolExamFacet {
-  textbook: string;
-  source_type: string;
-}
-
 /**
- * 출처 컬럼에서 실제로 존재하는 값들을 모은다.
+ * 출처 칸에서 실제로 존재하는 값들을 모은다.
  *
- * 기출 트리의 갈래도 **같은 스캔**에서 뽑는다 — 컬럼 몇 개를 더 고르는 것뿐이라
- * 왕복을 늘릴 이유가 없다.
+ * 기출 트리의 갈래도 **같은 재료**에서 뽑는다 — 서버가 7칸의 서로 다른 조합을 돌려주므로
+ * 아래의 중복 제거(`uniq`·`collectSchoolExams`)가 그대로 맞다.
  * @returns 학교·학년도·학년·교과서·학기 목록과 기출 갈래
  */
 export async function fetchSourceFacets(): Promise<SourceFacets> {
-  const rows: SourceFacetRow[] = [];
-  for (let from = 0; from < FACET_MAX_ROWS; from += FACET_CHUNK) {
-    const { data, error } = await supabase
-      .from('problem_sources')
-      .select('school_name, year, grade, textbook, source_type, semester, exam_type')
-      .order('id')
-      .range(from, from + FACET_CHUNK - 1);
-    if (error) throw error;
-    const page = (data ?? []) as typeof rows;
-    rows.push(...page);
-    if (page.length < FACET_CHUNK) break;
-  }
-
+  const rows = (await loadArchiveFacets()).sources;
   const uniq = (values: string[]) => [...new Set(values.filter(Boolean))].sort();
   return {
     schools: uniq(rows.map((r) => r.school_name)),
@@ -88,7 +85,7 @@ export async function fetchSourceFacets(): Promise<SourceFacets> {
 }
 
 /** 내신기출(학교가 있는 것)·모의고사 행에서 기출 트리 갈래를 중복 없이 모은다 */
-function collectSchoolExams(rows: SourceFacetRow[]): SchoolExamFacet[] {
+function collectSchoolExams(rows: readonly SourceFacetRow[]): SchoolExamFacet[] {
   const seen = new Set<string>();
   const out: SchoolExamFacet[] = [];
   for (const row of rows) {
@@ -107,35 +104,19 @@ function collectSchoolExams(rows: SourceFacetRow[]): SchoolExamFacet[] {
 }
 
 /**
- * 이름 경로 배열 컬럼에 실제로 쓰인 경로들 — 필터 선택지를 만든다.
- * @param column - 이름 경로 배열 컬럼 ('area_path' 영역 · 'unit_path' 교과서 단원)
- * @returns 중복 없는 경로 목록 (사전순)
+ * 경로들을 중복 없이 사전순으로 — 필터 선택지를 만든다.
+ * @param paths - 서버가 돌려준 서로 다른 경로들
+ * @returns 중복 없는 경로 목록 (한글 사전순)
  */
-async function collectPathFacets(column: 'area_path' | 'unit_path'): Promise<string[][]> {
+function sortPaths(paths: readonly string[][]): string[][] {
   const seen = new Set<string>();
   const out: string[][] = [];
-
-  for (let from = 0; from < FACET_MAX_ROWS; from += FACET_CHUNK) {
-    const { data, error } = await supabase
-      .from('problems')
-      .select(column)
-      .not(column, 'eq', '{}')
-      .order('id')
-      .range(from, from + FACET_CHUNK - 1);
-    // 선택지를 못 만들어도 목록은 봐야 한다 — 여기까지 모은 것만 돌려준다
-    if (error) break;
-
-    const rows = (data ?? []) as unknown as Record<string, string[]>[];
-    for (const row of rows) {
-      const path = row[column] ?? [];
-      const key = path.join(' > ');
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      out.push(path);
-    }
-    if (rows.length < FACET_CHUNK) break;
+  for (const path of paths) {
+    const key = path.join(' > ');
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(path);
   }
-
   return out.sort((a, b) => a.join('>').localeCompare(b.join('>'), 'ko'));
 }
 
@@ -167,70 +148,31 @@ export interface WorkFacet {
  * @returns 작품 목록 (제목 한글 사전순)
  */
 export async function fetchWorkFacets(): Promise<WorkFacet[]> {
-  const rows: string[][] = [];
-  for (let from = 0; from < FACET_MAX_ROWS; from += FACET_CHUNK) {
-    const { data, error } = await supabase
-      .from('problems')
-      .select('work_titles')
-      .not('work_titles', 'eq', '{}')
-      .order('id')
-      .range(from, from + FACET_CHUNK - 1);
-    // 선택지를 못 만들어도 목록은 봐야 한다 — 여기까지 모은 것만 돌려준다
-    if (error) break;
-    const page = (data ?? []) as unknown as { work_titles: string[] | null }[];
-    for (const row of page) rows.push(row.work_titles ?? []);
-    if (page.length < FACET_CHUNK) break;
-  }
-
-  const counts = tallyWorkCounts(rows);
+  const payload = await loadArchiveFacets();
+  const counts = tallyWorkCounts(payload.work_titles);
   if (counts.size === 0) return [];
-  const meta = await collectPassageWorkMeta();
-  return toWorkFacets(counts, meta.authors, meta.kinds);
-}
-
-/**
- * 지문에서 제목 → 지은이와 제목 → 갈래를 **한 번의 조회로** 모은다.
- *
- * 둘로 나누면 같은 표를 두 번 긁는다 — 컬럼 하나를 더 고르는 것뿐이라 왕복이 늘지 않는다.
- * 작품이 없는 지문은 트리와 무관하므로 `works` 조건은 그대로 둔다.
- */
-async function collectPassageWorkMeta(): Promise<{
-  authors: Map<string, string>;
-  kinds: Map<string, WorkKind>;
-}> {
-  const rows: PassageWorkRow[] = [];
-  for (let from = 0; from < FACET_MAX_ROWS; from += FACET_CHUNK) {
-    const { data, error } = await supabase
-      .from('passages')
-      .select('works, area_path')
-      .not('works', 'eq', '[]')
-      .order('id')
-      .range(from, from + FACET_CHUNK - 1);
-    if (error) break;
-    const page = (data ?? []) as unknown as {
-      works: PassageWork[] | null; area_path: string[] | null;
-    }[];
-    for (const row of page) rows.push({ works: row.works ?? [], area_path: row.area_path ?? [] });
-    if (page.length < FACET_CHUNK) break;
-  }
-  return {
-    authors: collectWorkAuthors(rows.map((r) => r.works)),
-    kinds: collectWorkKinds(rows),
-  };
+  // 지문 표는 (제목, 지은이, 영역) 하나씩이라 지은이 표·갈래 표가 같은 행을 함께 쓴다
+  const rows: PassageWorkRow[] = payload.passage_works.map((v) => ({
+    works: [{ label: '', title: v.title, author: v.author }],
+    area_path: v.area_path,
+    n: v.n,
+  }));
+  return toWorkFacets(counts, collectWorkAuthors(rows), collectWorkKinds(rows));
 }
 
 /**
  * 아카이브에 쓰인 영역 경로 목록.
  * @returns 중복 없는 경로 목록
  */
-export const fetchAreaFacets = (): Promise<string[][]> => collectPathFacets('area_path');
-
+export const fetchAreaFacets = async (): Promise<string[][]> =>
+  sortPaths((await loadArchiveFacets()).area_paths);
 
 /**
  * 아카이브에 쓰인 교과서 단원 경로 목록.
  * @returns 중복 없는 경로 목록
  */
-export const fetchUnitFacets = (): Promise<string[][]> => collectPathFacets('unit_path');
+export const fetchUnitFacets = async (): Promise<string[][]> =>
+  sortPaths((await loadArchiveFacets()).unit_paths);
 
 /** 문법 개념 하나 — 경로와 그 아래(자기 자신 포함) 문항 수 */
 export interface GrammarFacet {
@@ -243,9 +185,6 @@ export interface GrammarFacet {
 /**
  * 아카이브에 태깅된 문법 분류와 그 문항 수.
  *
- * ⚠️ `collectPathFacets` 를 재사용할 수 없다 — 그쪽은 컬럼 하나가 **경로 하나**라는
- *    전제인데, 이 컬럼은 원소 하나가 경로 하나이고 한 행에 여러 개가 들어 있다.
- *
  * 세는 규칙(조상 중복 제거)은 `tallyGrammarCounts` 에 있다. 개수를 함께 세는 이유는
  * 작품 패싯과 같다 — 트리에 '명사 (5)' 로 보여야 어디에 기출이 쌓였는지, 어디가
  * 아직 비었는지 한눈에 보인다.
@@ -253,29 +192,10 @@ export interface GrammarFacet {
  * ⚠️ 선택지는 이것으로 만들지 **않는다.** 태깅된 경로만 모으므로 아무도 안 붙인 개념은
  *    영영 안 나온다 — 선택지·트리는 마스터(`GRAMMAR_ALL_PATHS`)에서 만들고 여기 건수를
  *    얹는다. 이 함수는 '얼마나 쌓였나' 만 답한다.
- *
- * ⚠️ `FACET_MAX_ROWS` 를 넘는 아카이브에서는 건수가 근사치가 된다(작품 패싯과 같은 한계).
  * @returns 경로와 문항 수 (교재 목차 순서, 마스터에 없는 옛 경로는 뒤로)
  */
 export async function fetchGrammarFacets(): Promise<GrammarFacet[]> {
-  const rows: string[][] = [];
-
-  for (let from = 0; from < FACET_MAX_ROWS; from += FACET_CHUNK) {
-    const { data, error } = await supabase
-      .from('problems')
-      .select('grammar_paths')
-      .not('grammar_paths', 'eq', '{}')
-      .order('id')
-      .range(from, from + FACET_CHUNK - 1);
-    // 건수를 못 세도 목록은 봐야 한다 — 여기까지 모은 것만 돌려준다
-    if (error) break;
-
-    const page = (data ?? []) as unknown as { grammar_paths: string[] | null }[];
-    for (const row of page) rows.push(row.grammar_paths ?? []);
-    if (page.length < FACET_CHUNK) break;
-  }
-
-  const counts = tallyGrammarCounts(rows);
+  const counts = tallyWeightedGrammarCounts((await loadArchiveFacets()).grammar_paths);
   return expandGrammarAncestors([...counts.keys()])
     .map((path) => ({ path, count: counts.get(path) ?? 0 }));
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { tallyGrammarCounts } from './grammar-counts';
+import { tallyGrammarCounts, tallyWeightedGrammarCounts } from './grammar-counts';
 
 describe('tallyGrammarCounts', () => {
   it('잎을 세면 조상까지 함께 올라간다', () => {
@@ -60,5 +60,26 @@ describe('tallyGrammarCounts', () => {
     const counts = tallyGrammarCounts([['단어>품사>명사'], ['단어 > 품사 > 명사']]);
 
     expect(counts.get('단어 > 품사 > 명사')).toBe(2);
+  });
+
+  it('묶음판: 같은 태그 묶음을 가진 문항 n 개를 n 으로 센다 — 조상도 문항 단위로 한 번씩', () => {
+    const counts = tallyWeightedGrammarCounts([
+      { paths: ['문장 > 문법 요소 > 피동 표현', '문장 > 문법 요소 > 사동 표현'], n: 3 },
+      { paths: ['단어 > 품사 > 명사'], n: 2 },
+    ]);
+
+    expect(counts.get('문장 > 문법 요소 > 피동 표현')).toBe(3);
+    expect(counts.get('문장 > 문법 요소')).toBe(3);
+    expect(counts.get('문장')).toBe(3);
+    expect(counts.get('단어')).toBe(2);
+  });
+
+  it('묶음판과 낱개판이 같은 값을 낸다', () => {
+    const rows = [['단어 > 품사 > 명사'], ['단어 > 품사 > 명사'], ['단어 > 품사']];
+    const weighted = tallyWeightedGrammarCounts([
+      { paths: ['단어 > 품사 > 명사'], n: 2 }, { paths: ['단어 > 품사'], n: 1 },
+    ]);
+
+    expect([...weighted.entries()].sort()).toEqual([...tallyGrammarCounts(rows).entries()].sort());
   });
 });

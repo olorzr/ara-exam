@@ -43,6 +43,23 @@ export interface PassageWorkRow {
   works: readonly PassageWork[];
   /** 지문의 영역 경로 스냅샷 (`passages.area_path`) */
   area_path: readonly string[];
+  /**
+   * 이 모양의 지문이 몇 개인가 — 서버(`exam.archive_facets`, sql/66)가 같은 (제목, 지은이, 영역)을
+   * 묶어 센 수다. 없으면 1(지문 하나).
+   */
+  n?: number;
+}
+
+/** 문항 한 줄(또는 같은 작품명 묶음을 가진 문항 n 개)의 작품명 */
+export interface WorkTitlesRow {
+  titles: readonly string[];
+  /** 같은 묶음을 가진 문항 수(sql/66 이 묶어 센다). 없으면 1 */
+  n?: number;
+}
+
+/** 묶어 센 개수 — 없으면 한 행 */
+function weightOf(row: { n?: number }): number {
+  return row.n ?? 1;
 }
 
 /**
@@ -94,7 +111,7 @@ export function collectWorkKinds(rows: readonly PassageWorkRow[]): Map<string, W
     for (const work of row.works) {
       if (!work.title) continue;
       const votes = tally.get(work.title) ?? new Map<WorkKind, number>();
-      votes.set(kind, (votes.get(kind) ?? 0) + 1);
+      votes.set(kind, (votes.get(kind) ?? 0) + weightOf(row));
       tally.set(work.title, votes);
     }
   }
@@ -113,16 +130,16 @@ export function collectWorkKinds(rows: readonly PassageWorkRow[]): Map<string, W
 
 /**
  * 문항별 작품명 목록에서 작품마다 문항 수를 센다.
- * @param rows - 문항별 `work_titles`
+ * @param rows - 문항별 `work_titles` (같은 묶음을 서버가 묶어 셌으면 `n`)
  * @returns 작품명 → 문항 수
  */
-export function tallyWorkCounts(rows: readonly (readonly string[])[]): Map<string, number> {
+export function tallyWorkCounts(rows: readonly WorkTitlesRow[]): Map<string, number> {
   const counts = new Map<string, number>();
-  for (const titles of rows) {
+  for (const row of rows) {
     // 한 문항 안에 같은 제목이 두 번 들어 있어도 한 번만 센다(DB 가 막지만 옛 행이 있다)
-    for (const title of new Set(titles)) {
+    for (const title of new Set(row.titles)) {
       if (!title) continue;
-      counts.set(title, (counts.get(title) ?? 0) + 1);
+      counts.set(title, (counts.get(title) ?? 0) + weightOf(row));
     }
   }
   return counts;
@@ -133,18 +150,18 @@ export function tallyWorkCounts(rows: readonly (readonly string[])[]): Map<strin
  *
  * 작품 트리가 `지은이 › 작품` 두 단이라 문항 쪽 지은이를 제목으로 되찾아야 한다.
  * 같은 제목에 지은이가 여럿이면(표기가 갈렸거나 동명이작) **가장 많이 쓰인 이름**을 고른다.
- * @param rows - 지문별 작품 목록
+ * @param rows - 지문별 작품 목록 (같은 모양을 서버가 묶어 셌으면 `n`)
  * @returns 제목 → 지은이
  */
 export function collectWorkAuthors(
-  rows: readonly (readonly PassageWork[])[],
+  rows: readonly Pick<PassageWorkRow, 'works' | 'n'>[],
 ): Map<string, string> {
   const tally = new Map<string, Map<string, number>>();
-  for (const works of rows) {
-    for (const work of works) {
+  for (const row of rows) {
+    for (const work of row.works) {
       if (!work.title || !work.author) continue;
       const byAuthor = tally.get(work.title) ?? new Map<string, number>();
-      byAuthor.set(work.author, (byAuthor.get(work.author) ?? 0) + 1);
+      byAuthor.set(work.author, (byAuthor.get(work.author) ?? 0) + weightOf(row));
       tally.set(work.title, byAuthor);
     }
   }

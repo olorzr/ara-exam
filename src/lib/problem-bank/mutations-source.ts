@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { normalizeCategoryName } from '@/lib/category-name';
 import { normalizeGrammarPaths } from './grammar-tree';
+import { invalidateArchiveFacets } from './facets-cache';
 
 /**
  * **출처 단위**·**일괄** 쓰기 — 한 행이 아니라 출처 하나나 문항 여러 개를 한꺼번에 건드린다.
@@ -8,6 +9,8 @@ import { normalizeGrammarPaths } from './grammar-tree';
  * 문항·지문 한 행을 고치는 쪽(`mutations.ts`)과 갈라 둔 이유는 규약이 달라서다:
  * 저기는 `updated_at` 을 걸어 **낙관적 동시성**을 지키지만, 여기 것들은 여러 행을
  * 한 번에 바꾸므로 그 조건을 걸 수 없고 대신 **DB 함수(RPC) 한 번**으로 보낸다.
+ *
+ * ⚠️ 성공하면 패싯 캐시를 무효화한다(`facets-cache.ts`) — 출처·단원·문법 분류가 트리에 바로 반영되게.
  */
 
 /**
@@ -32,6 +35,7 @@ export async function deleteSource(id: string): Promise<void> {
     .select('id');
   if (error) throw error;
   if (!data || data.length === 0) throw new Error('이미 지워졌거나 지울 수 없는 출처예요.');
+  invalidateArchiveFacets();
 }
 
 /**
@@ -60,6 +64,7 @@ export async function setSourceTextbook(
     p_clear_units: clearUnits,
   });
   if (error) throw error;
+  invalidateArchiveFacets();
   return (data as string) ?? '';
 }
 
@@ -86,6 +91,7 @@ export async function addGrammarPaths(problemIds: string[], paths: string[]): Pr
     p_paths: values,
   });
   if (error) throw error;
+  invalidateArchiveFacets();
   return (data as number) ?? 0;
 }
 

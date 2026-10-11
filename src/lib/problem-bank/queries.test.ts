@@ -88,3 +88,15 @@ describe('fetchProblemPage — 학교급', () => {
     expect(lastParam('source.grade')).toBeNull();
   });
 });
+
+describe('fetchProblemPage — 검색', () => {
+  it('검색어는 소문자로 바꿔 like 로 건다 — search_text 가 이미 소문자라 ilike 가 필요 없다(sql/66)', async () => {
+    await fetchProblemPage({ search: '  Sa미인곡 ' });
+    expect(lastParam('search_text')).toBe('like.%sa미인곡%');
+  });
+
+  it('% _ \\ 는 글자 그대로 찾게 이스케이프한다', async () => {
+    await fetchProblemPage({ search: '50%_a' });
+    expect(lastParam('search_text')).toBe('like.%50\\%\\_a%');
+  });
+});

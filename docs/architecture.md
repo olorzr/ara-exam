@@ -359,7 +359,10 @@ src/
 - 의존: lib/supabase, lib/supabase-public(읽기 전용), lib/category-master(단원 마스터)
 - 주요 파일: queries.ts(아카이브 목록 + 출처 칸 조건 `applySourceAxes` — 올라간 기출 목록과 한 벌),
   source-list.ts·source-list-filters.ts(올라간 기출 목록 — 칸 규칙은 `buildFilterAxes` 를 빌려 쓴다),
-  source-queries.ts(한 출처를 통째로 — 시험지 화면), facets.ts, mutations.ts, mutations-source.ts, review-data.ts,
+  source-queries.ts(한 출처를 통째로 — 시험지 화면),
+  facets.ts(트리·선택지 재료 — `exam.archive_facets()` RPC 한 번, sql/66)·facets-payload.ts(응답 검사)·
+    facets-cache.ts(탭 안 캐시 5분 — 쓰기 함수가 무효화한다, 의존성 없음),
+  mutations.ts, mutations-source.ts, review-data.ts,
   storage.ts, storage-paths.ts, bbox.ts, figure-placeholders.ts, figure-capture.ts,
   area-tree.ts, area-master.ts, unit-tree.ts, unit-master.ts, grammar-tree.ts,
   passage-groups.ts(목록을 지문별로 — 떨어져 있어도 한 상자로 모은다. 작품 모드와는

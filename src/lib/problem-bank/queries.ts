@@ -236,8 +236,12 @@ export async function runProblemQuery<Row = ProblemRow>(
   }
   if (query.search?.trim()) {
     // .or() 를 쓰지 않는다 — 백슬래시·괄호 이스케이프가 인용을 통과하며 풀린다.
-    // 검색용 평문 컬럼 하나로 단순 ilike 를 건다(DB 트리거가 채운다).
-    request = request.ilike('search_text', `%${escapeIlike(query.search.trim().toLowerCase())}%`);
+    // 검색용 평문 컬럼 하나로 단순 like 를 건다(DB 트리거가 채운다).
+    // ⚠️ ilike 가 아니라 **like** 다(sql/66). search_text 는 트리거가 이미 lower() 로 저장하고
+    //    검색어도 여기서 소문자로 바꾸므로 결과가 같은데, 대소문자 접기가 빠져 한글에서 4배 빠르다
+    //    (29,000문항 순차 스캔 505ms → 128ms). 인덱스는 못 쓴다 — RLS 아래에서 LIKE 는 leakproof 가
+    //    아니라 인덱스 조건이 될 수 없다(sql/66 머리말). 트리거의 lower() 를 걷으면 이것도 ilike 로 되돌릴 것
+    request = request.like('search_text', `%${escapeIlike(query.search.trim().toLowerCase())}%`);
   }
 
   const { data, error, count } = await request;

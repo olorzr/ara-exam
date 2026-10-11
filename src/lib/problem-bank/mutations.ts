@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { sanitizeInlineHTML, sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import { normalizePassageWorks, normalizeWorkTitles } from '@/lib/problem-bank/work-title';
 import { normalizeGrammarPaths } from './grammar-tree';
+import { invalidateArchiveFacets } from './facets-cache';
 import type { Bbox, PassageWork, Problem, RenderMode } from '@/types/problem-bank';
 
 /**
@@ -16,6 +17,9 @@ import type { Bbox, PassageWork, Problem, RenderMode } from '@/types/problem-ban
  * ⚠️ **파생 컬럼은 보내지 않는다**(`work_title`·지문의 `title`/`author`, sql/33). DB 트리거가
  *    작품 목록에서 만든다 — 보내면 목록과 문자열 가운데 어느 쪽이 참인지 알 수 없어진다.
  *    대신 저장이 끝나면 **트리거가 만든 값을 그대로 돌려받아** 화면을 맞춘다(`.select`).
+ *
+ * ⚠️ 성공한 쓰기는 끝에서 **패싯 캐시를 무효화**한다(`facets-cache.ts`). 작품·영역·단원·문법이
+ *    바뀌었을 수 있는데 그대로 두면 아카이브 트리가 몇 분 동안 옛 값을 보여 준다.
  */
 
 /** 저장이 남의 수정과 부딪혔을 때 */
@@ -96,6 +100,7 @@ export async function updateProblem(
     .select('updated_at, work_titles, work_title');
   if (error) throw error;
   if (!data || data.length === 0) throw new ConflictError();
+  invalidateArchiveFacets();
   return data[0] as unknown as SavedProblem;
 }
 
@@ -154,6 +159,7 @@ export async function updatePassage(
     .select('updated_at, works, title, author');
   if (error) throw error;
   if (!data || data.length === 0) throw new ConflictError();
+  invalidateArchiveFacets();
   return data[0] as unknown as SavedPassage;
 }
 
@@ -165,6 +171,7 @@ export async function updatePassage(
 export async function deleteProblem(id: string): Promise<void> {
   const { error } = await supabase.from('problems').delete().eq('id', id);
   if (error) throw error;
+  invalidateArchiveFacets();
 }
 
 /**
@@ -184,6 +191,7 @@ export async function deleteProblems(ids: string[]): Promise<void> {
   if (unique.length === 0) return;
   const { error } = await supabase.from('problems').delete().in('id', unique);
   if (error) throw error;
+  invalidateArchiveFacets();
 }
 
 /**
@@ -194,6 +202,7 @@ export async function deleteProblems(ids: string[]): Promise<void> {
 export async function deletePassage(id: string): Promise<void> {
   const { error } = await supabase.from('passages').delete().eq('id', id);
   if (error) throw error;
+  invalidateArchiveFacets();
 }
 
 /**
@@ -233,5 +242,6 @@ export async function mergePassages(targetId: string, sourceId: string): Promise
     p_source: sourceId,
   });
   if (error) throw error;
+  invalidateArchiveFacets();
   return (data as string) ?? '';
 }

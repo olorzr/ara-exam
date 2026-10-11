@@ -4,39 +4,59 @@ import {
 } from './work-counts';
 
 describe('tallyWorkCounts', () => {
+  const t = (...titles: string[]) => ({ titles });
+
   it('한 문항이 여러 작품에 걸리면 **양쪽에서** 센다 — 조회가 배열 포함이라 그게 맞다', () => {
-    const counts = tallyWorkCounts([['진달래꽃', '엄마 걱정'], ['진달래꽃']]);
+    const counts = tallyWorkCounts([t('진달래꽃', '엄마 걱정'), t('진달래꽃')]);
     expect(counts.get('진달래꽃')).toBe(2);
     expect(counts.get('엄마 걱정')).toBe(1);
   });
 
   it('한 문항 안의 중복은 한 번만 센다 — 옛 행에 같은 제목이 두 번 있을 수 있다', () => {
-    expect(tallyWorkCounts([['동백꽃', '동백꽃']]).get('동백꽃')).toBe(1);
+    expect(tallyWorkCounts([t('동백꽃', '동백꽃')]).get('동백꽃')).toBe(1);
   });
 
   it('빈 이름은 세지 않는다', () => {
-    expect(tallyWorkCounts([['', '동백꽃'], []]).size).toBe(1);
+    expect(tallyWorkCounts([t('', '동백꽃'), t()]).size).toBe(1);
+  });
+
+  it('서버가 묶어 센 개수(n)를 그만큼 더한다 — 묶음 안 중복은 여전히 한 번', () => {
+    const counts = tallyWorkCounts([
+      { titles: ['진달래꽃', '엄마 걱정'], n: 3 },
+      { titles: ['진달래꽃', '진달래꽃'], n: 2 },
+    ]);
+    expect(counts.get('진달래꽃')).toBe(5);
+    expect(counts.get('엄마 걱정')).toBe(3);
   });
 });
 
 describe('collectWorkAuthors', () => {
   const work = (title: string, author: string) => ({ label: '', title, author });
+  const passage = (...works: ReturnType<typeof work>[]) => ({ works });
 
   it('지문의 작품에서 제목 → 지은이를 모은다', () => {
-    const authors = collectWorkAuthors([[work('진달래꽃', '김소월'), work('엄마 걱정', '기형도')]]);
+    const authors = collectWorkAuthors([passage(work('진달래꽃', '김소월'), work('엄마 걱정', '기형도'))]);
     expect(authors.get('진달래꽃')).toBe('김소월');
     expect(authors.get('엄마 걱정')).toBe('기형도');
   });
 
   it('같은 제목에 지은이가 갈리면 가장 많이 쓰인 이름을 고른다', () => {
     const authors = collectWorkAuthors([
-      [work('동백꽃', '김유정')], [work('동백꽃', '김유정')], [work('동백꽃', '오기')],
+      passage(work('동백꽃', '김유정')), passage(work('동백꽃', '김유정')), passage(work('동백꽃', '오기')),
     ]);
     expect(authors.get('동백꽃')).toBe('김유정');
   });
 
   it('지은이가 비면 담지 않는다 — 트리가 지은이 미입력 폴더로 받는다', () => {
-    expect(collectWorkAuthors([[work('동백꽃', '')]]).size).toBe(0);
+    expect(collectWorkAuthors([passage(work('동백꽃', ''))]).size).toBe(0);
+  });
+
+  it('묶어 센 개수(n)로 다수결한다 — 한 줄이라도 n 이 크면 이긴다', () => {
+    const authors = collectWorkAuthors([
+      { works: [work('동백꽃', '김유정')], n: 5 },
+      passage(work('동백꽃', '오기')), passage(work('동백꽃', '오기')),
+    ]);
+    expect(authors.get('동백꽃')).toBe('김유정');
   });
 });
 
@@ -141,6 +161,14 @@ describe('collectWorkKinds', () => {
 
   it('제목이 빈 작품은 세지 않는다', () => {
     expect(collectWorkKinds([row([''], ['문학'])]).size).toBe(0);
+  });
+
+  it('묶어 센 개수(n)만큼 표를 던진다 — 줄 수가 아니라 지문 수로 다수결', () => {
+    const kinds = collectWorkKinds([
+      { ...row(['꽃'], ['독서와 작문']), n: 3 },
+      row(['꽃'], ['문학']), row(['꽃'], ['문학']),
+    ]);
+    expect(kinds.get('꽃')).toBe('nonliterary');
   });
 });
 

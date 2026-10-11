@@ -41,10 +41,24 @@ function coveredPaths(paths: readonly string[]): Set<string> {
 export function tallyGrammarCounts(
   rows: readonly (readonly string[])[],
 ): Map<string, number> {
+  return tallyWeightedGrammarCounts(rows.map((paths) => ({ paths, n: 1 })));
+}
+
+/**
+ * `tallyGrammarCounts` 의 묶음판 — 같은 태그 묶음을 가진 문항 n 개를 한 줄로 받는다.
+ *
+ * 서버(`exam.archive_facets`, sql/66)가 `GROUP BY grammar_paths` 로 묶어 보낸다. 조상 중복 제거는
+ * 묶음 **안**에서 하므로(한 묶음 = 같은 태그를 가진 문항들) 묶음마다 `n` 을 더하면 문항 단위로 센 것과 같다.
+ * @param rows - 태그 묶음과 그 묶음을 가진 문항 수
+ * @returns 경로 → 문항 수
+ */
+export function tallyWeightedGrammarCounts(
+  rows: readonly { paths: readonly string[]; n: number }[],
+): Map<string, number> {
   const counts = new Map<string, number>();
-  for (const paths of rows) {
-    for (const key of coveredPaths(paths)) {
-      counts.set(key, (counts.get(key) ?? 0) + 1);
+  for (const row of rows) {
+    for (const key of coveredPaths(row.paths)) {
+      counts.set(key, (counts.get(key) ?? 0) + row.n);
     }
   }
   return counts;
