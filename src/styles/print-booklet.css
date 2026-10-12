@@ -8,6 +8,8 @@
    ⚠️ 용지 크기(@page size: A3 landscape)는 여기 없다. 전역 @page(print-a4.css)를 선택자로
       좁힐 수 없어 BookletStack 이 중철일 때만 <style> 로 덮는다.
    ⚠️ 측정 컨테이너(.a4-measure)는 이 구조 밖의 형제라 아래 zoom 이 쪽 배정에 영향을 주지 않는다.
+   ⚠️ 면 높이는 쪽보다 40px 낮다(BOOKLET_SIDE_HEIGHT_PX) — 쪽과 같게 되돌리면 프린터 여백 때문에
+      면마다 빈 쪽이 붙어 양면이 '한 장에 한 면, 뒷면 백지' 로 나온다(2026-10-13).
    ========================================================= */
 
 .booklet-leaf {
@@ -49,6 +51,29 @@
 
 .booklet-blank {
   background: #fff;
+}
+
+/*
+ * 표지는 면 높이에 맞춘다. 본문 낱장은 A4 그대로 두고 푸터 아래 빈 여백만 잘리게 하지만, 표지에는
+ * 그 여백이 없어(그림 표지는 종이를 꽉 채운다) 그대로 두면 그림 아래 40px 이 잘린다(코덱스 1R).
+ * 높이를 비우면 면(flex, stretch) 높이를 따라가고 그림은 그 안에 비율대로 담긴다.
+ * 인라인 높이(A4CoverSheet)를 이기려고 !important 를 쓴다.
+ */
+.booklet-slot > .a4-sheet--cover {
+  height: auto !important;
+}
+
+/*
+ * 쪽 번호는 책 바깥쪽 아래 — 오른쪽 면은 원래대로 오른쪽, 왼쪽 면은 왼쪽으로 옮긴다.
+ * 푸터 그리드는 1fr auto 1fr 이다(print-a4.css). 화면 미리보기도 같은 자리를 보여 주도록 @media 밖에 둔다.
+ * 측정 컨테이너는 이 구조 밖이라 쪽 배정에 영향이 없다.
+ */
+.booklet-slot[data-slot='left'] .a4-footer__page {
+  grid-column: 1;
+  /* ⚠️ 줄을 못박는다 — 없으면 자동 배치가 앞 칸(학원 이름, 2열)보다 왼쪽 칸을 다음 줄로 보내
+        푸터가 두 줄이 되고, 그만큼 본문이 줄어 측정값과 어긋나 마지막 줄이 잘린다 */
+  grid-row: 1;
+  justify-self: start;
 }
 
 @media screen {

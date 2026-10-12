@@ -18,10 +18,11 @@ describe('PaperPrintLayoutToggle', () => {
 });
 
 describe('PaperPrintLayoutNotice', () => {
-  it('인쇄 창에서 고를 것 — A3 · 가로 · 짧은 면 뒤집기 — 를 알린다', () => {
+  it('인쇄 창에서 고를 것 — A3 · 여백 없음 · 짧은 면 뒤집기 — 를 알린다', () => {
     const { container } = render(<PaperPrintLayoutNotice />);
     expect(container.textContent).toContain('A3');
     expect(container.textContent).toContain('짧은 면 뒤집기');
+    expect(container.textContent).toContain('여백 없음');
     expect(container.textContent).toContain('긴 면 뒤집기');
     expect(container.firstElementChild!.hasAttribute('data-no-print')).toBe(true);
   });

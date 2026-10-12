@@ -119,7 +119,7 @@ src/
   - `src/lib/print/booklet.ts` — 순수 계산: 중철 제본 면 배정(`bookletSheets` — 장마다 앞·뒷면의 [왼쪽, 오른쪽] 쪽)
   - `src/components/print/BookletStack.tsx` — 중철 제본 렌더: A3 가로 한 면에 A4 두 쪽, `<style>` 로 `@page` 를 A3 가로로 덮는다. `A4Document booklet` 이 그린다(`breakAfterLast` 와 타입으로 배타)
   - `src/styles/print-a4.css` — 낱장·푸터·페이지 브레이크 CSS (globals.css 에서 @import)
-  - `src/styles/print-booklet.css` — 중철 면·빈 면·화면 축소(zoom 0.5, 측정 무관)·면 안 쪽 넘김 억제
+  - `src/styles/print-booklet.css` — 중철 면·빈 면·화면 축소(zoom 0.5, 측정 무관)·면 안 쪽 넘김 억제·왼쪽 면 쪽 번호를 바깥쪽(왼쪽 아래)으로. 면 높이는 쪽보다 40px 낮다(`BOOKLET_SIDE_HEIGHT_PX`, 프린터 여백에도 면마다 빈 쪽이 안 붙게)
 - 소비자: `components/exam/{ExamPaperView,MultipleChoiceView,MultipleChoiceAnswerView,WordBookView}.tsx`, `components/exam-builder/ExamSheetRenderer.tsx`, `components/problem-paper/{ProblemPaperView,ProblemAnswerKeyView}.tsx`(표지·중철을 쓰는 유일한 소비자)
 - 블록 단위: 시험지=문항 1개, 객관식 답안지=5문항 1줄, 단어장=단어 1줄, 개념지=본문 HTML 최상위 요소 1개
 - 개념지 단 수: 본문 글자 수 300 초과면 2단이지만, **열 3개 이상인 표가 하나라도 있으면 1단**으로 되돌린다(2단 칸 ≈328px 에 넓은 표가 안 들어간다). 표 셀은 `overflow-wrap: anywhere` + 박스 묶음 줄바꿈 허용으로 칸을 넘지 않는다

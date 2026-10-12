@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { bookletSheets, type BookletSlot } from '@/lib/print/booklet';
-import { A4_HEIGHT_PX, A4_WIDTH_PX } from '@/lib/print/constants';
+import { A4_HEIGHT_PX, A4_WIDTH_PX, BOOKLET_SIDE_HEIGHT_PX } from '@/lib/print/constants';
 
 interface BookletStackProps {
   /** 읽는 순서의 A4 낱장들 (표지가 있으면 맨 앞) */
@@ -16,6 +16,9 @@ interface BookletStackProps {
  * ⚠️ 용지 크기는 이 컴포넌트가 그리는 `<style>` 이 덮는다. 전역 `@page`(print-a4.css 의 A4 세로)는
  *    선택자로 좁힐 수 없고, 이름 붙인 페이지(`page:`)는 사파리가 지원하지 않는다. 같은 특이성의
  *    `@page` 는 나중 것이 이기므로 본문 안의 `<style>` 이 이긴다 — 중철로 그릴 때만 A3 가로가 된다.
+ * ⚠️ 면은 쪽보다 낮게 그린다(`BOOKLET_SIDE_HEIGHT_PX`) — 쪽 높이와 같으면 프린터 여백 때문에 면마다
+ *    빈 쪽이 붙어 양면이 어긋난다(constants.ts 의 `BOOKLET_SIDE_SLACK_PX`). 안의 낱장은 A4 그대로라
+ *    `overflow: hidden` 이 푸터 아래 빈 여백만 잘라 낸다.
  * ⚠️ 낱장의 내용은 **이미 그린 것**을 받는다 — 측정 기계(`useA4Pagination`)와 떨어져 있어
  *    쪽 배정에 손대지 않는다.
  */
@@ -49,7 +52,7 @@ export default function BookletStack({ pages }: BookletStackProps) {
               <section
                 className={`booklet-side${faceIndex === lastFace ? ' booklet-side--last' : ''}`}
                 aria-label={name}
-                style={{ width: A4_WIDTH_PX * 2, height: A4_HEIGHT_PX }}
+                style={{ width: A4_WIDTH_PX * 2, height: BOOKLET_SIDE_HEIGHT_PX }}
               >
                 {renderSlot(left, 'left')}
                 {renderSlot(right, 'right')}

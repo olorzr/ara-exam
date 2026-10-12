@@ -21,6 +21,22 @@ export const PAGE_PAD_TOP = 57;
 /** 하단 여백 ≈ 11mm (푸터 아래) */
 export const PAGE_PAD_BOTTOM = 42;
 
+/**
+ * 중철 면(A3 가로 한 면)을 쪽보다 **이만큼 낮게** 그린다 — 아래 여백(`PAGE_PAD_BOTTOM`) 안에서만 깎는다.
+ *
+ * ⚠️ 면을 쪽 높이와 똑같이 두지 말 것(2026-10-13 실제 출력 사고). 크롬 인쇄 창의 '여백: 기본값' 은
+ *    CSS `@page { margin: 0 }` 이어도 **프린터의 인쇄 불가 영역(보통 4~6mm)** 만큼 여백을 잡는다.
+ *    크롬은 넘치는 폭에 맞춰 문서를 줄이는데, 가로 면은 폭을 맞춰도 높이가 남아 면마다 빈 쪽이 하나씩
+ *    붙는다(4면 → 8쪽). 양면으로 뽑으면 앞면에 면, 뒷면은 그 빈 쪽 — '한 장에 한 면, 뒷면 백지' 가 된다.
+ *    낱장 A4 는 세로라 폭에 맞춰 줄이면 높이도 들어가서 이 일이 없다.
+ *    40px 이면 여백 16mm 까지 버틴다(필요한 여유 ≥ 2m(W−H)/(W−2m)). 깎이는 자리는 푸터 아래 빈 여백뿐이다
+ *    (표지는 아래 여백이 없어 print-booklet.css 가 면 높이에 맞춰 줄인다).
+ */
+export const BOOKLET_SIDE_SLACK_PX = 40;
+
+/** 중철 면의 높이 — A4 쪽 높이에서 여유(`BOOKLET_SIDE_SLACK_PX`)를 뺀 값 */
+export const BOOKLET_SIDE_HEIGHT_PX = A4_HEIGHT_PX - BOOKLET_SIDE_SLACK_PX;
+
 /** 본문 폭 ≈ 180mm — 측정과 렌더가 반드시 같은 값을 써야 한다 */
 export const CONTENT_WIDTH = A4_WIDTH_PX - PAGE_PAD_X * 2;
 

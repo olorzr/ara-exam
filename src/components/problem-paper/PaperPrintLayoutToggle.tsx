@@ -45,6 +45,8 @@ interface PaperPrintLayoutNoticeProps {
 /**
  * 중철을 골랐을 때 인쇄 창에서 무엇을 골라야 하는지 알린다.
  *
+ * '여백 없음' 이면 면이 종이에 꼭 맞아 접는 선이 한가운데 온다. '기본값' 이어도 면마다 빈 쪽이 붙지는
+ * 않는다(면 높이 여유, constants.ts 의 `BOOKLET_SIDE_SLACK_PX`) — 조금 줄어들 뿐이다.
  * '짧은 면 뒤집기' 가 A3 가로 책자의 정답이다(`lib/print/booklet.ts` 머리 주석). 다만 드라이버가
  * 방향을 문서 기준으로 해석해 반대가 맞는 경우가 있어 '거꾸로 나오면' 을 함께 적는다.
  */
@@ -58,7 +60,7 @@ export function PaperPrintLayoutNotice({ blockedReason }: PaperPrintLayoutNotice
   }
   return (
     <p className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-gray-700" data-no-print>
-      인쇄 창에서 <b>용지 A3 · 가로 · 양면(짧은 면 뒤집기) · 배율 100%</b> 를 고르세요.
+      인쇄 창에서 <b>용지 A3 · 여백 없음 · 양면(짧은 면 뒤집기) · 배율 기본값</b> 을 고르세요.
       나온 종이를 순서대로 겹쳐 반으로 접고 가운데를 철하면 책자가 돼요.
       뒷면이 거꾸로 나오면 &lsquo;긴 면 뒤집기&rsquo; 로 바꿔 보세요.
     </p>

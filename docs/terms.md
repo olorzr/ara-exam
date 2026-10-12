@@ -631,7 +631,9 @@
   쪽 수는 4의 배수로 올리고 남는 자리는 끝에 빈 면으로 둔다
 - 면 배정(0-based, `total` = 4의 배수로 올린 쪽 수, 장 k): 앞면 `[total-1-2k, 2k]`, 뒷면 `[2k+1, total-2-2k]`
 - 프린터는 **양면 · 짧은 면 뒤집기**(A3 가로에서는 짧은 변이 좌우다). 거꾸로 나오면 '긴 면' 이 맞는 드라이버다
-- 코드에서의 사용: `bookletSheets`, `BookletStack`, `A4Document` 의 `booklet`, `PaperPrintLayout`(`'single' | 'booklet'`)
+- 인쇄 창은 **여백 없음 · 배율 기본값**. 면은 쪽보다 40px 낮게 그린다(`BOOKLET_SIDE_HEIGHT_PX`) — 같으면 프린터 여백 때문에 면마다 빈 쪽이 붙는다(2026-10-13)
+- 쪽 번호는 **책 바깥쪽 아래**: 왼쪽 면은 왼쪽 끝, 오른쪽 면은 오른쪽 끝(`print-booklet.css` 의 `[data-slot='left']` 규칙)
+- 코드에서의 사용: `bookletSheets`, `BookletStack`, `A4Document` 의 `booklet`, `PaperPrintLayout`(`'single' | 'booklet'`), `BOOKLET_SIDE_SLACK_PX`
 - 관련 파일: src/lib/print/booklet.ts, src/components/print/BookletStack.tsx, src/styles/print-booklet.css, src/lib/problem-paper/print-layout-pref.ts
 
 ## 문제지 표지 (PaperCover)
