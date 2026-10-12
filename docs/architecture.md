@@ -367,6 +367,7 @@ src/
   mutations.ts, mutations-source.ts, review-data.ts,
   storage.ts, storage-paths.ts, bbox.ts, figure-placeholders.ts, figure-capture.ts,
   area-tree.ts, area-master.ts, unit-tree.ts, unit-master.ts, grammar-tree.ts,
+  grammar-master.ts(문법 마스터 상수 + '혼합' 잎 규칙 — 함수는 grammar-tree.ts),
   passage-groups.ts(목록을 지문별로 — 떨어져 있어도 한 상자로 모은다. 작품 모드와는
     지문 없는 문항의 자리만 다르다),
   detail-queries.ts(상세·묶음 머리 조회 — 목록은 본문 없이 머리만 받는다),

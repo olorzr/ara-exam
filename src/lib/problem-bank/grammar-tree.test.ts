@@ -5,6 +5,7 @@ import {
   expandGrammarAncestors, formatGrammarPath, GRAMMAR_DEPTH_MAX, GRAMMAR_MAX_TAGS,
   GRAMMAR_TREE, grammarPathsUnder, isGrammarArea, normalizeGrammarPaths, parseGrammarPath,
 } from './grammar-tree';
+import { GRAMMAR_MIXED_LEAF, GRAMMAR_MIXED_MIN_CONCEPTS } from './grammar-master';
 
 /** 트리의 모든 경로(중간 마디 포함) */
 function allPaths(nodes: AreaTreeNode[], prefix: string[] = []): string[][] {
@@ -53,7 +54,7 @@ describe('문법 마스터 무결성', () => {
 
   it('선언 순서를 지킨다 — 9품사는 학교문법 순서다', () => {
     expect(optionsAt(GRAMMAR_TREE, ['단어', '품사'])).toEqual([
-      '명사', '대명사', '수사', '관형사', '부사', '조사', '감탄사', '동사', '형용사',
+      '명사', '대명사', '수사', '관형사', '부사', '조사', '감탄사', '동사', '형용사', '혼합',
     ]);
   });
 
@@ -61,11 +62,43 @@ describe('문법 마스터 무결성', () => {
     // 교재 목차에는 없지만 중3 '통일 시대의 우리말' 기출이 62문항이다. 어휘 밑에 두면
     // ① 중1 지역 방언 문항과 한 칸에서 섞이고 ② 표기·맞춤법 차이가 '어휘' 로 잡힌다
     expect(optionsAt(GRAMMAR_TREE, ['단어', '어휘 체계와 양상'])).toEqual([
-      '고유어·한자어·외래어', '표준어·방언', '유행어·은어·전문어',
+      '고유어·한자어·외래어', '표준어·방언', '유행어·은어·전문어', '혼합',
     ]);
     expect(optionsAt(GRAMMAR_TREE, ['남북한 언어'])).toEqual([
-      '남북한 어휘 차이', '남북한 표기와 맞춤법 차이', '남북한 언어의 동질성',
+      '남북한 어휘 차이', '남북한 표기와 맞춤법 차이', '남북한 언어의 동질성', '혼합',
     ]);
+  });
+});
+
+describe("'혼합' 잎 (사용자 규칙 2026-10-12)", () => {
+  /** 잎만 담은 가지들 — 3단 가지는 중분류, 2단 가지(담화·어문 규정·남북한 언어)는 대분류 */
+  function leafBranches(): { path: string[]; leaves: string[] }[] {
+    return allPaths(GRAMMAR_TREE)
+      .map((path) => ({ path, leaves: optionsAt(GRAMMAR_TREE, path) }))
+      .filter(({ path, leaves }) => leaves.length > 0
+        && leaves.every((leaf) => optionsAt(GRAMMAR_TREE, [...path, leaf]).length === 0));
+  }
+
+  it('개념이 셋 이상인 가지는 맨 뒤에 혼합이 하나 있다', () => {
+    // 셋 이상 묻는 문항이 잎 여럿으로 흩어지면 '조사' 를 눌렀을 때 종합 문항까지 딸려 나온다
+    const withMixed = leafBranches().filter(({ leaves }) => leaves.length - 1 >= GRAMMAR_MIXED_MIN_CONCEPTS);
+    expect(withMixed.length).toBeGreaterThan(0);
+    for (const { leaves } of withMixed) {
+      expect(leaves.at(-1)).toBe(GRAMMAR_MIXED_LEAF);
+      expect(leaves.filter((leaf) => leaf === GRAMMAR_MIXED_LEAF)).toHaveLength(1);
+    }
+  });
+
+  it('개념이 둘뿐인 가지에는 혼합이 없다 — 두 잎을 다 달면 된다', () => {
+    expect(optionsAt(GRAMMAR_TREE, ['국어의 역사', '국어의 변천'])).toEqual([
+      '국어 음운의 변천', '국어 어휘와 문법의 변천',
+    ]);
+  });
+
+  it('혼합 칸은 잎이라 상위 검색이 그 가지에 함께 잡는다', () => {
+    expect(grammarPathsUnder(['단어', '품사'])).toContain('단어 > 품사 > 혼합');
+    expect(grammarPathsUnder(['단어', '품사', '혼합'])).toEqual(['단어 > 품사 > 혼합']);
+    expect(grammarPathsUnder(['국어의 역사', '중세 국어'])).toContain('국어의 역사 > 중세 국어 > 혼합');
   });
 });
 
@@ -88,7 +121,8 @@ describe('경로 왕복', () => {
 describe('grammarPathsUnder — 상위 검색이 쓴다', () => {
   it('중분류를 고르면 자기 자신과 그 아래 잎을 전부 편다', () => {
     const under = grammarPathsUnder(['단어', '품사']);
-    expect(under).toHaveLength(10);
+    // 자기 자신 1 + 9품사 + 혼합 1
+    expect(under).toHaveLength(11);
     expect(under[0]).toBe('단어 > 품사');
     expect(under).toContain('단어 > 품사 > 명사');
     expect(under).toContain('단어 > 품사 > 형용사');
@@ -105,8 +139,8 @@ describe('grammarPathsUnder — 상위 검색이 쓴다', () => {
 
   it('대분류를 고르면 그 가지 전체를 편다', () => {
     const under = grammarPathsUnder(['문장']);
-    // 자기 자신 1 + 중분류 4 + 잎 30
-    expect(under).toHaveLength(35);
+    // 자기 자신 1 + 중분류 4 + 잎 30 + 중분류마다 혼합 4
+    expect(under).toHaveLength(39);
     expect(under[0]).toBe('문장');
     expect(under).toContain('문장 > 문법 요소 > 피동 표현');
     expect(under).toContain('문장 > 문법 요소');
@@ -119,7 +153,8 @@ describe('grammarPathsUnder — 상위 검색이 쓴다', () => {
   it('두 단계에서 끝나는 가지는 자기와 잎을 준다', () => {
     // 담화는 중분류가 없다 — 대분류 바로 아래가 잎이다
     const under = grammarPathsUnder(['담화']);
-    expect(under).toHaveLength(6);
+    // 자기 자신 1 + 잎 5 + 혼합 1
+    expect(under).toHaveLength(7);
     expect(under[0]).toBe('담화');
     expect(under).toContain('담화 > 담화의 맥락');
   });

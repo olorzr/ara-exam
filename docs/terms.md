@@ -469,13 +469,26 @@
 - ⚠️ area_path·unit_path 와 **모양이 다르다**: 그쪽은 배열 하나가 경로 하나라 문항에 한 개만
   붙지만, 문법은 한 문항이 개념 두셋을 걸쳐서 경로를 `' > '` 로 이어 붙인 문자열을 원소로 담는다.
   그래서 상위 검색이 `contains`(@>)가 아니라 **`overlaps`(&&)** 다 — 고른 마디와 그 아래 경로를
-  전부(중간 마디 포함) 펴서 찾는다. 중간 마디로 태깅된 종합 문항(`'단어 > 품사'`)도 걸려야 하기 때문이다
+  전부(중간 마디 포함) 펴서 찾는다. 손으로 중간 마디(`'단어 > 품사'`)를 넣은 문항도 걸려야 하기 때문이다
 - 깊이는 가지마다 다르다(담화·어문 규정은 2단, 나머지는 3단). DB 제약은 경로 길이가 아니라 **개수**다
+- **태깅 규칙**(원장님 2026-10-12): 한 가지 안에서 문항이 실제로 묻는 개념이 하나면 그 잎, 둘이면 두 잎,
+  **셋 이상이거나 가지 전반을 두루 물으면 그 가지의 [혼합](#혼합-문법-태그)** 하나.
+  **중세 국어 문법 문항은 `국어의 역사 > 중세 국어` 안에만** 단다(품사·음운·훈민정음·국어의 변천과 섞지 않는다)
 - 코드에서의 사용: `Problem.grammar_paths`, `GRAMMAR_TREE`, `GRAMMAR_ALL_PATHS`, `grammarPathsUnder`,
   `expandGrammarAncestors`, `isGrammarArea`, RPC `add_grammar_paths`, 아카이브 필터 `gram`
 - 훑어보는 화면은 [문법 트리](#문법-트리-grammar-browse-tree), 개수는 [문법 개념 건수](#문법-개념-건수-grammarfacet) 참고
-- 관련 파일: src/lib/problem-bank/grammar-tree.ts, src/components/problem-review/GrammarTagPicker.tsx,
-  sql/21_problem_bank_grammar.sql
+- 관련 파일: src/lib/problem-bank/grammar-tree.ts, src/lib/problem-bank/grammar-master.ts(마스터·태깅 규칙),
+  src/components/problem-review/GrammarTagPicker.tsx, sql/21_problem_bank_grammar.sql
+
+## 혼합 (문법 태그)
+- 정의: 문법 분류에서 **여러 개념을 두루 묻는 문항**을 담는 잎(`'단어 > 품사 > 혼합'`). 개념이 셋 이상인
+  가지마다 맨 뒤에 하나씩 붙는다(17곳). 개념이 둘뿐인 `국어의 변천` 에는 없다 — 둘 다 묻으면 두 잎을 단다
+- 왜: '조사' 를 눌렀을 때 9품사를 두루 묻는 문항까지 나오면 안 된다(원장님 2026-10-12). 셋 이상을 잎마다
+  흩어 달던 문항과 옛 '중간 마디' 태그(`'단어 > 품사'`)를 sql/69 가 혼합으로 옮겼다
+- 마스터 원본에 손으로 적지 않고 규칙으로 붙인다(`withMixedLeaf`) — 가지를 새로 더할 때 빠뜨리지 않게
+- 코드에서의 사용: `GRAMMAR_MIXED_LEAF`, `GRAMMAR_MIXED_MIN_CONCEPTS`(grammar-master.ts). 적재 검사기는
+  `~/.claude/tools/exam-specs/grammar-rule.cjs`
+- 관련 파일: src/lib/problem-bank/grammar-master.ts, sql/69_problem_bank_grammar_mixed.sql
 
 ## 구역 상자 (data-box)
 - 정의: 지문·발문 안의 상자·구간 표시. 값의 종류에 따라 인쇄 모양이 셋이다 —

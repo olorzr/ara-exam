@@ -122,7 +122,8 @@ describe('toProblemQuery', () => {
   it('문법은 고른 가지를 자기 자신까지 펴서 넘긴다', () => {
     // 저장값이 경로 문자열이라 '단어 > 품사' 하나로는 그 아래 잎이 안 걸린다 — 나열해야 한다
     const q = toProblemQuery({ ...EMPTY_FILTERS, grammar_path: ['단어', '품사'] });
-    expect(q.grammar_paths).toHaveLength(10);
+    // 자기 자신 1 + 9품사 + 혼합 1
+    expect(q.grammar_paths).toHaveLength(11);
     expect(q.grammar_paths).toContain('단어 > 품사 > 명사');
     // 고른 마디 자체도 넣는다 — 피커가 부분 경로를 허용해 '단어 > 품사' 로 태깅된 문항이 있다
     expect(q.grammar_paths).toContain('단어 > 품사');
