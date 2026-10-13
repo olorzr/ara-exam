@@ -1,0 +1,70 @@
+/* =========================================================
+   디자인 표지 공통 — 클로드 디자인 시안(2026-10-06 '문제지 표지 시안')을 옮긴 다섯 디자인
+   (.pbc-editorial · .pbc-rings · .pbc-spines · .pbc-soft · .pbc-sketch)이 함께 쓴다.
+
+   px 는 시안 그대로다 — A4 낱장이 96dpi px 로 고정이라(lib/print/constants.ts) 화면·인쇄가 1:1 이다.
+   ⚠️ 높이를 절대 쓰지 않는다. 중철에서는 표지가 면 높이(A4 − 40px)로 줄어든다
+      (print-booklet.css `.booklet-slot > .a4-sheet--cover`). 바닥 글은 `bottom:` 으로, 배경은 `inset` 으로 둔다.
+   글꼴 CSS 는 globals.css 가 jsdelivr 의 @fontsource 에서 가져온다(굵기는 lib/problem-paper/cover-fonts.ts 와 같다).
+   ========================================================= */
+
+.pb-cover--layout {
+  --pbc-ink: #141413;
+  --pbc-mute: #3a3a38;
+  --pbc-serif: 'Noto Serif KR', 'AppleMyungjo', serif;
+  --pbc-sans: 'IBM Plex Sans KR', 'Pretendard Variable', Pretendard, -apple-system, 'Apple SD Gothic Neo', sans-serif;
+  --pbc-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+  --pbc-display: 'Instrument Serif', 'Noto Serif KR', serif;
+  --pbc-title-scale: 1;
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding: 0;
+  color: var(--pbc-ink);
+  font-family: var(--pbc-sans);
+  /* 글자 크기·줄 높이를 여기서 정한다 — 문제지는 표지 낱장에도 범위 클래스(.pb-sheet: 10pt · 1.55)를 붙여
+     그대로 물려받으면 화면(창 미리보기)과 인쇄물의 줄 높이가 달라진다. 글 자리 계산(cover-fit.ts)도 이 값을 쓴다 */
+  font-size: 16px;
+  line-height: 1.3;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.pb-cover--layout *,
+.pb-cover--layout *::before,
+.pb-cover--layout *::after {
+  box-sizing: border-box;
+}
+
+/* 브라우저 기본 여백만 지운다. ⚠️ `:where()` 로 특이성을 0 으로 둔다 — `.pb-cover--layout ol`(0,1,1)로
+   쓰면 디자인 규칙(`.pbc-spines__list { margin: … }`, 0,1,0)을 이겨 시안의 여백이 사라진다 */
+:where(.pb-cover--layout) :where(h1, ol, dl, dd) {
+  margin: 0;
+}
+
+/* ⚠️ `p` 만은 세게 지운다 — 문제지 범위의 `.pb-sheet p { margin: 0 0 3pt }`(0,1,1)가 표지 안까지 닿는다.
+   그래서 디자인의 `p` 에는 여백(margin)을 쓰지 않고 안쪽 여백(padding)으로 띄운다(블러 태그라인 · 스케치 과정 줄) */
+.pb-cover.pb-cover--layout p {
+  margin: 0;
+}
+
+:where(.pb-cover--layout) :where(ol) {
+  padding: 0;
+  list-style: none;
+}
+
+/* '이름 ____' — 이름표와 밑줄 빈칸 */
+.pbc-field {
+  white-space: nowrap;
+}
+
+.pbc-field__line {
+  display: inline-block;
+  margin-left: 6px;
+  border-bottom: 1px solid var(--pbc-ink);
+  vertical-align: -2px;
+}
+
+.pbc-field__line--sm { width: 90px; }
+.pbc-field__line--md { width: 120px; }
+.pbc-field__line--lg { width: 150px; }

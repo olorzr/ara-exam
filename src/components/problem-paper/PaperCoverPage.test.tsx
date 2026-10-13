@@ -44,6 +44,40 @@ describe('PaperCoverPage', () => {
   });
 });
 
+describe('PaperCoverPage — 디자인', () => {
+  it('간단 표지는 고른 디자인으로 그리고 부제를 줄마다 나눠 싣는다', () => {
+    const { container } = render(
+      <PaperCoverPage
+        cover={{ ...DEFAULT_SIMPLE_COVER, layout: 'rings', subtitle: '고등 1학년\n화자와 정서' }}
+        title="현대시 읽기" year="2026"
+      />,
+    );
+    expect(container.querySelector('.pbc-rings')).not.toBeNull();
+    expect(container.querySelector('.pbc-rings__title')!.textContent).toBe('현대시 읽기');
+    expect(container.textContent).toContain('화자와 정서');
+    expect(container.textContent).toContain('2026');
+  });
+
+  it('그림 표지는 디자인 값이 있어도 그림만 그린다', () => {
+    const { container } = render(
+      <PaperCoverPage
+        cover={{ ...DEFAULT_SIMPLE_COVER, kind: 'image', layout: 'rings', imagePath: 'x' }}
+        title="제목" imageUrl="https://example.test/cover.jpg"
+      />,
+    );
+    expect(container.querySelector('.pbc-rings')).toBeNull();
+    expect(container.querySelectorAll('img')).toHaveLength(1);
+  });
+
+  it('표지 자리에 연도를 넘긴다', () => {
+    const { container } = render(<>{renderCoverSlot({
+      cover: { ...DEFAULT_SIMPLE_COVER, layout: 'editorial' }, paperTitle: '기출', suffix: ' - 교사용', year: '2025',
+    })}</>);
+    expect(container.querySelector('.pbc-editorial__title')!.textContent).toBe('기출 - 교사용');
+    expect(container.querySelector('.pbc-editorial__head')!.textContent).toContain('2025');
+  });
+});
+
 describe('표지 자리 — 못 읽거나 깨졌을 때', () => {
   it('그림을 끝내 못 받았으면 깨진 그림 대신 인쇄되는 안내를 그린다', () => {
     const { container } = render(

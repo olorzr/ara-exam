@@ -1,5 +1,14 @@
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
 @import url('https://cdn.jsdelivr.net/gh/leetaewook/gmarket-sans-dynamic-subset/GmarketSans.css');
+/* 문제지 디자인 표지 글꼴 — @fontsource(jsdelivr, CSP 가 이 CDN 만 연다). 굵기는 lib/problem-paper/cover-fonts.ts 와 같다 */
+@import url('https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-kr@5.3.1/400.css');
+@import url('https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-kr@5.3.1/900.css');
+@import url('https://cdn.jsdelivr.net/npm/@fontsource/ibm-plex-sans-kr@5.3.0/400.css');
+@import url('https://cdn.jsdelivr.net/npm/@fontsource/ibm-plex-sans-kr@5.3.0/500.css');
+@import url('https://cdn.jsdelivr.net/npm/@fontsource/ibm-plex-sans-kr@5.3.0/700.css');
+@import url('https://cdn.jsdelivr.net/npm/@fontsource/ibm-plex-mono@5.2.7/400.css');
+@import url('https://cdn.jsdelivr.net/npm/@fontsource/instrument-serif@5.2.8/400.css');
+@import url('https://cdn.jsdelivr.net/npm/@fontsource/instrument-serif@5.2.8/400-italic.css');
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -8,6 +17,12 @@
 @import "../styles/print-qa.css";
 @import "../styles/print-booklet.css";
 @import "../styles/paper-cover.css";
+@import "../styles/paper-covers/base.css";
+@import "../styles/paper-covers/editorial.css";
+@import "../styles/paper-covers/rings.css";
+@import "../styles/paper-covers/spines.css";
+@import "../styles/paper-covers/soft.css";
+@import "../styles/paper-covers/sketch.css";
 
 /* ── 옛한글 글꼴 — 네이버 나눔 옛한글(SIL OFL 1.1, public/fonts 자체 호스팅) ──────────────
    Pretendard 에는 첫가끝 조합형 자모가 없어 중세국어가 깨진 네모로 나온다. 세 얼굴을 둔다:

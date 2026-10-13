@@ -5,6 +5,7 @@ import { A4Document, CompactPageHeader } from '@/components/print';
 import ExamPrintHeader from '@/components/exam/ExamPrintHeader';
 import { buildAnswerRows, explanationEntries } from '@/lib/problem-paper/answers';
 import type { PaperCover } from '@/lib/problem-paper/cover';
+import { coverYearOf } from '@/lib/problem-paper/cover-text';
 import type { PaperItemSnapshot, ProblemPaper } from '@/types/problem-bank';
 import { renderCoverSlot } from './PaperCoverPage';
 
@@ -111,6 +112,7 @@ export default function ProblemAnswerKeyView({
   const coverPage = renderCoverSlot({
     cover, paperTitle: paper.title, suffix: ' - 답지',
     imageUrl: coverImageUrl, imageFailed: coverImageFailed, notice: coverNotice,
+    year: coverYearOf(paper.created_at),
   });
 
   return (

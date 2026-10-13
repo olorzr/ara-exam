@@ -1,0 +1,109 @@
+/* B 링 (시안 Rings.dc.html) — 흐린 고리 둘 위에 가운데 글 한 줄기 */
+
+.pb-cover.pbc-rings {
+  background: #ececea;
+  font-family: var(--pbc-serif);
+}
+
+.pbc-rings__ring {
+  position: absolute;
+  width: 620px;
+  height: 620px;
+  border-radius: 50%;
+  border: 110px solid #fbfbfa;
+  box-shadow: 0 0 34px 6px rgba(0, 0, 0, 0.1), inset 0 0 34px 6px rgba(0, 0, 0, 0.1);
+  filter: blur(5px);
+}
+
+.pbc-rings__ring--a { left: 52px; top: 60px; }
+.pbc-rings__ring--b { left: 118px; top: 420px; }
+
+/* 시안의 margin-top 누적 대신 비율로 늘고 주는 빈 칸 — 중철 면(1,082px)에서도 아래가 잘리지 않는다 */
+.pbc-rings__flow {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 50px 80px 80px;
+}
+
+.pbc-rings__gap {
+  flex-shrink: 1;
+  flex-basis: 0px;
+  min-height: 0;
+}
+.pbc-rings__gap--1 { flex-grow: 176; }
+.pbc-rings__gap--2 { flex-grow: 150; }
+.pbc-rings__gap--3 { flex-grow: 128; }
+.pbc-rings__gap--4 { flex-grow: 150; }
+.pbc-rings__gap--5 { flex-grow: 104; }
+
+.pbc-rings__small {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  color: var(--pbc-mute);
+}
+
+.pbc-rings__topics {
+  max-width: 600px;
+}
+
+.pbc-rings__title {
+  max-width: 600px;
+  font-size: calc(52px * var(--pbc-title-scale));
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+.pbc-rings__tagline {
+  font-family: var(--pbc-display);
+  font-style: italic;
+  font-size: 36px;
+  line-height: 1;
+}
+
+.pbc-rings__year {
+  font-size: 34px;
+  line-height: 1.15;
+  letter-spacing: 0.02em;
+}
+
+.pbc-rings__side {
+  position: absolute;
+  top: 548px;
+  font-family: var(--pbc-display);
+  font-size: 24px;
+  letter-spacing: 0.02em;
+}
+
+.pbc-rings__side--left { left: 48px; }
+.pbc-rings__side--right { right: 48px; }
+
+.pbc-rings__foot {
+  position: absolute;
+  left: 48px;
+  right: 48px;
+  bottom: 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 24px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--pbc-mute);
+}
+
+.pbc-rings__fields {
+  display: flex;
+  gap: 24px;
+}
+
+.pbc-rings__brand {
+  text-transform: lowercase;
+}

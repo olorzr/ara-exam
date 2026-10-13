@@ -5,6 +5,7 @@ import { A4Document, CompactPageHeader } from '@/components/print';
 import ExamPrintHeader from '@/components/exam/ExamPrintHeader';
 import { buildPaperBlocks } from '@/lib/problem-paper/blocks';
 import type { PaperCover } from '@/lib/problem-paper/cover';
+import { coverYearOf } from '@/lib/problem-paper/cover-text';
 import { buildOmrAnswerKey, omrSheetCountOf } from '@/lib/problem-paper/omr-payload';
 import type { PaperItemSnapshot, ProblemPaper } from '@/types/problem-bank';
 import { renderCoverSlot } from './PaperCoverPage';
@@ -76,6 +77,7 @@ export default function ProblemPaperView({
   const coverPage = renderCoverSlot({
     cover, paperTitle: paper.title, suffix: showAnswers ? ' - 교사용' : '',
     imageUrl: coverImageUrl, imageFailed: coverImageFailed, notice: coverNotice,
+    year: coverYearOf(paper.created_at),
   });
 
   return (

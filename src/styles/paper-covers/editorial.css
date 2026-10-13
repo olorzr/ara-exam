@@ -1,0 +1,135 @@
+/* A 에디토리얼 (시안 Main.dc.html) — 머리 · 제목 띠 · 글자 깔림 띠 · 정보 표 · 바닥 */
+
+.pb-cover.pbc-editorial {
+  background: #f1f1ee;
+}
+
+.pbc-editorial__head,
+.pbc-editorial__foot {
+  position: relative;
+  flex: none;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 32px;
+  font-family: var(--pbc-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.pbc-editorial__head {
+  height: 64px;
+  padding-top: 26px;
+}
+
+.pbc-editorial__title-band {
+  position: relative;
+  flex: none;
+  height: 330px;
+  padding: 40px 32px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.pbc-editorial__title {
+  font-family: var(--pbc-serif);
+  font-weight: 900;
+  font-size: calc(146px * var(--pbc-title-scale));
+  line-height: 0.92;
+  letter-spacing: -0.05em;
+}
+
+/* 중철 면에서는 이 띠가 줄어든다(시안의 400px 고정 띠) — 그래서 바닥 글이 면 안에 남는다 */
+.pbc-editorial__middle {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pbc-editorial__fill {
+  position: absolute;
+  top: 1px;
+  bottom: 0;
+  left: -30px;
+  right: -30px;
+  display: flex;
+  gap: 26px;
+  overflow: hidden;
+}
+
+.pbc-editorial__fill-col {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 460px;
+  font-family: var(--pbc-serif);
+  font-size: 10px;
+  line-height: 13px;
+  color: #c6c6c2;
+  word-break: break-all;
+  overflow: hidden;
+  transform-origin: top center;
+}
+
+.pbc-editorial__fill-col:nth-child(1) { transform: rotate(-3deg); }
+.pbc-editorial__fill-col:nth-child(2) { transform: rotate(2deg); }
+.pbc-editorial__fill-col:nth-child(3) { transform: rotate(-1deg); }
+.pbc-editorial__fill-col:nth-child(4) { transform: rotate(3deg); }
+.pbc-editorial__fill-col:nth-child(5) { transform: rotate(-2deg); }
+.pbc-editorial__fill-col:nth-child(6) { transform: rotate(1deg); }
+.pbc-editorial__fill-col:nth-child(7) { transform: rotate(-3deg); }
+
+.pbc-editorial__notice {
+  position: relative;
+  width: 180px;
+  text-align: center;
+  font-family: var(--pbc-serif);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+/* 시안은 258px 고정이다 — 단원이 길어 줄이 늘면 표가 자라고 위 깔림 띠(flex: 1)가 그만큼 준다 */
+.pbc-editorial__table {
+  position: relative;
+  flex: none;
+  min-height: 258px;
+  padding: 0 32px;
+  display: flex;
+  flex-direction: column;
+}
+
+.pbc-editorial__row {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  border-top: 1px solid var(--pbc-ink);
+  padding: 12px 0 11px;
+  font-size: 13px;
+}
+
+.pbc-editorial__row:last-child {
+  border-bottom: 1px solid var(--pbc-ink);
+}
+
+.pbc-editorial__row dt {
+  font-family: var(--pbc-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  padding-top: 2px;
+}
+
+.pbc-editorial__row dd {
+  min-height: 18px;
+}
+
+.pbc-editorial__pre {
+  white-space: pre;
+}
+
+.pbc-editorial__foot {
+  height: 71px;
+  align-items: flex-end;
+  padding-bottom: 26px;
+}

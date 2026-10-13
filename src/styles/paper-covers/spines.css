@@ -1,0 +1,201 @@
+/* C 책등 (시안 Spines.dc.html) — 머리 · 정보 줄 · 단원 목록 · 책등 아홉 권 */
+
+.pb-cover.pbc-spines {
+  background: #f3f3f1;
+}
+
+.pbc-spines__head {
+  flex: none;
+  min-height: 70px;
+  padding: 28px 40px 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  font-family: var(--pbc-mono);
+  /* 제목·과정이 아주 길면 머리·정보 줄을 함께 줄인다(cover-fit-spines.ts spinesHeadScale) */
+  font-size: calc(11px * var(--pbc-head-scale, 1));
+  letter-spacing: 0.04em;
+}
+
+.pbc-spines__head > span {
+  flex: none;
+}
+
+.pbc-spines__head-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: center;
+  font: inherit;
+}
+
+.pbc-spines__info {
+  flex: none;
+  margin: 0 40px;
+  border-top: 1px solid var(--pbc-ink);
+  padding-top: 14px;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  font-size: calc(12px * var(--pbc-head-scale, 1));
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.pbc-spines__fields {
+  flex: none;
+  display: flex;
+  gap: 28px;
+}
+
+.pbc-spines__list {
+  flex: none;
+  align-self: flex-end;
+  width: 440px;
+  margin: 60px 40px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pbc-spines__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.pbc-spines__item-name {
+  min-width: 0;
+  font-size: calc(25px * var(--pbc-topic-scale, 1));
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+
+.pbc-spines__item-no {
+  flex: none;
+  font-family: var(--pbc-display);
+  font-size: calc(26px * var(--pbc-topic-scale, 1));
+  color: #b5b5b1;
+}
+
+/* 남은 높이를 이 띠가 먹고 책등은 바닥에 선다 — 중철 면에서는 띠만 줄어든다 */
+.pbc-spines__shelf {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0 40px;
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+}
+
+.pbc-spines__spine {
+  flex: none;
+  max-height: 100%;
+  background: #e4e4e1;
+  border: 1px solid #cfcfcb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  writing-mode: vertical-rl;
+  overflow: hidden;
+  text-align: center;
+}
+
+/* 제목 책등(1·2·6)의 글 칸은 SpinesCover.tsx 의 TITLE_SPINES 와 같은 값이다 */
+.pbc-spines__spine--1 {
+  width: 58px;
+  height: 560px;
+  font-family: var(--pbc-serif);
+  font-size: calc(22px * var(--pbc-spine-scale, 1));
+  line-height: 1.15;
+  letter-spacing: 0.3em;
+}
+
+.pbc-spines__spine--2 {
+  width: 84px;
+  height: 470px;
+  padding-top: 20px;
+  font-family: var(--pbc-serif);
+  font-weight: 900;
+  font-size: calc(60px * var(--pbc-spine-scale, 1));
+  line-height: 1.05;
+  letter-spacing: 0.35em;
+}
+
+.pbc-spines__spine--3 {
+  width: 46px;
+  height: 520px;
+  align-items: flex-start;
+  padding-top: 24px;
+  font-family: var(--pbc-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+
+.pbc-spines__spine--4 {
+  width: 122px;
+  height: 560px;
+  padding: 70px 0;
+  writing-mode: horizontal-tb;
+}
+
+.pbc-spines__spine--5 {
+  width: 64px;
+  height: 420px;
+  font-family: var(--pbc-display);
+  font-style: italic;
+  font-size: 30px;
+  letter-spacing: 0.02em;
+}
+
+.pbc-spines__spine--6 {
+  width: 96px;
+  height: 500px;
+  font-family: var(--pbc-serif);
+  font-weight: 900;
+  font-size: calc(44px * var(--pbc-spine-scale, 1));
+  line-height: 1.05;
+  letter-spacing: 0.1em;
+}
+
+.pbc-spines__spine--7 {
+  width: 42px;
+  height: 460px;
+  align-items: flex-end;
+  padding-bottom: 24px;
+  font-family: var(--pbc-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+
+.pbc-spines__spine--8 {
+  width: 70px;
+  height: 540px;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.25em;
+}
+
+.pbc-spines__spine--9 {
+  width: 88px;
+  height: 480px;
+  align-items: flex-end;
+  padding-bottom: 28px;
+  font-family: var(--pbc-display);
+  font-size: 34px;
+  letter-spacing: 0.04em;
+}
+
+/* 과정 상자 — 가로 글 */
+.pbc-spines__label {
+  display: flex;
+  flex-direction: column;
+  max-width: 100%;
+  border: 1px solid var(--pbc-ink);
+  padding: 20px 14px;
+  font-size: calc(12px * var(--pbc-label-scale, 1));
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+}

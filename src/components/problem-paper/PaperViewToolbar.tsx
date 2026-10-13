@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { ArrowLeft, BookOpen, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import type { PaperCover } from '@/lib/problem-paper/cover';
+import { COVER_LAYOUT_LABELS, type PaperCover } from '@/lib/problem-paper/cover';
 import type { PaperPrintLayout } from '@/lib/problem-paper/print-layout-pref';
 import type { ProblemPaper } from '@/types/problem-bank';
 import PaperGradeSyncButton from './PaperGradeSyncButton';
@@ -40,7 +40,7 @@ interface PaperViewToolbarProps {
 
 function coverLabel(cover: PaperCover | null): string {
   if (!cover) return '표지';
-  return cover.kind === 'image' ? '표지 · 그림' : '표지 · 간단';
+  return cover.kind === 'image' ? '표지 · 그림' : `표지 · ${COVER_LAYOUT_LABELS[cover.layout]}`;
 }
 
 /**

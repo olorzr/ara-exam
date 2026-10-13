@@ -1,17 +1,15 @@
 import { supabase } from '@/lib/supabase';
 import { uploadProblemFile } from '@/lib/problem-bank/storage';
 import { newFigureToken, paperCoverPath } from '@/lib/problem-bank/storage-paths';
-import { normalizePaperCover, toCoverRow, type PaperCover } from './cover';
+import { COVER_COLUMNS, normalizePaperCover, toCoverRow, type PaperCover } from './cover';
 
 /**
- * 문제지 표지 읽기·쓰기 (`exam.problem_paper_covers`, sql/61).
+ * 문제지 표지 읽기·쓰기 (`exam.problem_paper_covers`, sql/61 · 디자인 칸은 sql/70).
  *
  * 행이 없으면 '표지 없음' 이다. 저장은 `paper_id` 로 upsert 한다 — 같은 표지를 두 선생님이
  * 동시에 고치는 일은 드물고, 겹치면 나중 저장이 이긴다(표지는 시험 내용이 아니라 인쇄 꾸밈이라
  * 낙관적 동시성까지 두지 않았다).
  */
-
-const COVER_COLUMNS = 'paper_id, kind, title, subtitle, show_name_box, image_path';
 
 /**
  * 문제지 표지를 읽는다.

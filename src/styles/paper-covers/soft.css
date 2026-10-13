@@ -1,0 +1,163 @@
+/* D 블러 (시안 Soft.dc.html) — 흐린 먹 번짐과 점선 원 위의 흰 굵은 제목 */
+
+.pb-cover.pbc-soft {
+  background: #e9e9e6;
+}
+
+.pbc-soft__wash {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: linear-gradient(180deg, #f0f0ed 0%, #e2e2df 55%, #cfcfcb 100%);
+}
+
+.pbc-soft__paper {
+  position: absolute;
+  left: 470px;
+  top: 150px;
+  width: 330px;
+  height: 300px;
+  overflow: hidden;
+  background: #e0e0dd;
+  padding: 18px 20px;
+  font-family: var(--pbc-serif);
+  font-size: 10px;
+  line-height: 14px;
+  color: #b3b3af;
+  word-break: break-all;
+}
+
+.pbc-soft__blur {
+  position: absolute;
+  border-radius: 50%;
+}
+
+.pbc-soft__blur--dark {
+  left: 300px;
+  top: 430px;
+  width: 560px;
+  height: 290px;
+  background: #3a3a39;
+  filter: blur(42px);
+}
+
+.pbc-soft__blur--mid {
+  left: -120px;
+  top: 520px;
+  width: 420px;
+  height: 360px;
+  background: #5a5a58;
+  filter: blur(50px);
+}
+
+.pbc-soft__dot {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px dotted #8d8d89;
+}
+
+.pbc-soft__dot--a { left: 40px; top: 300px; width: 330px; height: 330px; }
+.pbc-soft__dot--b { left: 430px; top: 690px; width: 300px; height: 300px; }
+.pbc-soft__dot--c { left: 560px; top: 40px; width: 220px; height: 220px; }
+
+.pbc-soft__mark {
+  position: absolute;
+  left: 36px;
+  top: 30px;
+  font-family: var(--pbc-display);
+  font-style: italic;
+  font-size: 150px;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: #fbfbfa;
+  text-shadow: 0 0 22px rgba(0, 0, 0, 0.22);
+}
+
+.pbc-soft__kicker {
+  position: absolute;
+  left: 44px;
+  top: 190px;
+  font-family: var(--pbc-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--pbc-mute);
+}
+
+/* 제목 · 단원 · 태그라인이 한 흐름이다 — 시안처럼 태그라인을 top 에 박으면 긴 제목과 겹친다 */
+.pbc-soft__body {
+  position: absolute;
+  left: 40px;
+  right: 40px;
+  top: 470px;
+}
+
+.pbc-soft__title,
+.pbc-soft__topic {
+  font-weight: 700;
+  line-height: 0.98;
+  letter-spacing: -0.04em;
+  color: #fbfbfa;
+  text-shadow: 0 0 18px rgba(0, 0, 0, 0.35);
+}
+
+.pbc-soft__title {
+  font-size: calc(84px * var(--pbc-title-scale));
+}
+
+.pbc-soft__topic {
+  font-size: calc(84px * var(--pbc-topic-scale, 0.8));
+}
+
+.pbc-soft__tagline {
+  padding-top: 30px;
+  padding-left: 4px;
+  font-family: var(--pbc-display);
+  font-style: italic;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.pbc-soft__foot {
+  position: absolute;
+  left: 40px;
+  right: 40px;
+  bottom: 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 24px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #1e1e1d;
+}
+
+.pbc-soft__note {
+  width: 320px;
+}
+
+.pbc-soft__fields {
+  flex: none;
+  width: 230px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pbc-soft__field {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.pbc-soft__field > span:first-child {
+  font-family: var(--pbc-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.pbc-soft__field-line {
+  flex: 1 1 0;
+  border-bottom: 1px solid var(--pbc-ink);
+}

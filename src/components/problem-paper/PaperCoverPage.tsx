@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 import { coverTitleFor, type CoverTitleSuffix, type PaperCover } from '@/lib/problem-paper/cover';
+import { toCoverLayoutProps } from '@/lib/problem-paper/cover-text';
+import { COVER_LAYOUT_COMPONENTS } from './covers';
 
 interface PaperCoverPageProps {
   cover: PaperCover;
@@ -9,6 +11,8 @@ interface PaperCoverPageProps {
   imageUrl?: string;
   /** 그림을 끝내 못 받았는가 — 깨진 그림 대신 **인쇄물에도 보이는** 안내를 그린다 */
   imageFailed?: boolean;
+  /** 문제지를 만든 해('2026') — 디자인 표지가 찍는다. 모르면 비운다 */
+  year?: string;
 }
 
 /** 표지 그림을 못 받았을 때 표지 자리에 찍는 말 */
@@ -30,16 +34,15 @@ export function PaperCoverNotice({ message }: { message: string }) {
   );
 }
 
-/** 이름 칸 — 학생이 손으로 적는다 */
-const NAME_FIELDS = ['학교', '학년 · 반', '이름'] as const;
-
 /**
  * 표지 내용. `A4CoverSheet` 안에 들어간다.
  *
- * 간단 표지는 학원 이름 · 큰 제목 · 부제 · 이름 칸이고, 그림 표지는 올린 그림을 종이에 맞춰
- * 비율을 지킨 채 담는다(잘리지 않는다 — 선생님이 만든 표지의 글자가 잘리면 안 된다).
+ * 간단 표지는 고른 디자인(`cover.layout` → `COVER_LAYOUT_COMPONENTS`)으로 그리고, 그림 표지는 올린 그림을
+ * 종이에 맞춰 비율을 지킨 채 담는다(잘리지 않는다 — 선생님이 만든 표지의 글자가 잘리면 안 된다).
  */
-export default function PaperCoverPage({ cover, title, imageUrl, imageFailed = false }: PaperCoverPageProps) {
+export default function PaperCoverPage({
+  cover, title, imageUrl, imageFailed = false, year = '',
+}: PaperCoverPageProps) {
   if (cover.kind === 'image' && imageFailed) {
     return <PaperCoverNotice message={COVER_IMAGE_FAILED_NOTICE} />;
   }
@@ -56,31 +59,11 @@ export default function PaperCoverPage({ cover, title, imageUrl, imageFailed = f
     );
   }
 
+  const Layout = COVER_LAYOUT_COMPONENTS[cover.layout];
   return (
-    <div className="pb-cover pb-cover--simple">
-      <div className="pb-cover__brand">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.png" alt="" width={24} height={24} />
-        <span>아라국어논술</span>
-      </div>
-
-      <div className="pb-cover__main">
-        <span className="pb-cover__accent" aria-hidden="true" />
-        <h1 className="pb-cover__title">{title}</h1>
-        {cover.subtitle && <p className="pb-cover__subtitle">{cover.subtitle}</p>}
-      </div>
-
-      {cover.showNameBox && (
-        <dl className="pb-cover__names">
-          {NAME_FIELDS.map((field) => (
-            <div key={field} className="pb-cover__name-row">
-              <dt>{field}</dt>
-              <dd />
-            </div>
-          ))}
-        </dl>
-      )}
-    </div>
+    <Layout
+      {...toCoverLayoutProps({ title, subtitle: cover.subtitle, showNameBox: cover.showNameBox, year })}
+    />
   );
 }
 
@@ -94,6 +77,8 @@ export interface CoverSlotInput {
   imageFailed?: boolean;
   /** 표지를 읽지 못했을 때의 안내 — 있으면 표지 대신 이것을 찍는다 */
   notice?: string;
+  /** 문제지를 만든 해(`coverYearOf(paper.created_at)`) */
+  year?: string;
 }
 
 /**
@@ -110,6 +95,7 @@ export function renderCoverSlot(input: CoverSlotInput): ReactNode | undefined {
       title={coverTitleFor(input.cover, input.paperTitle, input.suffix)}
       imageUrl={input.imageUrl}
       imageFailed={input.imageFailed}
+      year={input.year}
     />
   );
 }

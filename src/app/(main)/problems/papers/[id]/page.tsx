@@ -15,21 +15,24 @@ import { PaperPrintLayoutNotice } from '@/components/problem-paper/PaperPrintLay
 import PaperViewToolbar, { type PaperViewMode } from '@/components/problem-paper/PaperViewToolbar';
 import { supabase } from '@/lib/supabase';
 import { useImagesReady } from '@/hooks/useImagesReady';
+import { useCoverFontsReady } from '@/hooks/useCoverFontsReady';
 import { usePaperCover } from '@/hooks/usePaperCover';
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls';
 import {
   imagePathsOf, renumberedImageItems, renumberedPrintConfirmMessage,
 } from '@/lib/problem-paper/blocks';
+import { coverYearOf } from '@/lib/problem-paper/cover-text';
+import { paperPrintLabel } from '@/lib/problem-paper/print-label';
 import { trimmableGroupCount } from '@/lib/problem-paper/trim-works';
 import { usePaperPrintPrefs } from '@/hooks/usePaperPrintPrefs';
 import { normalizePaperSettings } from '@/lib/problem-paper/settings';
 import type { PaperItemSnapshot, ProblemPaper } from '@/types/problem-bank';
 
-/** 번호 어긋남 안내를 확인하기 전에는 중철로 그리지 않는다(아래 `bookletBlocked`) */
 /** 표지를 못 읽은 채 Cmd/Ctrl+P 로 뽑으면 표지 자리에 찍히는 말 */
 const COVER_FETCH_FAILED_NOTICE =
   '표지를 불러오지 못했어요. 화면 위쪽에서 \'다시 시도\' 를 누르거나 \'표지 없이 인쇄\' 를 고른 뒤 다시 인쇄해 주세요.';
 
+/** 번호 어긋남 안내를 확인하기 전에는 중철로 그리지 않는다(아래 `bookletBlocked`) */
 const BOOKLET_BLOCKED_REASON =
   '이미지 문항의 번호 어긋남 안내를 확인하면 중철 제본으로 바뀌어요. 그전에는 낱장으로 보여 줘요.';
 
@@ -133,13 +136,15 @@ export default function ProblemPaperViewPage() {
     setRenumberAcked(true);
   };
 
-  const printLabel = (() => {
-    if (coverState.loading) return '표지 준비 중…';
-    if (coverUnknown || coverBroken) return '표지 확인 필요';
-    if (coverPath && (coverImages.loading || coverReady.loading)) return '표지 준비 중…';
-    if (printsProblems && (images.loading || ready.loading)) return '이미지 준비 중…';
-    return booklet ? '인쇄 (A3 중철)' : '인쇄';
-  })();
+  // 디자인 표지는 글꼴 조각을 받기 전에 인쇄하면 표지만 대체 글꼴로 찍힌다 — 그동안 단추를 잠근다(fail-open)
+  const coverYear = coverYearOf(paper?.created_at);
+  const fontsReady = useCoverFontsReady(cover, paper?.title ?? '', coverYear);
+
+  const coverImagePending = Boolean(coverPath) && (coverImages.loading || coverReady.loading);
+  const printLabel = paperPrintLabel({
+    coverLoading: coverState.loading, coverNeedsCheck: coverUnknown || coverBroken, coverImagePending,
+    imagesPending: printsProblems && (images.loading || ready.loading), fontsPending: !fontsReady, booklet,
+  });
 
   useEffect(() => {
     let alive = true;
@@ -169,7 +174,6 @@ export default function ProblemPaperViewPage() {
   // ⚠️ 표지(그림 표지는 그림까지)를 다 받을 때까지 문서를 그리지 않는다 — 단추만 잠그면 그 짧은
   //    틈에 Cmd/Ctrl+P 로 뽑은 인쇄물에서 표지가 빠지거나 '불러오는 중' 이 표지로 나가고, 중철 면
   //    배정까지 한 쪽씩 밀린다(코덱스 2R·3R). 못 받았으면(깨짐) 인쇄되는 안내로 그린다
-  const coverImagePending = Boolean(coverPath) && (coverImages.loading || coverReady.loading);
   if (!loaded || coverState.loading || coverImagePending) {
     return (
       <div className="flex justify-center py-16">
@@ -203,7 +207,7 @@ export default function ProblemPaperViewPage() {
         cover={cover}
         onCoverClick={() => setCoverOpen(true)}
         printLabel={printLabel}
-        printDisabled={(printsProblems && imagesBlocked) || coverBlocked}
+        printDisabled={(printsProblems && imagesBlocked) || coverBlocked || !fontsReady}
         onPrint={handlePrint}
         trimWorks={trimmable ? { checked: trimWorks, onChange: changeTrimWorks } : undefined}
       />
@@ -284,6 +288,7 @@ export default function ProblemPaperViewPage() {
         paperTitle={paper.title}
         cover={cover}
         coverImageUrl={coverImageUrl}
+        year={coverYear}
         busy={coverState.saving}
         onClose={() => setCoverOpen(false)}
         onSave={coverState.save}

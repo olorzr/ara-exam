@@ -1,12 +1,15 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
-  COVER_SUBTITLE_MAX, COVER_TITLE_MAX, DEFAULT_SIMPLE_COVER, type PaperCover,
+  COVER_SUBTITLE_MAX, COVER_TITLE_MAX, DEFAULT_COVER_LAYOUT, DEFAULT_SIMPLE_COVER,
+  type PaperCover, type PaperCoverLayout,
 } from '@/lib/problem-paper/cover';
+import CoverLayoutPicker from './CoverLayoutPicker';
 
 type CoverChoice = 'none' | 'simple' | 'image';
 
@@ -18,6 +21,8 @@ interface PaperCoverDialogProps {
   cover: PaperCover | null;
   /** 지금 그림 표지의 서명 URL — 그림을 새로 고르지 않을 때 미리보기로 쓴다 */
   coverImageUrl?: string;
+  /** 문제지를 만든 해 — 디자인 미리보기에 찍는다 */
+  year?: string;
   busy: boolean;
   onClose: () => void;
   /** 저장 — 그림을 새로 골랐으면 `file` 이 온다. 저장했으면 true */
@@ -26,6 +31,9 @@ interface PaperCoverDialogProps {
   onRemove: () => Promise<boolean>;
 }
 
+/** 부제 자리글 — 줄마다 뜻이 있다(디자인 표지는 첫 줄을 과정, 둘째 줄부터를 단원 목록으로 싣는다) */
+const SUBTITLE_PLACEHOLDER = '고등 1학년 · 국어 · 2학기\n화자와 정서\n이미지와 감각';
+
 const CHOICES: { value: CoverChoice; label: string }[] = [
   { value: 'none', label: '표지 없음' },
   { value: 'simple', label: '간단 표지 만들기' },
@@ -33,7 +41,7 @@ const CHOICES: { value: CoverChoice; label: string }[] = [
 ];
 
 /**
- * 표지 고르기 창 — 없음 / 간단 표지 / 그림 올리기.
+ * 표지 고르기 창 — 없음 / 간단 표지(디자인 여섯 가지) / 그림 올리기.
  *
  * 입력 상태는 안쪽 폼이 들고 있다 — 창을 닫으면 내용이 언마운트되어 다음에 열 때 지금 표지에서
  * 새로 시작한다(효과로 되돌리면 `set-state-in-effect` 에 걸린다).
@@ -42,7 +50,7 @@ export default function PaperCoverDialog(props: PaperCoverDialogProps) {
   const { open, busy, onClose } = props;
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next && !busy) onClose(); }}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogTitle className="text-base">표지</DialogTitle>
         <CoverForm {...props} />
       </DialogContent>
@@ -51,13 +59,15 @@ export default function PaperCoverDialog(props: PaperCoverDialogProps) {
 }
 
 function CoverForm({
-  paperTitle, cover, coverImageUrl, busy, onClose, onSave, onRemove,
+  paperTitle, cover, coverImageUrl, year = '', busy, onClose, onSave, onRemove,
 }: PaperCoverDialogProps) {
   const start = cover ?? DEFAULT_SIMPLE_COVER;
   const [choice, setChoice] = useState<CoverChoice>(cover ? cover.kind : 'simple');
   const [title, setTitle] = useState(start.title);
   const [subtitle, setSubtitle] = useState(start.subtitle);
   const [showNameBox, setShowNameBox] = useState(start.showNameBox);
+  const [layout, setLayout] = useState<PaperCoverLayout>(start.layout);
+  const nameHintId = useId();
   const [file, setFile] = useState<File | null>(null);
 
   // 고른 파일 미리보기 — 주소는 쓰고 나면 돌려준다
@@ -79,6 +89,8 @@ function CoverForm({
     }
     const next: PaperCover = {
       kind: choice,
+      // 그림 표지에는 디자인이 없다(toCoverRow 도 같은 규칙으로 basic 을 저장한다)
+      layout: choice === 'simple' ? layout : DEFAULT_COVER_LAYOUT,
       title,
       subtitle,
       showNameBox,
@@ -116,18 +128,30 @@ function CoverForm({
             </label>
             <label className="block space-y-1 text-sm">
               <span className="text-gray-600">부제 (선택)</span>
-              <Input
-                value={subtitle} maxLength={COVER_SUBTITLE_MAX} placeholder="예: 2학기 중간고사 대비 3회"
+              <Textarea
+                value={subtitle} rows={3} maxLength={COVER_SUBTITLE_MAX} placeholder={SUBTITLE_PLACEHOLDER}
                 onChange={(e) => setSubtitle(e.target.value)} disabled={busy}
               />
+              <span className="block text-xs text-gray-400">
+                첫 줄은 과정, 둘째 줄부터는 단원이에요(여섯 줄까지 — 넘치면 마지막 단원에 이어 붙여요).
+              </span>
             </label>
-            <label className="flex items-center gap-2 text-sm text-gray-800">
-              <input
-                type="checkbox" checked={showNameBox} disabled={busy}
-                onChange={(e) => setShowNameBox(e.target.checked)}
-              />
-              학교 · 학년 반 · 이름 칸 넣기
-            </label>
+            <CoverLayoutPicker
+              value={layout} onChange={setLayout} disabled={busy}
+              preview={{ title: title.trim() || paperTitle, subtitle, showNameBox, year }}
+            />
+            <div>
+              <label className="flex items-center gap-2 text-sm text-gray-800">
+                <input
+                  type="checkbox" checked={showNameBox} disabled={busy} aria-describedby={nameHintId}
+                  onChange={(e) => setShowNameBox(e.target.checked)}
+                />
+                이름 칸 넣기
+              </label>
+              <p id={nameHintId} className="ml-6 text-xs text-gray-400">
+                간단: 학교 · 학년 반 · 이름 / 디자인: 이름 · 날짜
+              </p>
+            </div>
           </div>
         )}
 

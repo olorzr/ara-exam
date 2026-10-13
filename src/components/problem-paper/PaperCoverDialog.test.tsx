@@ -28,13 +28,37 @@ describe('PaperCoverDialog', () => {
   it('간단 표지 저장 — 적은 값으로 onSave, 저장하면 닫는다', async () => {
     const props = renderDialog(null);
     fireEvent.change(screen.getByPlaceholderText('상현중 기출'), { target: { value: '여름 특강' } });
-    fireEvent.click(screen.getByLabelText('학교 · 학년 반 · 이름 칸 넣기'));
+    fireEvent.click(screen.getByLabelText('이름 칸 넣기'));
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
     await waitFor(() => expect(props.onClose).toHaveBeenCalled());
     expect(props.onSave).toHaveBeenCalledWith(
-      { kind: 'simple', title: '여름 특강', subtitle: '', showNameBox: false, imagePath: '' },
+      { kind: 'simple', layout: 'basic', title: '여름 특강', subtitle: '', showNameBox: false, imagePath: '' },
       null,
     );
+  });
+
+  it('디자인을 고르고 여러 줄 부제를 적으면 줄바꿈째 저장한다', async () => {
+    const props = renderDialog(null);
+    fireEvent.change(screen.getByLabelText(/부제/), { target: { value: '고등 1학년\n화자와 정서' } });
+    fireEvent.click(screen.getByLabelText('책등'));
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() => expect(props.onSave).toHaveBeenCalled());
+    expect(vi.mocked(props.onSave).mock.calls[0][0]).toMatchObject({
+      kind: 'simple', layout: 'spines', subtitle: '고등 1학년\n화자와 정서',
+    });
+  });
+
+  it('지금 디자인으로 시작하고, 그림 표지로 바꾸면 디자인 없이 저장한다', async () => {
+    const props = renderDialog({ ...DEFAULT_SIMPLE_COVER, layout: 'soft' });
+    expect((screen.getByLabelText('블러') as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(screen.getByLabelText('만든 표지 그림 올리기'));
+    expect(screen.queryByLabelText('블러')).toBeNull();
+    fireEvent.change(screen.getByLabelText(/A4 세로 비율/), {
+      target: { files: [new File(['x'], 'cover.png', { type: 'image/png' })] },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() => expect(props.onSave).toHaveBeenCalled());
+    expect(vi.mocked(props.onSave).mock.calls[0][0]).toMatchObject({ kind: 'image', layout: 'basic' });
   });
 
   it('표지 없음으로 저장하면 지금 표지를 뺀다', async () => {

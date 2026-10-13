@@ -643,6 +643,13 @@
 - 코드에서의 사용: `PaperCover`, `normalizePaperCover`, `coverTitleFor`, `usePaperCover`, `PaperCoverPage`, `A4CoverSheet`
 - 관련 파일: src/lib/problem-paper/cover.ts, src/lib/problem-paper/cover-queries.ts, src/components/problem-paper/PaperCoverDialog.tsx, sql/61_problem_paper_covers.sql
 
+## 표지 디자인 (PaperCoverLayout)
+- 정의: 간단 표지의 모양. `basic`(간단 — 예전부터 있던 모양)과 클로드 디자인 시안을 옮긴 다섯 가지
+  `editorial`(에디토리얼) · `rings`(링) · `spines`(책등) · `soft`(블러) · `sketch`(스케치). 그림 표지에는 디자인이 없다
+- 디자인 표지는 기존 칸만으로 채운다 — **부제 첫 줄이 과정, 둘째 줄부터가 단원**(`splitSubtitle`), 연도는 문제지를 만든 해(`coverYearOf`)
+- 코드에서의 사용: `PaperCoverLayout`, `COVER_LAYOUTS`, `COVER_LAYOUT_LABELS`, `COVER_LAYOUT_COMPONENTS`, `CoverLayoutProps`, `titleScale`, `useCoverFontsReady`
+- 관련 파일: src/lib/problem-paper/{cover,cover-text,cover-scale,cover-copy,cover-fonts}.ts, src/components/problem-paper/covers/, src/components/problem-paper/CoverLayoutPicker.tsx, src/styles/paper-covers/, sql/70_problem_paper_cover_layout.sql
+
 ## 선택지 (SelectOption)
 - 정의: 고르는 칸의 **값과 보여 줄 이름 한 쌍**(`{ value: '__all__', label: '유형 전체' }`)
 - ⚠️ base-ui 의 `Select.Value` 는 `Select.Root` 에 `items`(값→이름 지도)가 없으면 고른 **값을
