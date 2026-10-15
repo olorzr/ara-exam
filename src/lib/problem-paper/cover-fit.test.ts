@@ -193,6 +193,9 @@ describe('자리 수치가 CSS 와 같다', () => {
     expect(css('paper-cover.css')).toContain('padding: 72px 76px 60px');
     expect(css('paper-covers/editorial.css')).toMatch(/height: 330px;\s+padding: 40px 32px 0;/);
     expect(css('paper-covers/soft.css')).toMatch(/left: 40px;\s+right: 40px;\s+top: 470px;/);
+    // 블러 태그라인 높이(위 여백 64px)는 SOFT_TAGLINE_H 와 같고, 제목 뒤 번짐 모서리는 고정 px 다(% 면 긴 제목에서 커진다)
+    expect(css('paper-covers/soft.css')).toMatch(/\.pbc-soft__tagline \{\s+padding-top: 64px;/);
+    expect(css('paper-covers/soft.css')).toMatch(/\.pbc-soft__headline::before \{[^}]*border-radius: \d+px;/);
     expect(css('paper-covers/sketch.css')).toContain('max-width: 190px');
     expect(css('paper-covers/sketch.css')).toMatch(/top: 210px;/);
   });

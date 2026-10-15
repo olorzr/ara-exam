@@ -1,7 +1,7 @@
 /* A 에디토리얼 (시안 Main.dc.html) — 머리 · 제목 띠 · 글자 깔림 띠 · 정보 표 · 바닥 */
 
 .pb-cover.pbc-editorial {
-  background: #f1f1ee;
+  background: #ffffff;
 }
 
 .pbc-editorial__head,
@@ -68,7 +68,7 @@
   font-family: var(--pbc-serif);
   font-size: 10px;
   line-height: 13px;
-  color: #c6c6c2;
+  color: #c6c6c6;
   word-break: break-all;
   overflow: hidden;
   transform-origin: top center;

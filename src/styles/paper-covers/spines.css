@@ -1,7 +1,7 @@
 /* C 책등 (시안 Spines.dc.html) — 머리 · 정보 줄 · 단원 목록 · 책등 아홉 권 */
 
 .pb-cover.pbc-spines {
-  background: #f3f3f1;
+  background: #ffffff;
 }
 
 .pbc-spines__head {
@@ -76,7 +76,7 @@
   flex: none;
   font-family: var(--pbc-display);
   font-size: calc(26px * var(--pbc-topic-scale, 1));
-  color: #b5b5b1;
+  color: #b5b5b5;
 }
 
 /* 남은 높이를 이 띠가 먹고 책등은 바닥에 선다 — 중철 면에서는 띠만 줄어든다 */
@@ -92,8 +92,8 @@
 .pbc-spines__spine {
   flex: none;
   max-height: 100%;
-  background: #e4e4e1;
-  border: 1px solid #cfcfcb;
+  background: #e5e5e5;
+  border: 1px solid #cfcfcf;
   display: flex;
   align-items: center;
   justify-content: center;

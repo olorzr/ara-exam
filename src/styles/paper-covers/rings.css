@@ -1,7 +1,7 @@
 /* B 링 (시안 Rings.dc.html) — 흐린 고리 둘 위에 가운데 글 한 줄기 */
 
 .pb-cover.pbc-rings {
-  background: #ececea;
+  background: #ffffff;
   font-family: var(--pbc-serif);
 }
 
@@ -10,7 +10,8 @@
   width: 620px;
   height: 620px;
   border-radius: 50%;
-  border: 110px solid #fbfbfa;
+  /* 흰 배경에서도 고리가 보이게 아주 옅은 무채 회색(시안은 회색 배경 위의 흰 고리였다) */
+  border: 110px solid #f1f1f1;
   box-shadow: 0 0 34px 6px rgba(0, 0, 0, 0.1), inset 0 0 34px 6px rgba(0, 0, 0, 0.1);
   filter: blur(5px);
 }

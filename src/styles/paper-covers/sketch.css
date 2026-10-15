@@ -1,7 +1,7 @@
 /* E 스케치 (시안 Sketch.dc.html) — 윤곽선 영문 · 손그림 · 단원 네 칸 */
 
 .pb-cover.pbc-sketch {
-  background: #f6f6f3;
+  background: #ffffff;
 }
 
 /* 시안의 height: 1087px 테두리는 중철 면(1,082px)을 넘는다 — 네 변 기준으로 면을 따라간다 */
@@ -11,7 +11,7 @@
   right: 18px;
   bottom: 18px;
   left: 18px;
-  border: 1px solid #9a9a95;
+  border: 1px solid #9a9a9a;
 }
 
 .pbc-sketch__word,

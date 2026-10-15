@@ -23,8 +23,8 @@ export const SOFT_BODY_TOPICS = 2;
 /** 단원 줄의 배율 상한 — 짧은 제목이어도 단원 줄은 제목보다 한 단계 작다 */
 const SOFT_TOPIC_MAX_SCALE = 0.8;
 const SOFT_BODY_TOP = 470;
-/** 태그라인(위 여백 30px + 24px) */
-const SOFT_TAGLINE_H = 54;
+/** 태그라인(위 여백 64px + 24px) — 제목 뒤 번짐이 걷힌 자리에 둔다(soft.css) */
+const SOFT_TAGLINE_H = 64 + 24;
 const SOFT_FOOT_BOTTOM = 40;
 /** 바닥 글 한 줄(11px × 1.6) · 폭 */
 const SOFT_NOTE_LINE_H = 11 * 1.6;

@@ -160,7 +160,7 @@ describe('디자인 표지 — 인쇄 CSS', () => {
     expect(getComputedStyle(spines).marginTop).toBe('60px');
     expect(getComputedStyle(spines).marginRight).toBe('40px');
     const soft = renderLayout('soft').querySelector<HTMLElement>('.pbc-soft__tagline')!;
-    expect(getComputedStyle(soft).paddingTop).toBe('30px');
+    expect(getComputedStyle(soft).paddingTop).toBe('64px');
   });
 
   it('문제지 범위(.pb-sheet) 안에서도 p 여백·글자 크기·줄 높이가 새어 들지 않는다(코덱스 3R)', () => {
@@ -172,7 +172,7 @@ describe('디자인 표지 — 인쇄 CSS', () => {
     const tagline = container.querySelector<HTMLElement>('.pbc-soft__tagline')!;
     expect(getComputedStyle(tagline).marginTop).toBe('0px');
     expect(getComputedStyle(tagline).marginBottom).toBe('0px');
-    expect(getComputedStyle(tagline).paddingTop).toBe('30px');
+    expect(getComputedStyle(tagline).paddingTop).toBe('64px');
   });
 
   it('링의 글 줄기는 비율 빈 칸으로 늘고 준다(시안의 margin 누적 아님)', () => {
@@ -181,6 +181,27 @@ describe('디자인 표지 — 인쇄 CSS', () => {
     const gap = getComputedStyle(root.querySelector('.pbc-rings__gap--1')!);
     expect(gap.flexGrow).toBe('176');
     expect(gap.flexBasis).toBe('0px');
+  });
+
+  it('배경은 흰색이고 누런 기 있는 회색이 없다 — 색은 모두 무채색(사용자 결정 2026-10-14 \'누런 건 싫어\')', () => {
+    for (const layout of DESIGNS) {
+      const root = renderLayout(layout).firstElementChild as HTMLElement;
+      expect(getComputedStyle(root).backgroundColor, layout).toBe('rgb(255, 255, 255)');
+    }
+    // 3·4·6·8자리 HEX 와 rgb()/rgba() 를 모두 R·G·B 로 펴서 견준다(코덱스 — 6자리만 보면 #ffe 가 빠진다)
+    const channels = (hex: string): string[] => {
+      const h = hex.length <= 4 ? [...hex].map((c) => c + c).join('') : hex;
+      return [h.slice(0, 2), h.slice(2, 4), h.slice(4, 6)].map((c) => String(parseInt(c, 16)));
+    };
+    for (const f of files) {
+      const css = readFileSync(join(dir, f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+      const colors = [
+        ...[...css.matchAll(/#([0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})\b/g)].map(([m, hex]) => [m, channels(hex)] as const),
+        ...[...css.matchAll(/rgba?\(([^)]*)\)/g)].map(([m, args]) => [m, args.split(/[\s,/]+/).filter(Boolean).slice(0, 3)] as const),
+      ];
+      expect(colors.length, f).toBeGreaterThan(0);
+      for (const [m, [r, g, b]] of colors) expect(r === g && g === b, `${f} ${m}`).toBe(true);
+    }
   });
 
   it('어느 디자인 CSS 도 면 바닥 근처를 top 으로 잡거나 면을 넘는 높이를 쓰지 않는다', () => {

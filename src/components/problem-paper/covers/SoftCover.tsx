@@ -25,7 +25,6 @@ export default function SoftCover(props: CoverLayoutProps) {
       className="pb-cover pb-cover--layout pbc-soft"
       style={cssVars({ '--pbc-title-scale': scales.title, '--pbc-topic-scale': scales.topic })}
     >
-      <div className="pbc-soft__wash" aria-hidden="true" />
       <div className="pbc-soft__paper" aria-hidden="true">{fill}</div>
       <div className="pbc-soft__blur pbc-soft__blur--dark" aria-hidden="true" />
       <div className="pbc-soft__blur pbc-soft__blur--mid" aria-hidden="true" />
@@ -39,10 +38,13 @@ export default function SoftCover(props: CoverLayoutProps) {
       </p>
 
       <div className="pbc-soft__body">
-        <h1 className="pbc-soft__title">{title}</h1>
-        {bodyTopics.map((topic, i) => (
-          <p key={`${i}-${topic}`} className="pbc-soft__topic">{topic}</p>
-        ))}
+        {/* 흰 글자 뒤에 글을 따라다니는 연기 한 겹(soft.css ::before) — 흰 배경 위에서도 흰 글자가 늘 짙은 바탕 위에 있다 */}
+        <div className="pbc-soft__headline">
+          <h1 className="pbc-soft__title">{title}</h1>
+          {bodyTopics.map((topic, i) => (
+            <p key={`${i}-${topic}`} className="pbc-soft__topic">{topic}</p>
+          ))}
+        </div>
         <p className="pbc-soft__tagline">{COVER_COPY.softTagline}</p>
       </div>
 
