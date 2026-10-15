@@ -15,8 +15,8 @@ import { useDebouncedValue } from './useDebouncedValue';
 
 /**
  * 검색어를 치는 동안 목록 조회를 미루는 시간.
- * 검색은 문항 29,000행을 훑는 조회라(sql/66 — RLS 때문에 인덱스를 못 쓴다) 글자마다 보내면
- * 앞 조회가 끝나기 전에 다음 조회가 쌓인다.
+ * 검색은 문항 3만 행을 훑는 조회라(sql/66 — RLS 때문에 인덱스를 못 쓴다. 작품·문법 축만 sql/72 함수에서
+ * GIN 을 탄다) 글자마다 보내면 앞 조회가 끝나기 전에 다음 조회가 쌓인다.
  */
 export const ARCHIVE_SEARCH_DEBOUNCE_MS = 300;
 
@@ -45,7 +45,7 @@ export function useProblemArchive(initial: ProblemFilters = EMPTY_FILTERS) {
   const [grammarFacets, setGrammarFacets] = useState<GrammarFacet[]>([]);
   const [workFacets, setWorkFacets] = useState<WorkFacet[]>([]);
 
-  // 다섯 패싯은 RPC 한 번(sql/66)을 나눠 쓴다 — 캐시(facets-cache.ts)가 한 요청만 보낸다.
+  // 다섯 패싯은 RPC 한 번(sql/66 → 서버 캐시 sql/71)을 나눠 쓴다 — 캐시(facets-cache.ts)가 한 요청만 보낸다.
   // `reload()`(선택 삭제·일괄 태깅 뒤)에도 다시 읽는다: 그 쓰기가 캐시를 이미 무효화해 두었다.
   // ⚠️ 늦게 끝난 옛 응답이 새 응답을 덮지 않게, 정리된 효과의 결과는 버린다.
   useEffect(() => {

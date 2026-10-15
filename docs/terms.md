@@ -381,6 +381,16 @@
 - DB 트리거가 채운다 — 앱에서 보내지 말 것(`aa_passage_area_problems`, 지문 쪽 `passages_sync_area`). 어느 영역이 '문법 전용' 인가는 SQL 이 아니라 TS(`solo-filter.ts`)가 정한다
 - 관련 파일: sql/67_problem_bank_passage_area.sql, src/lib/problem-bank/passage-shape.ts(검수 화면이 지문 대영역을 바꾸면 딸린 문항을 다시 읽는다)
 
+## 패싯 서버 캐시 (archive facets cache)
+- 정의: 아카이브 트리·선택지 재료(`archive_facets()` 결과)를 서버가 한 행에 들고 있다가, 패싯이 읽는 칸(문항 영역·단원·문법·작품, 지문 작품·영역, 출처 칸)을 바꾼 트랜잭션이 생겼을 때만 다시 세는 것. 탭 안 캐시(`facets-cache.ts`, 5분)와 겹으로 돈다
+- 코드에서의 사용: `exam.archive_facets_cache`(한 행 — payload·built_snapshot) · `exam.archive_facets_dirty`(쓴 트랜잭션 xid) · `exam.archive_facets_refresh(p_force)` · 트리거 `archive_facets_dirty_*`(넣기·지우기는 문장 단위, 고치기는 `_upd` 행 단위 — 패싯 칸의 최종 값이 달라진 행만)
+- 관련 파일: sql/71_problem_bank_archive_facets_cache.sql, src/lib/problem-bank/facets.ts
+
+## 작품·문법 축 함수 출발 (archive list RPC)
+- 정의: 아카이브 목록에서 작품이나 문법을 고르면 문항 표가 아니라 GIN 인덱스를 타는 함수에서 출발하고, 나머지 조건은 같은 체인이 그 결과에 거는 것. 영역·단원·검색만 걸리면 예전처럼 표에서 출발한다
+- 코드에서의 사용: `splitArchiveRpc`·`ARCHIVE_LIST_RPC`(archive-rpc.ts), `exam.problems_for_archive`, 체인은 `applyProblemFilters`·`applyProblemOrder`(query-chain.ts)
+- 관련 파일: sql/72_problem_bank_archive_list_rpc.sql, src/lib/problem-bank/archive-rpc.ts, src/lib/problem-bank/query-chain.ts, src/lib/problem-bank/queries.ts
+
 ## 묻는 작품만 인쇄 (trim works)
 - 정의: 문제지 보기 화면의 체크 '복합 지문은 묻는 작품만'(기본 켜짐, localStorage `ara-paper-trim-works`). (가)(나) 지문에서 그 묶음 문항들이 묻는 작품(`work_titles` 합집합)에 없는 작품의 **최상위 구역 상자**를 빼고 인쇄한다
 - **확실할 때만 뺀다** — 스냅샷에 `works` 가 없거나(sql/68 이전 문제지), 표시가 `(가)`~`(차)` 하나씩이 아니거나(`가~라`), 상자가 최상위에 하나씩 없거나, 작품 상자 안에 다른 (가)~(차) 상자가 있거나, 한 문항이라도 '지문 전체' 를 물으면 지문 전체를 찍는다. 뺀 구역의 그림은 인쇄 준비(서명) 확인에서도 빠진다. 작품으로 등록되지 않은 구역·머리 문단·〈보기〉는 늘 남긴다

@@ -27,6 +27,15 @@ export interface SourceAxisQuery {
   textbook?: string;
 }
 
+/**
+ * 함수 인자로 보내는 출처 조건(sql/72 `problems_for_archive` 의 `p_source`) — **키가 있으면 건다**.
+ * 칸 이름은 `SOURCE_EQ_AXES` + `grades` 그대로이고 sql/72 가 같은 목록 밖의 키를 거절한다
+ * (archive-rpc.test.ts 가 두 목록을 대조한다).
+ */
+export type SourceAxisArgs = Partial<Record<(typeof SOURCE_EQ_AXES)[number], string>> & {
+  grades?: string[];
+};
+
 /** 조건을 걸 수 있는 요청 — PostgREST 필터 빌더의 필요한 부분만 */
 interface SourceAxisFilterable<T> {
   eq(column: string, value: string): T;
@@ -54,4 +63,23 @@ export function applySourceAxes<T extends SourceAxisFilterable<T>>(
   // 학교급을 편 학년들 — 학년 칸(eq)과 **따로** 건다(둘 다 걸리면 교집합)
   if (query.grades && query.grades.length > 0) next = next.in(`${prefix}grade`, query.grades);
   return next;
+}
+
+/**
+ * 출처 칸 조건을 **함수 인자**로 바꾼다 — `applySourceAxes` 와 같은 규칙이다.
+ *
+ * 운영 PostgREST 14.5 는 함수 결과의 임베드(`source.`)에 필터를 못 걸어서(archive-rpc.ts), 작품·문법 함수 경로는
+ * 출처 칸을 이 모양으로 넘기고 함수 안에서 건다. ⚠️ 규칙을 둘로 나누지 말 것 — 있고 없음은 `undefined`,
+ * `''` 은 '미지정인 행만', 학년 여럿은 비지 않았을 때만.
+ * @param query - 조건 (`toProblemQuery` 가 만든 값)
+ * @returns 걸 칸만 담은 객체
+ */
+export function sourceAxisArgs(query: SourceAxisQuery): SourceAxisArgs {
+  const out: SourceAxisArgs = {};
+  for (const key of SOURCE_EQ_AXES) {
+    const value = query[key];
+    if (value !== undefined) out[key] = value;
+  }
+  if (query.grades && query.grades.length > 0) out.grades = [...query.grades];
+  return out;
 }

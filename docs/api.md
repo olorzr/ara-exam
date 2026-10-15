@@ -129,6 +129,32 @@
   기다려서 결과를 보여 준다(수신부 멱등). 등록 상태는 이 앱에 저장하지 않는다(진실은 ara-system `source_exam_id`).
   학교급은 출처 학년으로 가르고 섞이면 빼서 수신부 기본(중등부)에 맡긴다
 
+## RPC exam.archive_facets
+- 설명: 기출 아카이브의 트리·선택지 재료(출처 조합·영역·단원·문법 묶음·작품 묶음·지문 작품 표) jsonb 하나
+- 인자: 없음. **POST 로 부른다**(postgrest-js `.rpc()` 기본) — GET 은 PostgREST 가 읽기 전용 트랜잭션으로 돌려 캐시를 다시 지을 수 없다
+- Response: `{sources, area_paths, unit_paths, grammar_paths, work_titles, passage_works}` (`facets-payload.ts` 와 1:1)
+- 에러: 학원 도메인 선생님·service_role 이 아니면 `insufficient_privilege`(sql/71 부터 — 예전엔 빈 패싯)
+- 비고: SECURITY DEFINER · VOLATILE, **정식 정의 sql/71**. 결과를 `exam.archive_facets_cache` 한 행에 두고,
+  패싯이 읽는 칸을 바꾼 트랜잭션이 남긴 xid(`exam.archive_facets_dirty`)가 그 캐시의 스냅샷에 안 보이면 다시 짓는다
+
+## RPC exam.archive_facets_refresh
+- 설명: 위 캐시를 신선하면 돌려주고 아니면 다시 지어 돌려준다 — **호출자 검사 없음, 소유자·service_role 전용**
+- 인자: `p_force boolean` (기본 false) — true 면 신선 여부와 무관하게 다시 짓는다
+- 비고: 적재 스크립트 끝에 `SELECT exam.archive_facets_refresh();` 한 줄을 붙이면 첫 선생님이 다시 짓는 시간(최대 수 초)을
+  내지 않는다. ⚠️ `DISABLE TRIGGER ALL/USER` 로 돌린 백필은 쓰기 표시가 안 남으므로 **`archive_facets_refresh(true)`** 로 끝낸다
+
+## RPC exam.problems_for_archive
+- 설명: 아카이브 목록의 **작품·문법 축 출발점** — GIN 인덱스를 타는 `SETOF exam.problems`. 앱(`queries.ts`)은
+  작품·문법이 걸렸을 때만 부르고, 나머지 조건(영역·단원·지문 대영역·유형·검색·정렬·쪽·`count=exact`)은
+  PostgREST 가 함수 결과에 건다
+- 인자(**POST 본문**): `p_work_title text`, `p_only_work boolean`(그 작품만 — 배열 같음), `p_grammar_paths text[]`(겹침),
+  `p_source jsonb`(출처 칸 — `source_type`·`school_name`·`year`·`grade`·`semester`·`exam_type`·`textbook`·`grades`,
+  키가 있으면 같음/`grades` 는 in, `''` 은 미지정만)
+- 에러: 작품·문법이 둘 다 비면·모르는 출처 키면 `invalid_parameter_value`, 바깥 도메인이면 `insufficient_privilege`
+- 비고: SECURITY DEFINER(sql/72) — RLS 아래에선 배열 연산자가 leakproof 가 아니라 GIN 을 못 탄다. 운영 PostgREST 14.5 는
+  함수 결과의 **임베드에 필터를 못 걸고**(그래서 출처 칸이 인자다) **select 에 없는 칸으로 정렬하지 못한다**(앱이 정렬 칸을 보탠다).
+  GET 은 배열 인자를 따옴표 없이 실어 쉼표 든 작품명이 갈리므로 POST 만 쓴다
+
 ## RPC exam.set_source_textbook
 - 설명: 기출 출처의 교과서를 바꾸고, 원하면 그 출처의 단원 태그를 **같은 트랜잭션에서** 지운다
 - 인자: `p_source_id uuid`, `p_textbook text`, `p_clear_units boolean` (기본 true)

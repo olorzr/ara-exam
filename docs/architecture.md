@@ -357,12 +357,15 @@ src/
 ## lib/problem-bank
 - 역할: 아카이브 조회·쓰기, Storage 경로·서명, 영역·단원 마스터 읽기, 필터·패싯
 - 의존: lib/supabase, lib/supabase-public(읽기 전용), lib/category-master(단원 마스터)
-- 주요 파일: queries.ts(아카이브 목록 — 필터 체인 `runProblemQuery` 한 벌), source-axes.ts(출처 칸 조건
-  `applySourceAxes` — 올라간 기출 목록과 한 벌), solo-filter.ts('그 작품만 · 그 문법만' — 작품 축은 `work_titles` 같음,
+- 주요 파일: queries.ts(아카이브 목록 — `runProblemQuery` 가 출발점을 고르고 체인을 건다),
+  query-chain.ts(필터 체인·정렬 **한 벌** — `applyProblemFilters`·`applyProblemOrder`·`withOrderColumns`),
+  archive-rpc.ts(작품·문법 축이면 GIN 을 타는 함수 `exam.problems_for_archive`(sql/72)에서 출발 — 그 함수가 거른
+  작품·문법·출처 칸을 뺀 나머지만 체인에 넘긴다), source-axes.ts(출처 칸 조건
+  `applySourceAxes` — 올라간 기출 목록과 한 벌, 함수 인자 모양 `sourceAxisArgs` 도 같은 규칙), solo-filter.ts('그 작품만 · 그 문법만' — 작품 축은 `work_titles` 같음,
   문법 축은 지문 대영역 복제 칸 `passage_area`(sql/67) in), passage-shape.ts(지문 저장이 딸린 문항 행을 움직이는가),
   source-list.ts·source-list-filters.ts(올라간 기출 목록 — 칸 규칙은 `buildFilterAxes` 를 빌려 쓴다),
   source-queries.ts(한 출처를 통째로 — 시험지 화면),
-  facets.ts(트리·선택지 재료 — `exam.archive_facets()` RPC 한 번, sql/66)·facets-payload.ts(응답 검사)·
+  facets.ts(트리·선택지 재료 — `exam.archive_facets()` RPC 한 번(POST), 서버 캐시 sql/71)·facets-payload.ts(응답 검사)·
     facets-cache.ts(탭 안 캐시 5분 — 쓰기 함수가 무효화한다, 의존성 없음),
   mutations.ts, mutations-source.ts, review-data.ts,
   storage.ts, storage-paths.ts, bbox.ts, figure-placeholders.ts, figure-capture.ts,

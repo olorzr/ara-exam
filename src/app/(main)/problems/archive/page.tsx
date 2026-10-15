@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import ArchiveSelectionBar from '@/components/problem-bank/ArchiveSelectionBar';
 import ArchiveSidePanel from '@/components/problem-bank/ArchiveSidePanel';
 import ArchiveList from '@/components/problem-bank/ArchiveList';
@@ -22,7 +22,6 @@ import { filtersFromParams, filtersToQueryString } from '@/lib/problem-bank/filt
  * 필터는 주소에 실린다 — 검수하러 갔다 돌아와도 조건이 남고 링크를 주고받을 수 있다.
  */
 function ArchiveContent() {
-  const router = useRouter();
   const params = useSearchParams();
   // 주소는 **처음 한 번만** 읽는다. 이후 주소는 필터를 따라가므로 다시 읽으면 되돌아간다.
   // useMemo 가 아니라 useState 초기화를 쓰는 이유: '처음 값'이라는 뜻이 명확하고,
@@ -37,10 +36,13 @@ function ArchiveContent() {
   /** 상세 창에 띄운 문항 — 목록의 조건·스크롤·선택을 잃지 않으려고 창으로 연다 */
   const [openId, setOpenId] = useState<string | null>(null);
 
-  // 필터가 바뀌면 주소도 따라간다(뒤로 가기로 히스토리를 채우지 않도록 replace)
+  // 필터가 바뀌면 주소도 따라간다(뒤로 가기로 히스토리를 채우지 않도록 replace).
+  // ⚠️ router.replace 가 아니라 네이티브 replaceState 다 — 라우터는 같은 쪽이어도 클릭마다 서버 왕복(RSC)을
+  //    한 번 더 했다(2026-10-15). 이 화면은 주소를 **처음 한 번만** 읽으므로(`initial`) 주소를 적기만 하면 되고,
+  //    Next 16 은 네이티브 history 를 useSearchParams 와 맞춘다. 스크롤도 건드리지 않는다
   useEffect(() => {
-    router.replace(`/problems/archive${filtersToQueryString(archive.filters)}`, { scroll: false });
-  }, [archive.filters, router]);
+    window.history.replaceState(null, '', `/problems/archive${filtersToQueryString(archive.filters)}`);
+  }, [archive.filters]);
 
   const thumbnails = useSignedImageUrls(
     archive.rows.map((r) => r.image_path).filter(Boolean),

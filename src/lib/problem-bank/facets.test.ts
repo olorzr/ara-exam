@@ -2,19 +2,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
 
 /**
- * 패싯이 **RPC 한 번**으로 읽히고, 한 탭 안에서 나눠 쓰이는지 고정한다(sql/66).
+ * 패싯이 **RPC 한 번**으로 읽히고, 한 탭 안에서 나눠 쓰이는지 고정한다(sql/66 → 서버 캐시 sql/71).
  *
  * ⚠️ 예전에는 문항 표를 1,000행씩 순서대로 긁었다(열마다 ~29번 왕복, 20,000행에서 잘림).
  *    표를 긁는 요청이 되살아나면 `requests` 가 늘어 이 테스트가 깨진다.
  */
 
 const requests: URL[] = [];
+const methods: string[] = [];
 let respond: () => Response = () => new Response('{}', { status: 200 });
 
 vi.mock('@/lib/supabase', () => {
-  const fetch = async (input: RequestInfo | URL): Promise<Response> => {
+  const fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = input instanceof Request ? input.url : String(input);
     requests.push(new URL(url));
+    methods.push(init?.method ?? 'GET');
     return respond();
   };
   return {
@@ -50,6 +52,7 @@ function ok(): Response {
 
 beforeEach(() => {
   requests.length = 0;
+  methods.length = 0;
   respond = ok;
   invalidateArchiveFacets();
 });
@@ -72,6 +75,11 @@ describe('아카이브 패싯', () => {
       { title: '사미인곡', author: '정철', count: 10, kind: 'literary' },
       { title: '속미인곡', author: '정철', count: 4, kind: 'literary' },
     ]);
+  });
+
+  it('RPC 는 POST 다 — GET 은 PostgREST 가 읽기 전용 트랜잭션으로 돌려 서버 캐시를 다시 지을 수 없다(sql/71)', async () => {
+    await facets.fetchWorkFacets();
+    expect(methods).toEqual(['POST']);
   });
 
   it('다시 열어도 같은 탭 안에서는 다시 묻지 않는다', async () => {

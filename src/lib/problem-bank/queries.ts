@@ -1,7 +1,14 @@
 import { supabase } from '@/lib/supabase';
-import { pgArrayLiteral } from '@/lib/pg-array-literal';
-import { applySourceAxes, type SourceAxisQuery } from './source-axes';
+import type { SourceAxisQuery } from './source-axes';
+import { ARCHIVE_LIST_RPC, splitArchiveRpc } from './archive-rpc';
+import {
+  applyProblemFilters, applyProblemOrder, withOrderColumns, type ProblemChain, type ProblemOrder,
+} from './query-chain';
 import type { Problem, ProblemSource, QuestionType } from '@/types/problem-bank';
+
+// 여러 모듈이 이 자리에서 가져간다(passage-search·source-list·quiz-references·reference-texts)
+export { escapeIlike } from './query-chain';
+export type { ProblemOrder } from './query-chain';
 
 /**
  * 기출 아카이브 **목록** 조회.
@@ -94,31 +101,22 @@ export interface ProblemQuery extends SourceAxisQuery {
   page?: number;
 }
 
-/**
- * ilike 패턴에서 와일드카드를 막는다.
- *
- * `%`·`_` 를 그대로 넘기면 사용자가 친 글자가 패턴이 되어 엉뚱한 결과가 나온다.
- * @param value - 사용자가 친 검색어
- * @returns 이스케이프된 문자열
- */
-export function escapeIlike(value: string): string {
-  return value.replace(/[\\%_]/g, (m) => `\\${m}`);
+/** 조회 응답에서 쓰는 칸 — 표·함수 출발점 둘 다 이 모양으로 끝난다 */
+interface ChainResponse {
+  data: unknown;
+  error: unknown;
+  count: number | null;
 }
-
-/** 목록을 늘어놓는 순서 */
-export type ProblemOrder =
-  /** 최근에 올린 것부터, 같은 때 올라온 것끼리는 시험지에 실린 차례 — 아카이브 기본 */
-  | 'recent'
-  /** 출처 > 지문 > 쪽 > 번호 — 시험지에 실린 차례 그대로 */
-  | 'reading';
 
 /**
  * 조건에 맞는 문항을 한 구간 읽는다.
  *
- * ⚠️ 필터 체인·컬럼 목록·임베드 별칭이 **여기 한 벌**뿐이어야 한다. 조회 함수마다 베끼면
- *    언젠가 한쪽만 고쳐져 "목록에는 보이는데 담기에는 안 걸리는" 문항이 생긴다.
- *    그래서 형제 조회 모듈(`type-mix-queries.ts`)도 select 만 바꿔 **이 함수를 부른다** —
- *    체인을 베끼지 말 것.
+ * ⚠️ 필터 체인은 `query-chain.ts` **한 벌**뿐이어야 한다. 조회 함수마다 베끼면 언젠가 한쪽만 고쳐져
+ *    "목록에는 보이는데 담기에는 안 걸리는" 문항이 생긴다. 그래서 형제 조회 모듈(`type-mix-queries.ts`)도
+ *    select 만 바꿔 **이 함수를 부른다** — 체인을 베끼지 말 것.
+ * ⚠️ **출발점이 둘이다**(archive-rpc.ts). 작품·문법 축이 걸리면 GIN 을 타는 함수(sql/72)에서 출발하고,
+ *    그 함수가 거른 칸(작품·문법·출처)을 뺀 나머지 조건을 같은 체인에 건다. 아니면 문항 표에서 출발한다.
+ *    영역·단원·검색은 어느 쪽이든 순차 스캔이다(RLS 아래 leakproof 제약, sql/66 머리말).
  * @param query - 필터
  * @param order - 늘어놓을 순서
  * @param from - 첫 행 (0부터)
@@ -130,98 +128,36 @@ export async function runProblemQuery<Row = ProblemRow>(
   query: ProblemQuery, order: ProblemOrder, from: number, to: number,
   select: string = PROBLEM_LIST_SELECT,
 ): Promise<QueryPage<Row>> {
-  let request = supabase
+  const split = splitArchiveRpc(query);
+  if (split) {
+    // 함수 결과는 select 에 없는 칸으로 정렬하지 못한다(query-chain.ts 의 withOrderColumns)
+    const fromRpc = supabase
+      .rpc(ARCHIVE_LIST_RPC, split.args, { count: 'exact' })
+      .select(withOrderColumns(select, order));
+    return finishProblemQuery<Row, typeof fromRpc>(fromRpc, split.rest, order, from, to);
+  }
+  const fromTable = supabase
     .from('problems')
     .select(select, { count: 'exact' });
+  return finishProblemQuery<Row, typeof fromTable>(fromTable, query, order, from, to);
+}
 
-  if (order === 'reading') {
-    // 지문 순서로 늘어놓는다 — 화면이 지문별로 묶어 그리므로 같은 지문의 문항이 흩어지면
-    // 같은 지문 머리가 여러 번 나온다. 문제지에 담을 때도 이 순서라야 지문 묶음이 붙는다.
-    // 출처를 먼저 묶는 이유: 같은 작품이라도 학교마다 실린 대목이 다르다
-    request = request
-      .order('source_id')
-      .order('passage_id', { nullsFirst: false })
-      .order('page_no')
-      .order('number', { nullsFirst: false })
-      .order('id');
-  } else {
-    // ⚠️ created_at 만으로 정렬하면 안 된다 — 한 번에 저장한 행은 **같은 시각**을 받는다
-    //    (`save.ts` 의 `savedAt` 이 굳혀 보낸다). 동률이 페이지 경계에 걸리면
-    //    쪽을 넘길 때마다 어떤 문항은 두 번 나오고 어떤 문항은 영영 안 나온다(코덱스 리뷰 5R).
-    //    ⚠️ 그 동률을 **읽는 순서로** 푸는 것이 중요하다. id 는 gen_random_uuid() 라
-    //    그것만으로 풀면 한 시험지 안이 **무작위**로 나열돼 같은 지문의 문항이 흩어진다 —
-    //    화면이 지문별로 묶어 그리므로 같은 지문 머리가 여러 번 나온다.
-    //    옆에 둔 묶음끼리의 차례(최근 업로드가 위)는 created_at 이 그대로 정하고,
-    //    **묶음 안**만 시험지에 실린 차례로 풀어 같은 지문의 문항이 이웃하게 한다.
-    //    ⚠️ id 는 여전히 **마지막**이어야 한다 — 그것이 총순서를 만들어 쪽 넘김을 안정시킨다
-    //    (쪽 순서는 오름차순이다: 한 출처 안에서는 1쪽이 앞이 맞고, 출처끼리의 새것이 위라는 규약은 created_at 이 지킨다).
-    //    ⚠️ 그래서 저장하는 쪽이 **한 번의 저장에 created_at 을 하나로 굳혀 보낸다**
-    //    (`save.ts` 의 `savedAt`). 안 그러면 50건 묶음마다 시각이 달라 100문항짜리 시험지가
-    //    **51~100번 다음에 1~50번**으로 뒤집히고 그 경계의 지문이 두 묶음으로 갈린다 —
-    //    **두 파일은 한 쌍이다.** 그것이 붙기 전에 올린 옛 출처는 여전히 묶음 단위로 갈려 보인다
-    request = request
-      .order('created_at', { ascending: false })
-      .order('page_no')
-      .order('number', { nullsFirst: false })
-      .order('id');
-  }
-
-  request = request.range(from, to);
-
-  // ⚠️ 임베드에 별칭(`source:`)을 주면 필터 경로도 **별칭**을 써야 한다.
-  //    `problem_sources.year` 로 쓰면 PostgREST 가 "그런 임베드 없음" 으로 요청을 거부한다.
-  // ⚠️ 있고 없음은 `undefined` 로 가른다. `''` 은 **'미지정인 행만'** 이라는 뜻이라
-  //    참거짓으로 거르면 그 조건이 통째로 사라진다(filters.ts 의 UNSPECIFIED_AXIS).
-  request = applySourceAxes(request, query, 'source.');
-  // ⚠️ `.eq('work_title', …)` 이 아니다(sql/33). 파생 문자열로 걸면 `(가)(나)` 지문의 문항이
-  //    `'먼 후일 · 독은 아름답다'` 로만 걸려 '먼 후일' 을 골랐을 때 하나도 안 나온다.
-  //    빈 문자열('미지정만')은 이 축에 없다 — filters.ts 가 자유 텍스트라 막아 둔다
-  // ⚠️ 배열 컬럼 조건은 전부 `pgArrayLiteral` 문자열로 넘긴다 — postgrest-js 는 배열을 따옴표
-  //    없이 join 해서 쉼표 든 제목(「소녀, 두드리다」)이 두 원소로 갈려 **0건**이 됐다(2026-09-27)
-  // '그 작품만' 이면 **같음**(eq)이다 — 포함(cs)으로는 (가)(나) 를 함께 묻는 문항이 걸린다.
-  //    배열 리터럴 표기는 같다(`eq.{"동백꽃"}`) — PostgREST 가 배열 컬럼과 그대로 견준다
-  if (query.work_title) {
-    const titles = pgArrayLiteral([query.work_title]);
-    request = query.only_work ? request.eq('work_titles', titles) : request.contains('work_titles', titles);
-  }
-  // 갈래 필터 — 넘어온 유형 가운데 하나면 통과. 빈 배열은 '조건 없음' 이라 걸지 않는다
-  if (query.question_types && query.question_types.length > 0) {
-    request = request.in('question_type', query.question_types);
-  }
-  if (query.area_path && query.area_path.length > 0) {
-    // 배열 포함 — '문학' 으로 찾으면 '문학 > 현대시' 문항도 걸린다
-    request = request.contains('area_path', pgArrayLiteral(query.area_path));
-  }
-  if (query.unit_path && query.unit_path.length > 0) {
-    // 같은 이유로 대단원만 골라도 그 아래 소단원 문항이 함께 걸린다
-    request = request.contains('unit_path', pgArrayLiteral(query.unit_path));
-  }
-  if (query.grammar_paths && query.grammar_paths.length > 0) {
-    // ⚠️ 여기만 `contains` 가 아니라 **`overlaps`** 다. 이 컬럼은 원소 하나가 경로 하나라
-    //    (`'단어 > 품사 > 명사'`) 문항에 여러 개가 붙는다 — `@>` 는 "준 것을 **전부** 가진 행"
-    //    이라 두 태그를 넘기면 둘 다 붙은 문항만 나온다. 상위 검색은 고른 마디와 그 아래
-    //    경로를 나열해 찾는 것이라 "하나라도 걸리면" 이 맞다(grammar-tree.ts 의 grammarPathsUnder).
-    request = request.overlaps('grammar_paths', pgArrayLiteral(query.grammar_paths));
-  }
-  if (query.passage_areas && query.passage_areas.length > 0) {
-    // ⚠️ `pgArrayLiteral` 이 아니다 — `passage_area` 는 배열이 아니라 글자 칸이다. postgrest-js 의
-    //    `in()` 은 쉼표·괄호가 든 값만 따옴표로 감싸므로 `''` 은 `in.(화법과 언어,)` 로 실린다
-    //    (그 꼴이 운영 PostgREST 에서 '빈 값' 으로 읽히는 것을 확인했다 — quiz-references/candidates.ts)
-    request = request.in('passage_area', query.passage_areas);
-  }
-  if (query.search?.trim()) {
-    // .or() 를 쓰지 않는다 — 백슬래시·괄호 이스케이프가 인용을 통과하며 풀린다.
-    // 검색용 평문 컬럼 하나로 단순 like 를 건다(DB 트리거가 채운다).
-    // ⚠️ ilike 가 아니라 **like** 다(sql/66). search_text 는 트리거가 이미 lower() 로 저장하고
-    //    검색어도 여기서 소문자로 바꾸므로 결과가 같은데, 대소문자 접기가 빠져 한글에서 4배 빠르다
-    //    (29,000문항 순차 스캔 505ms → 128ms). 인덱스는 못 쓴다 — RLS 아래에서 LIKE 는 leakproof 가
-    //    아니라 인덱스 조건이 될 수 없다(sql/66 머리말). 트리거의 lower() 를 걷으면 이것도 ilike 로 되돌릴 것
-    request = request.like('search_text', `%${escapeIlike(query.search.trim().toLowerCase())}%`);
-  }
-
+/**
+ * 출발점에 정렬·쪽·조건을 걸고 읽는다.
+ * @param base - 표 또는 함수에서 출발한 빌더
+ * @param query - 체인에 걸 조건
+ * @param order - 늘어놓을 순서
+ * @param from - 첫 행
+ * @param to - 마지막 행
+ * @returns 행과 전체 개수
+ */
+async function finishProblemQuery<Row, T extends ProblemChain<T> & PromiseLike<ChainResponse>>(
+  base: T, query: ProblemQuery, order: ProblemOrder, from: number, to: number,
+): Promise<QueryPage<Row>> {
+  const request = applyProblemFilters(applyProblemOrder(base, order).range(from, to), query);
   const { data, error, count } = await request;
   if (error) throw error;
-  return { rows: (data ?? []) as unknown as Row[], total: count ?? 0 };
+  return { rows: (data ?? []) as Row[], total: count ?? 0 };
 }
 
 /**
