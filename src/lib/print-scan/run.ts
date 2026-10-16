@@ -149,7 +149,7 @@ async function registerWordsForBundle(
     html,
     category: bundleWordsCategory(bundle),
     previous: bundle.words_meta,
-    persist: (meta) => updateBundle(bundle.id, { words_meta: meta }),
+    persist: async (meta) => { await updateBundle(bundle.id, { words_meta: meta }); },
     port: env.port,
     pref: env.pref,
     signal: env.signal,

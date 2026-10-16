@@ -8,7 +8,7 @@ const WORDS_CHUNK = 1000;
  * 한 시험이 담을 수 있는 단어 수의 상한.
  *
  * ⚠️ **올리려면 아래 넷을 함께 고쳐야 한다**(코덱스 리뷰 P1) — 지금은 전부 1,000 에 묶여 있다:
- *   1. `exam/view` 의 `exam_words` 조회(페이지 없음)
+ *   1. `exam/view` 의 `exam_words` 조회(한 번에 `range(0, MAX_EXAM_WORDS - 1)` — 넘으면 개수 불일치로 인쇄를 막는다)
  *   2. `sync-to-grades` 의 `exam_words` 조회(페이지 없음)
  *   3. ara-system 인테이크의 `totalQuestions는 1~1000` 검증
  *   4. 여기

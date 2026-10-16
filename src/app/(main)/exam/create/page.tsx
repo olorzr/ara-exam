@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
-import type { Category, Word } from '@/types';
+import type { Category } from '@/types';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,7 +17,8 @@ import { DEFAULT_PASS_PERCENTAGE, PERCENTAGE_BASE, MIN_EXAM_WORDS, EXTERNAL_LEVE
 import { buildCategoryTree } from '@/lib/category-tree';
 import { shuffle } from '@/lib/shuffle';
 import { fireGradeSync } from '@/lib/grade-sync-client';
-import { fetchWordsByCategories, MAX_EXAM_WORDS } from '@/lib/words-fetch';
+import { MAX_EXAM_WORDS } from '@/lib/words-fetch';
+import { useExamCreateWords } from '@/hooks/useExamCreateWords';
 
 /**
  * 시험지 생성 페이지 (트리 구조 카테고리 선택, 합격선 설정, 셔플 옵션)
@@ -28,9 +29,6 @@ export default function ExamCreatePage() {
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCatIds, setSelectedCatIds] = useState<string[]>([]);
-  const [words, setWords] = useState<Word[]>([]);
-  // 고른 카테고리의 단어가 상한을 넘었다 — 잘린 채로 만들면 인쇄물과 성적이 조용히 어긋난다.
-  const [overLimit, setOverLimit] = useState(false);
   const [title, setTitle] = useState('');
   const [passPercentage, setPassPercentage] = useState(DEFAULT_PASS_PERCENTAGE);
   const [shuffleEnabled, setShuffleEnabled] = useState(true);
@@ -48,29 +46,10 @@ export default function ExamCreatePage() {
     })();
   }, [user]);
 
-  useEffect(() => {
-    (async () => {
-      if (selectedCatIds.length === 0) {
-        setWords([]);
-        setOverLimit(false);
-        return;
-      }
-      try {
-        // ⚠️ 여기서 `.range()` 없이 한 번에 청하면 1,000행에서 조용히 잘린다(fetchWordsByCategories 주석).
-        const { words: rows, overLimit: over } = await fetchWordsByCategories(selectedCatIds);
-        setWords(rows);
-        setOverLimit(over);
-        if (over) {
-          toast.error(`단어가 ${MAX_EXAM_WORDS}개를 넘어 시험을 만들 수 없어요. 카테고리를 나눠서 만들어주세요`);
-        }
-      } catch {
-        // 빈 목록으로 두면 '이 카테고리에 단어가 없다' 로 잘못 읽힌다 — 실패를 밝힌다.
-        setWords([]);
-        setOverLimit(false);
-        toast.error('단어를 불러오지 못했어요. 잠시 후 다시 시도해주세요');
-      }
-    })();
-  }, [selectedCatIds]);
+  // 고른 카테고리의 단어 — **그 선택으로 읽은 결과일 때만** 내준다(useExamCreateWords 머리 주석)
+  const {
+    current, words, overLimit, wordsLoading, wordsFailed, selectionKey, retryWords,
+  } = useExamCreateWords(selectedCatIds);
 
   /** 선택된 카테고리로 자동 제목을 생성한다 */
   const generateTitle = useCallback((catIds: string[]) => {
@@ -133,6 +112,13 @@ export default function ExamCreatePage() {
       toast.error('시험지 제목을 입력해주세요.');
       return;
     }
+    // ⚠️ 단추가 잠겨 있어도 여기서 **한 번 더** 본다 — 지금 선택과 같은 열쇠의 결과로만 만든다
+    if (!current) {
+      toast.error(wordsFailed
+        ? '단어를 불러오지 못했어요. 다시 시도한 뒤 만들어주세요.'
+        : selectionKey ? '고른 카테고리의 단어를 아직 불러오는 중이에요.' : '카테고리를 선택해주세요.');
+      return;
+    }
     if (words.length === 0) {
       toast.error('카테고리를 선택해주세요.');
       return;
@@ -154,7 +140,7 @@ export default function ExamCreatePage() {
     // 성공 시에는 페이지 이동(router.push)으로 언마운트되므로 creating 을 굳이
     // 되돌리지 않는다(언마운트 후 setState 경고 방지).
     try {
-      const orderedWords = shuffleEnabled ? shuffle(words) : words;
+      const orderedWords = shuffleEnabled ? shuffle(current.words) : current.words;
 
       const { data: examId, error: rpcErr } = await supabase.rpc(
         'create_exam_with_words',
@@ -163,7 +149,8 @@ export default function ExamCreatePage() {
           p_pass_percentage: passPercentage,
           p_total_questions: totalQuestions,
           p_pass_count: passCount,
-          p_category_ids: selectedCatIds,
+          // 단어를 읽은 그 선택이다 — 서버는 실제 단어에서 다시 계산하지만, 보내는 값도 어긋나지 않게
+          p_category_ids: current.key.split('|'),
           p_word_ids: orderedWords.map((w) => w.id),
           p_words: orderedWords.map((w, i) => ({
             word_id: w.id,
@@ -268,6 +255,9 @@ export default function ExamCreatePage() {
             passPercentage={passPercentage}
             passCount={passCount}
             creating={creating}
+            wordsLoading={wordsLoading}
+            wordsFailed={wordsFailed}
+            onRetryWords={retryWords}
             onCreate={handleCreate}
           />
         </div>

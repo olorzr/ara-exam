@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { PrintPageStrip } from '@/components/print-scan';
 import {
-  PrintQaKeyView, PrintQaList, PrintQaPaperView, PrintQaStatusCard,
+  PrintQaKeyView, PrintQaList, PrintQaPaperView, PrintQaSaveConflict, PrintQaStatusCard,
 } from '@/components/print-qa';
 import { QuizReferencesSection, ReferencePickerDialog } from '@/components/passage-quiz';
 import { useAiEnabled } from '@/hooks/useAiEnabled';
@@ -223,6 +223,15 @@ function PrintQaWorkspace({
               onSplit={() => { void qa.split(); }}
               onCancel={qa.cancel}
             />
+
+            {qa.saveFailure && (
+              <PrintQaSaveConflict
+                failure={qa.saveFailure}
+                busy={qa.running || qa.saving}
+                onReload={() => { void qa.reloadSaved(); }}
+                onOverwrite={() => { void qa.overwrite(); }}
+              />
+            )}
 
             {qa.items.length > 0 && (
               <QuizReferencesSection

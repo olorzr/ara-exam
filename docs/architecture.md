@@ -87,7 +87,8 @@ src/
 ### lib/print-qa (학교 프린트 문답 시험지 + 모범답안)
 - 역할: 읽어 둔 프린트 본문(`ocr_html`)을 **물음·답으로 가르고**(AI 한 턴), 답이 없거나 학생 필기뿐인 문항에 **모범답안**을 만든다(AI 또 한 턴). 결과로 **문제지 · 교사용(문제 밑에 답) · 답지** 세 인쇄물을 뽑는다
 - 의존: `lib/ai/codex`, `lib/concept-pick`(`htmlToPlainText`·`fold`), `lib/passage-quiz`(`QuizReferenceText`·`splitPassageBlocks`), `lib/quiz-references`(화면이 자료를 찾아 넘긴다)
-- ⚠️ **`lib/print-scan` 을 값으로 import 하지 않는다**(타입만). 그 배럴이 `run.ts` 를 다시 내보내 순환이 된다 — 저장은 훅(`usePrintQa`)이 `print-scan/save` 의 `updateBundle` 로 한다(`print-words` 와 같은 규약)
+- ⚠️ **`lib/print-scan` 을 값으로 import 하지 않는다**(타입만). 그 배럴이 `run.ts` 를 다시 내보내 순환이 된다 — 저장은 훅(`usePrintQa` → `usePrintQaPersist`)이 `print-scan/save` 의 `updateBundle` 로 한다(`print-words` 와 같은 규약)
+- ⚠️ 문답 저장은 **읽어 온 `updated_at` 이 그대로일 때만** 고친다(`updateBundle(…, { expectUpdatedAt })`). 충돌·지워짐이면 화면 값을 그대로 두고 `saveFailure` 로 알린다 — 어느 쪽을 버릴지는 사람이 확인창으로 고른다(2026-10-16)
 - ⚠️ 두 턴의 **성질이 다르다**: 나누기는 *옮겨 적기*라 프린트 읽기와 같은 모델·노력(`PRINT_OCR_*_PREFERENCE`)을 쓰고, 모범답안은 *글짓기*라 선생님이 고른 모델을 그대로 쓴다
 - ⚠️ 손글씨 판정은 **모델에게 묻지 않는다** — OCR 이 남긴 `<em>` 자리로 기계가 가린다(`handwriting.ts`). 앞글(`lead`)도 묻지 않고 원문에서 잘라 온다(`lead.ts`)
 - ⚠️ **모양을 정하는 곳은 하나다**: 번호 꼴은 `label.ts`, 답 표시 꼴은 `marks.ts` — 알아보는 쪽과 지켜 주는 쪽이 같은 글자 목록을 본다
@@ -144,7 +145,7 @@ src/
 ## concept_sheets HTML 파이프라인
 - 입력이 둘이다: ① 선생님이 편집기에서 직접 친 것, ② **학교 프린트 읽기**가 만든 것
   (`finalizePrintHtml` → `sanitizeConceptHTML` 을 거쳐 저장된다). 그 뒤 경로는 완전히 같다
-- 입력 (저장): TipTap `editor.getHTML()` → `sanitizeConceptHTML` → supabase insert/update (`src/hooks/useConceptSheetEditor.ts` 의 `handleSave`)
+- 입력 (저장): TipTap `editor.getHTML()` → `sanitizeConceptHTML` → supabase insert/update (`src/hooks/useConceptSheetEditor.ts` 의 `handleSave`). 저장된 값·주소 옮기기·이탈 안내는 `src/hooks/useConceptSheetDraft.ts` — 새 개념지는 저장하는 사이 손댄 것이 없을 때만 `/new` → `/{id}` 로 옮긴다
 - 출력 (렌더): supabase select → `src/lib/exam-transform.ts` 의 `transformHTML` / `stripTrailingEmpty` / `extractMarkedWords` 각 함수 entry 에서 `sanitizeConceptHTML` 호출 → `ExamSheetRenderer` 의 `dangerouslySetInnerHTML`
 - 마킹(`<mark data-concept>` 붙이기·떼기)은 **마킹 모드가 켜져 있을 때만** 포인터로 바뀐다. 상태는 `useConceptSheetEditor.markingMode` 하나이고 편집기(`ExamEditor`)와 미리보기(`ExamPreview`)가 나눠 쓴다. 꺼진 미리보기는 `ExamSheetRenderer` 가 `interactive=false` 로 받아 `resolveTransformMode` 로 `concept` 모드(클릭 불가)로 그린다. 사이드바의 해제·AI 추천은 단추 조작이라 이 모드와 무관하다
 - 화이트리스트 위치: `src/lib/sanitize-html.ts` (`ALLOWED_TAGS`, `ALLOWED_ATTR`). 새 TipTap 확장 추가 시 같이 갱신 필수

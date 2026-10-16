@@ -64,7 +64,7 @@ export function usePrintWordsRegister() {
         html: bundle.ocr_html,
         category: bundleWordsCategory(bundle),
         previous: bundle.words_meta,
-        persist: (next) => updateBundle(bundle.id, { words_meta: next }),
+        persist: async (next) => { await updateBundle(bundle.id, { words_meta: next }); },
         port: getCodexPort(),
         pref: getCodexModelPref(),
         signal: controller.signal,

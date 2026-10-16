@@ -4,7 +4,7 @@ import type { BoxPart } from './box-parts';
 import { trimEdgeEmptyParagraphs } from './html-trim';
 import type { PaperItemSnapshot } from '@/types/problem-bank';
 import { groupRangeLabel, groupsOf, type PaperItem } from './compose';
-import { passageBlocksOf } from './passage-blocks';
+import { passageBlocksOf, passagePrintsAsImage } from './passage-blocks';
 import { trimmedFigurePaths } from './trim-works';
 
 /**
@@ -80,6 +80,19 @@ export type PaperBlock =
     snapshot: PaperItemSnapshot;
   };
 
+/**
+ * 이 문항을 **잘라 둔 이미지 한 장으로** 인쇄하는가.
+ *
+ * ⚠️ 블록 만들기·번호 어긋남 판정·인쇄 준비 확인(`imagePathsOf`)이 **모두 이 함수**를 쓴다.
+ *    갈리면 이미지로 인쇄하는 문항의 본문 삽화(인쇄에 안 나가는 그림)가 깨졌다고 인쇄 단추가
+ *    잠긴다(2026-10-15 리뷰 10번). `image_path` 가 비면 글 문항으로 떨어지고 그때는 삽화가 필요하다.
+ * @param item - 문제지 항목
+ * @returns 이미지 블록 하나로 그리면 true
+ */
+export function problemPrintsAsImage(item: PaperItemSnapshot): boolean {
+  return item.render_mode === 'image' && Boolean(item.image_path);
+}
+
 /** 지문 머리글 문구 — 국어 시험지의 관용 표현 */
 function passageHeaderText(range: string): string {
   return `[${range}] 다음 글을 읽고 물음에 답하시오.`;
@@ -131,7 +144,7 @@ export function buildPaperBlocks(
       const snapshot = items[i];
       const number = i + 1;
 
-      if (snapshot.render_mode === 'image' && snapshot.image_path) {
+      if (problemPrintsAsImage(snapshot)) {
         blocks.push({
           kind: 'problem-image',
           key: `qi-${i}`,
@@ -174,6 +187,9 @@ export function buildPaperBlocks(
  *
  * ⚠️ 구역을 빼고 인쇄하면(`trimWorks`) 뺀 구역에만 있던 그림은 **필요 없다** — 넣어 두면 인쇄하지도
  *    않을 그림이 깨졌다고 인쇄 단추가 잠긴다(코덱스 1R). 판정은 인쇄 블록과 **같은 함수**다.
+ * ⚠️ 같은 까닭으로 **이미지로 인쇄하는** 문항·지문은 잘라 둔 이미지 하나만 필요하다 — 본문 삽화
+ *    (`figure_paths`)는 그 모드에서 그려지지 않는다. 글로 떨어지는 경우(이미지 경로가 빈 이미지
+ *    출제)에는 삽화를 그대로 받는다. 판정은 블록과 같은 `problemPrintsAsImage`·`passagePrintsAsImage` 다
  * @param items - 문제지 항목
  * @param options - 블록을 나누는 선택 (`buildPaperBlocks` 에 넘기는 것과 같은 값)
  * @returns 중복 없는 경로 목록 (없으면 빈 배열)
@@ -184,12 +200,17 @@ export function imagePathsOf(
   const skip = options.trimWorks ? trimmedFigurePaths(items) : new Map<string, Set<string>>();
   const paths = new Set<string>();
   for (const item of items) {
-    if (item.render_mode === 'image' && item.image_path) paths.add(item.image_path);
-    for (const figure of item.figure_paths) if (figure) paths.add(figure);
+    if (problemPrintsAsImage(item)) paths.add(item.image_path);
+    else for (const figure of item.figure_paths) if (figure) paths.add(figure);
+
     const passage = item.passage;
-    if (passage?.render_mode === 'image' && passage.image_path) paths.add(passage.image_path);
-    const dropped = passage ? skip.get(passage.id) : undefined;
-    for (const figure of passage?.figure_paths ?? []) if (figure && !dropped?.has(figure)) paths.add(figure);
+    if (!passage) continue;
+    if (passagePrintsAsImage(passage)) {
+      paths.add(passage.image_path);
+      continue;
+    }
+    const dropped = skip.get(passage.id);
+    for (const figure of passage.figure_paths ?? []) if (figure && !dropped?.has(figure)) paths.add(figure);
   }
   return [...paths];
 }
@@ -219,7 +240,7 @@ export function renumberedImageItems(
 ): { printed: number; original: number }[] {
   const out: { printed: number; original: number }[] = [];
   items.forEach((item, i) => {
-    if (item.render_mode !== 'image' || !item.image_path) return;
+    if (!problemPrintsAsImage(item)) return;
     if (item.number === null || item.number === i + 1) return;
     out.push({ printed: i + 1, original: item.number });
   });

@@ -11,9 +11,12 @@ export {
   generateConceptTitle,
   isCategoryIncomplete,
   buildConceptSheetPayload,
+  conceptDraftEquals,
 } from './concept-sheet-form';
-export type { ConceptSheetPayload } from './concept-sheet-form';
+export type { ConceptDraftSnapshot, ConceptSheetPayload } from './concept-sheet-form';
 export { fireConceptGradeSync } from './concept-grade-sync';
+export { checkExamWords, examWordsIssueMessage } from './exam-words-check';
+export type { ExamWordsIssue } from './exam-words-check';
 export { toKstDate } from './kst-date';
 export { categoryNaturalKey, withNormalizedCategoryNames } from './category-key';
 export type { CategoryNaturalKeyFields } from './category-key';

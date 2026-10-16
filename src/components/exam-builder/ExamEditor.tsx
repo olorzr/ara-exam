@@ -50,6 +50,12 @@ interface ExamEditorProps {
   /** 마킹 모드 — 부모(`useConceptSheetEditor`)가 쥐고 미리보기와 같은 값을 나눠 쓴다 */
   markingMode: boolean;
   onToggleMarkingMode: () => void;
+  /**
+   * 편집기가 처음 그려 낸 HTML — '저장된 값' 의 기준으로 쓴다.
+   * TipTap 은 넣은 HTML 을 제 모양으로 다시 쓰므로(빈 문단·속성 순서), DB 값과 견주면 아무것도
+   * 안 고쳐도 '저장 안 됨' 이 된다. 같은 편집기가 낸 값끼리 견주게 한다(2026-10-15 리뷰 4번).
+   */
+  onReady?: (html: string) => void;
 }
 
 /**
@@ -58,7 +64,7 @@ interface ExamEditorProps {
  * 마킹 모드 값은 부모가 쥔다(미리보기와 같은 값을 본다) — 여기서는 읽고 토글만 부른다.
  */
 export default function ExamEditor({
-  onHTMLChange, onMarksChange, editorRef, initialContent, markingMode, onToggleMarkingMode,
+  onHTMLChange, onMarksChange, editorRef, initialContent, markingMode, onToggleMarkingMode, onReady,
 }: ExamEditorProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -87,10 +93,12 @@ export default function ExamEditor({
   useEffect(() => {
     if (editor) {
       editorRef.current = editor;
-      onHTMLChange(editor.getHTML());
+      const html = editor.getHTML();
+      onReady?.(html);
+      onHTMLChange(html);
       syncMarks(editor);
     }
-  }, [editor, editorRef, onHTMLChange, syncMarks]);
+  }, [editor, editorRef, onHTMLChange, syncMarks, onReady]);
 
   /** 에디터 클릭/드래그 → 마킹 적용/해제 */
   const handleMouseUp = useCallback(() => {

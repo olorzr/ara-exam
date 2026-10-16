@@ -28,6 +28,19 @@ export interface PassageBlockInput {
 }
 
 /**
+ * 이 지문을 **잘라 둔 이미지 한 장으로** 인쇄하는가.
+ *
+ * ⚠️ 인쇄 준비 확인(`imagePathsOf`)도 **이 함수**로 판정한다. 둘이 갈리면 이미지로 인쇄하는
+ *    지문의 본문 삽화(쓰지도 않는 그림)를 인쇄 준비가 기다리다, 그 그림 하나가 깨졌다고
+ *    인쇄 단추가 잠긴다(2026-10-15 리뷰 10번). `image_path` 가 비면 글로 떨어진다.
+ * @param passage - 스냅샷의 지문
+ * @returns 이미지 블록 하나로 그리면 true
+ */
+export function passagePrintsAsImage(passage: PaperPassageSnapshot): boolean {
+  return passage.render_mode === 'image' && Boolean(passage.image_path);
+}
+
+/**
  * 지문 묶음의 인쇄 블록.
  * @param input - 지문·묶음·머리글·선택
  * @returns 순서대로의 블록 (머리글이 맨 앞)
@@ -38,7 +51,7 @@ export function passageBlocksOf(input: PassageBlockInput): PaperBlock[] {
     ? { sourceAccurate: true, literalLabels: hasLiteralPassageLabels(passage.html) } : {};
   const blocks: PaperBlock[] = [{ kind: 'passage-header', key: `ph-${start}`, text: headerText }];
 
-  if (passage.render_mode === 'image' && passage.image_path) {
+  if (passagePrintsAsImage(passage)) {
     blocks.push({
       kind: 'passage-image',
       key: `pi-${start}`,

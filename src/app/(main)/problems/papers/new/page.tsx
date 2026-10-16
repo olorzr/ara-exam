@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import ArchiveList from '@/components/problem-bank/ArchiveList';
+import ArchiveLoadError from '@/components/problem-bank/ArchiveLoadError';
 import ArchivePager from '@/components/problem-bank/ArchivePager';
 import ArchiveSidePanel from '@/components/problem-bank/ArchiveSidePanel';
 import ProblemCard from '@/components/problem-bank/ProblemCard';
@@ -153,7 +154,11 @@ export default function PaperComposePage() {
 
             <div className="max-h-[70vh] overflow-y-auto pr-1">
               {/* 아카이브와 **같은 목록 부품**이다 — 지문별로 묶어 그리는 규약을
-                  사본으로 두면 언젠가 한쪽만 고쳐진다 */}
+                  사본으로 두면 언젠가 한쪽만 고쳐진다.
+                  ⚠️ 지금 조건을 못 읽었으면 목록 대신 안내다 — 옛 조건의 행이 담기 대상이 되면 안 된다 */}
+              {archive.failed ? (
+                <ArchiveLoadError failure={archive.failed} onRetry={archive.retry} />
+              ) : (
               <ArchiveList
                 rows={archive.rows}
                 loading={archive.loading}
@@ -191,6 +196,7 @@ export default function PaperComposePage() {
                   />
                 )}
               />
+              )}
             </div>
 
             {/* 목록은 60개씩 끊어 온다 — 넘기는 버튼이 없으면 그 뒤 문항은 담을 수가 없다 */}

@@ -51,11 +51,50 @@ export async function insertBundles(rows: PrintBundleRow[]): Promise<void> {
   if (error) throw error;
 }
 
+/** 읽어 온 뒤 다른 탭·다른 선생님이 그 묶음을 먼저 저장했다 — 덮지 않고 멈춘다 */
+export class BundleConflictError extends Error {
+  constructor() {
+    super('다른 탭이나 다른 선생님이 이 프린트를 먼저 저장했어요. 고친 내용은 화면에 남아 있어요.');
+    this.name = 'BundleConflictError';
+  }
+}
+
+/** 고치려던 묶음이 없다 — 다른 탭에서 지웠거나 고칠 권한이 없다 */
+export class BundleMissingError extends Error {
+  constructor() {
+    super('이 프린트를 찾지 못했어요. 다른 탭에서 지웠거나 고칠 권한이 없어요. 고친 내용은 화면에 남아 있어요.');
+    this.name = 'BundleMissingError';
+  }
+}
+
+/** 묶음 갱신의 선택 */
+export interface UpdateBundleOptions {
+  /**
+   * 읽어 왔을 때의 `updated_at` — 주면 **그대로일 때만** 고친다(낙관적 동시성).
+   * 문답(`qa_items`·`qa_meta`)처럼 사람이 고친 것을 통째로 보내는 쓰기가 쓴다.
+   */
+  expectUpdatedAt?: string | null;
+}
+
 /**
  * 묶음의 상태·읽기 결과를 갱신한다.
+ *
+ * ⚠️ PostgREST 의 UPDATE 는 **0행이어도 error 가 null** 이다(2026-10-15 리뷰 7번). 고친 행을
+ *    돌려받아 비어 있으면 던진다 — 안 그러면 다른 탭에서 지운 묶음에 '저장했어요' 가 뜨고
+ *    미저장 표시가 사라진다(`deleteBundle` 과 같은 규약).
+ * ⚠️ `expectUpdatedAt` 을 주면 버전이 같을 때만 고친다(리뷰 2번). 0행이면 한 번 더 읽어
+ *    **충돌**(행은 있다)과 **없음**을 가른다 — 사람에게 할 말과 다시 할 일이 다르다.
+ *
+ * 버전은 `print_bundles_updated_at` 트리거(sql/26)가 쓰기마다 올린다. 조건 없는 쓰기(읽기 상태·
+ * 결과, 단어 영수증)도 버전을 올리므로, 그 사이 문답을 열어 둔 탭의 다음 저장은 조용히 덮지 않고
+ * **충돌**로 멈춘다. 반대로 문답 저장은 문답 칸만 보내므로 읽기 결과·영수증을 덮지 않는다.
  * @param id - 묶음 id
  * @param patch - 바꿀 값
- * @throws 저장 실패 시
+ * @param options - 버전 조건
+ * @returns 새 `updated_at`
+ * @throws BundleConflictError - 버전이 달라 고치지 않았을 때
+ * @throws BundleMissingError - 묶음이 없을 때(지워졌거나 권한 없음)
+ * @throws 그 밖의 저장 실패 시
  */
 export async function updateBundle(
   id: string,
@@ -71,9 +110,20 @@ export async function updateBundle(
     qa_meta?: PrintQaMeta;
     page_paths?: string[];
   },
-): Promise<void> {
-  const { error } = await supabase.from('print_bundles').update(patch).eq('id', id);
+  options: UpdateBundleOptions = {},
+): Promise<{ updated_at: string }> {
+  let request = supabase.from('print_bundles').update(patch).eq('id', id);
+  if (options.expectUpdatedAt) request = request.eq('updated_at', options.expectUpdatedAt);
+  const { data, error } = await request.select('updated_at').maybeSingle();
   if (error) throw error;
+  if (data) return { updated_at: data.updated_at as string };
+  if (!options.expectUpdatedAt) throw new BundleMissingError();
+
+  // 0행 — 버전이 달라서인지, 행이 없어서인지 가른다
+  const { data: still, error: readError } = await supabase
+    .from('print_bundles').select('id').eq('id', id).maybeSingle();
+  if (readError) throw readError;
+  throw still ? new BundleConflictError() : new BundleMissingError();
 }
 
 /**

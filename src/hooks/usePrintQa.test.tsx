@@ -17,7 +17,9 @@ vi.mock('@/lib/print-qa', async (importOriginal) => ({
   runPrintQaSplit: (...args: unknown[]) => runPrintQaSplit(...args),
   runPrintQaAnswers: (...args: unknown[]) => runPrintQaAnswers(...args),
 }));
-vi.mock('@/lib/print-scan/save', () => ({
+// 오류 갈래(충돌·없음)는 진짜를 쓴다 — 훅이 `instanceof` 로 가른다
+vi.mock('@/lib/print-scan/save', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/print-scan/save')>()),
   updateBundle: (...args: unknown[]) => updateBundle(...args),
 }));
 vi.mock('@/lib/ai/still-enabled', () => ({
@@ -56,7 +58,8 @@ const bundle = (over: Partial<PrintBundle> = {}): PrintBundle => ({
 beforeEach(() => {
   runPrintQaSplit.mockReset();
   runPrintQaAnswers.mockReset();
-  updateBundle.mockReset().mockResolvedValue(undefined);
+  // 저장은 새 버전을 돌려준다(2026-10-15 — 다음 저장의 조건이 된다)
+  updateBundle.mockReset().mockResolvedValue({ updated_at: 'v1' });
   ocrStillEnabled.mockReset().mockResolvedValue(true);
   [toastSuccess, toastWarning, toastError, toastInfo].forEach((t) => t.mockReset());
 });
@@ -193,6 +196,27 @@ describe('usePrintQa — 잠금 (코덱스 리뷰)', () => {
   });
 });
 
+describe('usePrintQa — 저장을 기다리는 동안 (코덱스 2R)', () => {
+  it('⚠️ AI 결과를 화면에 둔 뒤 저장이 끝날 때까지는 저장 안 됨이다 — 그 사이 떠나면 묻는다', async () => {
+    runPrintQaSplit.mockResolvedValue({
+      items: [item({ id: 'n1' })], work: { title: '', author: '' }, warnings: [],
+      dropped: { malformed: 0, duplicate: 0, answerNotInText: 0 },
+    });
+    let finishSave!: (v: { updated_at: string }) => void;
+    updateBundle.mockReturnValueOnce(new Promise((res) => { finishSave = res; }));
+    const { result } = renderHook(() => usePrintQa(bundle()));
+
+    let running!: Promise<number>;
+    act(() => { running = result.current.split(); });
+    await waitFor(() => expect(updateBundle).toHaveBeenCalled());
+    expect(result.current.items[0].id).toBe('n1');
+    expect(result.current.dirty).toBe(true);
+
+    await act(async () => { finishSave({ updated_at: 'v2' }); await running; });
+    expect(result.current.dirty).toBe(false);
+  });
+});
+
 describe('usePrintQa — 손 편집', () => {
   it('답을 고치면 teacher 가 되고 저장 전까지 dirty 다', async () => {
     const { result } = renderHook(() => usePrintQa(bundle({ qa_items: [item({ id: 'a' })] })));
@@ -210,7 +234,7 @@ describe('usePrintQa — 손 편집', () => {
     await waitFor(() => expect(result.current.dirty).toBe(false));
     expect(updateBundle).toHaveBeenCalledWith('b1', expect.objectContaining({
       qa_items: [expect.objectContaining({ answer: '직접 쓴 답' })],
-    }));
+    }), expect.anything());
   });
 
   it('⚠️ 물려받은 앞글은 승인이 풀린다 (Stop 게이트)', () => {

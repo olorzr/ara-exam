@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import ArchiveSelectionBar from '@/components/problem-bank/ArchiveSelectionBar';
 import ArchiveSidePanel from '@/components/problem-bank/ArchiveSidePanel';
 import ArchiveList from '@/components/problem-bank/ArchiveList';
+import ArchiveLoadError from '@/components/problem-bank/ArchiveLoadError';
 import ArchivePager from '@/components/problem-bank/ArchivePager';
 import ProblemCard from '@/components/problem-bank/ProblemCard';
 import ProblemDetailDialog from '@/components/problem-bank/ProblemDetailDialog';
@@ -113,6 +114,11 @@ function ArchiveContent() {
             onTagGrammar={() => setTagOpen(true)}
           />
 
+          {/* ⚠️ 지금 조건을 못 읽었으면 목록 대신 안내다 — 옛 조건의 행을 새 조건의 결과처럼 보이면
+              그 행으로 선택·삭제·태깅이 이어진다(2026-10-15 리뷰 5번) */}
+          {archive.failed ? (
+            <ArchiveLoadError failure={archive.failed} onRetry={archive.retry} />
+          ) : (
           <ArchiveList
             rows={archive.rows}
             loading={archive.loading}
@@ -130,6 +136,7 @@ function ArchiveContent() {
               />
             )}
           />
+          )}
 
           <ArchivePager
             page={archive.filters.page}

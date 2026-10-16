@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import ProblemEditorCard from '@/components/problem-review/ProblemEditorCard';
+import { useSignedImageUrls } from '@/hooks/useSignedImageUrls';
 import { useSourceTrees } from '@/hooks/useSourceTrees';
 import {
   ConflictError, deleteProblem, updateProblem, type ProblemPatch,
@@ -34,6 +36,20 @@ export default function ProblemEditPage() {
   const [loaded, setLoaded] = useState(false);
 
   const { areaTree, unitTree } = useSourceTrees(source);
+
+  /**
+   * 본문 속 그림의 서명 URL (2026-10-15 리뷰 9번).
+   *
+   * 버킷이 비공개라 경로만으로는 못 그린다 — 예전에는 이 화면만 서명을 안 해서, 출처 전체 검수
+   * 화면(`useProblemReview`)에서 멀쩡히 보이는 그림이 여기서는 늘 '불러오지 못했어요' 였다.
+   * **지금 문항의 경로**로 받으므로 그림을 빼고 저장하면(`setProblem`) 바라는 경로도 따라 바뀐다.
+   * URL 은 저장하지 않는다(만료된다) — 화면이 열릴 때마다 새로 받는다.
+   */
+  const figurePaths = useMemo(
+    () => (problem?.figure_paths ?? []).filter(Boolean),
+    [problem?.figure_paths],
+  );
+  const figures = useSignedImageUrls(figurePaths);
 
   useEffect(() => {
     let alive = true;
@@ -111,12 +127,25 @@ export default function ProblemEditPage() {
         )}
       </div>
 
+      {figures.missing.length > 0 && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
+        >
+          <span>본문 그림 {figures.missing.length}장을 불러오지 못했어요.</span>
+          <Button type="button" variant="outline" size="sm" onClick={figures.reload}>
+            다시 시도
+          </Button>
+        </div>
+      )}
+
       <ProblemEditorCard
         key={problem.id}
         problem={problem}
         passageWorks={passageWorks}
         areaTree={areaTree}
         unitTree={unitTree}
+        figureUrls={figures.urls}
         selected
         onSelect={() => { /* 단건 화면이라 선택 개념이 없다 */ }}
         onSave={save}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
@@ -15,8 +15,10 @@ import {
   buildConceptSheetPayload,
   generateConceptTitle,
   isCategoryIncomplete,
+  type ConceptDraftSnapshot,
 } from '@/lib/concept-sheet-form';
 import { useConceptMarkActions } from './useConceptMarkActions';
+import { useConceptSheetDraft } from './useConceptSheetDraft';
 import { DEFAULT_PASS_PERCENTAGE } from '@/lib/constants';
 import type { ConceptSheet } from '@/types';
 
@@ -73,13 +75,30 @@ export function useConceptSheetEditor(opts: ConceptSheetEditorOptions) {
   const toggleMarkingMode = useCallback(() => setMarkingMode((v) => !v), []);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(!isNew);
-  const [savedId, setSavedId] = useState<string | null>(isNew ? null : sheetId);
   const [initialHTML, setInitialHTML] = useState<string | null>(isNew ? '' : null);
-  // 낙관적 동시성 제어용. 불러올 때의 updated_at 을 기억해 저장 시 버전 충돌을 감지한다.
-  const [loadedUpdatedAt, setLoadedUpdatedAt] = useState<string | null>(null);
+  /**
+   * 저장된 개념지 id·버전·저장 중 — **ref** 다. 첫 저장이 끝나기 전에 다시 누르면 state 는 아직
+   * 안 바뀌어 있어 두 번째 INSERT 가 나간다(같은 개념지가 둘). 버전은 낙관적 동시성 제어용으로
+   * 불러올 때의 updated_at 을 기억해 저장 시 충돌을 감지하고, 저장마다 돌려받은 값으로 바뀐다.
+   */
+  const savedIdRef = useRef<string | null>(isNew ? null : sheetId);
+  const versionRef = useRef<string | null>(null);
+  const savingRef = useRef(false);
   const editorRef = useRef<Editor | null>(null);
 
   const markActions = useConceptMarkActions(editorRef, setEditorHTML);
+
+  /** 지금 화면의 편집 값 — 저장된 값과 견줘 '저장 안 됨'·주소 옮기기를 정한다(useConceptSheetDraft) */
+  const current = useMemo<ConceptDraftSnapshot>(
+    () => ({ title, category, html: editorHTML, passPercentage }),
+    [title, category, editorHTML, passPercentage],
+  );
+  const [initialSaved] = useState<ConceptDraftSnapshot | null>(() => (isNew
+    ? { title: '', category: DEFAULT_CONCEPT_CATEGORY, html: '', passPercentage: DEFAULT_PASS_PERCENTAGE }
+    : null));
+  const replace = useCallback((id: string) => router.replace(`${listHref}/${id}`), [router, listHref]);
+  const draft = useConceptSheetDraft({ current, initialSaved, editorRef, replace });
+  const { loadedIdRef, markLoaded, markSaved } = draft;
 
   /** 카테고리 변경 시 자동 제목도 갱신한다 */
   const handleCategoryChange = useCallback((next: BuilderCategory) => {
@@ -102,6 +121,8 @@ export function useConceptSheetEditor(opts: ConceptSheetEditorOptions) {
         setLoading(false);
         return;
       }
+      // ⚠️ 방금 만들어 주소만 바뀐 경우다 — 다시 읽으면 저장하는 사이 이어 친 값을 DB 값으로 덮는다
+      if (loadedIdRef.current === sheetId) return;
       // 네트워크 예외(throw)가 나도 스피너가 멈추도록 finally 에서 loading 을 내린다.
       try {
         const { data, error } = await supabase
@@ -117,8 +138,7 @@ export function useConceptSheetEditor(opts: ConceptSheetEditorOptions) {
         }
 
         const sheet = data as ConceptSheet;
-        setTitle(sheet.title);
-        setCategory({
+        const loadedCategory: BuilderCategory = {
           level: sheet.level,
           year: sheet.year ?? '',
           grade: sheet.grade,
@@ -127,14 +147,18 @@ export function useConceptSheetEditor(opts: ConceptSheetEditorOptions) {
           unit: sheet.unit,
           subunit: sheet.subunit,
           schoolName: sheet.school_name ?? '',
-        });
-        setLoadedUpdatedAt(sheet.updated_at);
-        setPassPercentage(sheet.pass_percentage ?? DEFAULT_PASS_PERCENTAGE);
+        };
+        const loadedPass = sheet.pass_percentage ?? DEFAULT_PASS_PERCENTAGE;
+        setTitle(sheet.title);
+        setCategory(loadedCategory);
+        versionRef.current = sheet.updated_at;
+        setPassPercentage(loadedPass);
         // 저장 시 sanitize 했더라도 과거 오염 데이터나 직접 DB/RPC 쓰기가 남아 있을 수
         // 있다. 편집기 content 로 주입하기 전에 읽기 경로에서도 정화한다.
         const safeHTML = sanitizeConceptHTML(sheet.editor_html);
         setInitialHTML(safeHTML);
         setEditorHTML(safeHTML);
+        markLoaded(sheet.id, { title: sheet.title, category: loadedCategory, html: safeHTML, passPercentage: loadedPass });
       } catch {
         toast.error('개념지를 불러오지 못했어요.');
         router.push(listHref);
@@ -142,11 +166,12 @@ export function useConceptSheetEditor(opts: ConceptSheetEditorOptions) {
         setLoading(false);
       }
     })();
-  }, [isNew, sheetId, user, router, listHref]);
+  }, [isNew, sheetId, user, router, listHref, loadedIdRef, markLoaded]);
 
   /* ── 저장 (editor_html 은 sanitizeConceptHTML 로 정화) ── */
   const handleSave = useCallback(async () => {
-    if (!user) return;
+    // ⚠️ 저장 중에 다시 누르면 무시한다 — 첫 INSERT 가 끝나기 전이면 같은 개념지가 둘 생긴다
+    if (!user || savingRef.current) return;
 
     if (isCategoryIncomplete(category)) {
       toast.error('카테고리를 먼저 설정해주세요.');
@@ -155,18 +180,24 @@ export function useConceptSheetEditor(opts: ConceptSheetEditorOptions) {
 
     const editor = editorRef.current;
     const currentMarks = editor ? extractMarks(editor) : marks;
+    /** 보내는 편집 값 — 저장하는 사이 이어 친 것과 가르려고 붙잡아 둔다(useConceptSheetDraft) */
+    const sent: ConceptDraftSnapshot = {
+      title, category, html: editor ? editor.getHTML() : editorHTML, passPercentage,
+    };
     const payload = buildConceptSheetPayload({
       title,
       category,
-      html: sanitizeConceptHTML(editor ? editor.getHTML() : editorHTML),
+      html: sanitizeConceptHTML(sent.html),
       marks: currentMarks,
       passPercentage,
     });
 
+    savingRef.current = true;
     setSaving(true);
 
     // 저장 중 throw(네트워크 등)가 나도 스피너가 멈추도록 finally 에서 saving 을 내린다.
     try {
+      const savedId = savedIdRef.current;
       if (savedId) {
         // 낙관적 동시성 제어: concept_sheets 는 공유 테이블이라 두 사람이 동시에
         // 편집하면 마지막 저장이 상대 변경을 통째로 덮어쓴다(last-write-wins).
@@ -176,8 +207,8 @@ export function useConceptSheetEditor(opts: ConceptSheetEditorOptions) {
           .from('concept_sheets')
           .update(payload)
           .eq('id', savedId);
-        if (loadedUpdatedAt) {
-          query = query.eq('updated_at', loadedUpdatedAt);
+        if (versionRef.current) {
+          query = query.eq('updated_at', versionRef.current);
         }
         const { data, error } = await query.select('updated_at').maybeSingle();
 
@@ -189,9 +220,11 @@ export function useConceptSheetEditor(opts: ConceptSheetEditorOptions) {
           toast.error('다른 사용자가 이 개념지를 먼저 수정했어요. 새로고침 후 다시 저장해주세요.');
           return;
         }
-        setLoadedUpdatedAt(data.updated_at);
+        versionRef.current = data.updated_at;
         fireConceptGradeSync(savedId, currentMarks.length);
         toast.success('저장되었습니다.');
+        // 지난번에 미뤄 둔 주소 옮기기가 있으면 깨끗해진 지금 시도한다
+        markSaved(sent, savedId, false);
       } else {
         const { data, error } = await supabase
           .from('concept_sheets')
@@ -203,20 +236,23 @@ export function useConceptSheetEditor(opts: ConceptSheetEditorOptions) {
           toast.error('저장에 실패했습니다.');
           return;
         }
-        setSavedId(data.id);
-        setLoadedUpdatedAt(data.updated_at);
+        savedIdRef.current = data.id;
+        versionRef.current = data.updated_at;
         fireConceptGradeSync(data.id, currentMarks.length);
         toast.success('저장되었습니다.');
-        router.replace(`${listHref}/${data.id}`);
+        // ⚠️ 주소는 **저장하는 사이 손댄 것이 없을 때만** 옮긴다(2026-10-15 리뷰 4번) — 옮기면 화면이
+        //    새로 마운트돼 DB 값으로 다시 그려지고, 이어 친 글이 사라진다
+        markSaved(sent, data.id, true);
       }
     } catch {
       toast.error('저장에 실패했습니다.');
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
     // ⚠️ passPercentage 를 deps 에 넣지 않으면 방금 바꾼 합격 기준이 아니라 마운트 시점 값으로
     //    저장된다(화면엔 70% 인데 저장은 80% 가 되는 조용한 어긋남).
-  }, [user, title, category, editorHTML, marks, passPercentage, savedId, loadedUpdatedAt, router, listHref]);
+  }, [user, title, category, editorHTML, marks, passPercentage, markSaved]);
 
   return {
     router,
@@ -242,6 +278,9 @@ export function useConceptSheetEditor(opts: ConceptSheetEditorOptions) {
     initialHTML,
     editorRef,
     handleSave,
+    /** 저장된 값과 다른 편집이 있는가 — 떠날 때 묻는 기준이기도 하다 */
+    dirty: draft.dirty,
+    handleEditorReady: draft.handleEditorReady,
     ...markActions,
   };
 }

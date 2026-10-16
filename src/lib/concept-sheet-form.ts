@@ -99,3 +99,33 @@ export function buildConceptSheetPayload(input: {
     pass_percentage: clampPassPercentage(input.passPercentage, DEFAULT_PASS_PERCENTAGE),
   };
 }
+
+/**
+ * 편집기에서 사람이 고치는 값 전부 — **저장하는 사이 무엇이 바뀌었는지** 이것으로 가린다
+ * (2026-10-15 리뷰 4번). 마킹은 편집기 HTML 안(`<mark data-concept>`)에 들어 있어 `html` 이 함께 덮는다.
+ */
+export interface ConceptDraftSnapshot {
+  title: string;
+  category: BuilderCategory;
+  /** 편집기 원본 HTML(정화 전) — 같은 편집기가 낸 두 값끼리만 견준다 */
+  html: string;
+  passPercentage: number;
+}
+
+/** 카테고리에서 견줄 칸 — `BuilderCategory` 의 칸 전부 */
+const BUILDER_CATEGORY_KEYS: readonly (keyof BuilderCategory)[] = [
+  'level', 'year', 'grade', 'publisher', 'semester', 'unit', 'subunit', 'schoolName',
+];
+
+/**
+ * 두 편집 값이 같은가.
+ * @param a - 편집 값
+ * @param b - 편집 값
+ * @returns 제목·카테고리·본문(마킹 포함)·합격 기준이 모두 같으면 true
+ */
+export function conceptDraftEquals(a: ConceptDraftSnapshot, b: ConceptDraftSnapshot): boolean {
+  return a.title === b.title
+    && a.html === b.html
+    && a.passPercentage === b.passPercentage
+    && BUILDER_CATEGORY_KEYS.every((key) => a.category[key] === b.category[key]);
+}

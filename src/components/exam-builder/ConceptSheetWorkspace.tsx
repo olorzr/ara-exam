@@ -123,6 +123,7 @@ export default function ConceptSheetWorkspace({
               initialContent={e.initialHTML ?? undefined}
               markingMode={e.markingMode}
               onToggleMarkingMode={e.toggleMarkingMode}
+              onReady={e.handleEditorReady}
             />
           </div>
           <div className="flex-[3] min-w-[280px] h-full overflow-y-auto">

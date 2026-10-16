@@ -15,9 +15,9 @@ import {
   runPrintQaAnswers, runPrintQaSplit, splitNotice, splitWarnings,
 } from '@/lib/print-qa';
 import { PRINT_OCR_EFFORT_PREFERENCE, PRINT_OCR_MODEL_PREFERENCE } from '@/lib/print-scan/constants';
-import { updateBundle } from '@/lib/print-scan/save';
 import type { PrintBundle, PrintQaItem, PrintQaMeta } from '@/types/print-scan';
 import { featureAllowed, reportQaError } from './usePrintQa.guards';
+import { usePrintQaPersist } from './usePrintQaPersist';
 import { usePrintQaSelection } from './usePrintQaSelection';
 
 /**
@@ -45,40 +45,34 @@ export function usePrintQa(bundle: PrintBundle) {
   const [meta, setMeta] = useState<PrintQaMeta>(() => bundle.qa_meta ?? {});
   const [phase, setPhase] = useState<PrintQaPhase>(null);
   const selection = usePrintQaSelection(bundle.qa_items ?? []);
+  /** 원문 묶음 — 충돌 뒤 서버 값을 받으면 그 행이다(코덱스 2R: 옛 원문으로 두면 어긋남 경고가 숨는다) */
+  const [source, setSource] = useState<PrintBundle>(bundle);
   const [dirty, setDirty] = useState(false);
-  const [saving, setSaving] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   /**
-   * 저장이 도는 중인가.
-   *
-   * ⚠️ **state 가 아니라 ref 다.** 같은 실행 흐름에서 두 번 부르면 state 는 아직 안 바뀌어 있어
-   *    두 번째가 통과한다(`usePrintSheetList` 의 `busyRef` 와 같은 판단).
-   * ⚠️ 저장과 AI 는 **한 잠금**이다(코덱스 리뷰). 따로 두면 모범답안이 도는 동안 누른 저장이
-   *    **옛 문항을 나중에 덮어써**, 화면에는 새 답이 보이는데 DB 에는 옛 답이 남고
-   *    `dirty` 는 false 라 아무도 눈치채지 못한다.
+   * 문답 저장 — 읽어 온 버전과 같을 때만 고친다(2026-10-15 리뷰 2번). 저장·AI 공용 잠금도 여기 있다.
+   * ⚠️ 저장은 던지지 않고 성공 여부만 돌려준다. **결과·편집은 저장 전에 화면에 둔다** — 충돌하거나
+   *    묶음이 지워졌어도 AI 가 만든 것과 사람이 고친 것이 남고 `dirty` 로 '저장 안 됨' 이 보인다.
    */
-  const savingRef = useRef(false);
+  const {
+    saving, failure: saveFailure, persist, savingRef, saveNow, reloadSaved, overwrite,
+  } = usePrintQaPersist(bundle, abortRef);
 
   // 느슨한 정리는 늦게 실행돼 이미 끝난 생성이 슬쩍 통과할 수 있다(usePrintScanOcr 과 같은 이유)
   useLayoutEffect(() => () => abortRef.current?.abort(), []);
 
   // 나누기가 보는 평문과 **같은 함수**로 만든다 — 따로 만들면 모범답안의 근거 대조가
   // 미묘하게 다른 글을 본다(`handwriting.ts` 의 표시 글자 처리)
-  const source = useMemo(
-    () => readPlainWithHandwriting(bundle.ocr_html, bundle.include_handwriting),
-    [bundle.ocr_html, bundle.include_handwriting],
+  const read = useMemo(
+    () => readPlainWithHandwriting(source.ocr_html, source.include_handwriting),
+    [source.ocr_html, source.include_handwriting],
   );
-  const plain = source.plain;
-  const hash = useMemo(() => printQaSourceHash(bundle.ocr_html), [bundle.ocr_html]);
+  const plain = read.plain;
+  const hash = useMemo(() => printQaSourceHash(source.ocr_html), [source.ocr_html]);
   /** 나눠 둔 문답이 지금 원문과 어긋나는가 — **지우지 않고 알리기만 한다** */
   const stale = isQaStale({ qa_items: items, qa_meta: meta }, hash);
 
   const cancel = useCallback(() => abortRef.current?.abort(), []);
-
-  /** 문답과 영수증을 함께 저장한다 — 둘이 갈라지면 해시가 거짓말을 한다 */
-  const persist = useCallback(async (nextItems: PrintQaItem[], nextMeta: PrintQaMeta) => {
-    await updateBundle(bundle.id, { qa_items: nextItems, qa_meta: nextMeta });
-  }, [bundle.id]);
 
   /**
    * 본문을 물음과 답으로 나눈다 (AI 한 턴).
@@ -114,9 +108,9 @@ export function usePrintQa(bundle: PrintBundle) {
       if (controller.signal.aborted) return 0;
 
       const result = await runPrintQaSplit({
-        html: bundle.ocr_html,
-        bundle: { name: bundle.name, school_name: bundle.school_name, grade: bundle.grade },
-        includeHandwriting: bundle.include_handwriting,
+        html: source.ocr_html,
+        bundle: { name: source.name, school_name: source.school_name, grade: source.grade },
+        includeHandwriting: source.include_handwriting,
         seed: Date.now().toString(36),
         port,
         pref,
@@ -136,11 +130,14 @@ export function usePrintQa(bundle: PrintBundle) {
         // 남겨 두면 인쇄물이 쓰지도 않은 자료 이름을 찍는다
         ranAt: new Date().toISOString(),
       };
-      await persist(result.items, nextMeta);
       setItems(result.items);
       setMeta(nextMeta);
       selection.reset(result.items);
-      setDirty(false);
+      // ⚠️ 저장을 기다리기 **전에** '저장 안 됨' 으로 둔다(코덱스 2R) — 느린 저장 동안 떠나도 묻게
+      setDirty(true);
+      const saved = await persist(result.items, nextMeta);
+      setDirty(!saved);
+      if (!saved) return result.items.length;
 
       const notice = splitNotice(result);
       toast[notice.level](notice.text);
@@ -154,7 +151,7 @@ export function usePrintQa(bundle: PrintBundle) {
       abortRef.current = null;
       setPhase(null);
     }
-  }, [bundle, hash, items.length, persist, selection]);
+  }, [source, hash, items.length, persist, savingRef, selection]);
 
   /**
    * 골라 둔 문항에 모범답안을 만든다 (AI 한 턴).
@@ -194,7 +191,7 @@ export function usePrintQa(bundle: PrintBundle) {
         work: meta.work,
         references,
         // 학생이 연필로 적은 답이 'AI 가 프린트에서 찾은 근거' 로 둔갑하지 않게 한다
-        handwritten: source.ranges,
+        handwritten: read.ranges,
         port: getCodexPort(),
         pref: getCodexModelPref(),
         signal: controller.signal,
@@ -214,10 +211,12 @@ export function usePrintQa(bundle: PrintBundle) {
         ])],
         answeredAt: new Date().toISOString(),
       };
-      await persist(nextItems, nextMeta);
       setItems(nextItems);
       setMeta(nextMeta);
-      setDirty(false);
+      setDirty(true);
+      const saved = await persist(nextItems, nextMeta);
+      setDirty(!saved);
+      if (!saved) return result.answers.length;
 
       const notice = answersNotice(result, targets.length);
       toast[notice.level](notice.text);
@@ -232,7 +231,7 @@ export function usePrintQa(bundle: PrintBundle) {
       abortRef.current = null;
       setPhase(null);
     }
-  }, [items, meta, persist, plain, selection.picked, source.ranges]);
+  }, [items, meta, persist, plain, read.ranges, savingRef, selection.picked]);
 
   /** 물음을 손으로 고친다 */
   const updateQuestion = useCallback((id: string, question: string) => {
@@ -268,29 +267,33 @@ export function usePrintQa(bundle: PrintBundle) {
   /** 기본 대상(답 없음·학생 손글씨)으로 되돌린다 */
   const pickDefault = useCallback(() => selection.reset(items), [items, selection]);
 
-  /** 손으로 고친 것을 저장한다 */
+  /** 손으로 고친 것을 저장한다 — 충돌·없음이면 `dirty` 를 내리지 않고 그 까닭을 `saveFailure` 로 둔다 */
   const save = useCallback(async () => {
     // AI 가 도는 중에는 저장하지 않는다 — 끝나면 그쪽이 저장하고, 여기서 끼어들면 서로 덮는다
-    if (savingRef.current || abortRef.current) return;
-    savingRef.current = true;
-    setSaving(true);
-    try {
-      await persist(items, meta);
-      setDirty(false);
-      toast.success('저장했어요.');
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : '저장하지 못했어요.');
-    } finally {
-      savingRef.current = false;
-      setSaving(false);
-    }
-  }, [items, meta, persist]);
+    if (await saveNow(items, meta)) setDirty(false);
+  }, [items, meta, saveNow]);
+
+  /** 충돌 뒤: 저장된 문답으로 되돌린다(이 화면의 것을 버린다 — 확인창) */
+  const reloadSavedQa = useCallback(() => reloadSaved((row) => {
+    setSource(row);
+    const saved = row.qa_items ?? [];
+    setItems(saved);
+    setMeta(row.qa_meta ?? {});
+    selection.reset(saved);
+    setDirty(false);
+  }), [reloadSaved, selection]);
+
+  /** 충돌 뒤: 이 화면의 문답으로 덮는다(상대 교정을 버린다 — 확인창) */
+  const overwriteQa = useCallback(async () => {
+    if (await overwrite(items, meta, setSource)) setDirty(false); // 덮는 행의 원문도 받는다(어긋남 경고)
+  }, [items, meta, overwrite]);
 
   return {
-    items, meta, phase, dirty, saving, plain, stale,
+    items, meta, phase, dirty, saving, plain, stale, saveFailure,
     picked: selection.picked,
     running: phase !== null,
     split, generateAnswers, pick: selection.pick, pickDefault, pickNone: selection.clear,
     approveLead, updateQuestion, updateAnswer, removeItem, save, cancel,
+    reloadSaved: reloadSavedQa, overwrite: overwriteQa,
   };
 }

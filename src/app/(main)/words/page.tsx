@@ -99,14 +99,27 @@ function WordsContent() {
                 onBulkDelete={m.handleBulkDelete}
               />
 
-              <WordCardGrid
-                words={m.sortedWords}
-                onEdit={m.startEdit}
-                onDelete={m.handleDeleteWord}
-                selectMode={m.selectMode}
-                selectedIds={m.selectedWordIds}
-                onToggleSelect={m.toggleWordSelect}
-              />
+              {/* ⚠️ 고른 카테고리의 목록이 오기 전·못 읽었을 때는 옛 목록을 그리지 않는다 —
+                  그 목록으로 수정·삭제·이동하면 다른 카테고리의 단어가 바뀐다(2026-10-15 리뷰 1번) */}
+              {m.wordsLoading ? (
+                <div className="flex items-center justify-center py-12" role="status" aria-label="단어 불러오는 중">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+                </div>
+              ) : m.wordsFailed ? (
+                <div className="flex flex-col items-center gap-3 py-12 text-sm text-gray-500" role="alert">
+                  <p>단어를 불러오지 못했어요.</p>
+                  <Button type="button" variant="outline" size="sm" onClick={m.reloadWords}>다시 시도</Button>
+                </div>
+              ) : (
+                <WordCardGrid
+                  words={m.sortedWords}
+                  onEdit={m.startEdit}
+                  onDelete={m.handleDeleteWord}
+                  selectMode={m.selectMode}
+                  selectedIds={m.selectedWordIds}
+                  onToggleSelect={m.toggleWordSelect}
+                />
+              )}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-20 text-gray-300">

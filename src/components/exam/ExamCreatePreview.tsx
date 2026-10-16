@@ -11,12 +11,19 @@ interface ExamCreatePreviewProps {
   passPercentage: number;
   passCount: number;
   creating: boolean;
+  /** 지금 고른 카테고리의 단어를 읽는 중인가 — 그동안은 만들 수 없다(옛 선택의 단어가 출제된다) */
+  wordsLoading?: boolean;
+  /** 지금 고른 카테고리의 단어를 못 읽었는가 */
+  wordsFailed?: boolean;
+  /** 단어를 다시 읽는다 */
+  onRetryWords?: () => void;
   onCreate: () => void;
 }
 
 /** 시험지 생성 페이지 오른쪽 미리보기 카드 (문항 수·합격 기준·생성 버튼) */
 export default function ExamCreatePreview({
-  totalQuestions, passPercentage, passCount, creating, onCreate,
+  totalQuestions, passPercentage, passCount, creating, wordsLoading = false, wordsFailed = false,
+  onRetryWords, onCreate,
 }: ExamCreatePreviewProps) {
   return (
     <Card className="sticky top-24">
@@ -50,13 +57,22 @@ export default function ExamCreatePreview({
 
         <Separator />
 
+        {wordsFailed && (
+          <div className="flex items-center justify-between gap-2 text-xs text-red-600" role="alert">
+            <span>단어를 불러오지 못했어요.</span>
+            {onRetryWords && (
+              <Button type="button" variant="outline" size="sm" onClick={onRetryWords}>다시 시도</Button>
+            )}
+          </div>
+        )}
+
         <Button
           className="w-full bg-primary hover:bg-primary-hover text-white"
           onClick={onCreate}
-          disabled={creating || totalQuestions < MIN_EXAM_WORDS}
+          disabled={creating || wordsLoading || wordsFailed || totalQuestions < MIN_EXAM_WORDS}
         >
           <FileText className="h-4 w-4 mr-2" />
-          {creating ? '생성 중...' : '시험지 생성'}
+          {creating ? '생성 중...' : wordsLoading ? '단어 불러오는 중…' : '시험지 생성'}
         </Button>
       </CardContent>
     </Card>

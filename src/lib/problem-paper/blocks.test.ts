@@ -197,6 +197,40 @@ describe('imagePathsOf', () => {
   it('텍스트 출제 문항의 image_path 는 인쇄에 쓰지 않는다', () => {
     expect(imagePathsOf([snap({ render_mode: 'text', image_path: 'x.jpg' })])).toEqual([]);
   });
+
+  // 2026-10-15 리뷰 10번 — 이미지로 인쇄하면 본문 삽화는 그려지지 않는다
+  it('⚠️ 이미지로 출제한 문항은 잘라 둔 이미지만 받는다 — 안 쓰는 삽화가 깨져도 인쇄가 잠기면 안 된다', () => {
+    const paths = imagePathsOf([snap({
+      render_mode: 'image', image_path: 'main.jpg', figure_paths: ['unused.jpg'],
+    })]);
+    expect(paths).toEqual(['main.jpg']);
+  });
+
+  it('⚠️ 이미지로 출제한 지문도 잘라 둔 이미지만 받는다', () => {
+    const p = {
+      ...passage('P1'), render_mode: 'image' as const, image_path: 'passage-main.jpg',
+      figure_paths: ['passage-unused.jpg'],
+    };
+    expect(imagePathsOf([snap({ passage: p })])).toEqual(['passage-main.jpg']);
+  });
+
+  it('글로 출제한 문항·지문은 삽화를 받는다', () => {
+    const p = { ...passage('P1'), figure_paths: ['pf.jpg'] };
+    const paths = imagePathsOf([snap({ passage: p, figure_paths: ['qf.jpg'] })]);
+    expect(paths.sort()).toEqual(['pf.jpg', 'qf.jpg']);
+  });
+
+  it('⚠️ 이미지 출제인데 잘라 둔 이미지가 없으면 글로 떨어지므로 삽화가 필요하다', () => {
+    const p = { ...passage('P1'), render_mode: 'image' as const, image_path: '', figure_paths: ['pf.jpg'] };
+    const paths = imagePathsOf([snap({
+      passage: p, render_mode: 'image', image_path: '', figure_paths: ['qf.jpg'],
+    })]);
+    expect(paths.sort()).toEqual(['pf.jpg', 'qf.jpg']);
+    // 블록도 같은 판정이다 — 글 블록으로 떨어진다
+    const kinds = build([snap({ passage: p, render_mode: 'image', image_path: '' })]).map((b) => b.kind);
+    expect(kinds).not.toContain('passage-image');
+    expect(kinds).not.toContain('problem-image');
+  });
 });
 
 describe('buildAnswerRows', () => {
