@@ -120,14 +120,15 @@ describe('buildSchoolExamTree — 맨 위 가지', () => {
 
   it('평가원 회차는 학년이 비어도 고3 과 한 잎이다 — 한 시험이 두 잎으로 갈리면 안 된다', () => {
     const tree = buildSchoolExamTree([mock(), mock({ grade: '' })]);
-    const leaves = tree[0].children[0].children;
+    // 모의고사·수능 › 고3 › 학년도 › 회차
+    const leaves = tree[0].children[0].children[0].children;
     expect(leaves.map((n) => n.label)).toEqual(['수능']);
     expect(schoolExamFilterPatch(leaves[0].value!).grade).toBe('');
   });
 
   it('모의고사에 학교·학기가 남아 있어도 같은 회차는 잎 하나다', () => {
     const tree = buildSchoolExamTree([mock(), mock({ school_name: '상현중', semester: '1학기' })]);
-    const leaves = tree[0].children[0].children;
+    const leaves = tree[0].children[0].children[0].children;
     expect(leaves.map((n) => n.label)).toEqual(['수능']);
     expect(leaves[0].value).toMatchObject({ school_name: '', semester: '' });
   });
