@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import SourceFilterBar from '@/components/problem-bank/SourceFilterBar';
@@ -27,7 +27,6 @@ const SEARCH_DEBOUNCE_MS = 300;
  * 조건은 주소에 싣는다 — 시험지를 열었다가 뒤로 와도 좁혀 둔 목록이 그대로다.
  */
 function SourcesContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [filters, setFilters] = useState<SourceListFilters>(
     () => sourceListFiltersFromParams(new URLSearchParams(searchParams.toString())),
@@ -35,10 +34,13 @@ function SourcesContent() {
   const [title, setTitle] = useState(filters.title);
   const [facets, setFacets] = useState<SourceFacets>(EMPTY_SOURCE_FACETS);
 
-  // 주소는 조건을 따라간다(뒤로 가기에 히스토리를 쌓지 않도록 replace)
+  // 주소는 조건을 따라간다(뒤로 가기에 히스토리를 쌓지 않도록 replace).
+  // ⚠️ router.replace 가 아니라 네이티브 replaceState 다 — 라우터는 같은 쪽이어도 서버 왕복(RSC)을 한 번 더 해
+  //    들어올 때와 제목을 칠 때마다 요청이 붙었다(2026-10-22, 아카이브의 2026-10-15 와 같은 판단). 이 화면은 주소를
+  //    **처음 한 번만** 읽으므로(useState 초기화) 적기만 하면 되고, Next 16 은 네이티브 history 를 useSearchParams 와 맞춘다
   useEffect(() => {
-    router.replace(`/problems/sources${sourceListFiltersToQueryString(filters)}`, { scroll: false });
-  }, [filters, router]);
+    window.history.replaceState(null, '', `/problems/sources${sourceListFiltersToQueryString(filters)}`);
+  }, [filters]);
 
   // 제목은 치기를 멈춘 뒤에 묻는다
   useEffect(() => {

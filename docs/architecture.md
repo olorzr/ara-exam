@@ -166,6 +166,7 @@ src/
           (problem-ocr 의 run·parse·merge·verify·answer-key)과 검수 절차는 걷었다 — git 이력에 있다
 [올라간 기출] 표 목록(`/problems/sources`) — 위 드롭다운(유형·학교급·학교·학년도·학년·학기·
           시험·교과서) + 제목 검색 + 차례, 문항 수(0 이면 '문항 없음'), '더 보기'
+          — 문항 수는 계산 열 `exam.problem_count`(sql/74)라 보이는 30건에만 센다
 [시험지]  원본 페이지 이미지 + 영역 오버레이 ↔ TipTap 편집·정답·영역·교과서 단원 — 틀린 곳을 고친다
           + 따로 올린 답지 보기 + 그림 추가(끌어 잡기)·다시 자르기·빼기
           + 다음 쪽 이어 읽기 / 앞 지문에 붙이기
@@ -364,7 +365,7 @@ src/
   작품·문법·출처 칸을 뺀 나머지만 체인에 넘긴다), source-axes.ts(출처 칸 조건
   `applySourceAxes` — 올라간 기출 목록과 한 벌, 함수 인자 모양 `sourceAxisArgs` 도 같은 규칙), solo-filter.ts('그 작품만 · 그 문법만' — 작품 축은 `work_titles` 같음,
   문법 축은 지문 대영역 복제 칸 `passage_area`(sql/67) in), passage-shape.ts(지문 저장이 딸린 문항 행을 움직이는가),
-  source-list.ts·source-list-filters.ts(올라간 기출 목록 — 칸 규칙은 `buildFilterAxes` 를 빌려 쓴다),
+  source-list.ts·source-list-filters.ts(올라간 기출 목록 — 칸 규칙은 `buildFilterAxes` 를 빌려 쓴다, 문항 수는 계산 열 `problem_count`(sql/74)),
   source-queries.ts(한 출처를 통째로 — 시험지 화면),
   facets.ts(트리·선택지 재료 — `exam.archive_facets()` RPC 한 번(POST), 서버 캐시 sql/71)·facets-payload.ts(응답 검사)·
     facets-cache.ts(탭 안 캐시 5분 — 쓰기 함수가 무효화한다, 의존성 없음),

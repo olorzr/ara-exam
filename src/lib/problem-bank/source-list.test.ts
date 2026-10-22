@@ -39,7 +39,8 @@ beforeEach(() => {
 describe('fetchSources — 조건', () => {
   it('조건 없이 부르면 최근 올린 순, 마지막 키는 id 다', async () => {
     await fetchSources();
-    expect(last().searchParams.get('select')).toBe('*,problems(count)');
+    // 문항 수는 계산 열이다 — 임베드(problems(count))는 출처 전체에 돌았다(sql/74)
+    expect(last().searchParams.get('select')).toBe('*,problem_count');
     expect(last().searchParams.get('order')).toBe('created_at.desc,id.desc');
     expect(last().searchParams.get('school_name')).toBeNull();
   });
@@ -71,10 +72,9 @@ describe('fetchSources — 조건', () => {
 });
 
 describe('fetchSources — 문항 수', () => {
-  it('임베드한 개수를 줄에 펴고 임베드 칸은 걷는다', async () => {
-    body = JSON.stringify([{ id: 'a', title: '가', problems: [{ count: 23 }] }, { id: 'b', title: '나', problems: [] }]);
+  it('계산 열의 개수를 그대로 쓰고, 비어 오면 0 이다', async () => {
+    body = JSON.stringify([{ id: 'a', title: '가', problem_count: 23 }, { id: 'b', title: '나', problem_count: null }, { id: 'c', title: '다' }]);
     const page = await fetchSources();
-    expect(page.rows.map((r) => r.problem_count)).toEqual([23, 0]);
-    expect('problems' in page.rows[0]).toBe(false);
+    expect(page.rows.map((r) => r.problem_count)).toEqual([23, 0, 0]);
   });
 });

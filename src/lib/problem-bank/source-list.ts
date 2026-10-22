@@ -39,13 +39,12 @@ export interface SourcePage {
   total: number;
 }
 
-/** 출처 행 + 문항 수 임베드(`problems(count)`) */
-type SourceRowWithCount = ProblemSource & { problems?: { count: number }[] };
+/** 출처 행 + 문항 수 계산 열(`problem_count`, sql/74) */
+type SourceRowWithCount = ProblemSource & { problem_count?: number | null };
 
-/** 임베드 모양을 목록 줄 모양으로 */
+/** 계산 열이 비어 오면(옛 응답·목) 0 으로 — '문항 없음' 으로 보인다 */
 function toListRow(row: SourceRowWithCount): SourceListRow {
-  const { problems, ...source } = row;
-  return { ...source, problem_count: problems?.[0]?.count ?? 0 };
+  return { ...row, problem_count: row.problem_count ?? 0 };
 }
 
 /**
@@ -68,8 +67,12 @@ export async function fetchSources(
 
   let request = supabase
     .from('problem_sources')
-    // 문항 수를 같은 왕복에서 센다 — 줄마다 따로 물으면 30번 왕복이다
-    .select('*, problems(count)', { count: 'exact' });
+    // 문항 수를 같은 왕복에서 센다 — 줄마다 따로 물으면 30번 왕복이다.
+    // ⚠️ `problems(count)` 임베드로 되돌리지 말 것(sql/74). 임베드는 LATERAL 조인이라, RLS 때문에 출처를
+    //    3행으로 잘못 추정한 플래너가 **출처 전체(1,185)마다** 문항을 센 뒤에 30건을 잘랐다(첫 조회 6.5초).
+    //    계산 열은 select 목록의 함수라 정렬·LIMIT 뒤로 미뤄져 보이는 행에만 돈다(같은 조건 100 ms).
+    //    `*` 는 계산 열을 담지 않아 이름을 따로 적는다
+    .select('*, problem_count', { count: 'exact' });
   request = applySourceAxes(request, query, '');
   if (query.title) request = request.ilike('title', `%${escapeIlike(query.title)}%`);
 
