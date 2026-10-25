@@ -55,7 +55,7 @@ const itemsByPaper = new Map([
 ]);
 
 const book: Book = {
-  id: 'b', title: '국어 문학', settings: DEFAULT_BOOK_SETTINGS, pageCounts: {}, cover: null,
+  id: 'b', title: '국어 문학', kind: 'book', finishedAt: null, settings: DEFAULT_BOOK_SETTINGS, pageCounts: {}, cover: null,
   userId: 'u', createdAt: '2026-10-25T00:00:00Z', updatedAt: '2026-10-25T00:00:00Z',
 };
 

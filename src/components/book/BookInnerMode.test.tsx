@@ -29,7 +29,8 @@ const snap = (n: number, over: Partial<PaperItemSnapshot> = {}): PaperItemSnapsh
 });
 const chapters: BookChapter[] = [{ id: 'c', bookId: 'b', paperId: 'p', orderIndex: 0, titleOverride: '', paper: null }];
 const book: Book = {
-  id: 'b', title: '책', settings: DEFAULT_BOOK_SETTINGS, pageCounts: {}, cover: null, userId: 'u', createdAt: '', updatedAt: '',
+  id: 'b', title: '책', kind: 'book', finishedAt: null, settings: DEFAULT_BOOK_SETTINGS, pageCounts: {}, cover: null,
+  userId: 'u', createdAt: '', updatedAt: '',
 };
 
 describe('BookInnerMode — 번호 어긋남 경고(코덱스 2R)', () => {

@@ -21,7 +21,8 @@ vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 const { useBook } = await import('./useBook');
 
 const base: Book = {
-  id: 'b1', title: '책', settings: DEFAULT_BOOK_SETTINGS, pageCounts: { teacher: { pages: 40, key: 't' } },
+  id: 'b1', title: '책', kind: 'book', finishedAt: null, settings: DEFAULT_BOOK_SETTINGS,
+  pageCounts: { teacher: { pages: 40, key: 't' } },
   cover: null, userId: 'u', createdAt: '', updatedAt: '',
 };
 
@@ -220,5 +221,63 @@ describe('useBook — 실패 되돌리기(코덱스 3R)', () => {
       await result.current.renameChapter('c0', '둘째 시도');
     });
     expect(result.current.chapters[0].titleOverride).toBe('저장된 제목');
+  });
+});
+
+describe('useBook — 다 만든 표시', () => {
+  beforeEach(() => {
+    m.fetchBook.mockResolvedValue({ book: base, chapters: [] });
+    m.updateBook.mockReset();
+  });
+
+  it('누르면 화면에 먼저 얹고 시각을 보내며, 서버 값을 받는다', async () => {
+    const pending = deferred<Book>();
+    m.updateBook.mockReturnValueOnce(pending.promise);
+    const { result } = await loaded();
+    await act(async () => { void result.current.setFinished(true); });
+    expect(result.current.book!.finishedAt).not.toBeNull();
+    await waitFor(() => expect(m.updateBook).toHaveBeenCalledTimes(1));
+    expect(m.updateBook.mock.calls[0][1]).toEqual({ finished_at: expect.any(String) });
+    await act(async () => { pending.resolve({ ...base, finishedAt: '2026-10-26T01:00:00Z' }); });
+    expect(result.current.book!.finishedAt).toBe('2026-10-26T01:00:00Z');
+  });
+
+  it('실패하면 만드는 중으로 되돌리고, 다시 작업은 null 을 보낸다', async () => {
+    m.updateBook.mockRejectedValueOnce(new Error('네트워크'));
+    const { result } = await loaded();
+    await act(async () => { await result.current.setFinished(true); });
+    expect(result.current.book!.finishedAt).toBeNull();
+
+    m.updateBook.mockResolvedValueOnce(base);
+    await act(async () => { await result.current.setFinished(false); });
+    expect(m.updateBook.mock.calls.at(-1)![1]).toEqual({ finished_at: null });
+  });
+});
+
+describe('useBook — 화면을 옮겨도 쓰기가 이어진다(코덱스 1R)', () => {
+  beforeEach(() => {
+    m.fetchBook.mockReset();
+    m.updateBook.mockReset();
+  });
+
+  it('저장이 도는 사이 다른 화면이 같은 책을 열면 저장이 끝난 뒤에 읽는다', async () => {
+    m.fetchBook.mockResolvedValue({ book: base, chapters: [] });
+    const pending = deferred<Book>();
+    m.updateBook.mockReturnValueOnce(pending.promise);
+    const first = await loaded();
+    await act(async () => { void first.result.current.save({ settings: { ...base.settings, columns: 1 } }); });
+    first.unmount();
+
+    // 새 화면(표지 만들기 ↔ 내지 만들기) — 저장이 끝나기 전에는 책을 읽지 않는다
+    const saved = { ...base, settings: { ...base.settings, columns: 1 as const } };
+    m.fetchBook.mockResolvedValue({ book: saved, chapters: [] });
+    const second = renderHook(() => useBook('b1', true));
+    await act(async () => { await Promise.resolve(); });
+    expect(m.fetchBook).toHaveBeenCalledTimes(1);
+    expect(second.result.current.loaded).toBe(false);
+
+    await act(async () => { pending.resolve(saved); });
+    await waitFor(() => expect(second.result.current.book?.settings.columns).toBe(1));
+    expect(m.fetchBook).toHaveBeenCalledTimes(2);
   });
 });

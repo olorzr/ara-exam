@@ -18,7 +18,7 @@ import BookInnerView from './BookInnerView';
 const STATUS_TEXT: Record<BookPageCountStatus, string> = {
   measuring: '쪽 수를 재는 중…',
   saving: '쪽 수 저장 중…',
-  saved: '쪽 수 저장됨 — 표지 화면이 이 값으로 책등을 그려요',
+  saved: '쪽 수 저장됨 — 표지 만들기가 이 값으로 책등을 그려요',
   failed: '쪽 수를 저장하지 못했어요',
 };
 

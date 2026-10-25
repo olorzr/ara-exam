@@ -136,18 +136,36 @@ describe('buildNavSections', () => {
     expect(etc.items.map((i) => i.label)).toEqual(['카테고리 관리', 'AI 연결']);
   });
 
-  it('책 만들기는 원장에게만, 문제 은행 그룹 맨 끝에 나온다 — 선생님 메뉴 차례는 그대로', () => {
-    const teacherProblems = sections.find((s) => s.id === 'problems')!;
-    expect(teacherProblems.items.some((i) => i.href === '/books')).toBe(false);
+  it('책 만들기는 원장에게만 따로 된 대분류다 — 표지 만들기 · 내지 만들기 · 다 만든 책', () => {
+    // 선생님 메뉴에는 그룹이 없고, 문제 은행에도 남지 않는다
+    expect(sections.some((s) => s.id === 'books')).toBe(false);
+    expect(sections.flatMap((s) => s.items).some((i) => i.href.startsWith('/books'))).toBe(false);
 
-    const adminProblems = buildNavSections(true).find((s) => s.id === 'problems')!;
-    expect(adminProblems.items.map((i) => i.label)).toEqual([
-      '문제 아카이브', '올라간 기출', '문제지 조합', 'O,X·단답형', '책 만들기',
+    const admin = buildNavSections(true);
+    expect(admin.map((s) => s.id)).toEqual(['home', 'concept', 'words', 'problems', 'books', 'etc', 'admin']);
+    const adminProblems = admin.find((s) => s.id === 'problems')!;
+    expect(adminProblems.items.map((i) => i.label)).toEqual(['문제 아카이브', '올라간 기출', '문제지 조합', 'O,X·단답형']);
+
+    const books = admin.find((s) => s.id === 'books')!;
+    expect(books.kind).toBe('group');
+    expect(books.kind === 'group' && books.label).toBe('책 만들기');
+    expect(books.items.map((i) => [i.label, i.href])).toEqual([
+      ['표지 만들기', '/books/covers'],
+      ['내지 만들기', '/books/inner'],
+      ['다 만든 책', '/books/done'],
     ]);
-    const books = adminProblems.items.at(-1)!;
-    expect(isNavItemActive('/books', books)).toBe(true);
-    expect(isNavItemActive('/books/abc-123', books)).toBe(true);
-    expect(isNavItemActive('/problems/papers', books)).toBe(false);
+
+    const [covers, inner, done] = books.items;
+    // 편집 화면은 그 소분류만 켠다 — 소분류끼리 서로를 켜지 않는다
+    expect(isNavItemActive('/books/covers/abc-123', covers)).toBe(true);
+    expect(isNavItemActive('/books/covers/abc-123', inner)).toBe(false);
+    expect(isNavItemActive('/books/inner/abc-123', inner)).toBe(true);
+    expect(isNavItemActive('/books/inner/abc-123', covers)).toBe(false);
+    expect(isNavItemActive('/books/done', done)).toBe(true);
+    expect(isNavItemActive('/books/done', covers)).toBe(false);
+    // 그룹은 들어오면 켜지고, 문제 은행은 켜지지 않는다
+    expect(isNavSectionActive('/books/covers/x', books)).toBe(true);
+    expect(isNavSectionActive('/books/covers/x', adminProblems)).toBe(false);
   });
 
   it('감사 로그는 관리자에게만, 하단 구간으로 나온다', () => {

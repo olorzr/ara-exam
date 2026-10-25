@@ -6,17 +6,17 @@ import { normalizePaperSettings } from '@/lib/problem-paper/settings';
 import type { PaperItemSnapshot, ProblemPaper } from '@/types/problem-bank';
 import { bookCoverOf, type BookCoverJson } from './cover';
 import { normalizeBookSettings, normalizePageCounts, type BookPageCounts, type BookSettings } from './settings';
-import type { Book, BookChapter, BookListItem } from './types';
+import { normalizeBookKind, type Book, type BookChapter, type BookKind, type BookListItem } from './types';
 
 /**
- * 책 읽기·쓰기 (`exam.books` · `exam.book_chapters`, sql/76).
+ * 책 읽기·쓰기 (`exam.books` · `exam.book_chapters`, sql/76 · sql/77).
  *
  * 두 표 모두 RLS 가 **원장 이메일**에만 열려 있다 — 다른 선생님은 읽기조차 0행이다(화면 게이트는 보조).
  * 원장님 혼자 쓰므로 낙관적 동시성은 두지 않는다(문제지 표지와 같은 판단 — 나중 저장이 이긴다).
  */
 
 /** 책 조회 컬럼 — ⚠️ 한 줄 리터럴이어야 PostgREST 행 타입 추론이 풀리지 않는다 */
-const BOOK_COLUMNS = 'id, title, settings, page_counts, cover, user_id, created_at, updated_at';
+const BOOK_COLUMNS = 'id, title, kind, finished_at, settings, page_counts, cover, user_id, created_at, updated_at';
 
 /** 목록 상한 */
 export const BOOK_LIST_LIMIT = 200;
@@ -30,6 +30,8 @@ const PAPER_ITEMS_LIMIT = 300;
 interface BookRow {
   id: string;
   title: string;
+  kind: unknown;
+  finished_at: string | null;
   settings: unknown;
   page_counts: unknown;
   cover: unknown;
@@ -42,6 +44,8 @@ function toBook(row: BookRow): Book {
   return {
     id: row.id,
     title: row.title,
+    kind: normalizeBookKind(row.kind),
+    finishedAt: row.finished_at ?? null,
     settings: normalizeBookSettings(row.settings),
     pageCounts: normalizePageCounts(row.page_counts),
     cover: bookCoverOf(row.cover),
@@ -55,15 +59,27 @@ function toPaper(row: ProblemPaper): ProblemPaper {
   return { ...row, settings: normalizePaperSettings(row.settings) };
 }
 
+/** 목록 조건 — 사이드바 세 화면(표지 만들기 · 내지 만들기 · 다 만든 책)이 이것으로 갈린다 */
+export interface BookListQuery {
+  /** 종류 — 비우면 둘 다 */
+  kind?: BookKind;
+  /** 다 만든 것만(true) / 만드는 중인 것만(false) */
+  finished: boolean;
+}
+
 /**
- * 책 목록 (최근 것부터) — 장 수도 함께 센다.
+ * 책 목록 — 장 수도 함께 센다. 만드는 중이면 최근에 만든 것부터, 다 만든 책이면 최근에 끝낸 것부터.
+ * @param query - 목록 조건
  * @returns 책들
  * @throws 조회 실패 시
  */
-export async function fetchBooks(): Promise<BookListItem[]> {
-  const { data, error } = await supabase
-    .from('books')
-    .select(`${BOOK_COLUMNS}, book_chapters(count)`)
+export async function fetchBooks(query: BookListQuery): Promise<BookListItem[]> {
+  let request = supabase.from('books').select(`${BOOK_COLUMNS}, book_chapters(count)`);
+  if (query.kind) request = request.eq('kind', query.kind);
+  request = query.finished
+    ? request.not('finished_at', 'is', null).order('finished_at', { ascending: false })
+    : request.is('finished_at', null);
+  const { data, error } = await request
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
     .limit(BOOK_LIST_LIMIT);
@@ -75,13 +91,14 @@ export async function fetchBooks(): Promise<BookListItem[]> {
 }
 
 /**
- * 새 책을 만든다.
+ * 새 항목을 만든다. 종류는 만들 때만 정한다(뒤에 바꾸는 길은 두지 않는다 — 표지만 항목에 장이 담기면 안 된다).
  * @param title - 제목
- * @returns 만든 책
+ * @param kind - 종류
+ * @returns 만든 항목
  * @throws 저장 실패 시
  */
-export async function createBook(title: string): Promise<Book> {
-  const { data, error } = await supabase.from('books').insert({ title }).select(BOOK_COLUMNS).single();
+export async function createBook(title: string, kind: BookKind): Promise<Book> {
+  const { data, error } = await supabase.from('books').insert({ title, kind }).select(BOOK_COLUMNS).single();
   if (error) throw error;
   return toBook(data as BookRow);
 }
@@ -92,6 +109,8 @@ export interface BookPatch {
   settings?: BookSettings;
   page_counts?: BookPageCounts;
   cover?: BookCoverJson | null;
+  /** 다 만든 때(ISO) — null 이면 다시 만드는 중 */
+  finished_at?: string | null;
 }
 
 /**

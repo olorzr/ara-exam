@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { fetchCreatorNames } from '@/lib/creator-names';
 import {
-  addChapter as insertChapter, BOOK_CHAPTERS_MAX, bookCoverOf, CHAPTER_TITLE_MAX, fetchBook,
-  removeChapter as deleteChapter, reorderChapters, updateBook, updateChapterTitle,
+  addChapter as insertChapter, BOOK_CHAPTERS_MAX, bookCoverOf, bookWritesSettled, CHAPTER_TITLE_MAX, enqueueBookWrite,
+  fetchBook, removeChapter as deleteChapter, reorderChapters, updateBook, updateChapterTitle,
   type Book, type BookChapter, type BookEdition, type BookPageCount, type BookPatch,
 } from '@/lib/book';
 
@@ -31,6 +31,7 @@ function applyPatch(book: Book, patch: BookPatch): Book {
     ...(patch.settings ? { settings: patch.settings } : {}),
     ...(patch.page_counts ? { pageCounts: patch.page_counts } : {}),
     ...(patch.cover !== undefined ? { cover: bookCoverOf(patch.cover) } : {}),
+    ...(patch.finished_at !== undefined ? { finishedAt: patch.finished_at } : {}),
   };
 }
 
@@ -39,11 +40,14 @@ function isDuplicate(error: unknown): boolean {
 }
 
 /**
- * 책 한 권 — 읽기와 고치기(제목·설정·표지·장 차례·쪽 수 기록).
+ * 책 한 권 — 읽기와 고치기(제목·설정·표지·장 차례·쪽 수 기록·다 만든 표시).
  *
  * ⚠️ 지금 값은 `latestRef` 가 정본이다 — 쪽 수 기록은 다른 판의 기록과 합쳐 jsonb 한 칸을 통째로 보내는데,
  *    렌더에서 닫아 둔 값으로 합치면 그 사이 저장된 다른 판의 기록을 지운다. 모든 변경이 `commit` 을 지난다.
- * ⚠️ 장 바꾸기(더하기·빼기·옮기기·제목)는 줄 하나(`chapterQueueRef`)에 서서 하나씩 돈다 — 겹치면 차례·제목이 서로를 덮는다.
+ * ⚠️ 장 바꾸기(더하기·빼기·옮기기·제목)는 줄 하나에 서서 하나씩 돈다 — 겹치면 차례·제목이 서로를 덮는다.
+ * ⚠️ 두 줄(책 칸 · 장)은 **모듈에 책마다 하나**다(`enqueueBookWrite`) — 표지 만들기와 내지 만들기가 같은 책을 다른 인스턴스로
+ *    연다. 책을 읽을 때는 그 책의 줄이 빌 때까지 기다린다(`bookWritesSettled`) — 저장이 도는 사이 다른 화면으로 넘어가면
+ *    새 화면이 저장 전 행을 읽고 옛 설정으로 새 값을 덮는다(코덱스 1R).
  * ⚠️ 제목·설정 저장은 **보내기 전에 화면에 먼저 얹는다**(낙관적). 설정은 jsonb 를 통째로 보내므로, 앞 저장의 응답이
  *    오기 전에 다른 칸을 고치면 렌더에서 닫아 둔 옛 설정으로 앞의 변경을 되돌린다. 응답은 **가장 나중에 보낸 쓰기의 것만**
  *    받는다(`writeSeqRef`) — 늦게 온 옛 응답이 새 값을 덮지 않게. 실패하면 마지막으로 서버가 돌려준 책으로 되돌린다.
@@ -71,6 +75,8 @@ export function useBook(bookId: string, enabled: boolean) {
     let alive = true;
     (async () => {
       let next: Loaded = { key: bookId, book: null, chapters: [], creatorName: '', failed: false };
+      await bookWritesSettled(bookId);
+      if (!alive) return;
       try {
         const { book, chapters } = await fetchBook(bookId);
         const names = book ? await fetchCreatorNames([book.userId]) : new Map<string, string>();
@@ -102,14 +108,13 @@ export function useBook(bookId: string, enabled: boolean) {
    * 보낼 본문은 차례가 왔을 때 만든다(`makePatch`) — 쪽 수는 서버가 마지막으로 돌려준 기록에 합쳐야 다른 판의 기록을
    * 지우지 않는다(코덱스 1R). 낙관적 쓰기는 본문을 **부를 때** 화면에 얹는다(다음 변경이 그 위에서 만들어지게).
    */
-  const writeQueueRef = useRef<Promise<unknown>>(Promise.resolve());
   const write = useCallback((
     makePatch: () => BookPatch | null, optimistic: boolean, failMessage: string,
   ): Promise<boolean> => {
     const seq = ++writeSeqRef.current;
     const early = optimistic ? makePatch() : null;
     if (early) commit((prev) => (prev.book ? { ...prev, book: applyPatch(prev.book, early) } : prev));
-    const run = writeQueueRef.current.then(async () => {
+    return enqueueBookWrite(bookId, 'fields', async () => {
       const patch = early ?? makePatch();
       if (!patch) return false;
       try {
@@ -126,8 +131,6 @@ export function useBook(bookId: string, enabled: boolean) {
         return false;
       }
     });
-    writeQueueRef.current = run.catch(() => false);
-    return run;
   }, [bookId, commit]);
 
   /** 제목·설정·표지 칸을 저장한다. @returns 저장했으면 true */
@@ -140,21 +143,26 @@ export function useBook(bookId: string, enabled: boolean) {
   }, false, '쪽 수를 저장하지 못했어요.'), [write]);
 
   /**
+   * '다 만들었어요' / '다시 작업' — 같은 쓰기 줄에 선다(설정 저장과 겹쳐 서로를 덮지 않게).
+   * @returns 저장했으면 true
+   */
+  const setFinished = useCallback((finished: boolean) => write(
+    () => ({ finished_at: finished ? new Date().toISOString() : null }), true, '다 만든 표시를 저장하지 못했어요.',
+  ), [write]);
+
+  /**
    * 장 바꾸기(더하기·빼기·옮기기·제목)를 **줄을 세워** 하나씩 돌린다. 제목을 고친 칸을 떠나며 곧바로 옮기기를 누르면
    * 두 요청이 겹치는데, 옮기기가 옛 제목으로 장을 다시 써서 바꾼 제목을 되돌린다(코덱스 1R). 줄이 비면 `busy` 가 풀린다.
    */
-  const chapterQueueRef = useRef<Promise<void>>(Promise.resolve());
   const pendingRef = useRef(0);
   const locked = useCallback((work: () => Promise<void>): Promise<void> => {
     pendingRef.current += 1;
     setBusy(true);
-    const run = chapterQueueRef.current.then(work).catch(() => {}).finally(() => {
+    return enqueueBookWrite(bookId, 'chapters', work).catch(() => {}).finally(() => {
       pendingRef.current -= 1;
       if (pendingRef.current === 0) setBusy(false);
     });
-    chapterQueueRef.current = run;
-    return run;
-  }, []);
+  }, [bookId]);
 
   const addChapter = useCallback((paperId: string) => locked(async () => {
     const chapters = latestRef.current?.chapters ?? [];
@@ -236,6 +244,7 @@ export function useBook(bookId: string, enabled: boolean) {
     busy,
     save,
     savePageCount,
+    setFinished,
     addChapter,
     removeChapter,
     moveChapter,

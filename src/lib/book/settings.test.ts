@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { bookLayoutKeyFor } from './layout';
 import {
-  bookLayoutKey, DEFAULT_BOOK_SETTINGS, EDITION_SUFFIX, normalizeBookSettings, normalizePageCounts,
+  bookLayoutKey, DEFAULT_BOOK_SETTINGS, EDITION_SUFFIX, MANUAL_PAGES_MAX, normalizeBookSettings, normalizePageCounts,
 } from './settings';
-import { chapterTitleOf } from './types';
+import { chapterTitleOf, normalizeBookKind, type Book } from './types';
 
 describe('normalizeBookSettings', () => {
   it('빈 값·옛 행은 기본 설정', () => {
@@ -17,7 +18,7 @@ describe('normalizeBookSettings', () => {
     });
     expect(s).toEqual({
       innerPaper: '1023', columns: 1, chapterStart: 'page', trimWorks: false,
-      spineColor: '#abcdef', spineText: '국어', backFill: 'spine',
+      spineColor: '#abcdef', spineText: '국어', backFill: 'spine', manualPages: {},
     });
     const bad = normalizeBookSettings({ innerPaper: '9', columns: 3, chapterStart: 'x', spineColor: 'red', backFill: 1 });
     expect(bad.innerPaper).toBe(DEFAULT_BOOK_SETTINGS.innerPaper);
@@ -25,6 +26,26 @@ describe('normalizeBookSettings', () => {
     expect(bad.chapterStart).toBe('odd');
     expect(bad.spineColor).toBe(DEFAULT_BOOK_SETTINGS.spineColor);
     expect(bad.backFill).toBe('white');
+  });
+
+  it('직접 넣은 쪽 수는 알려진 판의 양의 정수·상한 안만 남긴다', () => {
+    const s = normalizeBookSettings({
+      manualPages: { student: 120, teacher: 0, key: 12.5, other: 40 },
+    });
+    expect(s.manualPages).toEqual({ student: 120 });
+    expect(normalizeBookSettings({ manualPages: { student: MANUAL_PAGES_MAX } }).manualPages).toEqual({ student: MANUAL_PAGES_MAX });
+    expect(normalizeBookSettings({ manualPages: { student: MANUAL_PAGES_MAX + 1 } }).manualPages).toEqual({});
+    expect(normalizeBookSettings({ manualPages: 'x' }).manualPages).toEqual({});
+    expect(normalizeBookSettings({ manualPages: { teacher: '40' } }).manualPages).toEqual({});
+  });
+});
+
+describe('normalizeBookKind', () => {
+  it('표지만은 cover, 나머지(빈 값·모르는 값)는 책', () => {
+    expect(normalizeBookKind('cover')).toBe('cover');
+    expect(normalizeBookKind('book')).toBe('book');
+    expect(normalizeBookKind(null)).toBe('book');
+    expect(normalizeBookKind('inner')).toBe('book');
   });
 });
 
@@ -62,6 +83,20 @@ describe('bookLayoutKey', () => {
     expect(bookLayoutKey({ ...input, settings: { ...input.settings, trimWorks: false } })).not.toBe(base);
     expect(bookLayoutKey({ ...input, chapters: [...input.chapters].reverse() })).not.toBe(base);
     expect(bookLayoutKey({ ...input, chapters: [input.chapters[0], { paperId: 'b', title: '둘째' }] })).not.toBe(base);
+  });
+});
+
+describe('내지 구성 지문은 표지 쪽 설정에 흔들리지 않는다', () => {
+  it('직접 넣은 쪽 수·책등 색·내지 용지가 달라도 지문이 같다', () => {
+    const book: Book = {
+      id: 'b', title: '책', kind: 'book', finishedAt: null, settings: DEFAULT_BOOK_SETTINGS, pageCounts: {}, cover: null,
+      userId: 'u', createdAt: '', updatedAt: '',
+    };
+    const other: Book = {
+      ...book,
+      settings: { ...book.settings, manualPages: { student: 99 }, spineColor: '#000000', innerPaper: '1023' },
+    };
+    expect(bookLayoutKeyFor(other, [], 'student')).toBe(bookLayoutKeyFor(book, [], 'student'));
   });
 });
 

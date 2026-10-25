@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { ADMIN_EMAIL } from '@/lib/constants';
 import { DEFAULT_SIMPLE_COVER } from '@/lib/problem-paper/cover';
 import { bookCoverOf, DEFAULT_BOOK_COVER, toBookCoverJson } from './cover';
-import { BOOK_TITLE_MAX, CHAPTER_TITLE_MAX } from './types';
+import { BOOK_KINDS, BOOK_TITLE_MAX, CHAPTER_TITLE_MAX } from './types';
 
 describe('sql/76 거울', () => {
   const sql = readFileSync(path.resolve(__dirname, '../../../sql/76_books.sql'), 'utf8');
@@ -23,6 +23,19 @@ describe('sql/76 거울', () => {
 
   it('책에 담긴 문제지는 지울 수 없다(RESTRICT)', () => {
     expect(sql).toContain('REFERENCES exam.problem_papers(id) ON DELETE RESTRICT');
+  });
+});
+
+describe('sql/77 거울', () => {
+  const sql = readFileSync(path.resolve(__dirname, '../../../sql/77_books_kind_finished.sql'), 'utf8');
+
+  it('종류 CHECK 가 앱 BOOK_KINDS 와 같고 기본값은 책이다', () => {
+    expect(sql).toContain(`CHECK (kind IN (${BOOK_KINDS.map((k) => `'${k}'`).join(', ')}))`);
+    expect(sql).toContain("kind TEXT NOT NULL DEFAULT 'book'");
+  });
+
+  it('다 만든 때는 비울 수 있는 시각이다', () => {
+    expect(sql).toContain('finished_at TIMESTAMPTZ;');
   });
 });
 

@@ -2,10 +2,38 @@ import type { PaperCover } from '@/lib/problem-paper/cover';
 import type { ProblemPaper } from '@/types/problem-bank';
 import type { BookPageCounts, BookSettings } from './settings';
 
-/** 책 한 권 — `exam.books`(sql/76)를 믿을 수 있게 읽은 값 */
+/**
+ * 항목 종류(sql/77) — 책(장을 담아 내지까지 만든다) / 표지만(장이 없고 쪽 수를 직접 넣어 책등을 계산한다).
+ * 원장님: "표지만 만들어야 할 수도 있거든"(2026-10-26).
+ */
+export const BOOK_KINDS = ['book', 'cover'] as const;
+
+/** 항목 종류 */
+export type BookKind = (typeof BOOK_KINDS)[number];
+
+/** 화면에 보이는 종류 이름 */
+export const BOOK_KIND_LABELS: Record<BookKind, string> = {
+  book: '책',
+  cover: '표지만',
+};
+
+/**
+ * 저장된 종류를 믿을 수 있는 값으로 — 모르는 값은 책(sql/77 의 기본값과 같다).
+ * @param raw - `books.kind`
+ * @returns 종류
+ */
+export function normalizeBookKind(raw: unknown): BookKind {
+  return raw === 'cover' ? 'cover' : 'book';
+}
+
+/** 책 한 권 — `exam.books`(sql/76·77)를 믿을 수 있게 읽은 값 */
 export interface Book {
   id: string;
   title: string;
+  /** 종류 — 표지만이면 장이 없다 */
+  kind: BookKind;
+  /** '다 만들었어요' 를 누른 때. null 이면 아직 만드는 중 */
+  finishedAt: string | null;
   settings: BookSettings;
   pageCounts: BookPageCounts;
   /** 표지(앞·뒤). 없으면 null — 펼침면 앞면은 제목만 찍는 기본 */

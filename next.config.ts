@@ -66,6 +66,9 @@ const nextConfig: NextConfig = {
       // 기출 문제 은행의 대표 화면은 아카이브다. `/problems` 를 실제 페이지로 두면
       // isNavItemActive 가 세그먼트 접두사로 판정하므로 하위 메뉴와 함께 활성이 된다.
       { source: '/problems', destination: '/problems/archive', permanent: false },
+      // 책 만들기는 표지 만들기 · 내지 만들기 · 다 만든 책 세 소분류다(원장 전용). `/books` 를 페이지로 두면 위와 같은
+      // 까닭으로 세 메뉴가 함께 켜진다 — 옛 주소(0.9.57 의 책 목록)도 여기로 온다
+      { source: '/books', destination: '/books/covers', permanent: false },
     ];
   },
 };

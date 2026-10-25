@@ -62,7 +62,21 @@ export interface BookSettings {
   spineText: string;
   /** 뒷표지가 없을 때 펼침면 뒷면의 바탕 */
   backFill: BackFill;
+  /**
+   * 표지만 항목의 판별 쪽 수(직접 넣은 값, 4의 배수로 올리기 전). 책은 쓰지 않는다 — 책은 내지 화면이 잰다.
+   * ⚠️ 내지 구성 지문(`bookLayoutKey`)에 넣지 않는다 — 내지 배치를 바꾸지 않는 값이다.
+   */
+  manualPages: BookManualPages;
 }
+
+/** 판별 직접 넣은 쪽 수 */
+export type BookManualPages = Partial<Record<BookEdition, number>>;
+
+/**
+ * 직접 넣는 쪽 수 상한 — 열림인쇄 무선제본 내지는 수백 쪽이 보통이라, 오타(0 하나 더)를 걸러 내는 값이다.
+ * 이보다 크면 정규화가 버린다.
+ */
+export const MANUAL_PAGES_MAX = 2000;
 
 /** 책등 글자 상한 */
 export const SPINE_TEXT_MAX = 60;
@@ -86,6 +100,7 @@ export const DEFAULT_BOOK_SETTINGS: BookSettings = {
   spineColor: SPINE_COLOR_PRESETS[0].value,
   spineText: '',
   backFill: 'white',
+  manualPages: {},
 };
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
@@ -107,7 +122,31 @@ export function normalizeBookSettings(raw: unknown): BookSettings {
       ? v.spineColor.toLowerCase() : d.spineColor,
     spineText: typeof v.spineText === 'string' ? v.spineText.trim().slice(0, SPINE_TEXT_MAX) : d.spineText,
     backFill: v.backFill === 'spine' || v.backFill === 'white' ? v.backFill : d.backFill,
+    manualPages: normalizeManualPages(v.manualPages),
   };
+}
+
+/**
+ * 쪽 수 하나가 쓸 만한가 — 양의 정수이고 상한 안.
+ * @param value - 검사할 값
+ * @returns 쓸 만하면 true
+ */
+export function isManualPageCount(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= MANUAL_PAGES_MAX;
+}
+
+/**
+ * 직접 넣은 쪽 수를 믿을 수 있는 값으로 — 알려진 판의 쓸 만한 값만 남긴다.
+ * @param raw - `settings.manualPages`
+ * @returns 판별 쪽 수
+ */
+function normalizeManualPages(raw: unknown): BookManualPages {
+  const v = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const out: BookManualPages = {};
+  for (const edition of BOOK_EDITIONS) {
+    if (isManualPageCount(v[edition])) out[edition] = v[edition];
+  }
+  return out;
 }
 
 /**

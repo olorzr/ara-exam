@@ -725,9 +725,19 @@
 - ⚠️ 변환은 **정화보다 먼저**, 괄호 **밖**의 낱자는 건드리지 않는다. 못 바꾼 괄호는 남기고 경고한다
 
 ## 책 (Book)
-- 정의: 저장된 문제지 여러 장을 장(챕터)으로 묶어 A4 무선제본으로 찍는 책. 원장 전용 메뉴 '책 만들기'
-- 코드에서의 사용: `Book`, `exam.books`, `/books`
-- 관련 파일: src/lib/book/, src/components/book/, sql/76_books.sql
+- 정의: 저장된 문제지 여러 장을 장(챕터)으로 묶어 A4 무선제본으로 찍는 책. 원장 전용 사이드바 대분류 '책 만들기'(표지 만들기 · 내지 만들기 · 다 만든 책)
+- 코드에서의 사용: `Book`, `BookKind = 'book'`, `exam.books`, `/books/covers` · `/books/inner` · `/books/done`
+- 관련 파일: src/lib/book/, src/components/book/, sql/76_books.sql, sql/77_books_kind_finished.sql
+
+## 표지만 항목 (Cover-only book)
+- 정의: 내지 없이 표지 펼침면(뒷표지 · 책등 · 앞표지)만 만드는 항목. 장을 담지 않고 판마다 내지 쪽 수를 직접 넣으면 4의 배수로 올려 책등 두께를 계산한다. '표지 만들기' 의 '+ 새 표지'
+- 코드에서의 사용: `kind: 'cover'`, `BOOK_KIND_LABELS.cover`('표지만'), `settings.manualPages`, `resolveSpinePages`
+- 관련 파일: src/lib/book/spine-pages.ts, src/components/book/BookSpinePagesField.tsx, sql/77_books_kind_finished.sql
+
+## 다 만든 책 (Finished book)
+- 정의: 표지·내지 편집 화면에서 '다 만들었어요' 를 누른 항목(책·표지만 모두). 사이드바 '다 만든 책' 에 모이고 '다시 작업' 으로 만드는 중 목록에 돌린다. 인쇄 여부는 기계가 몰라 사람이 표시한다
+- 코드에서의 사용: `finishedAt`, `exam.books.finished_at`, `setFinished`, `BookFinishControl`
+- 관련 파일: src/hooks/useBook.ts, src/hooks/useBookList.ts, src/app/(main)/books/done/page.tsx
 
 ## 장 (Chapter)
 - 정의: 책 안의 문제지 한 장. 새 쪽(기본은 오른쪽 면)에서 시작하고 장 머리에 번호·제목·출처가 찍힌다. 제목을 따로 적지 않으면 문제지 제목
