@@ -1,4 +1,5 @@
 import {
+  BookMarked,
   BookOpen,
   BookText,
   FileScan,
@@ -88,7 +89,7 @@ export function isNavSectionActive(pathname: string, section: NavSection): boole
 
 /**
  * 사이드바 메뉴 구조를 만든다. 경로는 바뀌지 않고 이름만 기능 기준으로 묶여 있다.
- * @param isAdmin - 관리자 계정 여부 (감사 로그 노출 조건)
+ * @param isAdmin - 관리자(원장) 계정 여부 — 감사 로그·책 만들기 노출 조건
  * @returns 렌더 순서대로 정렬된 구간 목록
  */
 export function buildNavSections(isAdmin: boolean): NavSection[] {
@@ -154,6 +155,9 @@ export function buildNavSections(isAdmin: boolean): NavSection[] {
         { href: '/problems/papers', label: '문제지 조합', icon: Layers },
         // 지문을 넣으면 AI 가 O,X·단답형을 만든다. 만든 문항은 저장하지 않아 하위 경로가 없다
         { href: '/problems/quiz', label: 'O,X·단답형', icon: ListChecks },
+        // 저장된 문제지를 장으로 묶어 무선제본 책을 만든다 — 원장 전용(화면·DB 정책 sql/76 도 원장만).
+        // 경로가 /problems 밖이라 형제 메뉴와 서로를 켜지 않는다. 책 한 권 화면(/books/[id])도 이 항목이다
+        ...(isAdmin ? [{ href: '/books', label: '책 만들기', icon: BookMarked }] : []),
       ],
     },
     {

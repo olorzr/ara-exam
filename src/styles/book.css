@@ -1,0 +1,65 @@
+/* =========================================================
+   책 내지 — 장 머리 (BookChapterHeading)
+
+   .pb-sheet 안에서 그려진다. 높이는 엔진이 실제로 재므로 여기 px 는 꾸밈 값이다.
+   ⚠️ 블록 위아래 여백은 margin 이 아니라 padding 이다 — margin 은 잰 높이에 안 들어간다(problem-paper.css 규약).
+   ========================================================= */
+
+.bk-chapter {
+  padding: 4px 0 18px;
+}
+
+.bk-chapter__no {
+  display: inline-block;
+  font-family: 'Gmarket Sans', sans-serif;
+  font-size: 11pt;
+  font-weight: 700;
+  color: #ffffff;
+  background: #5bbfb7;
+  border-radius: 3px;
+  padding: 2px 10px;
+  letter-spacing: 1px;
+}
+
+.bk-chapter__title {
+  margin: 10px 0 0;
+  font-family: 'Gmarket Sans', sans-serif;
+  font-size: 18pt;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #111827;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #b8ede8;
+}
+
+.bk-chapter__meta {
+  margin-top: 6px;
+  font-size: 8.5pt;
+  color: #6b7280;
+  overflow-wrap: anywhere;
+}
+
+/* 번호 어긋남 경고 — 인쇄에서만, 쪽마다 위에 덮어 찍는다(BookInnerMode). fixed 라 쪽 배정(책등 두께의 근거)을 바꾸지 않는다 */
+.bk-print-warning {
+  display: none;
+}
+
+@media print {
+  .bk-print-warning {
+    display: block;
+    position: fixed;
+    top: 4mm;
+    left: 12mm;
+    right: 12mm;
+    z-index: 10;
+    padding: 1.5mm 3mm;
+    border: 1px solid #f59e0b;
+    border-radius: 2px;
+    background: #fef3c7;
+    color: #78350f;
+    font-size: 9pt;
+    text-align: center;
+  }
+}

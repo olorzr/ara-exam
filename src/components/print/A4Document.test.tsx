@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import A4Document from './A4Document';
 import {
@@ -304,6 +304,52 @@ describe('A4Document', () => {
       expect(first.querySelector('[data-slot="right"] .a4-sheet--cover')).not.toBeNull();
       expect(first.querySelector('[data-slot="left"] .a4-footer__page')?.textContent).toBe('3 / 3');
       expect(container.querySelectorAll('.a4-stack .booklet-blank')).toHaveLength(0);
+    });
+  });
+
+  describe('강제 쪽 넘김 · 빈 쪽 · 쪽 수 알림(책)', () => {
+    const chapterDoc = (props: { padPagesTo?: number; onLayout?: (info: { pageCount: number }) => void }) => (
+      <A4Document
+        blocks={[<div key="a" data-h={BLOCK_H}>1장</div>, <div key="b" data-h={BLOCK_H}>2장</div>]}
+        breakBefore={BREAKS}
+        firstPageHeader={<div data-h={FIRST_HEADER_H}>머리</div>}
+        laterPageHeader={<div data-h={LATER_HEADER_H}>머리</div>}
+        {...props}
+      />
+    );
+    /** 참조가 안정적이어야 한다 — 매 렌더 새 배열이면 measure 가 바뀐다 */
+    const BREAKS = [false, 'odd'] as const;
+
+    it("'odd' 로 끼운 빈 쪽은 머리글·푸터·블록이 없고 쪽 수(N)에는 센다", () => {
+      const { container } = render(chapterDoc({}));
+      const rendered = sheets(container);
+      expect(rendered).toHaveLength(3);
+      const blank = rendered[1];
+      expect(blank.classList.contains('a4-sheet--blank')).toBe(true);
+      expect(blank.querySelector('.a4-footer')).toBeNull();
+      expect(blank.querySelector('.a4-block')).toBeNull();
+      expect(blank.getAttribute('aria-label')).toBe('2쪽 (빈 쪽)');
+      expect(rendered[2].textContent).toContain('2장');
+      expect(rendered[2].querySelector('.a4-footer__page')?.textContent).toBe('3 / 3');
+    });
+
+    it('padPagesTo — 낱장 수가 배수가 되고 마지막(빈) 낱장에만 페이지 넘김을 끈다', () => {
+      const { container } = render(chapterDoc({ padPagesTo: 4 }));
+      const rendered = sheets(container);
+      expect(rendered).toHaveLength(4);
+      expect(rendered[3].classList.contains('a4-sheet--blank')).toBe(true);
+      expect(rendered.filter((s) => s.classList.contains('a4-sheet--last'))).toEqual([rendered[3]]);
+      expect(rendered[0].querySelector('.a4-footer__page')?.textContent).toBe('1 / 4');
+    });
+
+    it('onLayout 은 그린 낱장 수를 알리고, 같은 배치로 다시 그려도 또 부르지 않는다', () => {
+      const onLayout = vi.fn();
+      const { rerender, container } = render(chapterDoc({ padPagesTo: 4, onLayout }));
+      expect(onLayout).toHaveBeenLastCalledWith({ pageCount: 4 });
+      expect(sheets(container)).toHaveLength(4);
+      const calls = onLayout.mock.calls.length;
+      rerender(chapterDoc({ padPagesTo: 4, onLayout }));
+      expect(onLayout.mock.calls.length).toBe(calls);
     });
   });
 });

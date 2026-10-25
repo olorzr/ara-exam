@@ -167,6 +167,19 @@ export function paperCoverPath(paperId: string, token: string): string {
 }
 
 /**
+ * 책 표지 그림(앞·뒤) 경로 — 문제지 표지와 같은 **한 번만 쓰는 이름**(`paperCoverPath` 와 같은 근거).
+ * @param bookId - 책 id (UUID)
+ * @param token - 한 번만 쓰는 이름 (`newFigureToken`)
+ * @returns 버킷 기준 경로
+ */
+export function bookCoverPath(bookId: string, token: string): string {
+  if (!/^[0-9a-z]{6,16}$/.test(token)) {
+    throw new Error(`표지 그림 이름이 잘못됐어요: ${token}`);
+  }
+  return `books/${assertSafe(bookId, '책 id')}/cover-${token}.jpg`;
+}
+
+/**
  * 출처 하나가 쓰는 모든 경로의 접두사. 출처를 지울 때 통째로 정리하는 데 쓴다.
  * @param sourceId - 출처 id (UUID)
  * @returns 버킷 기준 폴더 경로

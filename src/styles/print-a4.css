@@ -49,6 +49,14 @@
   overflow: visible;
 }
 
+/* 빈 쪽(장 시작을 오른쪽 면에 맞추거나 쪽 수를 4의 배수로 채운 쪽) — 화면에서만 빗금으로 일부러 비운 쪽임을 알린다.
+   쪽 넘김은 .a4-sheet 규칙을 그대로 받는다(마지막이면 .a4-sheet--last) */
+@media screen {
+  .a4-sheet--blank {
+    background: repeating-linear-gradient(45deg, #fafafa, #fafafa 12px, #f3f4f6 12px, #f3f4f6 24px);
+  }
+}
+
 .a4-sheet__header {
   flex: none;
 }
@@ -227,6 +235,10 @@
     page-break-inside: avoid;
     break-after: page;
     page-break-after: always;
+  }
+  /* 빈 쪽은 인쇄에서 흰 종이다 */
+  .a4-sheet--blank {
+    background: #fff !important;
   }
   /* 마지막 낱장 뒤에 페이지를 넘기면 빈 장이 딸려 나온다 (React 가 클래스를 붙인다) */
   .a4-sheet--last {

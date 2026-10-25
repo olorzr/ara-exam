@@ -4,12 +4,13 @@ import type { ReactNode } from 'react';
 import {
   useA4Pagination,
   type BeforePaginateHandler,
+  type LayoutHandler,
   type SplitRequestHandler,
 } from '@/hooks/useA4Pagination';
 import { A4_WIDTH_PX, CONTENT_WIDTH, getColumnWidth } from '@/lib/print/constants';
-import type { PagePlan } from '@/lib/print/paginate';
+import type { BreakBefore, PagePlan } from '@/lib/print/paginate';
 import A4CoverSheet from './A4CoverSheet';
-import A4Sheet, { A4Footer } from './A4Sheet';
+import A4Sheet, { A4BlankSheet, A4Footer } from './A4Sheet';
 import BookletStack from './BookletStack';
 
 interface A4DocumentBaseProps {
@@ -39,6 +40,15 @@ interface A4DocumentBaseProps {
   onBeforePaginate?: BeforePaginateHandler;
   /** 남은 자리에 안 들어간 블록을 더 잘게 쪼갤 수 있으면 여기서 받아 처리한다 */
   onSplitRequest?: SplitRequestHandler;
+  /**
+   * 블록별 강제 쪽 넘김(책의 장 시작) — `'odd'` 는 오른쪽 면에서 시작하도록 빈 쪽을 끼운다.
+   * `splittable` 처럼 참조가 안정적이어야 한다(useMemo). 없으면 지금과 똑같이 배치한다.
+   */
+  breakBefore?: readonly BreakBefore[];
+  /** 끝에 빈 쪽을 붙여 쪽 수를 이 배수로 맞춘다(무선제본 내지 4) */
+  padPagesTo?: number;
+  /** 배치가 정해지거나 바뀌면 쪽 수를 알린다 — 안정적인 참조여야 한다(useCallback) */
+  onLayout?: LayoutHandler;
   /** 타이포그래피 스코프 클래스 (측정 컨테이너와 낱장 양쪽에 붙는다) */
   className?: string;
 }
@@ -80,13 +90,19 @@ export default function A4Document({
   splittable,
   onBeforePaginate,
   onSplitRequest,
+  breakBefore,
+  padPagesTo,
+  onLayout,
   className = '',
 }: A4DocumentProps) {
   const { measureRootRef, layout } = useA4Pagination({
     columns,
     splittable,
+    breakBefore,
+    padPagesTo,
     onBeforePaginate,
     onSplitRequest,
+    onLayout,
   });
   const columnWidth = getColumnWidth(columns);
 
@@ -104,7 +120,14 @@ export default function A4Document({
   const pages: PagePlan[] = layout.pages.length > 0 ? layout.pages : [{ columns: [[]] }];
 
   /** 본문 낱장 하나 — 낱장 모드와 중철 모드가 같은 마크업을 쓴다 */
-  const renderPage = (page: PagePlan, pageIndex: number) => (
+  const renderPage = (page: PagePlan, pageIndex: number) => (page.blank ? (
+    <A4BlankSheet
+      key={pageIndex}
+      className={className}
+      page={pageIndex + 1}
+      isLast={pageIndex === pages.length - 1 && !breakAfterLast && !backCoverPage}
+    />
+  ) : (
     <A4Sheet
       key={pageIndex}
       className={className}
@@ -130,7 +153,7 @@ export default function A4Document({
         ))}
       </div>
     </A4Sheet>
-  );
+  ));
 
   const cover = coverPage
     ? [<A4CoverSheet key="cover" className={className}>{coverPage}</A4CoverSheet>]

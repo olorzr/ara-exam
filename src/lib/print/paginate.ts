@@ -1,9 +1,21 @@
 import { CAPACITY_SAFETY_PX } from './constants';
 
+/**
+ * 블록 앞에서 쪽을 강제로 넘기는 방식(책의 장 시작).
+ * `'page'` 는 새 쪽에서, `'odd'` 는 홀수(오른쪽) 쪽에서 시작한다 — 필요하면 빈 쪽을 한 장 끼운다.
+ */
+export type BreakBefore = 'page' | 'odd' | false;
+
 /** 한 페이지의 컬럼별 블록 인덱스 배치 */
 export interface PagePlan {
   /** columns[c] = c 번 컬럼에 들어갈 블록 인덱스들 (원본 순서 유지) */
   columns: number[][];
+  /**
+   * 쪽 맞춤(`'odd'`)·배수 채움(`padPagesTo`)이 끼운 빈 쪽 — 머리글·푸터 없이 종이 한 장으로 그린다.
+   * ⚠️ **빈 쪽에만 키를 둔다.** 보통 쪽에 `blank: false` 를 적으면 배치 서명(`JSON.stringify`)과
+   *    기존 `toEqual` 테스트가 옵션을 안 쓰는 문서에서도 달라진다.
+   */
+  blank?: true;
 }
 
 export interface PaginateInput {
@@ -18,6 +30,13 @@ export interface PaginateInput {
   columnHeaderHeight?: number;
   /** 블록별 '행 단위로 더 쪼갤 수 있음' 표시 (개념지의 표). 없으면 전부 불가 */
   splittable?: readonly boolean[];
+  /** 블록별 강제 쪽 넘김 (책의 장 시작). `splittable` 과 같은 평행 배열 — 없으면 전부 `false` */
+  breakBefore?: readonly BreakBefore[];
+  /**
+   * 끝에 빈 쪽을 붙여 쪽 수를 이 배수로 맞춘다(무선제본 내지는 4). 정수 2 이상일 때만 — 그 밖은 그대로.
+   * 블록이 하나도 없으면 채우지 않는다. 중철(`bookletSheets`)도 4의 배수로 맞추므로 함께 쓰면 중복일 뿐이다.
+   */
+  padPagesTo?: number;
 }
 
 /**
@@ -56,6 +75,8 @@ export function paginate({
   laterPageBodyHeight,
   columnHeaderHeight = 0,
   splittable,
+  breakBefore,
+  padPagesTo,
 }: PaginateInput): PaginateResult {
   const pages: PagePlan[] = [];
   const oversized: number[] = [];
@@ -86,11 +107,26 @@ export function paginate({
     currentPage().columns[colIdx].push(index);
     remaining -= height;
   };
+  const blankPage = (): PagePlan => ({
+    columns: Array.from({ length: columns }, () => [] as number[]),
+    blank: true,
+  });
 
   openPage();
 
   for (let i = 0; i < blockHeights.length; i++) {
     const height = blockHeights[i];
+
+    const brk = breakBefore?.[i];
+    if (brk) {
+      // 지금 쪽에 내용이 있을 때만 넘긴다 — 첫 블록이면 1쪽이 비어 있고(홀수다) 앞에 빈 장을 만들지 않는다
+      if (pageHasContent()) openPage();
+      // 새 쪽이 짝수(왼쪽 면)면 그 쪽을 빈 쪽으로 못박고 한 쪽 더 연다. 1쪽은 늘 홀수라 빈 쪽이 될 일이 없다
+      if (brk === 'odd' && pages.length % 2 === 0) {
+        pages[pages.length - 1] = blankPage();
+        openPage();
+      }
+    }
 
     if (height <= remaining) {
       commit(i, height);
@@ -130,6 +166,11 @@ export function paginate({
     commit(i, height);
     remaining = -1;
     colIdx = columns - 1; // 다음 블록은 반드시 새 페이지에서 시작
+  }
+
+  // 무선제본 내지는 쪽 수가 4의 배수여야 한다 — 끝에 빈 쪽을 붙인다(쪽 번호·`onLayout` 이 이 수를 그대로 쓴다)
+  if (padPagesTo !== undefined && Number.isInteger(padPagesTo) && padPagesTo > 1) {
+    while (pages.length % padPagesTo !== 0) pages.push(blankPage());
   }
 
   return { pages, oversized, splitRequests };

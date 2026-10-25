@@ -544,6 +544,8 @@ ON CONFLICT (id) DO UPDATE SET
 -- UPDATE 정책은 **일부러 만들지 않는다** — 클라이언트가 upsert:true 로 올리면
 -- storage-api 가 UPDATE 권한까지 요구해 전량 실패한다(ara-system mig334 사고).
 -- 업로드는 항상 upsert:false + 새 UUID 경로.
+-- ⚠️ [2026-10-25] 이 세 정책의 정식 정의는 이제 sql/76 이다 — `books/`(책 표지 그림) 경로만 원장으로 좁혔다.
+--    여기를 다시 돌리면 그 좁힘이 풀려 선생님이 원장님 책 표지를 읽고 지울 수 있게 된다. 다시 돌렸다면 sql/76 도 다시 돌릴 것.
 DROP POLICY IF EXISTS "exam_problem_bank_select" ON storage.objects;
 CREATE POLICY "exam_problem_bank_select" ON storage.objects
   FOR SELECT TO authenticated

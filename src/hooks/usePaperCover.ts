@@ -44,9 +44,12 @@ function message(error: unknown, fallback: string): string {
 
 /**
  * 그림이 있어야 하는데 없는 자리 — 올리기 **전에** 둘 다 본다(앞을 올린 뒤에 뒤가 없다고 멈추면 앞 파일이 고아가 된다).
+ * 책 표지(`useBookCover`)도 같은 규칙을 쓴다.
+ * @param next - 저장하려는 표지
+ * @param files - 새로 고른 그림
  * @returns 막아야 하면 그 까닭, 아니면 null
  */
-function missingImage(next: PaperCover, files: CoverFiles): string | null {
+export function missingCoverImage(next: PaperCover, files: CoverFiles): string | null {
   if (next.kind === 'image' && !files.front && !next.imagePath) return '표지로 쓸 그림을 골라 주세요.';
   if (next.backKind === 'image' && !files.back && !next.backImagePath) return '뒷표지로 쓸 그림을 골라 주세요.';
   return null;
@@ -107,7 +110,7 @@ export function usePaperCover(paperId: string): PaperCoverState {
 
   const save = useCallback(async (next: PaperCover, files: CoverFiles = {}) => {
     if (busyRef.current) return false;
-    const missing = missingImage(next, files);
+    const missing = missingCoverImage(next, files);
     if (missing) {
       toast.error(missing);
       return false;

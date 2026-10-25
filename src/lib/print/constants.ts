@@ -12,6 +12,13 @@ export const A4_WIDTH_PX = 793.7;
 /** A4 297mm 를 96dpi 픽셀로 (= 1122.53px). 낱장 높이의 정본 */
 export const A4_HEIGHT_PX = (A4_WIDTH_PX * 297) / 210;
 
+/**
+ * 1mm 를 CSS 픽셀로(CSS 는 1in = 96px = 25.4mm 로 못박는다). 책 표지 펼침면처럼 **mm 로 그리는** 판에 쓴다.
+ * `210 × MM_TO_PX = 793.7008` 이라 `A4_WIDTH_PX`(793.7) 와 0.001px 차이다 — px 로 짠 A4 표지 디자인을
+ * 210mm × 297mm 상자에 그대로 넣어도 맞는다(constants.test.ts 가 고정한다).
+ */
+export const MM_TO_PX = 96 / 25.4;
+
 /** 좌우 여백 ≈ 15mm */
 export const PAGE_PAD_X = 57;
 

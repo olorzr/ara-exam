@@ -136,6 +136,20 @@ describe('buildNavSections', () => {
     expect(etc.items.map((i) => i.label)).toEqual(['카테고리 관리', 'AI 연결']);
   });
 
+  it('책 만들기는 원장에게만, 문제 은행 그룹 맨 끝에 나온다 — 선생님 메뉴 차례는 그대로', () => {
+    const teacherProblems = sections.find((s) => s.id === 'problems')!;
+    expect(teacherProblems.items.some((i) => i.href === '/books')).toBe(false);
+
+    const adminProblems = buildNavSections(true).find((s) => s.id === 'problems')!;
+    expect(adminProblems.items.map((i) => i.label)).toEqual([
+      '문제 아카이브', '올라간 기출', '문제지 조합', 'O,X·단답형', '책 만들기',
+    ]);
+    const books = adminProblems.items.at(-1)!;
+    expect(isNavItemActive('/books', books)).toBe(true);
+    expect(isNavItemActive('/books/abc-123', books)).toBe(true);
+    expect(isNavItemActive('/problems/papers', books)).toBe(false);
+  });
+
   it('감사 로그는 관리자에게만, 하단 구간으로 나온다', () => {
     expect(sections.some((s) => s.id === 'admin')).toBe(false);
 

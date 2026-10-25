@@ -211,3 +211,88 @@ describe('findBlockPage', () => {
     expect(findBlockPage(pages, 99)).toBe(-1);
   });
 });
+
+describe('paginate — 강제 쪽 넘김 · 빈 쪽 · 배수 채움', () => {
+  const base = { columns: 1 as const, firstPageBodyHeight: body(100), laterPageBodyHeight: body(100) };
+
+  it("'page' 는 남은 자리를 버리고 새 쪽에서 시작한다", () => {
+    const { pages } = paginate({ ...base, blockHeights: [30, 30, 30], breakBefore: [false, false, 'page'] });
+    expect(pages).toEqual([{ columns: [[0, 1]] }, { columns: [[2]] }]);
+  });
+
+  it("첫 블록의 'page'·'odd' 는 앞에 빈 쪽을 만들지 않는다", () => {
+    expect(paginate({ ...base, blockHeights: [30], breakBefore: ['page'] }).pages).toEqual([{ columns: [[0]] }]);
+    expect(paginate({ ...base, blockHeights: [30], breakBefore: ['odd'] }).pages).toEqual([{ columns: [[0]] }]);
+  });
+
+  it("'page' 가 연달아 와도 빈 쪽 없이 한 쪽씩이다", () => {
+    const { pages } = paginate({ ...base, blockHeights: [30, 30], breakBefore: ['page', 'page'] });
+    expect(pages).toEqual([{ columns: [[0]] }, { columns: [[1]] }]);
+  });
+
+  it("'odd' 인데 다음 쪽이 짝수면 빈 쪽을 끼워 홀수 쪽에서 시작한다", () => {
+    const { pages } = paginate({ ...base, blockHeights: [30, 30], breakBefore: [false, 'odd'] });
+    expect(pages).toEqual([{ columns: [[0]] }, { columns: [[]], blank: true }, { columns: [[1]] }]);
+    expect(findBlockPage(pages, 1) % 2).toBe(0); // 0-based 2 = 3쪽(홀수)
+  });
+
+  it("'odd' 인데 다음 쪽이 이미 홀수면 빈 쪽이 없다", () => {
+    // 블록 0·1 이 1·2쪽을 채우고 블록 2 는 3쪽에서 시작한다
+    const { pages } = paginate({ ...base, blockHeights: [80, 80, 30], breakBefore: [false, false, 'odd'] });
+    expect(pages).toEqual([{ columns: [[0]] }, { columns: [[1]] }, { columns: [[2]] }]);
+  });
+
+  it("2단에서 'page' 는 오른쪽 칸이 비어 있어도 새 쪽 왼쪽 칸에서 시작한다", () => {
+    const { pages } = paginate({
+      ...base, columns: 2, blockHeights: [30, 30], breakBefore: [false, 'page'],
+    });
+    expect(pages).toEqual([{ columns: [[0], []] }, { columns: [[1], []] }]);
+  });
+
+  it('빈 쪽도 단 수만큼 빈 칸을 가진다', () => {
+    const { pages } = paginate({
+      ...base, columns: 2, blockHeights: [30, 30], breakBefore: [false, 'odd'],
+    });
+    expect(pages[1]).toEqual({ columns: [[], []], blank: true });
+  });
+
+  it("한 쪽보다 큰 블록 뒤의 'page' 는 쪽을 하나만 늘린다", () => {
+    const { pages, oversized } = paginate({ ...base, blockHeights: [500, 30], breakBefore: [false, 'page'] });
+    expect(oversized).toEqual([0]);
+    expect(pages).toEqual([{ columns: [[0]] }, { columns: [[1]] }]);
+  });
+
+  it("쪼갤 수 있는 블록이 'page' 로 시작하면 앞 조각 용량이 새 쪽 전체다", () => {
+    const { splitRequests } = paginate({
+      ...base, blockHeights: [30, 300], breakBefore: [false, 'page'], splittable: [false, true],
+    });
+    expect(splitRequests).toEqual([{ index: 1, firstCapacity: 100, laterCapacity: 100 }]);
+  });
+
+  it('padPagesTo — 끝에 빈 쪽을 붙여 배수로 맞춘다', () => {
+    const five = paginate({ ...base, blockHeights: [80, 80, 80, 80, 80], padPagesTo: 4 }).pages;
+    expect(five).toHaveLength(8);
+    expect(five.slice(5).every((p) => p.blank === true)).toBe(true);
+    expect(paginate({ ...base, blockHeights: [80, 80, 80, 80], padPagesTo: 4 }).pages).toHaveLength(4);
+    expect(paginate({ ...base, blockHeights: [], padPagesTo: 4 }).pages).toEqual([]);
+    for (const pad of [undefined, 0, 1, 2.5]) {
+      expect(paginate({ ...base, blockHeights: [80, 80, 80], padPagesTo: pad }).pages).toHaveLength(3);
+    }
+  });
+
+  it("'odd' 로 끼운 빈 쪽도 배수 채움에서 센다", () => {
+    const { pages } = paginate({
+      ...base, blockHeights: [30, 30], breakBefore: [false, 'odd'], padPagesTo: 4,
+    });
+    expect(pages.map((p) => Boolean(p.blank))).toEqual([false, true, false, true]);
+  });
+
+  it('옵션을 안 쓰거나 전부 false 면 배치가 글자 하나까지 같고 blank 키가 없다', () => {
+    const heights = Array.from({ length: 137 }, (_, i) => 20 + (i % 7) * 5);
+    const input = { blockHeights: heights, columns: 2 as const, firstPageBodyHeight: body(400), laterPageBodyHeight: body(500) };
+    const plain = paginate(input);
+    const allFalse = paginate({ ...input, breakBefore: heights.map(() => false as const) });
+    expect(JSON.stringify(allFalse)).toBe(JSON.stringify(plain));
+    expect(plain.pages.some((page) => 'blank' in page)).toBe(false);
+  });
+});

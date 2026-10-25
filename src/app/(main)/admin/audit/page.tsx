@@ -30,6 +30,7 @@ const TABLE_LABEL: Record<string, string> = {
   passages: '지문',
   problems: '문항',
   problem_papers: '문제지',
+  books: '책',
 };
 
 const PAGE_SIZE = 50;
@@ -121,13 +122,10 @@ export default function AuditLogPage() {
           aria-label="테이블 필터"
         >
           <option value="">전체 테이블</option>
-          <option value="exams">시험지</option>
-          <option value="concept_sheets">개념지</option>
-          <option value="words">단어</option>
-          <option value="problem_sources">기출 출처</option>
-          <option value="passages">지문</option>
-          <option value="problems">문항</option>
-          <option value="problem_papers">문제지</option>
+          {/* 이름표와 같은 목록에서 만든다 — 따로 적으면 새 표(책)가 거르기에서 빠진다(코덱스 3R) */}
+          {Object.entries(TABLE_LABEL).map(([table, label]) => (
+            <option key={table} value={table}>{label}</option>
+          ))}
         </select>
         <select
           value={filterAction}

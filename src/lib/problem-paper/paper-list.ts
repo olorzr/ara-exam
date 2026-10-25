@@ -8,6 +8,13 @@ import type { ProblemPaper } from '@/types/problem-bank';
  * 페이지 안에 인라인으로 있던 것을 '내 것 / 다른 선생님 것' 탭을 붙이며 뗐다.
  */
 
+/** 참조 무결성 위반(foreign_key_violation) — 책에 담긴 문제지를 지우려 할 때 */
+const BOOK_REFERENCE_VIOLATION = '23503';
+
+/** 책에 담긴 문제지를 지우려 할 때의 안내 */
+export const PAPER_IN_BOOK_MESSAGE =
+  '원장님이 만드는 책에 담긴 문제지라 지울 수 없어요. 책 만들기에서 먼저 빼야 지울 수 있어요.';
+
 /** 한 번에 보여 줄 문제지 수 — 탭마다 따로 센다 */
 export const PAPER_LIST_LIMIT = 200;
 
@@ -33,10 +40,12 @@ export async function fetchPapers(scope: OwnerScope, userId: string): Promise<Pr
  *
  * ⚠️ `delete()` 는 0행을 지워도 error 가 null 이다 — 지운 행을 돌려받아 확인한다.
  * @param id - 문제지 id
- * @throws 지우지 못했을 때
+ * @throws 지우지 못했을 때 — 책에 담긴 문제지면 `PAPER_IN_BOOK_MESSAGE`
  */
 export async function deletePaper(id: string): Promise<void> {
   const { data, error } = await supabase.from('problem_papers').delete().eq('id', id).select('id');
+  // 원장님 책에 담긴 문제지는 DB 가 막는다(sql/76 RESTRICT). 선생님은 책을 볼 수 없어 원인을 알 길이 없으니 말해 준다
+  if (error?.code === BOOK_REFERENCE_VIOLATION) throw new Error(PAPER_IN_BOOK_MESSAGE);
   if (error) throw error;
   if (!data || data.length === 0) {
     throw new Error('이미 지워졌거나 지울 수 없는 문제지예요. 새로고침 후 다시 확인해 주세요.');

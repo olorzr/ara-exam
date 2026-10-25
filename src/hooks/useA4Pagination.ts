@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { A4_HEIGHT_PX, getColumnWidth, PAGE_PAD_BOTTOM, PAGE_PAD_TOP } from '@/lib/print/constants';
-import { findBlockPage, paginate, type PagePlan, type SplitRequest } from '@/lib/print/paginate';
+import {
+  findBlockPage, paginate, type BreakBefore, type PagePlan, type SplitRequest,
+} from '@/lib/print/paginate';
 
 /** 측정값이 이보다 작으면 아직 레이아웃이 안 잡힌 것으로 본다 */
 const MIN_SANE_BODY_PX = 80;
@@ -33,12 +35,27 @@ export type BeforePaginateHandler = (measureRoot: HTMLElement, columnWidth: numb
  */
 export type SplitRequestHandler = (requests: SplitRequest[], measureRoot: HTMLElement) => void;
 
+/** 배치가 끝났을 때 알려 주는 값 */
+export interface A4LayoutInfo {
+  /** 그릴 낱장 수 — 빈 쪽·배수 채움까지 센 값(PDF 에 담기는 쪽 수). 표지·뒷표지는 세지 않는다 */
+  pageCount: number;
+}
+
+/** 배치가 바뀔 때마다 불린다 — 안정적인 참조여야 한다(useCallback) */
+export type LayoutHandler = (info: A4LayoutInfo) => void;
+
 interface UseA4PaginationArgs {
   columns: 1 | 2;
   /** 블록별 '행 단위로 더 쪼갤 수 있음' 표시. 참조가 안정적이어야 한다(useMemo) */
   splittable?: readonly boolean[];
+  /** 블록별 강제 쪽 넘김(책의 장 시작). 참조가 안정적이어야 한다(useMemo) */
+  breakBefore?: readonly BreakBefore[];
+  /** 쪽 수를 이 배수로 맞춘다(무선제본 내지 4) */
+  padPagesTo?: number;
   onBeforePaginate?: BeforePaginateHandler;
   onSplitRequest?: SplitRequestHandler;
+  /** 배치가 정해지거나 바뀌면 쪽 수를 알린다(책의 책등 두께 계산) */
+  onLayout?: LayoutHandler;
 }
 
 interface UseA4PaginationResult {
@@ -56,8 +73,11 @@ interface UseA4PaginationResult {
 export function useA4Pagination({
   columns,
   splittable,
+  breakBefore,
+  padPagesTo,
   onBeforePaginate,
   onSplitRequest,
+  onLayout,
 }: UseA4PaginationArgs): UseA4PaginationResult {
   const measureRootRef = useRef<HTMLDivElement | null>(null);
   const [layout, setLayout] = useState<A4Layout>(EMPTY_LAYOUT);
@@ -99,6 +119,8 @@ export function useA4Pagination({
       laterPageBodyHeight,
       columnHeaderHeight,
       splittable,
+      breakBefore,
+      padPagesTo,
     });
 
     const oversizedScale: Record<number, number> = {};
@@ -122,10 +144,17 @@ export function useA4Pagination({
     if (signature === signatureRef.current) return;
     signatureRef.current = signature;
     setLayout(next);
-  }, [columns, splittable, onBeforePaginate, onSplitRequest]);
+  }, [columns, splittable, breakBefore, padPagesTo, onBeforePaginate, onSplitRequest]);
 
   // 렌더마다 확인 — 블록이 바뀌면 paint 전에 배치가 갱신된다
   useIsoLayoutEffect(measure);
+
+  // 쪽 수는 `measure()` 안이 아니라 **커밋 뒤** 알린다 — `layout` 은 서명이 바뀔 때만 새 객체라
+  // 실제로 배치가 바뀐 횟수만큼만 불린다(남의 콜백을 부를 뿐 이 훅의 state 는 건드리지 않는다)
+  useEffect(() => {
+    if (!layout.ready) return;
+    onLayout?.({ pageCount: layout.pages.length });
+  }, [layout, onLayout]);
 
   useEffect(() => {
     const root = measureRootRef.current;

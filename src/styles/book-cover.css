@@ -1,0 +1,148 @@
+/* =========================================================
+   책 표지 펼침면 (BookCoverSpread · BookSpine)
+
+   뒷표지 · 책등 · 앞표지를 한 장에 그린다. 크기·자리는 컴포넌트가 mm 로 인라인 style 을 준다
+   (lib/book/spine.ts 의 coverSpreadGeometry) — 여기에 치수를 베끼지 않는다.
+   ⚠️ 이 파일은 paper-covers/ 밖에 둔다 — 그 폴더는 무채색만 쓰도록 테스트가 고정한다(책등은 색이다).
+   ⚠️ 용지 크기(@page)는 여기 없다 — BookCoverSpread 가 <style> 로 덮는다.
+   ⚠️ 책등 글자의 자간·줄 높이·여백은 spine.ts 의 SPINE_* 상수와 같아야 한다(글자 크기 맞춤이 그 값으로 잰다).
+   ========================================================= */
+
+.book-cover {
+  position: relative;
+  /* 줄어들면 mm 로 박은 구역들이 잘린다 — 늘 제 크기 그대로(코덱스 4R). 좁은 화면에서는 감싼 칸이 가로로 넘긴다 */
+  flex: none;
+  margin: 0 auto;
+  overflow: hidden;
+  background: #fff;
+  box-sizing: border-box;
+  break-inside: avoid;
+  page-break-inside: avoid;
+  break-after: auto;
+  page-break-after: auto;
+}
+
+.book-cover__back,
+.book-cover__front,
+.book-cover__spine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.book-cover__front {
+  background: #fff;
+}
+
+/* 앞·뒤표지 재단 자리(210 × 297mm) — A4 표지 낱장(.a4-sheet--cover)과 같은 상자 모양. .a4-sheet 는 쓰지 않는다 */
+.book-cover__page {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+}
+
+.book-cover__brand {
+  position: absolute;
+  bottom: calc(3mm + 18mm);
+  text-align: center;
+  font-size: 10pt;
+  font-weight: 600;
+  letter-spacing: 3px;
+}
+
+/* ---- 책등 ---- */
+.book-spine {
+  position: absolute;
+  left: 0;
+  right: 0;
+  /* 위아래 재단 여백 3mm + 글자 여백 14mm (SPINE_PAD_Y_MM) */
+  top: calc(3mm + 14mm);
+  bottom: calc(3mm + 14mm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8mm;
+  padding: 0 0.8mm;
+  box-sizing: border-box;
+}
+
+.book-spine__title,
+.book-spine__brand {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  line-height: 1.15;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+
+.book-spine__title {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+  font-family: 'Gmarket Sans', 'Pretendard Variable', Pretendard, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.book-spine__brand {
+  flex: none;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+}
+
+/* ---- 재단선·접는 선 (화면에서만 — 요소에 data-no-print 도 붙어 있다) ---- */
+.book-cover__guides {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.book-cover__trim {
+  position: absolute;
+  border: 1px dashed rgba(220, 38, 38, 0.7);
+}
+
+.book-cover__fold {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px dashed rgba(37, 99, 235, 0.8);
+}
+
+.book-cover-stack {
+  display: flex;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+@media screen {
+  /* 작업 폭 430mm 남짓이 화면 본문 폭에 들어오게 반으로 줄인다(print-booklet.css 의 면과 같은 수법) */
+  .book-cover {
+    zoom: 0.5;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.12);
+  }
+}
+
+@media print {
+  .book-cover {
+    zoom: 1;
+    box-shadow: none;
+  }
+
+  .book-cover-stack {
+    display: block;
+    overflow: visible;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .book-cover__guides {
+    display: none !important;
+  }
+}

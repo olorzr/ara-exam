@@ -723,3 +723,34 @@
 - 관련 파일: src/lib/yet-hangul/compose.ts, src/lib/problem-ocr/normalize-html.ts,
   src/lib/print-scan/parse.ts
 - ⚠️ 변환은 **정화보다 먼저**, 괄호 **밖**의 낱자는 건드리지 않는다. 못 바꾼 괄호는 남기고 경고한다
+
+## 책 (Book)
+- 정의: 저장된 문제지 여러 장을 장(챕터)으로 묶어 A4 무선제본으로 찍는 책. 원장 전용 메뉴 '책 만들기'
+- 코드에서의 사용: `Book`, `exam.books`, `/books`
+- 관련 파일: src/lib/book/, src/components/book/, sql/76_books.sql
+
+## 장 (Chapter)
+- 정의: 책 안의 문제지 한 장. 새 쪽(기본은 오른쪽 면)에서 시작하고 장 머리에 번호·제목·출처가 찍힌다. 제목을 따로 적지 않으면 문제지 제목
+- 코드에서의 사용: `BookChapter`, `exam.book_chapters`, `chapterTitleOf`, `BookChapterHeading`
+- 관련 파일: src/lib/book/types.ts, src/components/book/inner-blocks.tsx
+
+## 판 (Edition)
+- 정의: 한 책을 세 가지로 뽑는 것 — 학생용(문제만) · 교사용(정답 표시) · 정답 및 해설(빠른 정답 + 해설). 판마다 쪽 수·책등·표지 꼬리가 다르다
+- 코드에서의 사용: `BookEdition`(`'student' | 'teacher' | 'key'`), `EDITION_LABELS`, `EDITION_SUFFIX`
+- 관련 파일: src/lib/book/settings.ts
+
+## 책등 · 세네카 (Spine)
+- 정의: 무선제본에서 앞표지와 뒷표지 사이, 책 두께만큼의 면. '세네카' 는 인쇄소에서 쓰는 일본식 말. 폭(mm) = 열림인쇄 견적 화면과 같은 식(쪽 수 ÷ 2 × 용지 두께 + 0.5, 소수 한 자리)
+- 코드에서의 사용: `spineWidthMm`, `BookSpine`, `MIN_SPINE_TEXT_MM`
+- 관련 파일: src/lib/book/spine.ts, src/components/book/BookSpine.tsx
+- ⚠️ 쪽 수는 4의 배수로 채운 값을 쓴다(내지 PDF 의 쪽 수와 같다)
+
+## 재단 사이즈 · 작업사이즈 (Trim size · Bleed size)
+- 정의: 재단 사이즈는 책이 잘려 나오는 크기(A4 210 × 297mm), 작업사이즈는 파일 크기로 재단 사이즈에 사방 3mm 여백을 더한 것. 표지 작업사이즈 = ceil(210 × 2 + 책등 + 6) × 303mm
+- 코드에서의 사용: `TRIM_W_MM`, `TRIM_H_MM`, `BLEED_MM`, `coverSpreadGeometry`
+- 관련 파일: src/lib/book/spine.ts
+
+## 내지 구성 지문 (Layout key)
+- 정의: 내지 쪽 수를 바꾸는 값(판·책 제목·단 수·장 시작·복합 지문·장 차례와 제목)을 줄인 글자. 저장된 쪽 수가 지금 구성의 것인지 가린다
+- 코드에서의 사용: `bookLayoutKey`, `bookLayoutKeyFor`, `pageCountFreshness`
+- 관련 파일: src/lib/book/settings.ts, src/lib/book/layout.ts

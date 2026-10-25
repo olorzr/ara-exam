@@ -109,11 +109,14 @@ export const COVER_TITLE_MAX = 100;
 /** 표지 부제 상한 — ⚠️ sql/61 의 CHECK(length(subtitle) <= 200) 와 같아야 한다 */
 export const COVER_SUBTITLE_MAX = 200;
 
-/** 인쇄물 종류별 제목 꼬리 — `ProblemPaperView`·`ProblemAnswerKeyView` 의 제목 규약과 같다 */
-export type CoverTitleSuffix = '' | ' - 교사용' | ' - 답지';
+/**
+ * 인쇄물 종류별 제목 꼬리 — `ProblemPaperView`·`ProblemAnswerKeyView` 의 제목 규약과 같다.
+ * `' - 정답 및 해설'` 은 책 만들기의 정답 및 해설 판(lib/book `EDITION_SUFFIX`)이 쓴다.
+ */
+export type CoverTitleSuffix = '' | ' - 교사용' | ' - 답지' | ' - 정답 및 해설';
 
 /** 인쇄물 꼬리 전부 — 글꼴 조각을 미리 받을 때 이 글자도 함께 받는다(`coverFontSample`) */
-export const COVER_TITLE_SUFFIXES: readonly CoverTitleSuffix[] = ['', ' - 교사용', ' - 답지'];
+export const COVER_TITLE_SUFFIXES: readonly CoverTitleSuffix[] = ['', ' - 교사용', ' - 답지', ' - 정답 및 해설'];
 
 /** 새로 표지를 만들 때의 기본값 */
 export const DEFAULT_SIMPLE_COVER: PaperCover = {

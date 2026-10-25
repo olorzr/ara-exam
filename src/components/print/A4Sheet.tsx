@@ -77,3 +77,28 @@ export default function A4Sheet({
     </section>
   );
 }
+
+interface A4BlankSheetProps {
+  /** 이 쪽의 번호(1부터) — 화면 낭독기와 테스트가 읽는다 */
+  page: number;
+  /** 문서의 마지막 낱장이면 뒤에 페이지를 넘기지 않는다 */
+  isLast?: boolean;
+  className?: string;
+}
+
+/**
+ * 빈 쪽 — 머리글·푸터·쪽 번호 없이 종이 한 장(책 관례: 빈 뒷면엔 번호를 찍지 않는다).
+ *
+ * 장을 오른쪽 면에서 시작하려고 끼운 쪽(`'odd'`)과 쪽 수를 4의 배수로 맞추려고 붙인 쪽(`padPagesTo`)이다.
+ * 쪽 수에는 센다 — 그 뒤 번호 찍힌 쪽은 빈 쪽을 건너뛴 번호이고 `n / N` 의 N 에도 들어간다.
+ */
+export function A4BlankSheet({ page, isLast = false, className = '' }: A4BlankSheetProps) {
+  return (
+    <section
+      className={`a4-sheet a4-sheet--blank ${isLast ? 'a4-sheet--last' : ''} ${className}`.trim()}
+      aria-label={`${page}쪽 (빈 쪽)`}
+      data-page={page}
+      style={{ width: A4_WIDTH_PX, height: A4_HEIGHT_PX }}
+    />
+  );
+}

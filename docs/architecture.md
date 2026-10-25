@@ -426,6 +426,16 @@ src/
 - 주요 파일: `option-select.tsx`(+ 회귀 테스트), `select.tsx`
 - `owner-scope-tabs.tsx` — '내가 만든 것 / 다른 선생님이 만든 것' 탭(문제지 조합·학교 프린트 시험지 목록). 패널은 탭마다 `TabsContent` 로 두고 목록은 고른 탭에만 그린다
 
+## lib/book (책 만들기 — 원장 전용, 2026-10-25)
+- 역할: 저장된 문제지를 장으로 묶은 책(A4 무선제본)의 설정·판·쪽 수 기록·책등 두께·표지 펼침면 치수, 그리고 `exam.books`·`exam.book_chapters`(sql/76) 읽기·쓰기
+- 의존: lib/print(constants `MM_TO_PX`), lib/problem-paper(cover 모델·cover-scale·settings), lib/problem-bank(storage·query-chain)
+- 주요 파일: inner-papers.ts(열림인쇄 내지 18종과 두께), spine.ts(책등 식·펼침면 치수·책등 글자 크기), settings.ts(설정·판·쪽 수·내지 지문),
+  layout.ts(지문을 책·장에서 만드는 한 함수), cover.ts(표지 jsonb ↔ `PaperCover`), queries.ts, types.ts
+- 화면: components/book — 구성(`BookComposePanel`: 장 목록·고르기·설정·표지 창·주문 요약) / 내지(`BookInnerMode` → `BookInnerView`:
+  `A4Document` + `breakBefore`·`padPagesTo`·`onLayout`) / 표지(`BookCoverMode` → `BookCoverSpread`·`BookSpine`)
+- 흐름: 내지 화면이 잰 쪽 수 → `books.page_counts[판] = {pages, key}` → 표지 화면이 지문(key)이 같을 때만 그 쪽 수 × 용지 두께로 책등을 그린다
+- 인쇄 엔진 확장(lib/print/paginate.ts): `breakBefore`(장 시작·오른쪽 면), `padPagesTo`(4의 배수 빈 쪽), `PagePlan.blank` — 옵션이 없으면 배치가 그대로다
+
 ## lib/problem-paper
 - 역할: 문제지 조합 규칙(지문 묶음 연속성)과 인쇄 블록 조립
 - 의존: lib/print(splitHtmlBlocks), lib/shuffle
