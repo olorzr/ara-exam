@@ -16,7 +16,11 @@
  *    문서 기준으로 해석해 반대가 맞는 경우가 있어 화면 안내가 그것을 함께 알린다.
  *    **뒤집기 방향이 틀렸다고 공식을 고치지 말 것** — 프린터 설정 문제다.
  *
- * 쪽 수가 4의 배수가 아니면 남는 자리는 **끝에** 빈 면으로 둔다(뒤표지 쪽).
+ * 쪽 수가 4의 배수가 아니면 남는 자리는 **끝에** 빈 면으로 둔다.
+ *
+ * 뒷표지가 있으면(`backCover`) 마지막 쪽(뒷표지)은 늘 **책의 맨 뒤 자리**(`total-1` — 1장 앞면 왼쪽)에 놓고,
+ * 빈 면은 그 **앞**(본문 끝과 뒷표지 사이, `count-1 .. total-2`)에 둔다. 자리 공식은 그대로라 짝 합 불변식도
+ * 그대로다 — 바뀌는 것은 `total-1` 자리에 앉는 쪽뿐이다.
  */
 
 /** A3 한 장(앞·뒤)에 들어가는 A4 쪽 수 */
@@ -41,16 +45,28 @@ export function bookletSheetCount(pageCount: number): number {
   return Math.ceil(Math.floor(pageCount) / BOOKLET_PAGES_PER_SHEET);
 }
 
+/** 면 배치 선택 */
+export interface BookletOptions {
+  /** 마지막 쪽이 뒷표지다 — 책의 맨 뒤 자리에 놓고 빈 면은 그 앞에 둔다 */
+  backCover?: boolean;
+}
+
 /**
  * 중철 책자의 장별 면 배치.
- * @param pageCount - A4 쪽 수 (읽는 순서)
+ * @param pageCount - A4 쪽 수 (읽는 순서, 뒷표지가 있으면 그것까지)
+ * @param options - 뒷표지가 있는가
  * @returns 장마다 앞면·뒷면의 [왼쪽, 오른쪽] 쪽 번호(0-based, 빈 면은 null)
  */
-export function bookletSheets(pageCount: number): BookletSheet[] {
+export function bookletSheets(pageCount: number, options: BookletOptions = {}): BookletSheet[] {
   const sheets = bookletSheetCount(pageCount);
   const count = sheets === 0 ? 0 : Math.floor(pageCount);
   const total = sheets * BOOKLET_PAGES_PER_SHEET;
-  const slot = (page: number): BookletSlot => (page < count ? page : null);
+  const back = Boolean(options.backCover) && count > 0;
+  const bodyCount = back ? count - 1 : count;
+  const slot = (position: number): BookletSlot => {
+    if (back && position === total - 1) return count - 1;
+    return position < bodyCount ? position : null;
+  };
 
   return Array.from({ length: sheets }, (_, k) => ({
     front: [slot(total - 1 - 2 * k), slot(2 * k)],

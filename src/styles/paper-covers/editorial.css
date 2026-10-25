@@ -1,4 +1,4 @@
-/* A 에디토리얼 (시안 Main.dc.html) — 머리 · 제목 띠 · 글자 깔림 띠 · 정보 표 · 바닥 */
+/* A 에디토리얼 (시안 Main.dc.html, 2026-10-25 판) — 머리 · 제목 띠(괄호 단원 줄) · 글자 깔림 띠 · 선생님/학생 표 · 바닥 */
 
 .pb-cover.pbc-editorial {
   background: #ffffff;
@@ -10,10 +10,23 @@
   flex: none;
   display: flex;
   justify-content: space-between;
+  gap: 24px;
   padding: 0 32px;
   font-family: var(--pbc-mono);
   font-size: 11px;
   letter-spacing: 0.04em;
+}
+
+.pbc-editorial__head > span,
+.pbc-editorial__foot > span {
+  flex: none;
+}
+
+/* 바닥 가운데는 과정이라 길 수 있다 — 줄어들며 줄을 바꾼다 */
+.pbc-editorial__foot > span:nth-child(2) {
+  flex: 0 1 auto;
+  min-width: 0;
+  text-align: center;
 }
 
 .pbc-editorial__head {
@@ -21,10 +34,11 @@
   padding-top: 26px;
 }
 
+/* ⚠️ 높이·위 여백·폭은 cover-fit.ts 의 EDITORIAL_BAND_ROOM · editorialTitleScale 과 같다 */
 .pbc-editorial__title-band {
   position: relative;
   flex: none;
-  height: 330px;
+  height: 360px;
   padding: 40px 32px 0;
   display: flex;
   flex-direction: column;
@@ -32,7 +46,9 @@
   text-align: center;
 }
 
+/* ⚠️ 폭 600px 은 cover-fit.ts 의 EDITORIAL_TITLE_WIDTH 와 같다 — 시안처럼 '현대시 / 읽기' 두 줄로 갈린다 */
 .pbc-editorial__title {
+  max-width: 600px;
   font-family: var(--pbc-serif);
   font-weight: 900;
   font-size: calc(146px * var(--pbc-title-scale));
@@ -40,10 +56,37 @@
   letter-spacing: -0.05em;
 }
 
-/* 중철 면에서는 이 띠가 줄어든다(시안의 400px 고정 띠) — 그래서 바닥 글이 면 안에 남는다 */
+/* 괄호 단원 줄 — ⚠️ 위 여백 24px · 줄 높이 24px 는 cover-fit.ts 의 EDITORIAL_TOPICS 와 같다 */
+.pbc-editorial__topics {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 14px;
+  max-width: 100%;
+  padding-top: 24px;
+  font-family: var(--pbc-serif);
+  font-size: 15px;
+  line-height: 24px;
+  letter-spacing: 0.1em;
+}
+
+.pbc-editorial__topics-text {
+  min-width: 0;
+}
+
+.pbc-editorial__paren {
+  flex: none;
+  font-family: var(--pbc-display);
+  font-style: italic;
+  font-size: 22px;
+  letter-spacing: 0;
+}
+
+/* 시안의 370px 띠. 낱장에서는 남는 높이를 바닥이 받고(시안의 115px 바닥), 중철 면에서는 바닥이 최소(71px)까지
+   줄어든 뒤에야 이 띠가 준다 — 그래서 바닥 글이 면 안에 남는다 */
 .pbc-editorial__middle {
   position: relative;
-  flex: 1 1 auto;
+  flex: 0 1 370px;
   min-height: 0;
   display: flex;
   align-items: center;
@@ -52,51 +95,48 @@
 
 .pbc-editorial__fill {
   position: absolute;
-  top: 1px;
-  bottom: 0;
-  left: -30px;
-  right: -30px;
+  top: 6px;
+  left: 32px;
+  right: 32px;
+  height: 360px;
   display: flex;
-  gap: 26px;
+  gap: 44px;
   overflow: hidden;
 }
 
 .pbc-editorial__fill-col {
   flex: 1 1 0;
   min-width: 0;
-  height: 460px;
   font-family: var(--pbc-serif);
-  font-size: 10px;
-  line-height: 13px;
-  color: #c6c6c6;
-  word-break: break-all;
+  font-size: 11px;
+  line-height: 19px;
+  color: #d6d6d6;
   overflow: hidden;
-  transform-origin: top center;
 }
 
-.pbc-editorial__fill-col:nth-child(1) { transform: rotate(-3deg); }
-.pbc-editorial__fill-col:nth-child(2) { transform: rotate(2deg); }
-.pbc-editorial__fill-col:nth-child(3) { transform: rotate(-1deg); }
-.pbc-editorial__fill-col:nth-child(4) { transform: rotate(3deg); }
-.pbc-editorial__fill-col:nth-child(5) { transform: rotate(-2deg); }
-.pbc-editorial__fill-col:nth-child(6) { transform: rotate(1deg); }
-.pbc-editorial__fill-col:nth-child(7) { transform: rotate(-3deg); }
+.pbc-editorial__fill-col:nth-child(even) {
+  padding-top: 28px;
+}
 
 .pbc-editorial__notice {
   position: relative;
   width: 180px;
+  padding: 16px 10px;
+  background: #ffffff;
   text-align: center;
   font-family: var(--pbc-serif);
   font-size: 12px;
   line-height: 1.55;
 }
 
-/* 시안은 258px 고정이다 — 단원이 길어 줄이 늘면 표가 자라고 위 깔림 띠(flex: 1)가 그만큼 준다 */
 .pbc-editorial__table {
   position: relative;
   flex: none;
-  min-height: 258px;
-  padding: 0 32px;
+  min-height: 214px;
+  padding: 20px 32px 0;
+}
+
+.pbc-editorial__table > dl {
   display: flex;
   flex-direction: column;
 }
@@ -105,8 +145,8 @@
   display: grid;
   grid-template-columns: 150px minmax(0, 1fr);
   border-top: 1px solid var(--pbc-ink);
-  padding: 12px 0 11px;
-  font-size: 13px;
+  padding: 14px 0 13px;
+  font-size: 14px;
 }
 
 .pbc-editorial__row:last-child {
@@ -117,19 +157,15 @@
   font-family: var(--pbc-mono);
   font-size: 11px;
   letter-spacing: 0.04em;
-  padding-top: 2px;
+  padding-top: 3px;
 }
 
 .pbc-editorial__row dd {
   min-height: 18px;
 }
 
-.pbc-editorial__pre {
-  white-space: pre;
-}
-
 .pbc-editorial__foot {
-  height: 71px;
+  flex: 1 0 71px;
   align-items: flex-end;
   padding-bottom: 26px;
 }

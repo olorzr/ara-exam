@@ -1,144 +1,100 @@
-/* D 블러 (시안 Soft.dc.html) — 흐린 먹 번짐과 점선 원 위의 흰 굵은 제목 */
+/* D 블러 (시안 Soft.dc.html, 2026-10-25 판) — 옅은 회색 번짐과 점선 원 위의 굵은 제목, 오른쪽 세로 글 */
 
 .pb-cover.pbc-soft {
   background: #ffffff;
 }
 
-.pbc-soft__paper {
-  position: absolute;
-  left: 470px;
-  top: 150px;
-  width: 330px;
-  height: 300px;
-  overflow: hidden;
-  background: #e0e0e0;
-  padding: 18px 20px;
-  font-family: var(--pbc-serif);
-  font-size: 10px;
-  line-height: 14px;
-  color: #b3b3b3;
-  word-break: break-all;
-}
-
-.pbc-soft__blur {
+/* 시안은 따뜻한 회색 그러데이션 위의 번짐이었다 — 배경은 흰색, 번짐은 무채색(2026-10-14 규약) */
+.pbc-soft__blob {
   position: absolute;
   border-radius: 50%;
+  filter: blur(30px);
 }
 
-.pbc-soft__blur--dark {
-  left: 300px;
-  top: 430px;
-  width: 560px;
-  height: 290px;
-  background: #3a3a3a;
-  filter: blur(42px);
-}
-
-.pbc-soft__blur--mid {
-  left: -120px;
-  top: 520px;
-  width: 420px;
-  height: 360px;
-  background: #5a5a5a;
-  filter: blur(50px);
-}
+.pbc-soft__blob--a { left: 430px; top: 120px; width: 260px; height: 260px; background: #cbcbcb; }
+.pbc-soft__blob--b { left: 560px; top: 250px; width: 240px; height: 240px; background: #d2d2d2; }
+.pbc-soft__blob--c { left: 330px; top: 300px; width: 230px; height: 230px; background: #d6d6d6; }
+.pbc-soft__blob--d { left: 480px; top: 390px; width: 200px; height: 200px; background: #c4c4c4; filter: blur(26px); }
+.pbc-soft__blob--e { left: -80px; top: 760px; width: 380px; height: 300px; background: #d4d4d4; filter: blur(44px); }
 
 .pbc-soft__dot {
   position: absolute;
   border-radius: 50%;
-  border: 2px dotted #8d8d8d;
+  border: 1.5px dotted #8d8d8d;
 }
 
-.pbc-soft__dot--a { left: 40px; top: 300px; width: 330px; height: 330px; }
-.pbc-soft__dot--b { left: 430px; top: 690px; width: 300px; height: 300px; }
-.pbc-soft__dot--c { left: 560px; top: 40px; width: 220px; height: 220px; }
+.pbc-soft__dot--a { left: 40px; top: 330px; width: 300px; height: 300px; }
+.pbc-soft__dot--b { left: 470px; top: 640px; width: 280px; height: 280px; }
+.pbc-soft__dot--c { left: 600px; top: 30px; width: 170px; height: 170px; }
 
 .pbc-soft__mark {
   position: absolute;
-  left: 36px;
+  left: 30px;
   top: 30px;
-  font-family: var(--pbc-display);
-  font-style: italic;
-  font-size: 150px;
+  font-family: var(--pbc-serif);
+  font-weight: 900;
+  font-size: 170px;
   line-height: 1;
-  letter-spacing: -0.04em;
-  /* 흰 배경에서도 보이게 옅은 무채 회색(시안은 회색 배경 위의 흰 글자 + 그림자였다 — 흰 배경에선 그림자가 번져 보여 뺐다) */
+  letter-spacing: -0.06em;
+  /* 흰 배경에서도 보이게 옅은 무채 회색(시안은 회색 배경 위의 흰 글자였다) */
   color: #e2e2e2;
 }
 
 .pbc-soft__kicker {
   position: absolute;
   left: 44px;
-  top: 190px;
+  top: 218px;
   font-family: var(--pbc-mono);
-  font-size: 11px;
-  letter-spacing: 0.08em;
+  font-size: 10px;
+  letter-spacing: 0.18em;
   color: var(--pbc-mute);
 }
 
-/* 제목 · 단원 · 태그라인이 한 흐름이다 — 시안처럼 태그라인을 top 에 박으면 긴 제목과 겹친다 */
+/* 제목 · 단원 · 태그라인이 한 흐름이다 — 시안처럼 태그라인을 top 에 박으면 긴 제목과 겹친다.
+   ⚠️ 위 520px · 폭(오른쪽 48px — 세로 글 자리) · 단원 위 22px · 태그라인 80 + 22px 는 cover-fit-soft.ts 와 같다 */
 .pbc-soft__body {
   position: absolute;
   left: 40px;
-  right: 40px;
-  top: 470px;
-}
-
-/*
- * 흰 제목·단원 뒤의 연기. 시안은 회색 배경에 먹 번짐 두 개가 고정 자리에 있어 제목이 길어 그 밖으로 나가도
- * 흰 글자가 회색 위에 있었다. 배경을 흰색으로 바꾼 뒤(2026-10-14)로는 번짐 밖의 흰 글자가 흰 바탕 위에서
- * 사라진다(코덱스) — 그래서 글 묶음 크기를 따라가는 번짐을 하나 더 깐다. 글 폭만큼만(fit-content) 덮는다.
- */
-.pbc-soft__headline {
-  position: relative;
-  z-index: 0;
-  width: fit-content;
-  max-width: 100%;
-}
-
-/* 번짐은 표준편차라 가장자리에서 50%, 안쪽 1.5배 거리에서 93% 짙다 — 글 가장자리가 늘 그만큼 안쪽에 들게
-   네 변을 36px 이상 넓히고(24px × 1.5) 모서리는 고정 px 로 둥글린다(% 면 긴 제목에서 모서리가 커져 귀퉁이 글자가
-   번짐 밖으로 나간다, 코덱스) */
-.pbc-soft__headline::before {
-  content: '';
-  position: absolute;
-  top: -36px;
-  right: -56px;
-  bottom: -36px;
-  left: -44px;
-  z-index: -1;
-  border-radius: 40px;
-  background: #3a3a3a;
-  filter: blur(24px);
-}
-
-.pbc-soft__title,
-.pbc-soft__topic {
-  font-weight: 700;
-  line-height: 0.98;
-  letter-spacing: -0.04em;
-  color: #ffffff;
-  text-shadow: 0 0 18px rgba(0, 0, 0, 0.35);
+  right: 48px;
+  top: 520px;
 }
 
 .pbc-soft__title {
-  font-size: calc(84px * var(--pbc-title-scale));
+  font-weight: 700;
+  font-size: calc(112px * var(--pbc-title-scale));
+  line-height: 0.95;
+  letter-spacing: -0.06em;
 }
 
-.pbc-soft__topic {
-  font-size: calc(84px * var(--pbc-topic-scale, 0.8));
+.pbc-soft__topics {
+  padding-top: 22px;
+  font-size: calc(28px * var(--pbc-topic-scale, 1));
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
 }
 
-/* 위 번짐(아래 끝 36px + 번짐)이 거의 다 걷힌 자리에 둔다 — 짙은 연기 위의 검은 글자가 되지 않게(코덱스).
-   흰 테두리 빛은 고정 먹 번짐이 뒤에 올 때를 위한 것이다. ⚠️ 높이는 cover-fit-soft.ts SOFT_TAGLINE_H 와 같다 */
 .pbc-soft__tagline {
-  padding-top: 64px;
+  padding-top: 80px;
   padding-left: 4px;
-  text-shadow: 0 0 4px #ffffff, 0 0 10px #ffffff;
   font-family: var(--pbc-display);
   font-style: italic;
-  font-size: 24px;
+  font-size: 22px;
   line-height: 1;
+}
+
+/* 오른쪽 세로 글 — 오른쪽 위 모서리를 축으로 시계 방향 90° 돌려, 560px 에서 위로 올라가며 놓인다 */
+.pbc-soft__vertical {
+  position: absolute;
+  right: 30px;
+  top: 560px;
+  transform: rotate(90deg);
+  transform-origin: right top;
+  white-space: nowrap;
+  font-family: var(--pbc-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--pbc-mute);
 }
 
 .pbc-soft__foot {
@@ -150,33 +106,29 @@
   justify-content: space-between;
   align-items: flex-end;
   gap: 24px;
-  font-size: 11px;
-  line-height: 1.6;
+  font-size: 12px;
+  line-height: 1.7;
   color: #1e1e1e;
 }
 
+/* ⚠️ 폭 260px 는 cover-fit-soft.ts 의 SOFT_NOTE_WIDTH 와 같다 */
 .pbc-soft__note {
-  width: 320px;
+  width: 260px;
+  white-space: pre-wrap;
 }
 
-.pbc-soft__fields {
-  flex: none;
-  width: 230px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.pbc-soft__label {
+  font-family: var(--pbc-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
 }
 
 .pbc-soft__field {
+  flex: none;
+  width: 230px;
   display: flex;
   gap: 10px;
   align-items: baseline;
-}
-
-.pbc-soft__field > span:first-child {
-  font-family: var(--pbc-mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
 }
 
 .pbc-soft__field-line {

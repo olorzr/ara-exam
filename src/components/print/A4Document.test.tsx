@@ -246,6 +246,49 @@ describe('A4Document', () => {
       expect(blocksSeen).toHaveLength(total);
     });
 
+    it('뒷표지 — 본문 뒤 한 장이고 쪽 번호를 세지 않으며, 문서의 마지막 낱장 표시는 뒷표지로 옮겨 간다', () => {
+      const total = blocksPerPage(FIRST_HEADER_H) + 1;
+      const { container } = render(
+        <A4Document
+          blocks={Array.from({ length: total }, (_, i) => <div key={i} data-h={BLOCK_H}>문항 {i + 1}</div>)}
+          firstPageHeader={<div data-h={FIRST_HEADER_H}>전체 헤더</div>}
+          laterPageHeader={<div data-h={LATER_HEADER_H}>컴팩트 헤더</div>}
+          coverPage={<div>표지 내용</div>}
+          backCoverPage={<div>뒷표지 내용</div>}
+        />,
+      );
+      const stack = container.querySelector('.a4-stack')!;
+      const last = stack.lastElementChild!;
+      expect(last.classList.contains('a4-sheet--cover-back')).toBe(true);
+      expect(last.classList.contains('a4-sheet--last')).toBe(true);
+      expect(last.getAttribute('aria-label')).toBe('뒷표지');
+      expect(last.textContent).toBe('뒷표지 내용');
+      const body = bodySheets(container);
+      expect(body.map((s) => s.querySelector('.a4-footer__page')?.textContent)).toEqual(['1 / 2', '2 / 2']);
+      expect(body.some((s) => s.classList.contains('a4-sheet--last'))).toBe(false);
+    });
+
+    it('중철 + 앞·뒷표지 — 뒷표지는 1장 앞면 왼쪽(책의 맨 뒤), 빈 면은 본문 끝과 뒷표지 사이', () => {
+      const total = blocksPerPage(FIRST_HEADER_H) + blocksPerPage(LATER_HEADER_H) + 1;
+      const { container } = render(
+        <A4Document
+          booklet
+          coverPage={<div>표지 내용</div>}
+          backCoverPage={<div>뒷표지 내용</div>}
+          blocks={Array.from({ length: total }, (_, i) => <div key={i} data-h={BLOCK_H}>문항 {i + 1}</div>)}
+          firstPageHeader={<div data-h={FIRST_HEADER_H}>전체 헤더</div>}
+          laterPageHeader={<div data-h={LATER_HEADER_H}>컴팩트 헤더</div>}
+        />,
+      );
+      // 앞표지 + 본문 3 + 뒷표지 = 5쪽 → 2장, 빈 면 셋
+      const sides = Array.from(container.querySelectorAll('.a4-stack .booklet-side'));
+      expect(sides).toHaveLength(4);
+      expect(sides[0].querySelector('[data-slot="right"] .a4-sheet--cover:not(.a4-sheet--cover-back)')).not.toBeNull();
+      expect(sides[0].querySelector('[data-slot="left"] .a4-sheet--cover-back')).not.toBeNull();
+      expect(container.querySelectorAll('.a4-stack .booklet-blank')).toHaveLength(3);
+      expect(sides[3].querySelector('[data-slot="left"] .a4-footer__page')?.textContent).toBe('3 / 3');
+    });
+
     it('중철 + 표지 — 표지가 1쪽이 되어 1장 앞면 오른쪽에 온다', () => {
       const total = blocksPerPage(FIRST_HEADER_H) + blocksPerPage(LATER_HEADER_H) + 1;
       const { container } = render(

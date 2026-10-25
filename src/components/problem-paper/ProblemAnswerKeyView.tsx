@@ -7,7 +7,7 @@ import { buildAnswerRows, explanationEntries } from '@/lib/problem-paper/answers
 import type { PaperCover } from '@/lib/problem-paper/cover';
 import { coverYearOf } from '@/lib/problem-paper/cover-text';
 import type { PaperItemSnapshot, ProblemPaper } from '@/types/problem-bank';
-import { renderCoverSlot } from './PaperCoverPage';
+import { renderCoverSlots, type CoverSlotImages } from './PaperCoverPage';
 
 /** 한 줄에 담을 문항 수 — 줄 하나가 인쇄 블록 하나다(쪽이 갈려도 줄은 안 쪼개진다) */
 const ITEMS_PER_ROW = 5;
@@ -19,10 +19,10 @@ interface ProblemAnswerKeyViewProps {
   booklet?: boolean;
   /** 표지 (없으면 null) — 문제지와 같은 표지에 ' - 답지' 꼬리 */
   cover?: PaperCover | null;
-  /** 그림 표지의 서명 URL */
-  coverImageUrl?: string;
-  /** 그림 표지를 끝내 못 받았는가 — 표지 자리에 인쇄되는 안내를 그린다 */
-  coverImageFailed?: boolean;
+  /** 표지 그림(앞·뒤)의 서명 URL 과 깨짐 — 깨졌으면 그 자리에 인쇄되는 안내를 그린다 */
+  coverImages?: CoverSlotImages;
+  /** 디자인 표지의 선생님 이름 */
+  coverTeacher?: string;
   /** 표지를 읽지 못했을 때 표지 자리에 찍을 안내 (있으면 표지 대신 이것) */
   coverNotice?: string;
 }
@@ -42,8 +42,7 @@ interface ProblemAnswerKeyViewProps {
  * 작아 격자에서 크게 찍는다(`.pb-answer-value--choice`).
  */
 export default function ProblemAnswerKeyView({
-  paper, items, booklet = false, cover = null, coverImageUrl,
-  coverImageFailed = false, coverNotice,
+  paper, items, booklet = false, cover = null, coverImages, coverTeacher, coverNotice,
 }: ProblemAnswerKeyViewProps) {
   const title = `${paper.title} - 답지`;
   const rows = useMemo(() => buildAnswerRows(items), [items]);
@@ -109,17 +108,16 @@ export default function ProblemAnswerKeyView({
     return out;
   }, [rows, explanations]);
 
-  const coverPage = renderCoverSlot({
+  const coverSlots = renderCoverSlots({
     cover, paperTitle: paper.title, suffix: ' - 답지',
-    imageUrl: coverImageUrl, imageFailed: coverImageFailed, notice: coverNotice,
-    year: coverYearOf(paper.created_at),
+    images: coverImages, notice: coverNotice, year: coverYearOf(paper.created_at), teacher: coverTeacher,
   });
 
   return (
     <A4Document
       blocks={blocks}
       booklet={booklet}
-      coverPage={coverPage}
+      {...coverSlots}
       columns={1}
       className="pb-sheet"
       firstPageHeader={

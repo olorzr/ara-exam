@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/react';
-import PaperCoverPage, { COVER_IMAGE_FAILED_NOTICE, renderCoverSlot } from './PaperCoverPage';
+import PaperCoverPage, {
+  BACK_COVER_IMAGE_FAILED_NOTICE, COVER_IMAGE_FAILED_NOTICE, renderCoverSlots,
+} from './PaperCoverPage';
 import { DEFAULT_SIMPLE_COVER } from '@/lib/problem-paper/cover';
 
 describe('PaperCoverPage', () => {
@@ -70,9 +72,9 @@ describe('PaperCoverPage — 디자인', () => {
   });
 
   it('표지 자리에 연도를 넘긴다', () => {
-    const { container } = render(<>{renderCoverSlot({
+    const { container } = render(<>{renderCoverSlots({
       cover: { ...DEFAULT_SIMPLE_COVER, layout: 'editorial' }, paperTitle: '기출', suffix: ' - 교사용', year: '2025',
-    })}</>);
+    }).coverPage}</>);
     expect(container.querySelector('.pbc-editorial__title')!.textContent).toBe('기출 - 교사용');
     expect(container.querySelector('.pbc-editorial__head')!.textContent).toContain('2025');
   });
@@ -92,16 +94,55 @@ describe('표지 자리 — 못 읽거나 깨졌을 때', () => {
   });
 
   it('표지를 못 읽었으면 표지가 없어도 안내 한 장을 표지 자리에 둔다', () => {
-    const { container } = render(<>{renderCoverSlot({ cover: null, paperTitle: 'p', suffix: '', notice: '못 읽었어요' })}</>);
+    const slots = renderCoverSlots({
+      cover: { ...DEFAULT_SIMPLE_COVER, backKind: 'design' }, paperTitle: 'p', suffix: '', notice: '못 읽었어요',
+    });
+    const { container } = render(<>{slots.coverPage}</>);
     expect(container.textContent).toBe('못 읽었어요');
+    // 표지를 못 읽었으면 뒷표지도 그리지 않는다(인쇄는 잠겨 있고 안내만 나간다)
+    expect(slots.backCoverPage).toBeUndefined();
   });
 
   it('표지가 없고 안내도 없으면 표지 낱장을 그리지 않는다', () => {
-    expect(renderCoverSlot({ cover: null, paperTitle: 'p', suffix: '' })).toBeUndefined();
+    expect(renderCoverSlots({ cover: null, paperTitle: 'p', suffix: '' })).toEqual({});
   });
 
   it('교사용·답지 꼬리를 붙여 그린다', () => {
-    const { container } = render(<>{renderCoverSlot({ cover: DEFAULT_SIMPLE_COVER, paperTitle: '기출', suffix: ' - 답지' })}</>);
+    const { container } = render(<>{renderCoverSlots({ cover: DEFAULT_SIMPLE_COVER, paperTitle: '기출', suffix: ' - 답지' }).coverPage}</>);
     expect(container.querySelector('.pb-cover__title')!.textContent).toBe('기출 - 답지');
+  });
+});
+
+describe('뒷표지 자리', () => {
+  it('없음이면 뒷표지 낱장을 그리지 않는다', () => {
+    expect(renderCoverSlots({ cover: DEFAULT_SIMPLE_COVER, paperTitle: 'p', suffix: '' }).backCoverPage).toBeUndefined();
+  });
+
+  it('디자인 짝 — 앞표지 디자인을 따르고 연도를 찍는다', () => {
+    const { backCoverPage } = renderCoverSlots({
+      cover: { ...DEFAULT_SIMPLE_COVER, layout: 'sketch', backKind: 'design' }, paperTitle: 'p', suffix: '', year: '2026',
+    });
+    const { container } = render(<>{backCoverPage}</>);
+    expect(container.querySelector('.pbc-back--sketch')).not.toBeNull();
+    expect(container.textContent).toContain('© 2026 아라국어논술');
+  });
+
+  it('그림 — 뒷표지 그림을 그리고, 끝내 못 받았으면 인쇄되는 안내를 그린다', () => {
+    const cover = { ...DEFAULT_SIMPLE_COVER, backKind: 'image' as const, backImagePath: 'papers/p/cover-b.jpg' };
+    const ok = render(<>{renderCoverSlots({
+      cover, paperTitle: 'p', suffix: '', images: { backUrl: 'https://example.test/back.jpg' },
+    }).backCoverPage}</>).container;
+    expect(ok.querySelector('img')!.getAttribute('src')).toBe('https://example.test/back.jpg');
+    const broken = render(<>{renderCoverSlots({
+      cover, paperTitle: 'p', suffix: '', images: { backUrl: 'x', backBroken: true },
+    }).backCoverPage}</>).container;
+    expect(broken.textContent).toBe(BACK_COVER_IMAGE_FAILED_NOTICE);
+  });
+
+  it('선생님 이름을 디자인 앞표지에 넘긴다', () => {
+    const { container } = render(<>{renderCoverSlots({
+      cover: { ...DEFAULT_SIMPLE_COVER, layout: 'rings' }, paperTitle: 'p', suffix: '', teacher: '송알',
+    }).coverPage}</>);
+    expect(container.textContent).toContain('선생님 · 송알');
   });
 });

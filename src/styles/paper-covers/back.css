@@ -1,0 +1,114 @@
+/* 디자인 뒷표지 (BackCover) — 앞표지 디자인의 짝. 꾸밈은 앞표지 CSS 조각을 빌려 쓰고 여기서는 자리만 옮긴다.
+   ⚠️ 글 묶음은 bottom 기준 — 중철 면(A4 − 40px)에서도 잘리지 않는다. 색은 무채색만(2026-10-14 규약). */
+
+.pb-cover.pbc-back {
+  background: #ffffff;
+}
+
+.pbc-back__decor {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+.pbc-back__text {
+  position: absolute;
+  left: 96px;
+  right: 96px;
+  bottom: 84px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.pbc-back__brand {
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+}
+
+.pbc-back__subject,
+.pbc-back__note,
+.pbc-back__mark {
+  font-family: var(--pbc-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--pbc-mute);
+}
+
+.pbc-back__copyright {
+  max-width: 360px;
+  padding: 18px 0 6px;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--pbc-mute);
+}
+
+/* 명조로 짠 디자인은 상표도 명조(받아 둔 굵기는 400 · 900 뿐이다) */
+.pbc-back--editorial .pbc-back__brand,
+.pbc-back--rings .pbc-back__brand,
+.pbc-back--spines .pbc-back__brand,
+.pbc-back--sketch .pbc-back__brand,
+.pbc-back--zine .pbc-back__brand {
+  font-family: var(--pbc-serif);
+  font-weight: 400;
+}
+
+.pbc-back--editorial .pbc-back__brand,
+.pbc-back--spines .pbc-back__brand {
+  font-weight: 900;
+}
+
+/* ---- 디자인별 꾸밈 자리 ---- */
+.pbc-back__accent {
+  position: absolute;
+  left: 361px;
+  top: 120px;
+}
+
+.pbc-back__head {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  border-bottom: 1px solid var(--pbc-ink);
+  margin: 0 32px;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.pbc-back__ring {
+  left: 87px;
+  top: 140px;
+}
+
+.pbc-back__shelf {
+  position: absolute;
+  left: 40px;
+  top: 60px;
+  height: 420px;
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+}
+
+.pbc-back__zine-box {
+  left: 54px;
+  right: 54px;
+  top: 120px;
+  height: 340px;
+}
+
+/* 스케치는 아래 물결을 비켜 글 묶음을 올린다 */
+.pbc-back--sketch .pbc-back__text {
+  bottom: 150px;
+}
+
+.pbc-back__zine-circle {
+  left: 322px;
+  top: 520px;
+}

@@ -5,12 +5,16 @@ import { DEFAULT_SIMPLE_COVER } from '@/lib/problem-paper/cover';
 const fetchPaperCover = vi.fn();
 const savePaperCover = vi.fn();
 const removePaperCover = vi.fn();
+const uploadPaperCoverImage = vi.fn();
 
 vi.mock('@/lib/problem-paper/cover-queries', () => ({
   fetchPaperCover: (...args: unknown[]) => fetchPaperCover(...args),
   savePaperCover: (...args: unknown[]) => savePaperCover(...args),
   removePaperCover: (...args: unknown[]) => removePaperCover(...args),
-  uploadPaperCoverImage: vi.fn(),
+  uploadPaperCoverImage: (...args: unknown[]) => uploadPaperCoverImage(...args),
+}));
+vi.mock('@/lib/problem-paper/cover-image', () => ({
+  encodeCoverJpeg: vi.fn(async (file: File) => new Blob([file.name], { type: 'image/jpeg' })),
 }));
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
@@ -21,6 +25,7 @@ describe('usePaperCover', () => {
     fetchPaperCover.mockReset();
     savePaperCover.mockReset();
     removePaperCover.mockReset();
+    uploadPaperCoverImage.mockReset();
   });
 
   it('읽는 동안은 loading, 다 읽으면 표지를 준다', async () => {
@@ -73,5 +78,58 @@ describe('usePaperCover', () => {
     await act(async () => { ok = await result.current.save({ ...DEFAULT_SIMPLE_COVER, kind: 'image' }); });
     expect(ok).toBe(false);
     expect(savePaperCover).not.toHaveBeenCalled();
+  });
+
+  it('그림 뒷표지인데 그림도 경로도 없으면 아무것도 올리지 않고 멈춘다 — 앞 그림이 고아가 되지 않게', async () => {
+    fetchPaperCover.mockResolvedValue(null);
+    const { result } = renderHook(() => usePaperCover('p1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    let ok = true;
+    await act(async () => {
+      ok = await result.current.save(
+        { ...DEFAULT_SIMPLE_COVER, kind: 'image', backKind: 'image' },
+        { front: new File(['a'], 'front.png', { type: 'image/png' }) },
+      );
+    });
+    expect(ok).toBe(false);
+    expect(uploadPaperCoverImage).not.toHaveBeenCalled();
+    expect(savePaperCover).not.toHaveBeenCalled();
+  });
+
+  it('앞·뒤 그림을 차례로 올리고 그 경로로 저장한다', async () => {
+    fetchPaperCover.mockResolvedValue(null);
+    uploadPaperCoverImage.mockResolvedValueOnce('papers/p1/cover-front.jpg').mockResolvedValueOnce('papers/p1/cover-back.jpg');
+    savePaperCover.mockImplementation(async (_id: string, cover: unknown) => cover);
+    const { result } = renderHook(() => usePaperCover('p1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => {
+      await result.current.save(
+        { ...DEFAULT_SIMPLE_COVER, kind: 'image', backKind: 'image' },
+        {
+          front: new File(['a'], 'front.png', { type: 'image/png' }),
+          back: new File(['b'], 'back.png', { type: 'image/png' }),
+        },
+      );
+    });
+    expect(uploadPaperCoverImage).toHaveBeenCalledTimes(2);
+    expect(savePaperCover.mock.calls[0][1]).toMatchObject({
+      imagePath: 'papers/p1/cover-front.jpg', backImagePath: 'papers/p1/cover-back.jpg',
+    });
+  });
+
+  it('뒷표지 그림만 새로 고르면 앞표지 경로는 그대로 두고 뒤만 올린다', async () => {
+    fetchPaperCover.mockResolvedValue(null);
+    uploadPaperCoverImage.mockResolvedValueOnce('papers/p1/cover-back.jpg');
+    savePaperCover.mockImplementation(async (_id: string, cover: unknown) => cover);
+    const { result } = renderHook(() => usePaperCover('p1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => {
+      await result.current.save(
+        { ...DEFAULT_SIMPLE_COVER, layout: 'rings', backKind: 'image' },
+        { back: new File(['b'], 'back.png', { type: 'image/png' }) },
+      );
+    });
+    expect(uploadPaperCoverImage).toHaveBeenCalledTimes(1);
+    expect(savePaperCover.mock.calls[0][1]).toMatchObject({ imagePath: '', backImagePath: 'papers/p1/cover-back.jpg' });
   });
 });

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { coverTitleFor, type CoverTitleSuffix, type PaperCover } from '@/lib/problem-paper/cover';
 import { toCoverLayoutProps } from '@/lib/problem-paper/cover-text';
-import { COVER_LAYOUT_COMPONENTS } from './covers';
+import { BackCover, COVER_LAYOUT_COMPONENTS } from './covers';
 
 interface PaperCoverPageProps {
   cover: PaperCover;
@@ -13,11 +13,17 @@ interface PaperCoverPageProps {
   imageFailed?: boolean;
   /** 문제지를 만든 해('2026') — 디자인 표지가 찍는다. 모르면 비운다 */
   year?: string;
+  /** 디자인 표지의 선생님 이름(`coverTeacherName`). 비면 그 줄을 그리지 않는다 */
+  teacher?: string;
 }
 
 /** 표지 그림을 못 받았을 때 표지 자리에 찍는 말 */
 export const COVER_IMAGE_FAILED_NOTICE =
   '표지 그림을 불러오지 못했어요. 화면 위쪽의 \'다시 시도\' 를 누른 뒤 다시 인쇄해 주세요.';
+
+/** 뒷표지 그림을 못 받았을 때 뒷표지 자리에 찍는 말 */
+export const BACK_COVER_IMAGE_FAILED_NOTICE =
+  '뒷표지 그림을 불러오지 못했어요. 화면 위쪽의 \'다시 시도\' 를 누른 뒤 다시 인쇄해 주세요.';
 
 /**
  * 표지 자리에 찍는 안내 한 장.
@@ -41,61 +47,109 @@ export function PaperCoverNotice({ message }: { message: string }) {
  * 종이에 맞춰 비율을 지킨 채 담는다(잘리지 않는다 — 선생님이 만든 표지의 글자가 잘리면 안 된다).
  */
 export default function PaperCoverPage({
-  cover, title, imageUrl, imageFailed = false, year = '',
+  cover, title, imageUrl, imageFailed = false, year = '', teacher = '',
 }: PaperCoverPageProps) {
   if (cover.kind === 'image' && imageFailed) {
     return <PaperCoverNotice message={COVER_IMAGE_FAILED_NOTICE} />;
   }
-  if (cover.kind === 'image') {
-    return (
-      <div className="pb-cover pb-cover--image">
-        {imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img className="pb-cover__image" src={imageUrl} alt={`${title} 표지`} />
-        ) : (
-          <span className="pb-cover__pending">표지 그림을 불러오는 중…</span>
-        )}
-      </div>
-    );
-  }
+  if (cover.kind === 'image') return <CoverImage url={imageUrl} alt={`${title} 표지`} />;
 
   const Layout = COVER_LAYOUT_COMPONENTS[cover.layout];
   return (
     <Layout
-      {...toCoverLayoutProps({ title, subtitle: cover.subtitle, showNameBox: cover.showNameBox, year })}
+      {...toCoverLayoutProps({ title, subtitle: cover.subtitle, showNameBox: cover.showNameBox, year, teacher })}
     />
   );
 }
 
-/** 표지 자리 하나를 고르는 데 필요한 값 */
+/** 그림 한 장 — 종이에 맞춰 비율을 지킨 채 담는다(잘리지 않는다) */
+function CoverImage({ url, alt }: { url?: string; alt: string }) {
+  return (
+    <div className="pb-cover pb-cover--image">
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img className="pb-cover__image" src={url} alt={alt} />
+      ) : (
+        <span className="pb-cover__pending">표지 그림을 불러오는 중…</span>
+      )}
+    </div>
+  );
+}
+
+interface PaperBackCoverPageProps {
+  cover: PaperCover;
+  /** 문서 제목(그림 대체 글에 쓴다) */
+  title: string;
+  imageUrl?: string;
+  imageFailed?: boolean;
+  year?: string;
+}
+
+/**
+ * 뒷표지 내용 — 디자인 짝(`BackCover`, 앞표지 디자인을 따른다) 또는 올린 그림. `backKind` 가 `none` 이면 그리지 않는다.
+ * 그림을 끝내 못 받았으면 **인쇄물에도 보이는** 안내를 그린다(앞표지와 같은 규약).
+ */
+export function PaperBackCoverPage({ cover, title, imageUrl, imageFailed = false, year = '' }: PaperBackCoverPageProps) {
+  if (cover.backKind === 'image' && imageFailed) {
+    return <PaperCoverNotice message={BACK_COVER_IMAGE_FAILED_NOTICE} />;
+  }
+  if (cover.backKind === 'image') return <CoverImage url={imageUrl} alt={`${title} 뒷표지`} />;
+  if (cover.backKind === 'design') return <BackCover layout={cover.layout} year={year} />;
+  return null;
+}
+
+/** 표지 그림의 서명 URL 과 깨짐 — `useCoverImages` 가 주는 값 가운데 그리는 데 필요한 것 */
+export interface CoverSlotImages {
+  frontUrl?: string;
+  backUrl?: string;
+  frontBroken?: boolean;
+  backBroken?: boolean;
+}
+
+/** 표지 자리(앞·뒤)를 고르는 데 필요한 값 */
 export interface CoverSlotInput {
   cover: PaperCover | null;
   paperTitle: string;
   /** 인쇄물 꼬리 — 문제지 '' · 교사용 ' - 교사용' · 답지 ' - 답지' */
   suffix: CoverTitleSuffix;
-  imageUrl?: string;
-  imageFailed?: boolean;
-  /** 표지를 읽지 못했을 때의 안내 — 있으면 표지 대신 이것을 찍는다 */
+  /** 표지 그림(앞·뒤) */
+  images?: CoverSlotImages;
+  /** 표지를 읽지 못했을 때의 안내 — 있으면 표지 대신 이것을 찍고 뒷표지는 그리지 않는다 */
   notice?: string;
   /** 문제지를 만든 해(`coverYearOf(paper.created_at)`) */
   year?: string;
+  /** 디자인 표지의 선생님 이름(`coverTeacherName`) */
+  teacher?: string;
+}
+
+/** 표지 자리 둘 — 없으면 그 낱장을 그리지 않는다 */
+export interface CoverSlots {
+  coverPage?: ReactNode;
+  backCoverPage?: ReactNode;
 }
 
 /**
  * 표지 자리에 넣을 내용(문제지·교사용·답지가 같이 쓴다 — 두 벌로 두면 한쪽만 고쳐진다).
+ * 결과를 그대로 `A4Document` 에 펼친다(`{...renderCoverSlots(…)}`).
  * @param input - 표지와 상태
- * @returns 표지 낱장 내용. 표지가 없으면 undefined(표지 낱장을 그리지 않는다)
+ * @returns 앞표지·뒷표지 낱장 내용. 없으면 undefined(그 낱장을 그리지 않는다)
  */
-export function renderCoverSlot(input: CoverSlotInput): ReactNode | undefined {
-  if (input.notice) return <PaperCoverNotice message={input.notice} />;
-  if (!input.cover) return undefined;
-  return (
-    <PaperCoverPage
-      cover={input.cover}
-      title={coverTitleFor(input.cover, input.paperTitle, input.suffix)}
-      imageUrl={input.imageUrl}
-      imageFailed={input.imageFailed}
-      year={input.year}
-    />
-  );
+export function renderCoverSlots(input: CoverSlotInput): CoverSlots {
+  if (input.notice) return { coverPage: <PaperCoverNotice message={input.notice} /> };
+  const { cover, images = {} } = input;
+  if (!cover) return {};
+  const title = coverTitleFor(cover, input.paperTitle, input.suffix);
+  return {
+    coverPage: (
+      <PaperCoverPage
+        cover={cover} title={title} imageUrl={images.frontUrl} imageFailed={images.frontBroken}
+        year={input.year} teacher={input.teacher}
+      />
+    ),
+    backCoverPage: cover.backKind === 'none' ? undefined : (
+      <PaperBackCoverPage
+        cover={cover} title={title} imageUrl={images.backUrl} imageFailed={images.backBroken} year={input.year}
+      />
+    ),
+  };
 }

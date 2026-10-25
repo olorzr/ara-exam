@@ -433,16 +433,23 @@ src/
   html-trim.ts, settings.ts, shuffle-groups.ts, cover.ts, cover-image.ts, cover-queries.ts, print-layout-pref.ts,
   trim-works.ts(복합 지문에서 묻지 않는 작품 구역 빼기), print-label.ts(인쇄 단추 글자),
   cover-text.ts·cover-scale.ts·cover-copy.ts·cover-fonts.ts(디자인 표지의 글 나누기·크기 계산 도구·고정 문구·글꼴),
-  cover-fit.ts·cover-fit-spines.ts·cover-fit-soft.ts(디자인마다 글이 들어갈 자리와 크기 결정)
+  cover-fit.ts·cover-fit-spines.ts·cover-fit-soft.ts·cover-fit-zine.ts(디자인마다 글이 들어갈 자리와 크기 결정)
 - **표지**(2026-10-04): 곁표 `exam.problem_paper_covers`(sql/61, 문제지 1:1, 행이 없으면 표지 없음).
   간단 표지(제목·부제·이름 칸)와 그림 표지(올린 그림을 JPEG 로 다시 인코딩해 `papers/{id}/cover-{token}.jpg`)
   둘이다. `usePaperCover` 가 읽고 쓰고 `PaperCoverDialog` 가 고르며 `PaperCoverPage` 가 그린다.
   문제지·교사용·답지 셋에 같은 표지가 붙고 제목 꼬리만 다르다(`coverTitleFor`).
   문제지 본문은 불변 스냅샷이라 칸을 더하지 않고 곁표에 둔다
-- **표지 디자인**(2026-10-13): 간단 표지 안에서 여섯 디자인을 고른다(`layout`, sql/70). 그리는 쪽은
-  `components/problem-paper/covers/`(디자인마다 컴포넌트 하나 + `COVER_LAYOUT_COMPONENTS` 등록부), CSS 는
-  `styles/paper-covers/`(globals.css 에서 @import), 글꼴은 jsdelivr @fontsource. 창의 `CoverLayoutPicker` 는
-  실제 표지를 줄여 보여 준다. 디자인 표지는 글꼴을 받기 전에 인쇄 단추를 잠근다(`useCoverFontsReady`, fail-open)
+- **표지 디자인**(2026-10-13 · 2026-10-25): 간단 표지 안에서 일곱 디자인을 고른다(`layout`, sql/70 · CHECK 정본 sql/75 —
+  2026-10-25 에 F 라인드로잉 `zine` 이 더해졌다). 그리는 쪽은 `components/problem-paper/covers/`(디자인마다 컴포넌트 하나 +
+  `COVER_LAYOUT_COMPONENTS` 등록부), CSS 는 `styles/paper-covers/`(globals.css 에서 @import), 글꼴은 jsdelivr @fontsource.
+  창의 `CoverLayoutPicker` 는 실제 표지를 줄여 보여 준다. 디자인 표지는 글꼴을 받기 전에 인쇄 단추를 잠근다
+  (`useCoverFontsReady`, fail-open). 디자인 표지의 '선생님' 줄은 표지 행의 `teacher`, 비면 문제지를 만든 선생님
+  (`usePaperLoad` 가 `public.profiles` 에서 읽는다 — `coverTeacherName`)
+- **뒷표지**(2026-10-25): 같은 표지 행의 `back_kind`(none · design · image)·`back_image_path`(sql/75). 디자인 뒷표지는
+  간단 표지 디자인의 짝(`BackCover`, back.css)이다. 표지 자리 조립은 `renderCoverSlots`(앞·뒤 둘)이고 `A4Document` 의
+  `backCoverPage` 가 본문 뒤 한 장을 그린다(쪽 번호에 세지 않는다, 문서의 마지막 낱장 표시 `a4-sheet--last` 가 뒷표지로
+  옮겨 간다). 중철은 `bookletSheets(n, { backCover })` 가 뒷표지를 책의 맨 뒤 자리(1장 앞면 왼쪽)에 두고 빈 면을 그 앞에
+  둔다. 앞·뒤 표지 그림은 `useCoverImages` 가 함께 서명·확인해 하나라도 안 왔거나 깨졌으면 인쇄를 막는다
 - **묻는 작품만 인쇄**(2026-10-12): 문제지 보기 화면의 선택(localStorage, 기본 켜짐). 스냅샷의 지문 `works`·문항
   `work_titles`(sql/68)로 묻지 않는 (가)(나) 최상위 상자를 뺀다. 확실하지 않으면(옛 스냅샷·범위 표시·상자 없음) 지문 전체
 - **인쇄 방식**(2026-10-04): 낱장 / 중철 제본(A3 가로 양면). 화면 선택이고 localStorage 에

@@ -1,6 +1,6 @@
 /* =========================================================
-   디자인 표지 공통 — 클로드 디자인 시안(2026-10-06 '문제지 표지 시안')을 옮긴 다섯 디자인
-   (.pbc-editorial · .pbc-rings · .pbc-spines · .pbc-soft · .pbc-sketch)이 함께 쓴다.
+   디자인 표지 공통 — 클로드 디자인 시안('문제지 표지 시안', 2026-10-06 · 2026-10-25 판)을 옮긴 여섯 디자인
+   (.pbc-editorial · .pbc-rings · .pbc-spines · .pbc-soft · .pbc-sketch · .pbc-zine)과 디자인 뒷표지(.pbc-back)가 함께 쓴다.
 
    px 는 시안 그대로다 — A4 낱장이 96dpi px 로 고정이라(lib/print/constants.ts) 화면·인쇄가 1:1 이다.
    ⚠️ 높이를 절대 쓰지 않는다. 중철에서는 표지가 면 높이(A4 − 40px)로 줄어든다
@@ -53,7 +53,7 @@
   list-style: none;
 }
 
-/* '이름 ____' — 이름표와 밑줄 빈칸 */
+/* '학생 ____' — 이름표와 밑줄 빈칸(길이는 parts.tsx BlankField 가 디자인마다 준다) */
 .pbc-field {
   white-space: nowrap;
 }
@@ -64,7 +64,3 @@
   border-bottom: 1px solid var(--pbc-ink);
   vertical-align: -2px;
 }
-
-.pbc-field__line--sm { width: 90px; }
-.pbc-field__line--md { width: 120px; }
-.pbc-field__line--lg { width: 150px; }

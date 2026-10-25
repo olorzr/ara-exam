@@ -5,6 +5,7 @@ import { COVER_FONT_SPECS, COVER_FONTS_TIMEOUT_MS } from '@/lib/problem-paper/co
 import { useCoverFontsReady } from './useCoverFontsReady';
 
 const DESIGN: PaperCover = { ...DEFAULT_SIMPLE_COVER, layout: 'rings', title: '현대시 읽기' };
+const CTX = { paperTitle: '문제지', year: '2026', teacher: '' };
 
 function stubFonts(load: ((spec: string, text?: string) => Promise<FontFace[]>) | undefined) {
   Object.defineProperty(document, 'fonts', { configurable: true, value: load ? { load } : undefined });
@@ -18,7 +19,7 @@ afterEach(() => {
 describe('useCoverFontsReady', () => {
   it('글꼴 API 가 없으면 기다리지 않는다', () => {
     stubFonts(undefined);
-    const { result } = renderHook(() => useCoverFontsReady(DESIGN, '문제지', '2026'));
+    const { result } = renderHook(() => useCoverFontsReady(DESIGN, CTX));
     expect(result.current).toBe(true);
   });
 
@@ -26,7 +27,7 @@ describe('useCoverFontsReady', () => {
     const load = vi.fn().mockResolvedValue([]);
     stubFonts(load);
     const { result, rerender } = renderHook(
-      ({ cover }: { cover: PaperCover | null }) => useCoverFontsReady(cover, '문제지', '2026'),
+      ({ cover }: { cover: PaperCover | null }) => useCoverFontsReady(cover, CTX),
       { initialProps: { cover: null as PaperCover | null } },
     );
     expect(result.current).toBe(true);
@@ -42,27 +43,34 @@ describe('useCoverFontsReady', () => {
     const gate = new Promise<void>((resolve) => { finish = resolve; });
     const load = vi.fn<(spec: string, text?: string) => Promise<FontFace[]>>(() => gate.then(() => []));
     stubFonts(load);
-    const { result } = renderHook(() => useCoverFontsReady(DESIGN, '상현중 기출', '2026'));
+    const { result } = renderHook(() => useCoverFontsReady(DESIGN, { paperTitle: '상현중 기출', year: '2026', teacher: '송알' }));
     expect(result.current).toBe(false);
     await waitFor(() => expect(load).toHaveBeenCalledTimes(COVER_FONT_SPECS.length));
     const sample = load.mock.calls[0][1] ?? '';
-    for (const text of ['현대시 읽기', '상현중 기출', '교사용', '답지', '2026', '아라국어논술']) {
+    for (const text of ['현대시 읽기', '상현중 기출', '교사용', '답지', '2026', '아라국어논술', '송알', '©']) {
       expect(sample).toContain(text);
     }
     await act(async () => { finish(); });
     await waitFor(() => expect(result.current).toBe(true));
   });
 
+  it('간단 앞표지라도 디자인 뒷표지면 받는다 — 뒷표지가 디자인 글꼴을 쓴다', async () => {
+    const load = vi.fn().mockResolvedValue([]);
+    stubFonts(load);
+    renderHook(() => useCoverFontsReady({ ...DEFAULT_SIMPLE_COVER, backKind: 'design' }, CTX));
+    await waitFor(() => expect(load).toHaveBeenCalled());
+  });
+
   it('받기가 실패해도 연다(fail-open)', async () => {
     stubFonts(vi.fn().mockRejectedValue(new Error('network')));
-    const { result } = renderHook(() => useCoverFontsReady(DESIGN, '문제지', '2026'));
+    const { result } = renderHook(() => useCoverFontsReady(DESIGN, CTX));
     await waitFor(() => expect(result.current).toBe(true));
   });
 
   it('끝내 안 오면 시간 상한에서 연다', async () => {
     vi.useFakeTimers();
     stubFonts(vi.fn(() => new Promise<FontFace[]>(() => {})));
-    const { result } = renderHook(() => useCoverFontsReady(DESIGN, '문제지', '2026'));
+    const { result } = renderHook(() => useCoverFontsReady(DESIGN, CTX));
     expect(result.current).toBe(false);
     await act(async () => { await vi.advanceTimersByTimeAsync(COVER_FONTS_TIMEOUT_MS); });
     expect(result.current).toBe(true);

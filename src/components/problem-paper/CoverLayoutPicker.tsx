@@ -8,14 +8,14 @@ import { toCoverLayoutProps } from '@/lib/problem-paper/cover-text';
 import { A4_HEIGHT_PX, A4_WIDTH_PX } from '@/lib/print/constants';
 import { COVER_LAYOUT_COMPONENTS } from './covers';
 
-/** 고르기 칸의 작은 표지 배율 — A4 낱장(794px)이 111px 폭이 된다(창 폭에 세 칸) */
-export const COVER_THUMB_SCALE = 0.14;
+/** 고르기 칸의 작은 표지 배율 — A4 낱장(794px)이 95px 폭이 된다(창 폭에 네 칸 — 디자인 일곱이 두 줄) */
+export const COVER_THUMB_SCALE = 0.12;
 
 interface CoverLayoutPickerProps {
   value: PaperCoverLayout;
   onChange: (layout: PaperCoverLayout) => void;
   /** 작은 표지에 넣을 지금 입력값 — 치는 대로 바뀐다 */
-  preview: { title: string; subtitle: string; showNameBox: boolean; year: string };
+  preview: { title: string; subtitle: string; showNameBox: boolean; year: string; teacher?: string };
   disabled?: boolean;
 }
 
@@ -34,7 +34,7 @@ export default function CoverLayoutPicker({ value, onChange, preview, disabled }
   return (
     <fieldset className="space-y-1.5" disabled={disabled}>
       <legend className="text-sm text-gray-600">디자인</legend>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-4 gap-2">
         {COVER_LAYOUTS.map((layout) => {
           const Layout = COVER_LAYOUT_COMPONENTS[layout];
           const checked = value === layout;

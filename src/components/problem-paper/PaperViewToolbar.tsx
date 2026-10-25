@@ -40,7 +40,8 @@ interface PaperViewToolbarProps {
 
 function coverLabel(cover: PaperCover | null): string {
   if (!cover) return '표지';
-  return cover.kind === 'image' ? '표지 · 그림' : `표지 · ${COVER_LAYOUT_LABELS[cover.layout]}`;
+  const front = cover.kind === 'image' ? '표지 · 그림' : `표지 · ${COVER_LAYOUT_LABELS[cover.layout]}`;
+  return cover.backKind === 'none' ? front : `${front} · 뒷표지`;
 }
 
 /**

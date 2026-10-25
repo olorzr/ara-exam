@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  COVER_TOPICS_MAX, coverFillText, coverYearOf, splitSubtitle, toCoverLayoutProps,
+  COVER_TOPICS_MAX, brandLine, courseOrSubject, coverTeacherName, coverYearOf, splitSubtitle, toCoverLayoutProps,
+  topicsLine,
 } from './cover-text';
 
 describe('splitSubtitle', () => {
@@ -43,22 +44,33 @@ describe('coverYearOf', () => {
   });
 });
 
-describe('coverFillText', () => {
-  it('조각을 이어 붙여 정한 길이를 넘을 때까지 되풀이한다', () => {
-    const text = coverFillText(['현대시', '', ' 화자 '], 30, '대신');
-    expect(text.startsWith('현대시, 화자. 현대시, 화자. ')).toBe(true);
-    expect(text.length).toBeGreaterThanOrEqual(30);
-  });
-
-  it('조각이 모두 비면 대신할 글을 쓴다', () => {
-    expect(coverFillText(['', ' '], 6, 'ARA')).toBe('ARA. ARA. ');
+describe('toCoverLayoutProps', () => {
+  it('부제를 나눠 함께 싣고 원문도 남긴다 — 선생님 이름은 다듬어 싣고 없으면 비운다', () => {
+    expect(toCoverLayoutProps({
+      title: '제목', subtitle: '과정\n단원', showNameBox: true, year: '2026', teacher: ' 송알 ',
+    })).toEqual({
+      title: '제목', subtitle: '과정\n단원', course: '과정', topics: ['단원'], showNameBox: true, year: '2026', teacher: '송알',
+    });
+    expect(toCoverLayoutProps({ title: '제목', subtitle: '', showNameBox: false, year: '' }).teacher).toBe('');
   });
 });
 
-describe('toCoverLayoutProps', () => {
-  it('부제를 나눠 함께 싣고 원문도 남긴다', () => {
-    expect(toCoverLayoutProps({ title: '제목', subtitle: '과정\n단원', showNameBox: true, year: '2026' })).toEqual({
-      title: '제목', subtitle: '과정\n단원', course: '과정', topics: ['단원'], showNameBox: true, year: '2026',
-    });
+describe('coverTeacherName', () => {
+  it('표지에 적은 이름이 먼저, 비면 문제지를 만든 선생님', () => {
+    expect(coverTeacherName({ teacher: '김선생' }, '송알')).toBe('김선생');
+    expect(coverTeacherName({ teacher: '  ' }, '송알')).toBe('송알');
+    expect(coverTeacherName(null, ' 송알 ')).toBe('송알');
+    expect(coverTeacherName({ teacher: '' }, '')).toBe('');
+  });
+});
+
+describe('표지 글 잇기', () => {
+  it('단원 줄 · 과정 자리 · 상표 줄', () => {
+    expect(topicsLine(['화자와 정서', '이미지와 감각'])).toBe('화자와 정서 · 이미지와 감각');
+    expect(topicsLine([])).toBe('');
+    expect(courseOrSubject('고등 1학년')).toBe('고등 1학년');
+    expect(courseOrSubject('')).toBe('국어 · 논술');
+    expect(brandLine('고등', '', '2026')).toBe('아라국어논술 · 고등 · 2026');
+    expect(brandLine()).toBe('아라국어논술');
   });
 });

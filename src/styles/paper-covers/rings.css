@@ -1,4 +1,4 @@
-/* B 링 (시안 Rings.dc.html) — 흐린 고리 둘 위에 가운데 글 한 줄기 */
+/* B 링 (시안 Rings.dc.html, 2026-10-25 판) — 흐린 고리 둘 위에 가운데 글 한 줄기 */
 
 .pb-cover.pbc-rings {
   background: #ffffff;
@@ -19,7 +19,8 @@
 .pbc-rings__ring--a { left: 52px; top: 60px; }
 .pbc-rings__ring--b { left: 118px; top: 420px; }
 
-/* 시안의 margin-top 누적 대신 비율로 늘고 주는 빈 칸 — 중철 면(1,082px)에서도 아래가 잘리지 않는다 */
+/* 시안의 margin-top 누적 대신 비율로 늘고 주는 빈 칸 — 중철 면(1,082px)에서도 아래가 잘리지 않는다.
+   ⚠️ 좌우 여백 100px(글 폭 594px)은 cover-fit.ts 의 RINGS_TEXT_WIDTH 와 같다 — 옆글(아라 · 국어논술)을 비킨다 */
 .pbc-rings__flow {
   position: absolute;
   top: 0;
@@ -30,7 +31,7 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: 50px 80px 80px;
+  padding: 50px 100px 80px;
 }
 
 .pbc-rings__gap {
@@ -38,28 +39,46 @@
   flex-basis: 0px;
   min-height: 0;
 }
-.pbc-rings__gap--1 { flex-grow: 176; }
-.pbc-rings__gap--2 { flex-grow: 150; }
-.pbc-rings__gap--3 { flex-grow: 128; }
+.pbc-rings__gap--1 { flex-grow: 190; }
+.pbc-rings__gap--2 { flex-grow: 160; }
+.pbc-rings__gap--3 { flex-grow: 130; }
 .pbc-rings__gap--4 { flex-grow: 150; }
-.pbc-rings__gap--5 { flex-grow: 104; }
+.pbc-rings__gap--5 { flex-grow: 96; }
 
 .pbc-rings__small {
+  max-width: 100%;
   font-size: 13px;
   letter-spacing: 0.08em;
   color: var(--pbc-mute);
 }
 
-.pbc-rings__topics {
-  max-width: 600px;
+.pbc-rings__teacher {
+  max-width: 480px;
 }
 
 .pbc-rings__title {
-  max-width: 600px;
-  font-size: calc(52px * var(--pbc-title-scale));
+  max-width: 100%;
+  font-size: calc(56px * var(--pbc-title-scale));
   font-weight: 400;
   line-height: 1.15;
   letter-spacing: -0.01em;
+}
+
+/* ⚠️ 위 여백·크기는 cover-fit.ts 의 RINGS_CROSS_H · RINGS_TOPICS 와 같다 */
+.pbc-rings__cross {
+  padding-top: 6px;
+  font-family: var(--pbc-display);
+  font-size: 26px;
+  line-height: 1;
+}
+
+.pbc-rings__topics {
+  max-width: 100%;
+  padding-top: 6px;
+  font-size: calc(22px * var(--pbc-topic-scale, 1));
+  line-height: 1.3;
+  letter-spacing: 0.04em;
+  color: var(--pbc-mute);
 }
 
 .pbc-rings__tagline {
@@ -69,18 +88,23 @@
   line-height: 1;
 }
 
-.pbc-rings__year {
-  font-size: 34px;
-  line-height: 1.15;
-  letter-spacing: 0.02em;
+.pbc-rings__student {
+  font-size: 20px;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+}
+
+.pbc-rings__student .pbc-field__line {
+  margin-left: 14px;
+  height: 22px;
+  vertical-align: -4px;
 }
 
 .pbc-rings__side {
   position: absolute;
   top: 548px;
-  font-family: var(--pbc-display);
-  font-size: 24px;
-  letter-spacing: 0.02em;
+  font-size: 15px;
+  letter-spacing: 0.1em;
 }
 
 .pbc-rings__side--left { left: 48px; }
@@ -91,20 +115,8 @@
   left: 48px;
   right: 48px;
   bottom: 40px;
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 24px;
+  text-align: center;
   font-size: 12px;
   letter-spacing: 0.06em;
   color: var(--pbc-mute);
-}
-
-.pbc-rings__fields {
-  display: flex;
-  gap: 24px;
-}
-
-.pbc-rings__brand {
-  text-transform: lowercase;
 }

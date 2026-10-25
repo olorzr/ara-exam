@@ -2,8 +2,9 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  COVER_COLUMNS, COVER_LAYOUT_LABELS, COVER_LAYOUTS, COVER_SUBTITLE_MAX, COVER_TITLE_MAX,
-  DEFAULT_SIMPLE_COVER, coverTitleFor, isCoverLayout, normalizePaperCover, toCoverRow,
+  BACK_COVER_KINDS, COVER_COLUMNS, COVER_LAYOUT_LABELS, COVER_LAYOUTS, COVER_SUBTITLE_MAX, COVER_TEACHER_MAX,
+  COVER_TITLE_MAX, DEFAULT_SIMPLE_COVER, coverTitleFor, effectiveBackKind, isBackCoverKind, isCoverLayout,
+  normalizePaperCover, toCoverRow,
 } from './cover';
 
 const ROW = {
@@ -15,6 +16,7 @@ describe('normalizePaperCover', () => {
   it('간단 표지 — 글자를 다듬고 그림 경로는 버린다', () => {
     expect(normalizePaperCover(ROW)).toEqual({
       kind: 'simple', layout: 'basic', title: '1학기 중간 대비', subtitle: '3회', showNameBox: false, imagePath: '',
+      teacher: '', backKind: 'none', backImagePath: '',
     });
   });
 
@@ -67,6 +69,52 @@ describe('normalizePaperCover — 디자인', () => {
   });
 });
 
+describe('normalizePaperCover — 뒷표지 · 선생님 이름(sql/75)', () => {
+  it('칸이 없으면(sql/75 전의 행) 뒷표지 없음 · 선생님 자동이고 앞표지는 그대로', () => {
+    expect(normalizePaperCover(ROW)).toMatchObject({ kind: 'simple', backKind: 'none', backImagePath: '', teacher: '' });
+  });
+
+  it('디자인 뒷표지와 그림 뒷표지를 읽는다', () => {
+    expect(normalizePaperCover({ ...ROW, layout: 'zine', back_kind: 'design' })).toMatchObject({
+      layout: 'zine', backKind: 'design', backImagePath: '',
+    });
+    expect(normalizePaperCover({ ...ROW, back_kind: 'image', back_image_path: 'papers/p/cover-b.jpg' }))
+      .toMatchObject({ backKind: 'image', backImagePath: 'papers/p/cover-b.jpg' });
+  });
+
+  it('붙일 수 없는 뒷표지는 뒷표지만 없앤다 — 앞표지를 버리면 첫 장이 빠진다', () => {
+    expect(normalizePaperCover({ ...ROW, back_kind: 'image', back_image_path: '' }))
+      .toMatchObject({ kind: 'simple', backKind: 'none' });
+    expect(normalizePaperCover({ ...ROW, kind: 'image', back_kind: 'design' }))
+      .toMatchObject({ kind: 'image', backKind: 'none' });
+    expect(normalizePaperCover({ ...ROW, back_kind: 'both' })).toMatchObject({ backKind: 'none' });
+  });
+
+  it('뒷표지가 그림이 아니면 남은 경로를 버린다', () => {
+    expect(normalizePaperCover({ ...ROW, back_kind: 'design', back_image_path: 'x' })?.backImagePath).toBe('');
+  });
+
+  it('선생님 이름을 다듬고 상한에서 자른다', () => {
+    expect(normalizePaperCover({ ...ROW, teacher: ' 송알 ' })?.teacher).toBe('송알');
+    expect(normalizePaperCover({ ...ROW, teacher: '가'.repeat(60) })?.teacher).toHaveLength(COVER_TEACHER_MAX);
+  });
+
+  it('뒷표지 종류 판정', () => {
+    expect(BACK_COVER_KINDS).toEqual(['none', 'design', 'image']);
+    expect(isBackCoverKind('design')).toBe(true);
+    expect(isBackCoverKind('Design')).toBe(false);
+    expect(effectiveBackKind('simple', 'design', '')).toBe('design');
+    expect(effectiveBackKind('image', 'design', '')).toBe('none');
+    expect(effectiveBackKind('image', 'image', '')).toBe('none');
+    expect(effectiveBackKind('image', 'image', 'p')).toBe('image');
+  });
+
+  it('라인드로잉(zine)이 디자인 목록에 있다', () => {
+    expect(COVER_LAYOUTS).toContain('zine');
+    expect(COVER_LAYOUT_LABELS.zine).toBe('라인드로잉');
+  });
+});
+
 describe('coverTitleFor', () => {
   it('제목이 비었으면 문제지 제목 + 꼬리', () => {
     expect(coverTitleFor(DEFAULT_SIMPLE_COVER, '상현중 기출', ' - 교사용')).toBe('상현중 기출 - 교사용');
@@ -95,6 +143,20 @@ describe('toCoverRow', () => {
       .toBe('basic');
   });
 
+  it('뒷표지 — 그림 앞표지의 디자인 뒷표지는 없음으로, 그림이 아니면 경로를 비운다', () => {
+    const image = { ...DEFAULT_SIMPLE_COVER, kind: 'image' as const, imagePath: 'x' };
+    expect(toCoverRow('p', { ...image, backKind: 'design' }).back_kind).toBe('none');
+    expect(toCoverRow('p', { ...DEFAULT_SIMPLE_COVER, backKind: 'design', backImagePath: 'y' }))
+      .toMatchObject({ back_kind: 'design', back_image_path: '' });
+    expect(toCoverRow('p', { ...image, backKind: 'image', backImagePath: 'y' }))
+      .toMatchObject({ back_kind: 'image', back_image_path: 'y' });
+  });
+
+  it('선생님 이름을 다듬고 상한에서 자른다', () => {
+    expect(toCoverRow('p', { ...DEFAULT_SIMPLE_COVER, teacher: ' 송알 ' }).teacher).toBe('송알');
+    expect(toCoverRow('p', { ...DEFAULT_SIMPLE_COVER, teacher: '가'.repeat(60) }).teacher).toHaveLength(COVER_TEACHER_MAX);
+  });
+
   it('조회 컬럼이 저장하는 칸을 전부 담는다 — 빠지면 저장한 값을 다시 읽지 못한다', () => {
     const columns = COVER_COLUMNS.split(',').map((c) => c.trim());
     expect(columns.sort()).toEqual(Object.keys(toCoverRow('p', DEFAULT_SIMPLE_COVER)).sort());
@@ -102,10 +164,27 @@ describe('toCoverRow', () => {
 });
 
 describe('sql/70 거울', () => {
-  it('디자인 CHECK 와 기본값이 앱 목록과 같다', () => {
+  it('디자인 기본값이 앱 기본값과 같다', () => {
     const sql = readFileSync(path.resolve(__dirname, '../../../sql/70_problem_paper_cover_layout.sql'), 'utf8');
-    expect(sql).toContain(`CHECK (layout IN (${COVER_LAYOUTS.map((l) => `'${l}'`).join(', ')}))`);
     expect(sql).toContain(`DEFAULT '${DEFAULT_SIMPLE_COVER.layout}'`);
+  });
+});
+
+describe('sql/75 거울', () => {
+  const sql = readFileSync(path.resolve(__dirname, '../../../sql/75_problem_paper_cover_back_teacher.sql'), 'utf8');
+  const list = (values: readonly string[]) => values.map((v) => `'${v}'`).join(', ');
+
+  it('디자인 CHECK(정본) · 뒷표지 종류 CHECK 가 앱 목록과 같다', () => {
+    expect(sql).toContain(`CHECK (layout IN (${list(COVER_LAYOUTS)}))`);
+    expect(sql).toContain(`CHECK (back_kind IN (${list(BACK_COVER_KINDS)}))`);
+  });
+
+  it('기본값 · 선생님 이름 상한 · 그림 뒷표지 · 디자인 뒷표지 규칙이 앱과 같다', () => {
+    expect(sql).toContain(`back_kind TEXT NOT NULL DEFAULT '${DEFAULT_SIMPLE_COVER.backKind}'`);
+    expect(sql).toContain("teacher TEXT NOT NULL DEFAULT ''");
+    expect(sql).toContain(`CHECK (length(teacher) <= ${COVER_TEACHER_MAX})`);
+    expect(sql).toContain("CHECK (back_kind <> 'image' OR back_image_path <> '')");
+    expect(sql).toContain("CHECK (back_kind <> 'design' OR kind = 'simple')");
   });
 });
 

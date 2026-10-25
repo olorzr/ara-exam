@@ -3,8 +3,10 @@ import { bookletSheets, type BookletSlot } from '@/lib/print/booklet';
 import { A4_HEIGHT_PX, A4_WIDTH_PX, BOOKLET_SIDE_HEIGHT_PX } from '@/lib/print/constants';
 
 interface BookletStackProps {
-  /** 읽는 순서의 A4 낱장들 (표지가 있으면 맨 앞) */
+  /** 읽는 순서의 A4 낱장들 (표지가 있으면 맨 앞, 뒷표지가 있으면 맨 뒤) */
   pages: ReactNode[];
+  /** 마지막 낱장이 뒷표지다 — 책의 맨 뒤 자리에 놓고 빈 면은 그 앞에 둔다(`bookletSheets`) */
+  backCover?: boolean;
 }
 
 /**
@@ -22,9 +24,10 @@ interface BookletStackProps {
  * ⚠️ 낱장의 내용은 **이미 그린 것**을 받는다 — 측정 기계(`useA4Pagination`)와 떨어져 있어
  *    쪽 배정에 손대지 않는다.
  */
-export default function BookletStack({ pages }: BookletStackProps) {
-  const sheets = bookletSheets(pages.length);
+export default function BookletStack({ pages, backCover = false }: BookletStackProps) {
+  const sheets = bookletSheets(pages.length, { backCover });
   const lastFace = sheets.length * 2 - 1;
+  const backSlot = backCover ? pages.length - 1 : -1;
 
   const renderSlot = (slot: BookletSlot, side: 'left' | 'right') => (
     <div data-slot={side} data-page={slot === null ? 'blank' : slot + 1} className="booklet-slot">
@@ -34,7 +37,10 @@ export default function BookletStack({ pages }: BookletStackProps) {
     </div>
   );
 
-  const slotLabel = (slot: BookletSlot) => (slot === null ? '빈 면' : `${slot + 1}쪽`);
+  const slotLabel = (slot: BookletSlot) => {
+    if (slot === null) return '빈 면';
+    return slot === backSlot ? '뒷표지' : `${slot + 1}쪽`;
+  };
 
   return (
     <>

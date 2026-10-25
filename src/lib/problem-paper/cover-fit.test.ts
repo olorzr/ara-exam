@@ -2,37 +2,44 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  RINGS_TITLE_STEPS, SKETCH_GRID_TOPICS, basicCoverBudget, basicCoverScale,
-  editorialTitleScale, ringsTitleScale, sketchGridTopics, sketchKicker, sketchTitleScale, sketchTopicScale,
+  EDITORIAL_TITLE_WIDTH, RINGS_TEXT_WIDTH, RINGS_TITLE_STEPS, SKETCH_BREATH, SKETCH_HEAD, basicCoverBudget, basicCoverScale,
+  editorialTitleScale, editorialTopicsHeight, ringsScales, sketchHeadHeight, sketchHeadScales, sketchKicker,
 } from './cover-fit';
-import { SOFT_BODY_TOPICS, softBodyBudget, softFootNotes, softScales } from './cover-fit-soft';
+import { SOFT_BODY, softBodyBudget, softFootNotes, softScales } from './cover-fit-soft';
 import {
-  SPINE_TITLE_BOXES, spinesCourseLines, spinesCourseScale, spinesHeadScale, spinesListBudget, spinesTitleScales,
-  spinesTopicScale,
+  SPINES_BODY, SPINE_TITLE_BOXES, spinesBodyBudget, spinesBodyScale, spinesCourseLines, spinesCourseScale,
+  spinesHeadInfoHeight, spinesTeacherText, spinesTitleScales,
 } from './cover-fit-spines';
+import { ZINE_INFO, zineInfoScale, zineLabel, zineLabelScale, zineTitleScale } from './cover-fit-zine';
 import { textBlocksHeight, wrappedLineCount } from './cover-scale';
-import { toCoverLayoutProps } from './cover-text';
+import { toCoverLayoutProps, type CoverLayoutProps } from './cover-text';
 
 const NORMAL = toCoverLayoutProps({
   title: '현대시 읽기',
   subtitle: '고등 1학년 · 국어 · 2학기\n화자와 정서\n이미지와 감각',
   showNameBox: true,
   year: '2026',
+  teacher: '송알',
 });
 const word = (n: number, ch = '가') => ch.repeat(n);
+const with_ = (patch: Partial<CoverLayoutProps>): CoverLayoutProps => ({ ...NORMAL, ...patch });
 
 describe('보통 표지는 시안 크기 그대로', () => {
-  it('간단·에디토리얼·링·책등·블러·스케치', () => {
+  it('간단·에디토리얼·링·책등·블러·스케치·라인드로잉', () => {
     expect(basicCoverScale(NORMAL)).toBe(1);
-    expect(editorialTitleScale(NORMAL.title)).toBe(1);
-    expect(ringsTitleScale(NORMAL.title)).toBe(1);
+    expect(editorialTitleScale(NORMAL)).toBe(1);
+    expect(ringsScales(NORMAL)).toEqual({ title: 1, topic: 1 });
     // 굵은 책등(60px · 자간 0.35em)은 시안에서 '읽기' 두 글자만 담던 칸이라 여섯 자부터 줄어든다
     expect(spinesTitleScales('봄봄')).toEqual({ thin: 1, bold: 1, wide: 1 });
     expect(spinesTitleScales(NORMAL.title)).toMatchObject({ thin: 1, wide: 1 });
-    expect(spinesTopicScale(NORMAL)).toBe(1);
-    expect(sketchTitleScale(NORMAL)).toBe(1);
-    expect(sketchTopicScale(sketchGridTopics(NORMAL.topics))).toBe(1);
-    expect(softScales(NORMAL).title).toBe(1);
+    expect(spinesBodyScale(NORMAL)).toEqual({ title: 1, topic: 1 });
+    // 띄어쓰기를 글자 하나로 세는 보수적 계산이라 '현대시 읽기' 한 줄을 지키려고 조금(2%) 줄인다
+    expect(sketchHeadScales(NORMAL).title).toBeGreaterThanOrEqual(0.98);
+    expect(sketchHeadScales(NORMAL).sub).toBeGreaterThanOrEqual(0.98);
+    expect(softScales(NORMAL)).toEqual({ title: 1, topic: 1 });
+    expect(zineTitleScale(NORMAL.title)).toBe(1);
+    expect(zineLabelScale(zineLabel(NORMAL))).toBe(1);
+    expect(zineInfoScale(NORMAL)).toBe(1);
   });
 });
 
@@ -61,71 +68,127 @@ describe('간단 — 제목과 부제를 함께 줄여 이름 칸을 종이 안�
   });
 });
 
+describe('에디토리얼 — 괄호 단원 줄과 제목이 띠(320px) 안에 함께 든다', () => {
+  it('단원 줄이 늘면 제목 자리가 준다', () => {
+    expect(editorialTopicsHeight([])).toBe(0);
+    expect(editorialTopicsHeight(NORMAL.topics)).toBe(24 + 24);
+    const many = Array.from({ length: 6 }, () => word(30, '나'));
+    expect(editorialTopicsHeight(many)).toBeGreaterThan(editorialTopicsHeight(NORMAL.topics));
+    expect(editorialTitleScale({ title: NORMAL.title, topics: many })).toBeLessThan(1);
+  });
+
+  it('긴 낱말 제목도 띠 안에', () => {
+    const title = Array.from({ length: 7 }, () => word(13)).join(' ');
+    const scale = editorialTitleScale({ title, topics: NORMAL.topics });
+    expect(scale).toBeLessThan(0.5);
+    const size = 146 * scale;
+    expect(wrappedLineCount(title, EDITORIAL_TITLE_WIDTH / size) * size * 0.92).toBeLessThanOrEqual(320 - editorialTopicsHeight(NORMAL.topics));
+  });
+});
+
+describe('링 — 제목 · × · 단원 줄이 함께 300px 안에', () => {
+  it('긴 제목은 단계표 아래까지 줄이고, 단원 줄이 늘면 더 줄인다', () => {
+    const title = Array.from({ length: 7 }, () => word(13)).join(' ');
+    expect(ringsScales({ title, topics: [] }).title).toBeLessThanOrEqual(RINGS_TITLE_STEPS[RINGS_TITLE_STEPS.length - 1].scale);
+    const long = { title: word(30), topics: [] as string[] };
+    const withTopics = { ...long, topics: Array.from({ length: 6 }, () => word(30, '나')) };
+    expect(ringsScales(withTopics).title).toBeLessThan(ringsScales(long).title);
+    expect(RINGS_TEXT_WIDTH).toBe(594);
+  });
+
+  it('단원이 아주 길어도 제목이 읽을 크기로 남고 둘이 함께 자리 안이다(코덱스 2R)', () => {
+    const p = toCoverLayoutProps({
+      title: '현대시 읽기', subtitle: ['과정', ...Array(6).fill(word(30))].join('\n'), showNameBox: true, year: '2026',
+    });
+    const { title, topic } = ringsScales(p);
+    expect(56 * title).toBeGreaterThan(30);
+    expect(topic).toBeLessThan(1);
+    const line = p.topics.join(' · ');
+    const titleH = wrappedLineCount(p.title, RINGS_TEXT_WIDTH / (56 * title)) * 56 * title * 1.15;
+    const topicH = wrappedLineCount(line, RINGS_TEXT_WIDTH / 1.04 / (22 * topic)) * 22 * topic * 1.3;
+    expect(titleH + topicH + 32 + 6).toBeLessThanOrEqual(300);
+  });
+});
+
+describe('스케치 — 윤곽선 제목과 아래 묶음이 선생님·학생 칸(470px) 위에 든다', () => {
+  it('과정 줄은 상표 · 과정 · 연도이고 빈 조각은 건너뛴다', () => {
+    expect(sketchKicker(NORMAL)).toBe('아라국어논술 · 고등 1학년 · 국어 · 2학기 · 2026');
+    expect(sketchKicker({ course: '', year: '' })).toBe('아라국어논술');
+  });
+
+  it('아래 묶음이 길어지면 제목을 더 줄인다', () => {
+    const title = word(12);
+    const short = sketchHeadScales({ ...NORMAL, title }).title;
+    const long = sketchHeadScales({ ...NORMAL, title, topics: Array.from({ length: 6 }, () => word(30, '나')) }).title;
+    expect(long).toBeLessThan(short);
+  });
+
+  it.each([
+    ['긴 제목 + 긴 과정', with_({ title: Array.from({ length: 7 }, () => word(13)).join(' '), course: word(195, '나') })],
+    // 코덱스 1R — 제목만 줄이면 바닥까지 줄여도 단원 줄이 칸에 닿던 199자 부제
+    ['아주 긴 단원 줄', toCoverLayoutProps({
+      title: '현대시 읽기', subtitle: `과\n${Array(11).fill(word(17)).join(' ')}`, showNameBox: true, year: '2026', teacher: '송알',
+    })],
+    ['500자 제목', with_({ title: `${word(500)} - 교사용` })],
+  ])('%s도 선생님·학생 칸 위에 든다', (_name, p) => {
+    expect(SKETCH_HEAD.top + sketchHeadHeight(p) + SKETCH_BREATH).toBeLessThanOrEqual(SKETCH_HEAD.gridTop);
+  });
+
+  it('단원이 아주 길면 단원·과정 줄도 함께 줄인다', () => {
+    const p = toCoverLayoutProps({
+      title: '현대시 읽기', subtitle: `과\n${Array(11).fill(word(17)).join(' ')}`, showNameBox: true, year: '2026',
+    });
+    expect(sketchHeadScales(p).sub).toBeLessThan(1);
+  });
+});
+
 describe('블러 — 제목과 단원 줄을 함께 바닥 글 위에 둔다(코덱스 2R)', () => {
   const long = Array(6).fill(word(15)).join(' ');
   const p = toCoverLayoutProps({ title: long, subtitle: `과정\n${long}\n${long}`, showNameBox: true, year: '2026' });
 
-  it('셋을 함께 줄이고, 그 크기의 높이가 자리 안이다', () => {
+  it('둘을 함께 줄이고, 그 크기의 높이가 자리 안이다(사이 22px 포함)', () => {
     const { title, topic } = softScales(p);
     const budget = softBodyBudget(p);
     expect(title).toBeLessThan(budget.title);
-    const k = title / budget.title;
-    expect(textBlocksHeight(budget.blocks, k)).toBeLessThanOrEqual(budget.height);
-    expect(topic).toBeLessThanOrEqual(title);
+    expect(textBlocksHeight(budget.blocks, topic) + 22).toBeLessThanOrEqual(budget.height);
+    // 단원 줄 글자는 제목 글자보다 크지 않다
+    expect(28 * topic).toBeLessThanOrEqual(112 * title);
   });
 
-  it('바닥 글은 컴포넌트와 같은 줄이다 — 셋째 단원부터 잇는다', () => {
-    const q = { ...NORMAL, topics: ['가', '나', '다', '라'] };
-    expect(SOFT_BODY_TOPICS).toBe(2);
-    expect(softFootNotes(q)).toEqual(['아라국어논술 · 고등 1학년 · 국어 · 2학기', '2026학년도', '다 · 라', '수업용 문제지 · 외부 배포 금지']);
-    expect(softFootNotes({ ...q, year: '', course: '', topics: [] })).toEqual(['아라국어논술', '수업용 문제지 · 외부 배포 금지']);
-  });
-});
-
-describe('스케치·에디토리얼·링 — 긴 낱말 제목도 띠 안에', () => {
-  const title = Array.from({ length: 7 }, () => word(13)).join(' ');
-
-  it('단계표만 쓸 때보다 더 줄인다', () => {
-    expect(sketchTitleScale({ title, course: '' })).toBeLessThan(0.5);
-    expect(editorialTitleScale(title)).toBeLessThan(0.5);
-    expect(ringsTitleScale(title)).toBeLessThanOrEqual(RINGS_TITLE_STEPS[RINGS_TITLE_STEPS.length - 1].scale);
-  });
-
-  it('스케치 단원은 넷을 넘으면 마지막 칸에 잇고, 긴 칸은 글자를 줄인다', () => {
-    expect(SKETCH_GRID_TOPICS).toBe(4);
-    expect(sketchGridTopics(['가', '나', '다', '라', '마'])).toEqual(['가', '나', '다', '라 · 마']);
-    expect(sketchTopicScale([word(190)])).toBeLessThan(0.5);
+  it('바닥 글은 컴포넌트와 같은 줄이다 — 선생님 줄은 이름이 있을 때만', () => {
+    expect(softFootNotes(NORMAL)).toEqual(['선생님  송알', '아라국어논술 · 고등 1학년 · 국어 · 2학기 · 2026']);
+    expect(softFootNotes({ teacher: '', course: '', year: '' })).toEqual(['아라국어논술']);
+    expect(SOFT_BODY).toEqual({ top: 520, width: 706 });
   });
 });
 
-describe('코덱스 3R — 제목 아래·위의 다른 글줄이 늘면 그만큼 자리를 줄인다', () => {
-  it('스케치: 과정 줄이 길어 여러 줄이면 제목을 더 줄인다', () => {
-    const title = Array.from({ length: 5 }, () => word(17)).join(' ');
-    const short = sketchTitleScale({ title, course: '고등 1학년' });
-    const long = sketchTitleScale({ title, course: word(195, '나') });
-    expect(long).toBeLessThan(short);
-    expect(sketchKicker('')).toBe('아라국어논술');
-    expect(sketchKicker('고등')).toBe('아라국어논술 · 고등');
-  });
-
-  it('책등: 과정 조각이 많으면 과정 상자 글을 줄인다', () => {
+describe('책등 — 오른쪽 정렬 제목·단원 목록과 책장', () => {
+  it('과정 상자는 과정을 나누고, 비면 아라 · 국어 · 논술', () => {
+    expect(spinesCourseLines('고등 1학년 · 국어 · 2학기')).toEqual(['고등 1학년', '국어', '2학기']);
+    expect(spinesCourseLines('')).toEqual(['아라', '국어', '논술']);
     expect(spinesCourseScale(spinesCourseLines('고등 1학년 · 국어 · 2학기'))).toBe(1);
     const many = spinesCourseLines(Array(25).fill('국어').join(' · '));
-    expect(many).toHaveLength(25);
     expect(spinesCourseScale(many)).toBeLessThan(1);
-    expect(spinesCourseLines('')).toEqual(['국어', '논술']);
   });
 
-  it('책등: 머리 제목·정보 줄이 길면 단원 목록 자리가 준다', () => {
-    const base = spinesListBudget(NORMAL);
-    // 머리 줄이 세 줄이 되는 제목(13자 낱말 일곱 + 꼬리) — 두 줄까지는 최소 높이 70px 안이다
-    expect(spinesListBudget({ ...NORMAL, title: word(100) })).toBe(base);
-    const threeLines = `${Array.from({ length: 7 }, () => word(13)).join(' ')} - 교사용`;
-    expect(spinesListBudget({ ...NORMAL, title: threeLines })).toBeLessThan(base);
-    expect(spinesListBudget({ ...NORMAL, course: word(195, '나') })).toBeLessThan(base);
-    // 이름·날짜 칸이 없으면 정보 줄이 넓어 같은 과정이 한 줄에 든다
-    expect(spinesListBudget({ ...NORMAL, showNameBox: false, course: word(40, '나') }))
-      .toBeGreaterThan(spinesListBudget({ ...NORMAL, course: word(40, '나') }));
+  it('선생님 줄 — 이름이 길면 줄이 늘고, 학생 칸이 없으면 줄이 넓다', () => {
+    expect(spinesTeacherText('송알')).toBe('선생님  송알');
+    expect(spinesTeacherText('')).toBe('');
+    const base = spinesHeadInfoHeight(NORMAL);
+    expect(spinesHeadInfoHeight({ ...NORMAL, teacher: word(40) + ' ' + word(40) })).toBeGreaterThan(base);
+    expect(spinesHeadInfoHeight({ teacher: '', showNameBox: false })).toBe(base);
+  });
+
+  it('긴 제목·단원은 함께 줄여 본문 자리 안이다 — 책장 560px 은 늘 남는다', () => {
+    const p = with_({ title: `${Array(24).fill(word(28)).join(' ')} - 교사용`, topics: Array(6).fill(word(40, '나')) });
+    const { title, topic } = spinesBodyScale(p);
+    expect(title).toBeLessThan(0.42);
+    const blocks = [
+      { text: p.title, fontSize: 64 * title, lineHeight: 1, width: SPINES_BODY.width },
+      ...p.topics.map((text) => ({ text, fontSize: 18 * topic, lineHeight: 1.35, width: SPINES_BODY.topicWidth })),
+    ];
+    expect(textBlocksHeight(blocks, 1) + 2 * p.topics.length).toBeLessThanOrEqual(spinesBodyBudget(p));
+    expect(spinesBodyBudget(NORMAL)).toBeGreaterThan(300);
   });
 });
 
@@ -144,9 +207,37 @@ describe('책등 세로 제목 — 어떤 낱말 모양의 100자 제목 + 꼬�
   });
 });
 
+describe('라인드로잉 — 제목 한 줄 · 상자 모서리 라벨 · 정보 격자', () => {
+  it('라벨은 단원 줄, 없으면 과정, 그마저 없으면 문제지', () => {
+    expect(zineLabel(NORMAL)).toBe('화자와 정서 · 이미지와 감각');
+    expect(zineLabel({ topics: [], course: '고등' })).toBe('고등');
+    expect(zineLabel({ topics: [], course: '' })).toBe('문제지');
+  });
+
+  it('라벨은 자간까지 세어 두 줄 안에 든다(코덱스 1R — 25자 한 낱말)', () => {
+    const label = word(25);
+    const size = 38 * zineLabelScale(label);
+    expect(wrappedLineCount(label, 480 / (size * 1.02)) * size).toBeLessThanOrEqual(80);
+  });
+
+  it('긴 제목·라벨·선생님 이름·과정은 줄인다', () => {
+    expect(zineTitleScale(word(20))).toBeLessThan(1);
+    expect(zineLabelScale(Array(6).fill(word(20)).join(' · '))).toBeLessThan(1);
+    expect(zineInfoScale(with_({ teacher: word(40) }))).toBeLessThan(1);
+    expect(zineInfoScale(with_({ course: word(195, '나') }))).toBeLessThan(1);
+  });
+
+  it('정보 격자의 줄인 글은 상자2 위에 든다', () => {
+    const p = with_({ course: word(195, '나') });
+    const size = 16 * zineInfoScale(p);
+    const lines = wrappedLineCount(`아라국어논술\n${p.course}`, ZINE_INFO.courseWidth / size);
+    expect(lines * size * ZINE_INFO.lineHeight).toBeLessThanOrEqual(ZINE_INFO.height);
+  });
+});
+
 describe('표지 제목을 비우고 문제지 제목이 아주 길 때(길이 상한 없음, 코덱스 5R)', () => {
   const long = `${word(500)} - 교사용`;
-  const p = toCoverLayoutProps({ title: long, subtitle: '과정\n단원', showNameBox: true, year: '2026' });
+  const p = toCoverLayoutProps({ title: long, subtitle: '과정\n단원', showNameBox: true, year: '2026', teacher: '송알' });
 
   it('책등 셋 모두 칸 안에', () => {
     const scales = spinesTitleScales(long);
@@ -158,45 +249,33 @@ describe('표지 제목을 비우고 문제지 제목이 아주 길 때(길이 �
     }
   });
 
-  it('간단 표지도 자리 안에', () => {
-    const { blocks, height } = basicCoverBudget(p);
-    expect(textBlocksHeight(blocks, basicCoverScale(p))).toBeLessThanOrEqual(height);
-  });
-
-  it('블러도 자리 안에', () => {
-    const budget = softBodyBudget(p);
-    const k = softScales(p).title / budget.title;
-    expect(textBlocksHeight(budget.blocks, k)).toBeLessThanOrEqual(budget.height);
-  });
-});
-
-describe('책등 — 아주 긴 제목·과정에도 단원 목록과 책장 자리가 남는다(코덱스 6R)', () => {
-  const title = Array(24).fill(word(28)).join(' ');
-  const subtitle = `${Array(11).fill(word(16, '나')).join(' ')}\n단원`;
-  const p = toCoverLayoutProps({ title: `${title} - 교사용`, subtitle, showNameBox: true, year: '2026' });
-
-  it('머리·정보 줄을 줄여 목록 자리를 270px 넘게 남기고, 단원 글자는 시안 크기 그대로', () => {
-    expect(spinesHeadScale(p)).toBeLessThan(1);
-    expect(spinesListBudget(p)).toBeGreaterThan(270);
-    expect(spinesTopicScale(p)).toBe(1);
-  });
-
-  it('보통 표지는 머리·정보 줄을 줄이지 않는다', () => {
-    expect(spinesHeadScale(NORMAL)).toBe(1);
-    expect(spinesHeadScale({ ...NORMAL, course: word(40, '나') })).toBe(1);
+  it('간단·블러·책등 본문 모두 자리 안에', () => {
+    const basic = basicCoverBudget(p);
+    expect(textBlocksHeight(basic.blocks, basicCoverScale(p))).toBeLessThanOrEqual(basic.height);
+    const soft = softBodyBudget(p);
+    expect(textBlocksHeight(soft.blocks, softScales(p).topic) + 22).toBeLessThanOrEqual(soft.height);
+    expect(spinesBodyScale(p).title).toBeGreaterThan(0);
+    expect(zineTitleScale(long)).toBeGreaterThan(0);
   });
 });
 
 describe('자리 수치가 CSS 와 같다', () => {
   const css = (f: string) => readFileSync(join(process.cwd(), 'src/styles', f), 'utf8');
-  it('간단 여백 · 에디토리얼 제목 띠 · 블러 제목 띠 · 스케치 칸 폭', () => {
+  it('간단 여백 · 에디토리얼 띠 · 링 글 폭 · 블러 본문 · 스케치 머리 · 책등 머리 · 라인드로잉 격자', () => {
     expect(css('paper-cover.css')).toContain('padding: 72px 76px 60px');
-    expect(css('paper-covers/editorial.css')).toMatch(/height: 330px;\s+padding: 40px 32px 0;/);
-    expect(css('paper-covers/soft.css')).toMatch(/left: 40px;\s+right: 40px;\s+top: 470px;/);
-    // 블러 태그라인 높이(위 여백 64px)는 SOFT_TAGLINE_H 와 같고, 제목 뒤 번짐 모서리는 고정 px 다(% 면 긴 제목에서 커진다)
-    expect(css('paper-covers/soft.css')).toMatch(/\.pbc-soft__tagline \{\s+padding-top: 64px;/);
-    expect(css('paper-covers/soft.css')).toMatch(/\.pbc-soft__headline::before \{[^}]*border-radius: \d+px;/);
-    expect(css('paper-covers/sketch.css')).toContain('max-width: 190px');
-    expect(css('paper-covers/sketch.css')).toMatch(/top: 210px;/);
+    expect(css('paper-covers/editorial.css')).toMatch(/height: 360px;\s+padding: 40px 32px 0;/);
+    expect(css('paper-covers/editorial.css')).toMatch(/padding-top: 24px;[^}]*line-height: 24px;/);
+    expect(css('paper-covers/editorial.css')).toMatch(/\.pbc-editorial__title \{\s+max-width: 600px;/);
+    expect(css('paper-covers/rings.css')).toContain('padding: 50px 100px 80px');
+    expect(css('paper-covers/soft.css')).toMatch(/left: 40px;\s+right: 48px;\s+top: 520px;/);
+    expect(css('paper-covers/soft.css')).toMatch(/\.pbc-soft__tagline \{\s+padding-top: 80px;/);
+    expect(css('paper-covers/soft.css')).toMatch(/\.pbc-soft__note \{\s+width: 260px;/);
+    expect(css('paper-covers/sketch.css')).toMatch(/left: 44px;\s+top: 56px;\s+width: 700px;/);
+    expect(css('paper-covers/sketch.css')).toMatch(/padding: 65px 0 0 6px;/);
+    expect(css('paper-covers/sketch.css')).toMatch(/\.pbc-sketch__grid \{[^}]*top: 470px;/);
+    expect(css('paper-covers/spines.css')).toMatch(/\.pbc-spines__head \{[^}]*height: 70px;/);
+    expect(css('paper-covers/spines.css')).toMatch(/\.pbc-spines__body \{[^}]*margin: 54px 40px 0;/);
+    expect(css('paper-covers/zine.css')).toMatch(/\.pbc-zine__info \{[^}]*top: 374px;/);
+    expect(css('paper-covers/zine.css')).toMatch(/\.pbc-zine__box--2 \{[^}]*top: 470px;/);
   });
 });

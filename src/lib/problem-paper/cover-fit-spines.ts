@@ -1,15 +1,15 @@
 import { COVER_COPY } from './cover-copy';
 import { COVER_FIT_PAGE_H, COVER_ROOT_LH } from './cover-fit';
 import {
-  FIT_SCALE_STEP, MIN_FIT_SCALE, fitScale, fitTextScale, fitVerticalScale, wrappedLineCount, type VerticalBox,
+  fitTextScale, fitVerticalScale, titleLengthOf, titleScale, wrappedLineCount,
+  type TextBlock, type TitleScaleStep, type VerticalBox,
 } from './cover-scale';
 import type { CoverLayoutProps } from './cover-text';
 
 /**
- * C 책등의 글 크기 (순수 함수) — 세로 제목 책등 셋, 과정 상자, 단원 목록. 자리 px 는 spines.css 와 같다.
+ * C 책등의 글 크기 (순수 함수) — 본문 제목·단원 목록, 세로 제목 책등 셋, 과정 상자. 자리 px 는 spines.css 와 같다.
  */
 
-// ---- C 책등 — 세로 제목 책등 셋(spines.css 의 --1·--2·--6), 단원 목록 390×320px ----
 /** 제목 책등 셋의 글 칸(책 크기에서 테두리·위아래 여백을 뺐다) */
 export const SPINE_TITLE_BOXES = {
   thin: { height: 518, width: 48, fontSize: 22, letterSpacing: 0.3, lineHeight: 1.15 },
@@ -32,22 +32,43 @@ export function spinesTitleScales(title: string): Record<keyof typeof SPINE_TITL
 
 /** 가장 높은 책(spines.css 의 --1 · --4) — 책장은 이만큼은 늘 남긴다 */
 const SPINE_MAX_H = 560;
-/** 머리 줄: 위 여백 28px · 최소 높이 70px · 가운데 칸 폭(714px − 양끝 글 · 간격) · mono 11px(자간 0.04em) */
-const SPINES_HEAD = { padTop: 28, minH: 70, width: 625, fontSize: 11, tracking: 1.04 };
-/** 정보 줄: 위 선 1px + 위 여백 14px · 12px(자간 0.02em) · 폭(이름·날짜 칸이 있으면 그만큼 좁다) */
-const SPINES_INFO = { padTop: 15, fontSize: 12, tracking: 1.02, width: 714, widthWithFields: 392 };
-/** 단원 목록 위 여백 + 책장과의 숨 */
-const SPINES_LIST_MARGIN = 60 + 10;
-/** 과정 상자 책등(--4, 122×560): 위아래 여백 70px · 상자 안 여백 20/14px · 테두리 */
-const SPINES_LABEL = { width: 122 - 28 - 4, height: SPINE_MAX_H - 140 - 40 - 4, fontSize: 12, lineHeight: 1.4 };
+/** 머리 줄 높이(고정 글: 아라 · 아라국어논술 — 문제지 · 연도) */
+const SPINES_HEAD_H = 70;
+/** 정보 줄: 위 선 1px + 위 여백 14px · 12px(자간 0.02em) · 폭(학생 칸이 있으면 그만큼 좁다) */
+const SPINES_INFO = { padTop: 15, fontSize: 12, tracking: 1.02, width: 714, widthWithField: 714 - 24 - 190 };
+/** 본문(제목·단원) — 위 여백 54px · 폭 714px · 단원 목록 위 여백 14px · 책장과의 숨 10px.
+ * 단원 이름 폭은 번호(≈30px)·간격(12px)을 빼고 자간 0.02em 만큼 줄인 값이다 */
+export const SPINES_BODY = { marginTop: 54, width: 714, listGap: 14, breath: 10, topicWidth: (714 - 12 - 30) / 1.02 };
+/** 과정 상자 책등(--4, 122×560): 위아래 여백 70px · 상자 안 여백 20/14px · 테두리 · 자간 0.02em */
+const SPINES_LABEL = {
+  width: (122 - 28 - 4) / 1.02, height: SPINE_MAX_H - 140 - 40 - 4, fontSize: 12, lineHeight: 1.4,
+};
+/** 본문 제목의 단계 — 64px 에서 11자 한 줄 */
+export const SPINES_TITLE_STEPS: readonly TitleScaleStep[] = [
+  { maxLength: 11, scale: 1 },
+  { maxLength: 20, scale: 0.75 },
+  { maxLength: 32, scale: 0.55 },
+  { maxLength: Infinity, scale: 0.42 },
+];
+/** 단원 한 줄 — 이름 18px · 줄 높이 1.35(번호 24px 와 같은 높이) */
+const SPINES_TOPIC = { fontSize: 18, lineHeight: 1.35 };
 
 /**
- * 책등의 과정 상자 줄 — 과정을 ` · ` 에서 나눈다(비면 '국어 · 논술').
+ * 책등 정보 줄의 선생님 글 — 컴포넌트가 그리는 것과 같다.
+ * @param teacher - 선생님 이름
+ * @returns `선생님  송알` (이름이 없으면 '')
+ */
+export function spinesTeacherText(teacher: string): string {
+  return teacher ? `${COVER_COPY.teacherLabel}  ${teacher}` : '';
+}
+
+/**
+ * 책등의 과정 상자 줄 — 과정을 ` · ` 에서 나눈다(비면 시안처럼 아라 · 국어 · 논술).
  * @param course - 과정
  * @returns 상자 안 줄
  */
 export function spinesCourseLines(course: string): string[] {
-  return (course || COVER_COPY.subject).split(/\s*·\s*/).filter(Boolean);
+  return (course || COVER_COPY.spinesBox).split(/\s*·\s*/).filter(Boolean);
 }
 
 /**
@@ -61,50 +82,39 @@ export function spinesCourseScale(lines: readonly string[]): number {
 }
 
 /**
- * 머리·정보 줄이 차지해도 되는 높이 — 보통(머리 70px + 정보 한두 줄 ≈ 100px)은 그대로 두고, 제목·과정이 아주 길어
- * 이 높이를 넘으면 두 줄의 글자를 함께 줄인다. 안 줄이면 목록 자리가 바닥나고 책장이 눌린다(코덱스 6R).
- */
-const SPINES_HEAD_INFO_MAX = 180;
-
-function spinesHeadInfoHeight(p: CoverLayoutProps, scale: number): number {
-  const headText = `${p.title} — ${COVER_COPY.sheet}`;
-  const headSize = SPINES_HEAD.fontSize * scale;
-  const headLines = wrappedLineCount(headText, SPINES_HEAD.width / (headSize * SPINES_HEAD.tracking));
-  const head = Math.max(SPINES_HEAD.minH, SPINES_HEAD.padTop + headLines * headSize * COVER_ROOT_LH);
-  const infoText = p.course ? `${COVER_COPY.brandKo} · ${p.course}` : COVER_COPY.brandKo;
-  const infoWidth = p.showNameBox ? SPINES_INFO.widthWithFields : SPINES_INFO.width;
-  const infoSize = SPINES_INFO.fontSize * scale;
-  const infoLines = wrappedLineCount(infoText, infoWidth / (infoSize * SPINES_INFO.tracking));
-  return head + SPINES_INFO.padTop + infoLines * infoSize * COVER_ROOT_LH;
-}
-
-/**
- * 책등 머리·정보 줄의 글 배율 — 둘의 높이가 `SPINES_HEAD_INFO_MAX` 안에 들게.
- * @param p - 표지 값
- * @returns 배율(보통 1)
- */
-export function spinesHeadScale(p: CoverLayoutProps): number {
-  return fitScale((s) => spinesHeadInfoHeight(p, s) <= SPINES_HEAD_INFO_MAX, MIN_FIT_SCALE, FIT_SCALE_STEP);
-}
-
-/**
- * 단원 목록이 차지해도 되는 높이 — 중철 면에서 가장 높은 책(560px)을 남기고, 머리·정보 줄이 **실제로 차지하는
- * 높이**(긴 제목·과정은 줄이 는다, 코덱스 3R — 상한이 있다, 6R)와 위 여백을 뺀다. 늘 270px 넘게 남는다.
+ * 머리·정보 줄의 높이 — 머리는 고정 글이고, 정보 줄은 선생님 이름이 길면 줄이 는다.
  * @param p - 표지 값
  * @returns 높이(px)
  */
-export function spinesListBudget(p: CoverLayoutProps): number {
-  return COVER_FIT_PAGE_H - SPINE_MAX_H - spinesHeadInfoHeight(p, spinesHeadScale(p)) - SPINES_LIST_MARGIN;
+export function spinesHeadInfoHeight(p: Pick<CoverLayoutProps, 'teacher' | 'showNameBox'>): number {
+  const width = p.showNameBox ? SPINES_INFO.widthWithField : SPINES_INFO.width;
+  const lines = Math.max(1, wrappedLineCount(spinesTeacherText(p.teacher), width / (SPINES_INFO.fontSize * SPINES_INFO.tracking)));
+  return SPINES_HEAD_H + SPINES_INFO.padTop + lines * SPINES_INFO.fontSize * COVER_ROOT_LH;
 }
 
 /**
- * 책등의 단원 목록 배율 — 이름 칸 폭(440px − 번호) × `spinesListBudget`.
+ * 본문(제목·단원 목록)이 차지해도 되는 높이 — 중철 면에서 가장 높은 책(560px)과 머리·정보 줄·여백을 뺀다.
  * @param p - 표지 값
- * @returns 배율
+ * @returns 높이(px)
  */
-export function spinesTopicScale(p: CoverLayoutProps): number {
-  return fitTextScale(
-    p.topics.map((text) => ({ text, fontSize: 25, lineHeight: 1.15, width: 390 })), spinesListBudget(p), 2,
-  );
+export function spinesBodyBudget(p: CoverLayoutProps): number {
+  const listGap = p.topics.length > 0 ? SPINES_BODY.listGap : 0;
+  return COVER_FIT_PAGE_H - SPINE_MAX_H - spinesHeadInfoHeight(p) - SPINES_BODY.marginTop - listGap - SPINES_BODY.breath;
 }
 
+/**
+ * 책등 본문의 제목·단원 배율 — 둘을 **함께** 줄여 책장 위에 든다(따로 줄이면 합이 넘친다).
+ * @param p - 표지 값
+ * @returns 제목 배율(단계표 × 맞춤)과 단원 배율(맞춤)
+ */
+export function spinesBodyScale(p: CoverLayoutProps): { title: number; topic: number } {
+  const pref = titleScale(titleLengthOf(p.title), SPINES_TITLE_STEPS);
+  const blocks: TextBlock[] = [
+    { text: p.title, fontSize: 64 * pref, lineHeight: 1, width: SPINES_BODY.width },
+    ...p.topics.map((text) => ({
+      text, fontSize: SPINES_TOPIC.fontSize, lineHeight: SPINES_TOPIC.lineHeight, width: SPINES_BODY.topicWidth,
+    })),
+  ];
+  const k = fitTextScale(blocks, spinesBodyBudget(p), 2);
+  return { title: pref * k, topic: k };
+}

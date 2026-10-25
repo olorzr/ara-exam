@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AlertTriangle } from 'lucide-react';
-import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import ProblemPaperView from '@/components/problem-paper/ProblemPaperView';
@@ -13,20 +12,19 @@ import PaperCoverAlerts from '@/components/problem-paper/PaperCoverAlerts';
 import PaperCoverDialog from '@/components/problem-paper/PaperCoverDialog';
 import { PaperPrintLayoutNotice } from '@/components/problem-paper/PaperPrintLayoutToggle';
 import PaperViewToolbar, { type PaperViewMode } from '@/components/problem-paper/PaperViewToolbar';
-import { supabase } from '@/lib/supabase';
 import { useImagesReady } from '@/hooks/useImagesReady';
 import { useCoverFontsReady } from '@/hooks/useCoverFontsReady';
+import { useCoverImages } from '@/hooks/useCoverImages';
 import { usePaperCover } from '@/hooks/usePaperCover';
+import { usePaperLoad } from '@/hooks/usePaperLoad';
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls';
 import {
   imagePathsOf, renumberedImageItems, renumberedPrintConfirmMessage,
 } from '@/lib/problem-paper/blocks';
-import { coverYearOf } from '@/lib/problem-paper/cover-text';
+import { coverTeacherName, coverYearOf } from '@/lib/problem-paper/cover-text';
 import { paperPrintLabel } from '@/lib/problem-paper/print-label';
 import { trimmableGroupCount } from '@/lib/problem-paper/trim-works';
 import { usePaperPrintPrefs } from '@/hooks/usePaperPrintPrefs';
-import { normalizePaperSettings } from '@/lib/problem-paper/settings';
-import type { PaperItemSnapshot, ProblemPaper } from '@/types/problem-bank';
 
 /** 표지를 못 읽은 채 Cmd/Ctrl+P 로 뽑으면 표지 자리에 찍히는 말 */
 const COVER_FETCH_FAILED_NOTICE =
@@ -45,9 +43,7 @@ export default function ProblemPaperViewPage() {
   const params = useParams<{ id: string }>();
   const paperId = params?.id ?? '';
 
-  const [paper, setPaper] = useState<ProblemPaper | null>(null);
-  const [items, setItems] = useState<PaperItemSnapshot[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const { paper, items, loaded, creatorName } = usePaperLoad(paperId);
   const [mode, setMode] = useState<PaperViewMode>('paper');
   // 인쇄 방식·'묻는 작품만 인쇄' 는 브라우저에 기억해 둔 값으로 시작한다
   const { printLayout, changePrintLayout, trimWorks, changeTrimWorks } = usePaperPrintPrefs();
@@ -80,21 +76,12 @@ export default function ProblemPaperViewPage() {
   // 묻지 않는 (가)(나) 구역을 뺄 수 있는 지문이 하나라도 있어야 체크박스를 낸다 — 옛 문제지(sql/68 전)는 없다
   const trimmable = useMemo(() => trimmableGroupCount(items) > 0, [items]);
 
-  // 표지 그림은 **따로** 서명·확인한다 — 문항 이미지와 한 묶음으로 두면 답지 모드에서도
+  // 표지 그림(앞·뒤)은 **따로** 서명·확인한다 — 문항 이미지와 한 묶음으로 두면 답지 모드에서도
   // 화면에 없는 문항 그림 때문에 인쇄가 막히거나 엉뚱한 경고가 뜬다
-  const coverPath = cover?.kind === 'image' ? cover.imagePath : '';
-  const coverImages = useSignedImageUrls(useMemo(() => (coverPath ? [coverPath] : []), [coverPath]));
-  const coverImageUrl = coverPath ? coverImages.urls.get(coverPath) : undefined;
-  const coverReady = useImagesReady(useMemo(() => (coverImageUrl ? [coverImageUrl] : []), [coverImageUrl]));
-  // `failed` 는 앞 그림의 결과를 들고 있을 수 있어 **지금 URL** 이 실패했는지로 본다
-  const coverBroken = Boolean(coverPath) && (
-    coverImages.missing.length > 0
-    || (Boolean(coverImageUrl) && !coverReady.loading && coverReady.failed.includes(coverImageUrl ?? ''))
-  );
-  // 그림 표지가 아직 안 왔거나 깨졌으면 첫 장이 빈 종이로 나간다 — 인쇄를 막는다
+  const coverImages = useCoverImages(cover);
+  // 그림 표지가 아직 안 왔거나 깨졌으면 첫 장(끝 장)이 빈 종이로 나간다 — 인쇄를 막는다
   // 표지를 못 읽었는데 '표지 없이' 를 고르지 않았어도 막는다 — 있는 표지가 빠진 채 나간다(코덱스 1R)
-  const coverBlocked = coverState.loading || coverUnknown
-    || (Boolean(coverPath) && (coverImages.loading || coverReady.loading || coverBroken));
+  const coverBlocked = coverState.loading || coverUnknown || coverImages.pending || coverImages.broken;
 
   /**
    * 번호 어긋남을 **사람이 확인했는가.**
@@ -138,43 +125,19 @@ export default function ProblemPaperViewPage() {
 
   // 디자인 표지는 글꼴 조각을 받기 전에 인쇄하면 표지만 대체 글꼴로 찍힌다 — 그동안 단추를 잠근다(fail-open)
   const coverYear = coverYearOf(paper?.created_at);
-  const fontsReady = useCoverFontsReady(cover, paper?.title ?? '', coverYear);
+  const teacher = coverTeacherName(cover, creatorName);
+  const fontsReady = useCoverFontsReady(cover, { paperTitle: paper?.title ?? '', year: coverYear, teacher });
 
-  const coverImagePending = Boolean(coverPath) && (coverImages.loading || coverReady.loading);
   const printLabel = paperPrintLabel({
-    coverLoading: coverState.loading, coverNeedsCheck: coverUnknown || coverBroken, coverImagePending,
+    coverLoading: coverState.loading, coverNeedsCheck: coverUnknown || coverImages.broken,
+    coverImagePending: coverImages.pending,
     imagesPending: printsProblems && (images.loading || ready.loading), fontsPending: !fontsReady, booklet,
   });
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const [paperRes, itemRes] = await Promise.all([
-          supabase.from('problem_papers').select('*').eq('id', paperId).maybeSingle(),
-          supabase.from('problem_paper_items').select('order_index, snapshot')
-            .eq('paper_id', paperId).order('order_index').limit(300),
-        ]);
-        if (!alive) return;
-        if (paperRes.error) throw paperRes.error;
-        if (itemRes.error) throw itemRes.error;
-
-        const row = paperRes.data as ProblemPaper | null;
-        if (row) setPaper({ ...row, settings: normalizePaperSettings(row.settings) });
-        setItems(((itemRes.data ?? []) as { snapshot: PaperItemSnapshot }[]).map((r) => r.snapshot));
-      } catch (e) {
-        if (alive) toast.error(e instanceof Error ? e.message : '불러오지 못했어요.');
-      } finally {
-        if (alive) setLoaded(true);
-      }
-    })();
-    return () => { alive = false; };
-  }, [paperId]);
-
-  // ⚠️ 표지(그림 표지는 그림까지)를 다 받을 때까지 문서를 그리지 않는다 — 단추만 잠그면 그 짧은
+  // ⚠️ 표지(그림 표지는 그림까지, 앞·뒤 모두)를 다 받을 때까지 문서를 그리지 않는다 — 단추만 잠그면 그 짧은
   //    틈에 Cmd/Ctrl+P 로 뽑은 인쇄물에서 표지가 빠지거나 '불러오는 중' 이 표지로 나가고, 중철 면
   //    배정까지 한 쪽씩 밀린다(코덱스 2R·3R). 못 받았으면(깨짐) 인쇄되는 안내로 그린다
-  if (!loaded || coverState.loading || coverImagePending) {
+  if (!loaded || coverState.loading || coverImages.pending) {
     return (
       <div className="flex justify-center py-16">
         <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
@@ -218,7 +181,7 @@ export default function ProblemPaperViewPage() {
 
       <PaperCoverAlerts
         fetchFailed={coverUnknown}
-        imageBroken={coverBroken}
+        imageBroken={coverImages.broken}
         onRetryFetch={coverState.reload}
         onSkipCover={() => setSkipCover(true)}
         onRetryImage={coverImages.reload}
@@ -269,16 +232,14 @@ export default function ProblemPaperViewPage() {
         <ProblemPaperView
           paper={paper} items={items} imageUrls={images.urls}
           showAnswers={mode === 'teacher'} trimWorks={trimWorks}
-          booklet={booklet} cover={cover} coverImageUrl={coverImageUrl}
-          coverImageFailed={coverBroken}
+            booklet={booklet} cover={cover} coverImages={coverImages} coverTeacher={teacher}
           coverNotice={coverUnknown ? COVER_FETCH_FAILED_NOTICE : undefined}
         />
       )}
       {mode === 'key' && (
         <ProblemAnswerKeyView
           paper={paper} items={items}
-          booklet={booklet} cover={cover} coverImageUrl={coverImageUrl}
-          coverImageFailed={coverBroken}
+          booklet={booklet} cover={cover} coverImages={coverImages} coverTeacher={teacher}
           coverNotice={coverUnknown ? COVER_FETCH_FAILED_NOTICE : undefined}
         />
       )}
@@ -287,8 +248,10 @@ export default function ProblemPaperViewPage() {
         open={coverOpen}
         paperTitle={paper.title}
         cover={cover}
-        coverImageUrl={coverImageUrl}
+        coverImageUrl={coverImages.frontUrl}
+        backImageUrl={coverImages.backUrl}
         year={coverYear}
+        creatorName={creatorName}
         busy={coverState.saving}
         onClose={() => setCoverOpen(false)}
         onSave={coverState.save}

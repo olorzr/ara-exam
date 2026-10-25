@@ -650,15 +650,19 @@
 - 정의: 문제지 인쇄물의 첫 장. **간단 표지**(`simple` — 학원 이름·제목·부제·이름 칸을 앱이 그린다)와
   **그림 표지**(`image` — 선생님이 만든 그림을 올려 그대로 쓴다). 행이 없으면 표지 없음
 - 쪽 번호(`n / N`)에 세지 않는다. 중철에서는 1쪽 자리(1장 앞면 오른쪽)에 온다
-- 코드에서의 사용: `PaperCover`, `normalizePaperCover`, `coverTitleFor`, `usePaperCover`, `PaperCoverPage`, `A4CoverSheet`
-- 관련 파일: src/lib/problem-paper/cover.ts, src/lib/problem-paper/cover-queries.ts, src/components/problem-paper/PaperCoverDialog.tsx, sql/61_problem_paper_covers.sql
+- **뒷표지**(`backKind`, 2026-10-25): 없음(`none`) · 앞표지 디자인의 짝(`design` — 간단 표지일 때만, 학원 이름·저작권 안내·연도) ·
+  올린 그림(`image`). 앞표지가 있어야 있고 같은 행에 둔다(sql/75). 쪽 번호에 세지 않고 중철에서는 책의 맨 뒤 자리(1장 앞면 왼쪽)에 온다
+- 코드에서의 사용: `PaperCover`, `PaperBackCoverKind`, `normalizePaperCover`, `effectiveBackKind`, `coverTitleFor`, `usePaperCover`, `PaperCoverPage`, `PaperBackCoverPage`, `renderCoverSlots`, `A4CoverSheet`(`side`)
+- 관련 파일: src/lib/problem-paper/cover.ts, src/lib/problem-paper/cover-queries.ts, src/components/problem-paper/PaperCoverDialog.tsx, src/components/problem-paper/PaperBackCoverFields.tsx, src/components/problem-paper/covers/BackCover.tsx, sql/61_problem_paper_covers.sql, sql/75_problem_paper_cover_back_teacher.sql
 
 ## 표지 디자인 (PaperCoverLayout)
-- 정의: 간단 표지의 모양. `basic`(간단 — 예전부터 있던 모양)과 클로드 디자인 시안을 옮긴 다섯 가지
-  `editorial`(에디토리얼) · `rings`(링) · `spines`(책등) · `soft`(블러) · `sketch`(스케치). 그림 표지에는 디자인이 없다
-- 디자인 표지는 기존 칸만으로 채운다 — **부제 첫 줄이 과정, 둘째 줄부터가 단원**(`splitSubtitle`), 연도는 문제지를 만든 해(`coverYearOf`)
+- 정의: 간단 표지의 모양. `basic`(간단 — 예전부터 있던 모양)과 클로드 디자인 시안을 옮긴 여섯 가지
+  `editorial`(에디토리얼) · `rings`(링) · `spines`(책등) · `soft`(블러) · `sketch`(스케치) · `zine`(라인드로잉, 2026-10-25). 그림 표지에는 디자인이 없다
+- 디자인 표지는 기존 칸으로 채운다 — **부제 첫 줄이 과정, 둘째 줄부터가 단원**(`splitSubtitle`), 연도는 문제지를 만든 해(`coverYearOf`),
+  **선생님** 줄은 표지에 적은 이름(`teacher`) 또는 문제지를 만든 선생님(`coverTeacherName`, 둘 다 비면 그 줄이 없다).
+  '이름 칸 넣기' 는 디자인에서는 **학생 빈칸** 하나다(날짜 칸은 2026-10-25 시안에서 빠졌다)
 - 코드에서의 사용: `PaperCoverLayout`, `COVER_LAYOUTS`, `COVER_LAYOUT_LABELS`, `COVER_LAYOUT_COMPONENTS`, `CoverLayoutProps`, `titleScale`, `useCoverFontsReady`
-- 관련 파일: src/lib/problem-paper/{cover,cover-text,cover-scale,cover-copy,cover-fonts}.ts, src/components/problem-paper/covers/, src/components/problem-paper/CoverLayoutPicker.tsx, src/styles/paper-covers/, sql/70_problem_paper_cover_layout.sql
+- 관련 파일: src/lib/problem-paper/{cover,cover-text,cover-scale,cover-copy,cover-fonts}.ts, src/components/problem-paper/covers/, src/components/problem-paper/CoverLayoutPicker.tsx, src/styles/paper-covers/, sql/70_problem_paper_cover_layout.sql, sql/75_problem_paper_cover_back_teacher.sql
 
 ## 선택지 (SelectOption)
 - 정의: 고르는 칸의 **값과 보여 줄 이름 한 쌍**(`{ value: '__all__', label: '유형 전체' }`)

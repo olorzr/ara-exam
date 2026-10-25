@@ -1,15 +1,18 @@
 'use client';
 
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useId, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { useObjectUrl } from '@/hooks/useObjectUrl';
+import type { CoverFiles } from '@/hooks/usePaperCover';
 import {
-  COVER_SUBTITLE_MAX, COVER_TITLE_MAX, DEFAULT_COVER_LAYOUT, DEFAULT_SIMPLE_COVER,
-  type PaperCover, type PaperCoverLayout,
+  COVER_SUBTITLE_MAX, COVER_TEACHER_MAX, COVER_TITLE_MAX, DEFAULT_COVER_LAYOUT, DEFAULT_SIMPLE_COVER,
+  type PaperBackCoverKind, type PaperCover, type PaperCoverLayout,
 } from '@/lib/problem-paper/cover';
 import CoverLayoutPicker from './CoverLayoutPicker';
+import PaperBackCoverFields from './PaperBackCoverFields';
 
 type CoverChoice = 'none' | 'simple' | 'image';
 
@@ -21,12 +24,16 @@ interface PaperCoverDialogProps {
   cover: PaperCover | null;
   /** 지금 그림 표지의 서명 URL — 그림을 새로 고르지 않을 때 미리보기로 쓴다 */
   coverImageUrl?: string;
+  /** 지금 그림 뒷표지의 서명 URL */
+  backImageUrl?: string;
   /** 문제지를 만든 해 — 디자인 미리보기에 찍는다 */
   year?: string;
+  /** 문제지를 만든 선생님 이름 — '선생님' 칸을 비우면 이것을 쓴다 */
+  creatorName?: string;
   busy: boolean;
   onClose: () => void;
-  /** 저장 — 그림을 새로 골랐으면 `file` 이 온다. 저장했으면 true */
-  onSave: (next: PaperCover, file: File | null) => Promise<boolean>;
+  /** 저장 — 그림을 새로 골랐으면 `files` 에 앞·뒤 그림이 온다. 저장했으면 true */
+  onSave: (next: PaperCover, files: CoverFiles) => Promise<boolean>;
   /** 표지 빼기. 뺐으면 true */
   onRemove: () => Promise<boolean>;
 }
@@ -41,7 +48,7 @@ const CHOICES: { value: CoverChoice; label: string }[] = [
 ];
 
 /**
- * 표지 고르기 창 — 없음 / 간단 표지(디자인 여섯 가지) / 그림 올리기.
+ * 표지 고르기 창 — 없음 / 간단 표지(디자인 일곱 가지) / 그림 올리기, 그리고 뒷표지(없음 · 디자인 짝 · 그림).
  *
  * 입력 상태는 안쪽 폼이 들고 있다 — 창을 닫으면 내용이 언마운트되어 다음에 열 때 지금 표지에서
  * 새로 시작한다(효과로 되돌리면 `set-state-in-effect` 에 걸린다).
@@ -59,27 +66,34 @@ export default function PaperCoverDialog(props: PaperCoverDialogProps) {
 }
 
 function CoverForm({
-  paperTitle, cover, coverImageUrl, year = '', busy, onClose, onSave, onRemove,
+  paperTitle, cover, coverImageUrl, backImageUrl, year = '', creatorName = '', busy, onClose, onSave, onRemove,
 }: PaperCoverDialogProps) {
   const start = cover ?? DEFAULT_SIMPLE_COVER;
   const [choice, setChoice] = useState<CoverChoice>(cover ? cover.kind : 'simple');
   const [title, setTitle] = useState(start.title);
   const [subtitle, setSubtitle] = useState(start.subtitle);
+  const [teacher, setTeacher] = useState(start.teacher);
   const [showNameBox, setShowNameBox] = useState(start.showNameBox);
   const [layout, setLayout] = useState<PaperCoverLayout>(start.layout);
+  const [backChoice, setBackChoice] = useState<PaperBackCoverKind>(start.backKind);
   const nameHintId = useId();
+  const teacherHintId = useId();
   const [file, setFile] = useState<File | null>(null);
+  const [backFile, setBackFile] = useState<File | null>(null);
 
   // 고른 파일 미리보기 — 주소는 쓰고 나면 돌려준다
-  const fileUrl = useMemo(
-    () => (file && typeof URL.createObjectURL === 'function' ? URL.createObjectURL(file) : null),
-    [file],
-  );
-  useEffect(() => () => { if (fileUrl) URL.revokeObjectURL(fileUrl); }, [fileUrl]);
+  const fileUrl = useObjectUrl(file);
 
   const existingImage = cover?.kind === 'image' ? cover.imagePath : '';
   const previewUrl = fileUrl ?? (existingImage ? coverImageUrl : undefined);
-  const canSave = choice !== 'image' || Boolean(file || existingImage);
+  // 디자인 뒷표지는 간단 표지의 짝이다 — 그림 표지로 바꾸면 '없음' 으로 본다(toCoverRow·sql/75 와 같은 규칙)
+  const effectiveBack: PaperBackCoverKind = choice !== 'simple' && backChoice === 'design' ? 'none' : backChoice;
+  const existingBack = cover?.backKind === 'image' ? cover.backImagePath : '';
+  // '표지 없음' 은 앞·뒤를 다 빼므로 그림 조건을 보지 않는다(뒷표지 그림을 고르다 말고 바꿔도 저장된다, 코덱스 1R)
+  const canSave = choice === 'none' || (
+    (choice !== 'image' || Boolean(file || existingImage))
+    && (effectiveBack !== 'image' || Boolean(backFile || existingBack))
+  );
 
   const submit = async () => {
     if (choice === 'none') {
@@ -95,8 +109,15 @@ function CoverForm({
       subtitle,
       showNameBox,
       imagePath: choice === 'image' ? existingImage : '',
+      teacher,
+      backKind: effectiveBack,
+      backImagePath: effectiveBack === 'image' ? existingBack : '',
     };
-    if (await onSave(next, choice === 'image' ? file : null)) onClose();
+    const files: CoverFiles = {
+      front: choice === 'image' ? file : null,
+      back: effectiveBack === 'image' ? backFile : null,
+    };
+    if (await onSave(next, files)) onClose();
   };
 
   return (
@@ -136,9 +157,20 @@ function CoverForm({
                 첫 줄은 과정, 둘째 줄부터는 단원이에요(여섯 줄까지 — 넘치면 마지막 단원에 이어 붙여요).
               </span>
             </label>
+            <label className="block space-y-1 text-sm">
+              <span className="text-gray-600">선생님</span>
+              <Input
+                value={teacher} maxLength={COVER_TEACHER_MAX} aria-describedby={teacherHintId}
+                placeholder={creatorName || '문제지를 만든 선생님'}
+                onChange={(e) => setTeacher(e.target.value)} disabled={busy}
+              />
+              <span id={teacherHintId} className="block text-xs text-gray-400">
+                비워 두면 문제지를 만든 선생님 이름을 써요. 디자인 표지에만 찍혀요.
+              </span>
+            </label>
             <CoverLayoutPicker
               value={layout} onChange={setLayout} disabled={busy}
-              preview={{ title: title.trim() || paperTitle, subtitle, showNameBox, year }}
+              preview={{ title: title.trim() || paperTitle, subtitle, showNameBox, year, teacher: teacher.trim() || creatorName }}
             />
             <div>
               <label className="flex items-center gap-2 text-sm text-gray-800">
@@ -149,7 +181,7 @@ function CoverForm({
                 이름 칸 넣기
               </label>
               <p id={nameHintId} className="ml-6 text-xs text-gray-400">
-                간단: 학교 · 학년 반 · 이름 / 디자인: 이름 · 날짜
+                간단: 학교 · 학년 반 · 이름 / 디자인: 학생 빈칸
               </p>
             </div>
           </div>
@@ -174,6 +206,14 @@ function CoverForm({
             )}
             <p className="text-xs text-gray-400">PNG·JPG 모두 돼요. 올릴 때 인쇄용 JPEG 로 바꿔 저장해요.</p>
           </div>
+        )}
+
+        {choice !== 'none' && (
+          <PaperBackCoverFields
+            value={effectiveBack} onChange={setBackChoice} allowDesign={choice === 'simple'}
+            file={backFile} onFile={setBackFile}
+            savedImageUrl={existingBack ? backImageUrl : undefined} disabled={busy}
+          />
         )}
       </div>
 

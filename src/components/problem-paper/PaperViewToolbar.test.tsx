@@ -56,4 +56,9 @@ describe('PaperViewToolbar — 표지 단추', () => {
     renderToolbar(undefined, { ...DEFAULT_SIMPLE_COVER, kind: 'image', imagePath: 'x' });
     expect(screen.getByRole('button', { name: '표지 · 그림' })).toBeTruthy();
   });
+
+  it('뒷표지가 있으면 꼬리를 단다', () => {
+    renderToolbar(undefined, { ...DEFAULT_SIMPLE_COVER, layout: 'zine', backKind: 'design' });
+    expect(screen.getByRole('button', { name: '표지 · 라인드로잉 · 뒷표지' })).toBeTruthy();
+  });
 });

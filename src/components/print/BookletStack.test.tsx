@@ -31,6 +31,17 @@ describe('BookletStack', () => {
     expect(container.querySelectorAll('.booklet-blank')).toHaveLength(3);
   });
 
+  it('뒷표지 — 마지막 쪽을 책의 맨 뒤 자리에 두고 빈 면은 그 앞에, 캡션은 뒷표지라고 적는다', () => {
+    const { container } = render(<BookletStack pages={pages(5)} backCover />);
+    expect(faces(container)).toEqual([
+      ['5', '1'],
+      ['2', 'blank'],
+      ['blank', '3'],
+      ['4', 'blank'],
+    ]);
+    expect(container.querySelector('.booklet-leaf__caption')!.textContent).toContain('왼쪽 뒷표지');
+  });
+
   it('면 안의 자리에 그 쪽 내용을 그린다', () => {
     const { container } = render(<BookletStack pages={pages(4)} />);
     const first = container.querySelector('.booklet-side')!;
@@ -119,12 +130,19 @@ describe('BookletStack — 인쇄 CSS', () => {
     expect(number('right').justifySelf).toBe('end');
   });
 
-  it('표지는 면 높이를 따르고(그림이 잘리지 않게), 본문 낱장은 A4 높이 그대로다', () => {
+  it('표지·뒷표지는 면 높이를 따르고(그림이 잘리지 않게), 본문 낱장은 A4 높이 그대로다', () => {
     const { container } = render(
-      <BookletStack pages={[<A4CoverSheet key="c"><div>표지</div></A4CoverSheet>, bodyPage(1, 1)]} />,
+      <BookletStack
+        backCover
+        pages={[
+          <A4CoverSheet key="c"><div>표지</div></A4CoverSheet>, bodyPage(1, 1),
+          <A4CoverSheet key="b" side="back" isLast><div>뒷표지</div></A4CoverSheet>,
+        ]}
+      />,
     );
-    const cover = container.querySelector<HTMLElement>('.a4-sheet--cover')!;
-    expect(getComputedStyle(cover).height).toBe('auto');
+    const covers = Array.from(container.querySelectorAll<HTMLElement>('.a4-sheet--cover'));
+    expect(covers).toHaveLength(2);
+    for (const cover of covers) expect(getComputedStyle(cover).height).toBe('auto');
     const body = container.querySelector<HTMLElement>('.a4-sheet:not(.a4-sheet--cover)')!;
     expect(getComputedStyle(body).height).toBe(`${A4_HEIGHT_PX}px`);
   });

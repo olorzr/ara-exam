@@ -28,6 +28,11 @@ interface A4DocumentBaseProps {
    * 측정이 끝나기 전 폴백에는 그리지 않는다.
    */
   coverPage?: ReactNode;
+  /**
+   * 뒷표지 한 장(본문 뒤). 표지처럼 쪽 번호를 세지 않는다. 있으면 '문서의 마지막 낱장' 은 본문이 아니라
+   * 이 장이다(`a4-sheet--last`). 중철에서는 책의 맨 뒤 자리에 놓이고 빈 면은 그 앞에 온다.
+   */
+  backCoverPage?: ReactNode;
   /** 블록별 '행 단위로 더 쪼갤 수 있음' 표시 (개념지의 표). 참조가 안정적이어야 한다 */
   splittable?: readonly boolean[];
   /** 배치 직전 손질 훅 — 블록을 갱신했으면 true (개념지 표 열 폭 맞춤) */
@@ -71,6 +76,7 @@ export default function A4Document({
   breakAfterLast = false,
   booklet = false,
   coverPage,
+  backCoverPage,
   splittable,
   onBeforePaginate,
   onSplitRequest,
@@ -106,7 +112,8 @@ export default function A4Document({
       page={pageIndex + 1}
       total={pages.length}
       showPageNumber={showPageNumber}
-      isLast={pageIndex === pages.length - 1 && !breakAfterLast}
+      // 뒷표지가 있으면 마지막 낱장은 뒷표지다 — 본문 마지막 장에서 멈추면 뒷표지가 다음 장에 붙지 못한다
+      isLast={pageIndex === pages.length - 1 && !breakAfterLast && !backCoverPage}
     >
       <div className="a4-cols">
         {page.columns.map((column, columnIndex) => (
@@ -127,6 +134,9 @@ export default function A4Document({
 
   const cover = coverPage
     ? [<A4CoverSheet key="cover" className={className}>{coverPage}</A4CoverSheet>]
+    : [];
+  const back = backCoverPage
+    ? [<A4CoverSheet key="back" side="back" isLast={!breakAfterLast} className={className}>{backCoverPage}</A4CoverSheet>]
     : [];
 
   return (
@@ -166,9 +176,9 @@ export default function A4Document({
       <div className="a4-stack">
         {layout.ready ? (
           booklet ? (
-            <BookletStack pages={[...cover, ...pages.map(renderPage)]} />
+            <BookletStack pages={[...cover, ...pages.map(renderPage), ...back]} backCover={back.length > 0} />
           ) : (
-            [...cover, ...pages.map(renderPage)]
+            [...cover, ...pages.map(renderPage), ...back]
           )
         ) : (
           // 측정 전(첫 페인트 직전)·측정 실패 시 폴백.

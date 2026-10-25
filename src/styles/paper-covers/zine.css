@@ -1,0 +1,193 @@
+/* F 라인드로잉 (시안 Zine.dc.html, 2026-10-25) — 굵은 테두리 상자 셋 안의 선 그림 · 모서리 라벨 · 정보 격자 */
+
+.pb-cover.pbc-zine {
+  /* 시안은 #fafaf8 · #111 이다 — 배경은 흰색, 먹은 공통 먹색(2026-10-14 무채색 규약) */
+  background: #ffffff;
+  font-family: var(--pbc-serif);
+}
+
+/* ⚠️ 제목 줄 폭(686 − 연필통 44 − 간격 16)·높이는 cover-fit-zine.ts 의 ZINE_TITLE 과 같다 */
+.pbc-zine__title-row {
+  position: absolute;
+  left: 54px;
+  right: 54px;
+  top: 50px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.pbc-zine__title {
+  min-width: 0;
+  font-size: calc(60px * var(--pbc-title-scale, 1));
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.1em;
+}
+
+.pbc-zine__cup {
+  flex: none;
+  color: var(--pbc-ink);
+}
+
+.pbc-zine__box {
+  position: absolute;
+  overflow: hidden;
+  border: 2.5px solid var(--pbc-ink);
+  color: var(--pbc-ink);
+}
+
+/* 상자 안 그림 — 상자를 채우되 비율을 지킨다(중철 면에서 상자2 가 줄면 그림도 함께 준다) */
+.pbc-zine__drawing {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+.pbc-zine__box--1 {
+  left: 54px;
+  right: 54px;
+  top: 150px;
+  height: 200px;
+}
+
+/* 상자 모서리에 걸친 라벨 — 흰 바탕이 상자 윗선을 끊는다. ⚠️ 폭 상한(480 + 왼쪽 여백 18)은 ZINE_LABEL 과 같다 */
+.pbc-zine__label {
+  position: absolute;
+  right: 54px;
+  top: 124px;
+  max-width: 498px;
+  padding: 0 0 4px 18px;
+  background: #ffffff;
+  text-align: right;
+  font-size: calc(38px * var(--pbc-label-scale, 1));
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+/* ⚠️ 위 374px · 칸 비율 · 글 크기는 cover-fit-zine.ts 의 ZINE_INFO 와 같다 */
+.pbc-zine__info {
+  position: absolute;
+  left: 54px;
+  right: 54px;
+  top: 374px;
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1.2fr 0.8fr;
+  column-gap: 20px;
+  font-size: calc(16px * var(--pbc-info-scale, 1));
+  line-height: 1.55;
+}
+
+.pbc-zine__cell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pbc-zine__cell--end {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.pbc-zine__cell--display {
+  font-family: var(--pbc-display);
+  font-size: calc(18px * var(--pbc-info-scale, 1));
+}
+
+.pbc-zine__student {
+  display: flex;
+  flex-direction: column;
+}
+
+.pbc-zine__student-line {
+  display: block;
+  width: 120px;
+  max-width: 100%;
+  height: 18px;
+  border-bottom: 1.5px solid var(--pbc-ink);
+}
+
+/* 가운데 상자 — 위(470px)·아래(313px) 두 변 기준. 높이를 박으면 중철 면에서 아래 상자와 겹친다 */
+.pbc-zine__box--2 {
+  left: 54px;
+  right: 54px;
+  top: 470px;
+  bottom: 313px;
+}
+
+/* 모토 — 상자2 의 아래 왼쪽 모서리에 붙어 그 모서리 선을 끊는다(시안의 겹침) */
+.pbc-zine__motto {
+  position: absolute;
+  left: 54px;
+  bottom: 313px;
+  width: 250px;
+  height: 170px;
+  padding-top: 18px;
+  background: #ffffff;
+  border-top: 2.5px solid var(--pbc-ink);
+  border-right: 2.5px solid var(--pbc-ink);
+  font-size: 44px;
+  line-height: 1.12;
+  letter-spacing: 0.02em;
+  white-space: pre-line;
+}
+
+.pbc-zine__box--3 {
+  left: 54px;
+  bottom: 115px;
+  width: 244px;
+  height: 172px;
+}
+
+.pbc-zine__circle {
+  position: absolute;
+  left: 330px;
+  bottom: 125px;
+  width: 150px;
+  height: 150px;
+  border: 2.5px solid var(--pbc-ink);
+  border-radius: 50%;
+  color: var(--pbc-ink);
+}
+
+.pbc-zine__blob {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+.pbc-zine__year {
+  position: absolute;
+  left: 508px;
+  bottom: 143px;
+  font-family: var(--pbc-display);
+  font-size: 72px;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  white-space: pre-line;
+}
+
+.pbc-zine__note {
+  position: absolute;
+  left: 54px;
+  bottom: 65px;
+  font-size: 11px;
+  line-height: 1.45;
+  letter-spacing: 0.04em;
+  white-space: pre-line;
+}
+
+.pbc-zine__brand {
+  position: absolute;
+  right: 54px;
+  bottom: 50px;
+  text-align: right;
+  font-size: 13px;
+  line-height: 1.15;
+  letter-spacing: 0.06em;
+  white-space: pre-line;
+}

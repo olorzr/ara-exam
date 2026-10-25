@@ -13,19 +13,17 @@ export function cssVars(vars: Record<`--${string}`, number>): CSSProperties {
   return vars as CSSProperties;
 }
 
-/** 손으로 적는 빈칸의 길이 — 시안의 90 · 120 · 150px */
-export type BlankFieldSize = 'sm' | 'md' | 'lg';
-
 /**
- * '이름 ____' 처럼 이름표 하나와 밑줄 빈칸.
+ * '학생 ____' 처럼 이름표 하나와 밑줄 빈칸. 빈칸 길이는 시안마다 다르다(120 · 150 · 200 · 230px).
  * @param props.label - 이름표
- * @param props.size - 빈칸 길이
+ * @param props.width - 빈칸 길이(px)
+ * @param props.className - 디자인별 모양
  */
-export function BlankField({ label, size }: { label: string; size: BlankFieldSize }) {
+export function BlankField({ label, width, className = '' }: { label: string; width: number; className?: string }) {
   return (
-    <span className="pbc-field">
+    <span className={`pbc-field ${className}`.trim()}>
       {label}
-      <span className={`pbc-field__line pbc-field__line--${size}`} aria-hidden="true" />
+      <span className="pbc-field__line" style={{ width }} aria-hidden="true" />
     </span>
   );
 }

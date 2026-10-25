@@ -8,6 +8,12 @@ import {
   fetchPaperCover, removePaperCover, savePaperCover, uploadPaperCoverImage,
 } from '@/lib/problem-paper/cover-queries';
 
+/** 저장할 때 새로 고른 그림 — 앞표지·뒷표지 각각(고르지 않았으면 null·생략) */
+export interface CoverFiles {
+  front?: File | null;
+  back?: File | null;
+}
+
 /** 표지 상태와 조작 */
 export interface PaperCoverState {
   /** 지금 표지 (없으면 null) */
@@ -24,10 +30,10 @@ export interface PaperCoverState {
   /** 저장·삭제 중인가 */
   saving: boolean;
   /**
-   * 표지를 저장한다. 그림 표지면 `imageFile` 을 JPEG 로 바꿔 올린 **뒤** 행을 쓴다.
+   * 표지를 저장한다. 새로 고른 그림(앞·뒤)을 JPEG 로 바꿔 올린 **뒤** 행을 쓴다.
    * @returns 저장했으면 true
    */
-  save: (next: PaperCover, imageFile?: File | null) => Promise<boolean>;
+  save: (next: PaperCover, files?: CoverFiles) => Promise<boolean>;
   /** 표지를 없앤다. @returns 지웠으면 true */
   remove: () => Promise<boolean>;
 }
@@ -37,12 +43,27 @@ function message(error: unknown, fallback: string): string {
 }
 
 /**
+ * 그림이 있어야 하는데 없는 자리 — 올리기 **전에** 둘 다 본다(앞을 올린 뒤에 뒤가 없다고 멈추면 앞 파일이 고아가 된다).
+ * @returns 막아야 하면 그 까닭, 아니면 null
+ */
+function missingImage(next: PaperCover, files: CoverFiles): string | null {
+  if (next.kind === 'image' && !files.front && !next.imagePath) return '표지로 쓸 그림을 골라 주세요.';
+  if (next.backKind === 'image' && !files.back && !next.backImagePath) return '뒷표지로 쓸 그림을 골라 주세요.';
+  return null;
+}
+
+async function uploadIfPicked(paperId: string, file: File | null | undefined): Promise<string | null> {
+  if (!file) return null;
+  return uploadPaperCoverImage(paperId, await encodeCoverJpeg(file));
+}
+
+/**
  * 문제지 표지를 읽고 고친다.
  *
  * ⚠️ 잠금은 state 가 아니라 `busyRef` 다 — 같은 실행 흐름에서 두 번 눌리면 state 는 아직
  *    안 바뀌어 있다(`useSourceDelete` 와 같은 규약). 잠금은 **첫 await 앞**에서 건다.
  * ⚠️ 그림을 올린 뒤 행 쓰기가 실패하면 올린 파일은 고아로 남는다 — 엉뚱한 표지가 걸리는 것보다
- *    낫고, 그림 자르기와 같은 규약이다.
+ *    낫고, 그림 자르기와 같은 규약이다. 옛 그림 파일도 지우지 않는다(다른 탭이 그 경로로 인쇄 중일 수 있다).
  * @param paperId - 문제지 id
  * @returns 표지 상태
  */
@@ -84,20 +105,23 @@ export function usePaperCover(paperId: string): PaperCoverState {
 
   const reload = useCallback(() => setAttempt((n) => n + 1), []);
 
-  const save = useCallback(async (next: PaperCover, imageFile?: File | null) => {
+  const save = useCallback(async (next: PaperCover, files: CoverFiles = {}) => {
     if (busyRef.current) return false;
+    const missing = missingImage(next, files);
+    if (missing) {
+      toast.error(missing);
+      return false;
+    }
     busyRef.current = true;
     setSaving(true);
     try {
-      let target = next;
-      if (next.kind === 'image' && imageFile) {
-        const jpeg = await encodeCoverJpeg(imageFile);
-        target = { ...next, imagePath: await uploadPaperCoverImage(paperId, jpeg) };
-      }
-      if (target.kind === 'image' && !target.imagePath) {
-        toast.error('표지로 쓸 그림을 골라 주세요.');
-        return false;
-      }
+      const frontPath = next.kind === 'image' ? await uploadIfPicked(paperId, files.front) : null;
+      const backPath = next.backKind === 'image' ? await uploadIfPicked(paperId, files.back) : null;
+      const target: PaperCover = {
+        ...next,
+        imagePath: frontPath ?? next.imagePath,
+        backImagePath: backPath ?? next.backImagePath,
+      };
       const saved = await savePaperCover(paperId, target);
       if (aliveRef.current) {
         setCover(saved);
