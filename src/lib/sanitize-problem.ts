@@ -32,7 +32,10 @@ const ALLOWED_TAGS = [
   'span',
 ];
 
-const ALLOWED_ATTR = ['colspan', 'rowspan', 'data-box', 'data-figure', 'style'];
+/** 칸선 없는 나란히 표의 `data-layout` 값 — 인쇄·편집기 CSS 선택자와 짝이다 */
+export const VERSE_LAYOUT = 'verse';
+
+const ALLOWED_ATTR = ['colspan', 'rowspan', 'data-box', 'data-figure', 'data-layout', 'style'];
 
 /** inline style 은 개념지와 같은 좁은 집합만 — 표 셀 정렬·색이 전부다 */
 const ALLOWED_CSS_PROPS = new Set([
@@ -49,10 +52,13 @@ const PROBLEM_PROFILE: SanitizeProfile = {
   // 허용 말머리는 box-labels.ts 가 단일 출처다(인쇄 CSS 선택자와 짝이다).
   // ⚠️ 여기서 걸린 값은 **되돌릴 수 없이** 사라진다 — 시험지 표기('(가)')를 살리려면
   //    파서가 정화 **전에** normalizeBoxAttributes 로 다듬어야 한다
-  allowedDataAttrs: new Map<string, (value: string) => boolean>([
+  allowedDataAttrs: new Map<string, (value: string, tagName: string) => boolean>([
     ['data-box', isBoxLabel],
     // 그림 자리표시자의 순번. `figure_paths` 의 1-based 자리이고 한 자리뿐이다
     ['data-figure', (value) => /^[1-9]$/.test(value)],
+    // 원문과 풀이를 칸선 없이 나란히 놓는 표(`<table data-layout="verse">`, 2026-10-26).
+    // 공백·탭으로 줄을 맞춘 글은 HTML 이 접어 버려 두 칸이 한 줄로 뭉개진다 — 줄 맞춤은 표로만 한다
+    ['data-layout', (value, tagName) => tagName === 'table' && value === VERSE_LAYOUT],
   ]),
 };
 

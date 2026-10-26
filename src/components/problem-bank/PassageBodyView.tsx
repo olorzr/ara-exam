@@ -1,5 +1,6 @@
 'use client';
 
+import { markFootnotes } from '@/lib/problem-bank/footnotes';
 import { sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import { hasLiteralPassageLabels, hasSourceAccuratePassageLayout } from '@/lib/problem-bank/source-accurate-passages';
 import { hasYetHangul } from '@/lib/yet-hangul';
@@ -68,7 +69,8 @@ export default function PassageBodyView({
       }${literalLabels ? ' pb-passage-part--literal-labels' : ''
       }`}>
         <BodyWithFigures
-          html={sanitizeProblemHTML(passage.html)}
+          // 각주(`*낱말 : 풀이`)는 작게 — 정화한 **뒤에** 표시를 붙인다(footnotes.ts)
+          html={markFootnotes(sanitizeProblemHTML(passage.html))}
           paths={passage.figure_paths ?? []}
           urls={figureUrls ?? new Map()}
         />

@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { sanitizeInlineHTML, sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import { choiceGlyph } from '@/lib/problem-bank/choices';
 import { renderFiguresInHtml, unplacedFigures } from '@/lib/problem-bank/figure-render';
+import { markFootnotes } from '@/lib/problem-bank/footnotes';
 import { hasTabulatedChoices, matrixChoices, pairedChoices } from '@/lib/problem-bank/paired-choices';
 import { correctChoiceIndices, splitsExplanation } from '@/lib/problem-paper/answers';
 import type { PaperBlock } from '@/lib/problem-paper/blocks';
@@ -248,7 +249,7 @@ function ProblemBlock({ number, snapshot, settings, imageUrls, showAnswers, slot
         <div className="pb-q__stem">
           {/* 끝에 붙은 빈 문단을 걷어낸다 — 그대로 두면 선지 앞에 빈 줄이 생긴다 */}
           <StemWithFigures
-            html={stripTrailingEmptyParagraphs(sanitizeProblemHTML(paired?.stemHtml ?? matrix?.stemHtml ?? snapshot.stem_html))}
+            html={markFootnotes(stripTrailingEmptyParagraphs(sanitizeProblemHTML(paired?.stemHtml ?? matrix?.stemHtml ?? snapshot.stem_html)))}
             paths={snapshot.figure_paths}
             imageUrls={imageUrls}
             number={number}

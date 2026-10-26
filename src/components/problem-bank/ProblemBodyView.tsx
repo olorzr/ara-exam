@@ -3,6 +3,7 @@
 import { choiceGlyph } from '@/lib/problem-bank/choices';
 import { correctChoiceIndices, formatAnswer } from '@/lib/problem-paper/answers';
 import { renderFiguresInHtml, unplacedFigures } from '@/lib/problem-bank/figure-render';
+import { markFootnotes } from '@/lib/problem-bank/footnotes';
 import { hasTabulatedChoices, matrixChoices, pairedChoices } from '@/lib/problem-bank/paired-choices';
 import { stripTrailingEmptyParagraphs } from '@/lib/problem-paper/html-trim';
 import { sanitizeInlineHTML, sanitizeProblemHTML } from '@/lib/sanitize-problem';
@@ -76,7 +77,7 @@ export default function ProblemBodyView({ problem, imageUrls }: ProblemBodyViewP
           {!asImage && (
             <div className="pb-q__stem">
               <BodyWithFigures
-                html={stripTrailingEmptyParagraphs(sanitizeProblemHTML(paired?.stemHtml ?? matrix?.stemHtml ?? problem.stem_html))}
+                html={markFootnotes(stripTrailingEmptyParagraphs(sanitizeProblemHTML(paired?.stemHtml ?? matrix?.stemHtml ?? problem.stem_html)))}
                 paths={problem.figure_paths}
                 urls={imageUrls}
               />

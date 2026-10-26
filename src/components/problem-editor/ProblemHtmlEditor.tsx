@@ -11,6 +11,7 @@ import { sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import { hasYetHangul } from '@/lib/yet-hangul';
 import { FigurePlaceholderNode } from './FigurePlaceholderNode';
 import ProblemEditorToolbar from './ProblemEditorToolbar';
+import { VerseTableAttribute, VerseTableView } from './VerseTableAttribute';
 
 /**
  * 〈보기〉 상자를 살려 두는 blockquote.
@@ -87,7 +88,10 @@ export default function ProblemHtmlEditor({
       // 없으면 편집기가 그림 자리표시자를 모르는 태그로 보고 버린다
       FigurePlaceholderNode,
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
-      Table.configure({ resizable: true }),
+      // 크기 조절 표는 NodeView 가 <table> 을 직접 그려서 data-layout 을 따로 맞춰 줘야 한다
+      Table.configure({ resizable: true, View: VerseTableView }),
+      // 없으면 칸선 없는 나란히 표가 저장할 때 보통 표로 돌아간다
+      VerseTableAttribute,
       TableRow,
       CustomTableCell,
       CustomTableHeader,

@@ -233,6 +233,15 @@ export interface BookLayoutInput {
 }
 
 /**
+ * 인쇄 모양 개정 번호 — 문제지 인쇄 CSS·블록 조립이 **쪽 수를 바꾸게** 고쳐지면 하나 올린다.
+ *
+ * 구성 지문은 책·장 설정만 보므로, 글자 크기나 지문 그리는 법이 바뀌어도 지문이 같아 옛 쪽 수가 '최신' 으로
+ * 남고 책등이 **조용히** 틀린다. 이 번호가 지문에 들어가 있어 올리는 순간 모든 책이 다시 재라고 막힌다.
+ *  - 2: 2026-10-26 칸선 없는 나란히 표(향찰·한시 두 칸) · 각주 작은 글씨(0.9.61, 코덱스 2R)
+ */
+export const BOOK_RENDER_REVISION = 2;
+
+/**
  * 내지 구성 지문 — 장 차례·제목·단 수 등 쪽 수를 바꾸는 값을 FNV-1a 로 줄인 글자.
  *
  * 쪽 수는 내지 화면이 재서 저장하고 표지 화면이 그 값으로 책등을 그린다. 그 사이 장을 바꾸면 옛 쪽 수로 책등이
@@ -246,6 +255,8 @@ export function bookLayoutKey(input: BookLayoutInput): string {
     input.chapters.map((c) => [c.paperId, c.title.trim()]),
     // 목차는 맨 뒤에 덧붙였다 — 앞 칸의 차례를 바꾸지 않으려고(지문은 어차피 달라진다: 2026-10-26 기존 책은 다시 잰다)
     input.settings.toc,
+    // 인쇄 모양 개정 — 맨 뒤에 덧붙였다(앞 칸 차례를 바꾸지 않으려고)
+    BOOK_RENDER_REVISION,
   ]);
   let hash = 0x811c9dc5;
   for (let i = 0; i < text.length; i += 1) {

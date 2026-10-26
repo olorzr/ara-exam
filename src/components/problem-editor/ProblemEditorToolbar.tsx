@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useEditorState, type Editor } from '@tiptap/react';
 import { Bold, Italic, Minus, Table as TableIcon, Underline as UnderlineIcon, WrapText } from 'lucide-react';
 import { BOX_LABEL_OPTIONS } from '@/lib/box-labels';
+import { VERSE_LAYOUT } from '@/lib/sanitize-problem';
 import YetHangulDialog from './YetHangulDialog';
 
 /** '상자 아님' 센티널 — 빈 문자열 option 은 브라우저마다 다루기가 다르다 */
@@ -30,6 +31,7 @@ export default function ProblemEditorToolbar({ editor }: ProblemEditorToolbarPro
       italic: e.isActive('italic'),
       underline: e.isActive('underline'),
       table: e.isActive('table'),
+      verse: e.isActive('table') && e.getAttributes('table').layout === VERSE_LAYOUT,
       blockquote: e.isActive('blockquote'),
       boxLabel: (e.getAttributes('blockquote')['data-box'] as string | null) ?? null,
     }),
@@ -90,6 +92,17 @@ export default function ProblemEditorToolbar({ editor }: ProblemEditorToolbarPro
       >
         <TableIcon className="h-3.5 w-3.5" />
       </button>
+      {state.table && (
+        <button
+          type="button" className={buttonClass(state.verse)}
+          onClick={() => editor.chain().focus()
+            .updateAttributes('table', { layout: state.verse ? null : VERSE_LAYOUT }).run()}
+          aria-pressed={state.verse}
+          title="원문과 풀이를 줄 맞춰 나란히 적은 글(향찰·한시 번역 등)은 칸선 없이 인쇄해요"
+        >
+          칸선 없는 나란히 표
+        </button>
+      )}
 
       <button
         type="button" className={buttonClass(yetOpen)}

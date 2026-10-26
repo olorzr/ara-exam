@@ -13,6 +13,23 @@ describe('sanitizeProblemHTML', () => {
     expect(sanitizeProblemHTML(html)).toContain('colspan="2"');
   });
 
+  it('칸선 없는 나란히 표(data-layout="verse")는 그대로 남는다 — 정화 전후가 같아야 적재 검사가 통과한다', () => {
+    const html = '<table data-layout="verse"><tbody><tr><td>生死路隱</td><td>생사 길은</td></tr></tbody></table>';
+    expect(sanitizeProblemHTML(html)).toBe(html);
+  });
+
+  it('data-layout 은 표에서 verse 값일 때만 남는다', () => {
+    expect(sanitizeProblemHTML('<table data-layout="grid"><tbody><tr><td>가</td></tr></tbody></table>'))
+      .not.toContain('data-layout');
+    expect(sanitizeProblemHTML('<p data-layout="verse">가</p>')).toBe('<p>가</p>');
+    expect(sanitizeInlineHTML('<span data-layout="verse">가</span>')).toBe('<span>가</span>');
+  });
+
+  it('개념지 정화는 data-layout 을 받지 않는다 — 문항 전용 규칙이 새지 않는다', () => {
+    expect(sanitizeConceptHTML('<table data-layout="verse"><tbody><tr><td>가</td></tr></tbody></table>'))
+      .not.toContain('data-layout');
+  });
+
   it('〈보기〉 상자는 data-box 로 표시한다', () => {
     const html = '<blockquote data-box="보기"><p>ㄱ. 첫째</p></blockquote>';
     const out = sanitizeProblemHTML(html);

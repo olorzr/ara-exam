@@ -1,4 +1,5 @@
 import { unplacedFigures } from '@/lib/problem-bank/figure-render';
+import { markFootnotes } from '@/lib/problem-bank/footnotes';
 import { hasLiteralPassageLabels, hasSourceAccuratePassageLayout } from '@/lib/problem-bank/source-accurate-passages';
 import { sanitizeProblemHTML } from '@/lib/sanitize-problem';
 import { hasYetHangul } from '@/lib/yet-hangul';
@@ -68,8 +69,9 @@ export function passageBlocksOf(input: PassageBlockInput): PaperBlock[] {
   const html = (trimWorks ? trimPassageToAskedWorks(passage, group)?.html : undefined) ?? passage.html;
   // ⚠️ 최상위 요소 단위로 쪼개되 **구역 상자는 자식 단위로 터뜨린다**(box-parts.ts) — 상자 하나에
   //    지문 전체가 담기면 한 쪽을 넘겨 통째로 축소된다. 자리표시자에서 문자열을 자르지 않으므로
-  //    표 안의 그림은 그리는 쪽이 끼운다. 경로 없는 그림·가장자리 빈 문단은 거기서 걷는다
-  const parts = splitPassagePieces(sanitizeProblemHTML(html), figures)
+  //    표 안의 그림은 그리는 쪽이 끼운다. 경로 없는 그림·가장자리 빈 문단은 거기서 걷는다.
+  //    각주 표시는 정화한 뒤·쪼개기 전에 붙인다 — 떼어 낸 각주 문단이 제 블록이 된다(footnotes.ts)
+  const parts = splitPassagePieces(markFootnotes(sanitizeProblemHTML(html)), figures)
     .map((piece, i): PaperBlock => {
       const box = piece.box ? { box: piece.box } : {};
       return piece.figurePath

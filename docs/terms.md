@@ -779,3 +779,13 @@
 - 정의: 내지 쪽 수를 바꾸는 값(판·책 제목·단 수·장 시작·복합 지문·장 차례와 제목·목차)을 줄인 글자. 저장된 쪽 수가 지금 구성의 것인지 가린다
 - 코드에서의 사용: `bookLayoutKey`, `bookLayoutKeyFor`, `pageCountFreshness`
 - 관련 파일: src/lib/book/settings.ts, src/lib/book/layout.ts
+
+## 칸선 없는 나란히 표 (verse table)
+- 정의: 향찰과 해독, 한시와 번역처럼 원문과 풀이를 줄 맞춰 나란히 적은 글을 담는 두 칸 표. 칸선 없이 그리고 글자 크기는 본문과 같다. 공백·탭으로 줄을 맞추면 화면이 한 칸으로 접어 뭉개지므로 이 표로만 담는다
+- 코드에서의 사용: `<table data-layout="verse">`, `VERSE_LAYOUT`(sanitize-problem.ts), `VerseTableAttribute`(편집기), 적재 도구 `layout-lint.cjs` 의 `toVerseTables`
+- 관련 파일: src/lib/sanitize-problem.ts, src/components/problem-editor/VerseTableAttribute.ts, src/styles/problem-paper.css
+
+## 각주 (footnote)
+- 정의: 지문·〈보기〉 끝에 `* 낱말 : 풀이` 꼴로 단 단어 설명. 참고사항이라 작은 글씨로 찍는다(데이터는 그대로, 그릴 때 알아본다)
+- 코드에서의 사용: `markFootnotes`, `FOOTNOTE_CLASS`(`pb-note`)
+- 관련 파일: src/lib/problem-bank/footnotes.ts, src/styles/problem-paper.css

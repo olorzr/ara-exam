@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { bookLayoutKeyFor } from './layout';
 import {
-  bookLayoutKey, DEFAULT_BOOK_SETTINGS, EDITION_SUFFIX, MANUAL_PAGES_MAX, normalizeBookSettings, normalizePageCounts,
+  BOOK_RENDER_REVISION, bookLayoutKey, DEFAULT_BOOK_SETTINGS, EDITION_SUFFIX, MANUAL_PAGES_MAX, normalizeBookSettings, normalizePageCounts,
   SPINE_COLOR_PRESETS, SPINE_INK_PRESETS,
 } from './settings';
 import { spineInkFor } from './spine';
@@ -102,6 +102,18 @@ describe('bookLayoutKey', () => {
     expect(bookLayoutKey({ ...input, settings: { ...input.settings, toc: false } })).not.toBe(base);
     expect(bookLayoutKey({ ...input, chapters: [...input.chapters].reverse() })).not.toBe(base);
     expect(bookLayoutKey({ ...input, chapters: [input.chapters[0], { paperId: 'b', title: '둘째' }] })).not.toBe(base);
+  });
+
+  it('인쇄 모양 개정 번호가 지문에 든다 — 올리면 이미 잰 책이 모두 다시 재라고 막힌다', () => {
+    // 개정 번호를 빼고 같은 식으로 만든 지문과 달라야 한다(빠지면 글자 크기가 바뀌어도 옛 쪽 수가 '최신' 이다)
+    const text = JSON.stringify([
+      input.edition, input.title, input.settings.columns, input.settings.chapterStart, input.settings.trimWorks,
+      input.chapters.map((c) => [c.paperId, c.title]), input.settings.toc,
+    ]);
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < text.length; i += 1) { hash ^= text.charCodeAt(i); hash = Math.imul(hash, 0x01000193) >>> 0; }
+    expect(bookLayoutKey(input)).not.toBe(hash.toString(16).padStart(8, '0'));
+    expect(BOOK_RENDER_REVISION).toBeGreaterThanOrEqual(2);
   });
 });
 
