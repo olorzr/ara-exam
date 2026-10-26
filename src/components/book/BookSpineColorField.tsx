@@ -13,7 +13,7 @@ interface BookSpineColorFieldProps {
 }
 
 /**
- * 책등 색 — 바로 고르는 색 여섯과 직접 고르기. 바로 고르는 색은 그 자리에서 저장하고, 직접 고르기는 멈춘 뒤 한 번 저장한다.
+ * 책등 색 — 바로 고르는 색 열(파스텔 여덟 + 진한 둘)과 직접 고르기. 바로 고르는 색은 그 자리에서 저장하고, 직접 고르기는 멈춘 뒤 한 번 저장한다.
  * (구성 화면의 책 설정에서 표지 만들기 화면으로 옮겨 왔다 — 동작은 그대로다.)
  */
 export default function BookSpineColorField({ settings: s, disabled, onSettings }: BookSpineColorFieldProps) {

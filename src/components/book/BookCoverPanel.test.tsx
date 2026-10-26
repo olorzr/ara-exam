@@ -29,4 +29,11 @@ describe('BookCoverPanel — 제목(코덱스 2R)', () => {
     expect(screen.queryByDisplayValue('표지')).toBeNull();
     expect(screen.getByLabelText('내지 용지')).toBeTruthy();
   });
+
+  it('책등 글꼴 칸이 있고 고르면 설정을 저장한다', () => {
+    const save = vi.fn(async () => true);
+    render(<BookCoverPanel book={book} edition="student" state={stateOf(save)} />);
+    fireEvent.click(screen.getByLabelText('연성'));
+    expect(save).toHaveBeenCalledWith({ settings: { ...DEFAULT_BOOK_SETTINGS, spineFont: 'yeonsung' } });
+  });
 });

@@ -1,5 +1,6 @@
 import type { CoverTitleSuffix } from '@/lib/problem-paper/cover';
 import { DEFAULT_INNER_PAPER, isInnerPaperCode } from './inner-papers';
+import { DEFAULT_SPINE_FONT, isSpineFontId, type SpineFontId } from './spine-fonts';
 
 /**
  * 책 설정·판(에디션)·쪽 수 기록 (순수 함수).
@@ -56,10 +57,14 @@ export interface BookSettings {
   chapterStart: ChapterStart;
   /** (가)(나) 복합 지문에서 묻지 않는 작품의 구역을 빼고 인쇄한다(문제지 화면의 같은 선택) */
   trimWorks: boolean;
+  /** 내지 첫 쪽에 목차(장 제목과 시작 쪽)를 넣는다 — 내지 배치를 바꾸므로 구성 지문에 든다 */
+  toc: boolean;
   /** 책등 바탕색 `#rrggbb` */
   spineColor: string;
   /** 책등 글자 — 비우면 책 제목 */
   spineText: string;
+  /** 책등 제목 글꼴(아래쪽 학원 이름은 늘 지마켓 산스) — 표지 전용이라 구성 지문에 넣지 않는다 */
+  spineFont: SpineFontId;
   /** 뒷표지가 없을 때 펼침면 뒷면의 바탕 */
   backFill: BackFill;
   /**
@@ -81,14 +86,22 @@ export const MANUAL_PAGES_MAX = 2000;
 /** 책등 글자 상한 */
 export const SPINE_TEXT_MAX = 60;
 
-/** 책등 색 고르기 칸의 바로 고를 수 있는 색 — 남색 · 먹색 · 진녹 · 버건디 · 회색 · 검정 */
+/**
+ * 책등 색 고르기 칸의 바로 고를 수 있는 색 — 파스텔 여덟 + 진한 색 둘(원장님 2026-10-26 "기본 색이 너무 칙칙해, 파스텔톤이 좋아").
+ * 파스텔은 글자색이 검정으로 잡히고(`spineInkFor`) 진한 둘은 흰 글자다. ⚠️ 값은 소문자 — 정규화가 소문자로 바꾸고
+ * 고르기 칸이 글자 그대로 견줘 고른 칸을 표시한다.
+ */
 export const SPINE_COLOR_PRESETS: readonly { value: string; label: string }[] = [
+  { value: '#f6c6d0', label: '연분홍' },
+  { value: '#f8d3b8', label: '살구' },
+  { value: '#f7e6a6', label: '연노랑' },
+  { value: '#d4e8b8', label: '연두' },
+  { value: '#bfe5d9', label: '민트' },
+  { value: '#bcd8f0', label: '하늘' },
+  { value: '#d3cdef', label: '라벤더' },
+  { value: '#e4c9e3', label: '연보라' },
   { value: '#1f3a5f', label: '남색' },
   { value: '#2f3437', label: '먹색' },
-  { value: '#1f4d3a', label: '진녹' },
-  { value: '#6b1e2e', label: '버건디' },
-  { value: '#8a8f98', label: '회색' },
-  { value: '#000000', label: '검정' },
 ];
 
 /** 새 책의 설정 */
@@ -97,8 +110,10 @@ export const DEFAULT_BOOK_SETTINGS: BookSettings = {
   columns: 2,
   chapterStart: 'odd',
   trimWorks: true,
+  toc: true,
   spineColor: SPINE_COLOR_PRESETS[0].value,
   spineText: '',
+  spineFont: DEFAULT_SPINE_FONT,
   backFill: 'white',
   manualPages: {},
 };
@@ -118,9 +133,11 @@ export function normalizeBookSettings(raw: unknown): BookSettings {
     columns: v.columns === 1 ? 1 : v.columns === 2 ? 2 : d.columns,
     chapterStart: v.chapterStart === 'page' || v.chapterStart === 'odd' ? v.chapterStart : d.chapterStart,
     trimWorks: typeof v.trimWorks === 'boolean' ? v.trimWorks : d.trimWorks,
+    toc: typeof v.toc === 'boolean' ? v.toc : d.toc,
     spineColor: typeof v.spineColor === 'string' && HEX_COLOR.test(v.spineColor)
       ? v.spineColor.toLowerCase() : d.spineColor,
     spineText: typeof v.spineText === 'string' ? v.spineText.trim().slice(0, SPINE_TEXT_MAX) : d.spineText,
+    spineFont: isSpineFontId(v.spineFont) ? v.spineFont : d.spineFont,
     backFill: v.backFill === 'spine' || v.backFill === 'white' ? v.backFill : d.backFill,
     manualPages: normalizeManualPages(v.manualPages),
   };
@@ -185,7 +202,7 @@ export interface BookLayoutInput {
   edition: BookEdition;
   /** 책 제목(머리글에 찍힌다) */
   title: string;
-  settings: Pick<BookSettings, 'columns' | 'chapterStart' | 'trimWorks'>;
+  settings: Pick<BookSettings, 'columns' | 'chapterStart' | 'trimWorks' | 'toc'>;
   /** 장 차례대로 — 문제지 id 와 장 제목(장 머리 블록 높이가 제목 길이를 따른다) */
   chapters: readonly { paperId: string; title: string }[];
 }
@@ -202,6 +219,8 @@ export function bookLayoutKey(input: BookLayoutInput): string {
   const text = JSON.stringify([
     input.edition, input.title.trim(), input.settings.columns, input.settings.chapterStart, input.settings.trimWorks,
     input.chapters.map((c) => [c.paperId, c.title.trim()]),
+    // 목차는 맨 뒤에 덧붙였다 — 앞 칸의 차례를 바꾸지 않으려고(지문은 어차피 달라진다: 2026-10-26 기존 책은 다시 잰다)
+    input.settings.toc,
   ]);
   let hash = 0x811c9dc5;
   for (let i = 0; i < text.length; i += 1) {

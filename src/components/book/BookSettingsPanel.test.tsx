@@ -25,4 +25,13 @@ describe('BookSettingsPanel — 내지 설정만', () => {
     expect(screen.queryByLabelText('뒷표지 바탕')).toBeNull();
     expect(screen.getByRole('link', { name: '표지 만들기' }).getAttribute('href')).toBe('/books/covers/b');
   });
+
+  it('목차 넣기 — 기본은 켜짐, 끄면 toc: false 로 보낸다', () => {
+    const onSettings = vi.fn();
+    render(<BookSettingsPanel book={book} disabled={false} onTitle={vi.fn()} onSettings={onSettings} />);
+    const box = screen.getByRole('checkbox', { name: /목차 넣기/ }) as HTMLInputElement;
+    expect(box.checked).toBe(true);
+    fireEvent.click(box);
+    expect(onSettings).toHaveBeenCalledWith({ ...DEFAULT_BOOK_SETTINGS, toc: false });
+  });
 });

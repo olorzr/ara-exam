@@ -41,6 +41,64 @@
   overflow-wrap: anywhere;
 }
 
+/* ---- 목차 (BookToc) — 내지 맨 앞. 높이는 엔진이 재므로 여백은 padding 이다 ----
+   ⚠️ 쪽 번호 칸은 폭을 박아 둔다(flex-basis) — 번호가 채워져도 제목 칸 폭·줄바꿈이 그대로여야 배치가 안 바뀐다.
+      min-width 로 바꾸면 자릿수가 많은 번호가 제목 칸을 밀어 줄 높이가 흔들린다(목차가 쪽을 넘나든다). */
+.bk-toc {
+  padding: 4px 0 14px;
+}
+
+.bk-toc__head {
+  margin: 0;
+  font-family: 'Gmarket Sans', sans-serif;
+  font-size: 18pt;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #111827;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #b8ede8;
+}
+
+.bk-toc__row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: 10.5pt;
+  line-height: 1.4;
+  color: #1f2937;
+}
+
+.bk-toc__no {
+  flex: 0 0 2.6em;
+  font-family: 'Gmarket Sans', sans-serif;
+  font-weight: 700;
+  color: #5bbfb7;
+  white-space: nowrap;
+}
+
+.bk-toc__title {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+
+.bk-toc__leader {
+  flex: 1 1 1em;
+  min-width: 1em;
+  align-self: flex-end;
+  margin-bottom: 0.35em;
+  border-bottom: 1px dotted #9ca3af;
+}
+
+.bk-toc__page {
+  flex: 0 0 2.8em;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 /* 번호 어긋남 경고 — 인쇄에서만, 쪽마다 위에 덮어 찍는다(BookInnerMode). fixed 라 쪽 배정(책등 두께의 근거)을 바꾸지 않는다 */
 .bk-print-warning {
   display: none;

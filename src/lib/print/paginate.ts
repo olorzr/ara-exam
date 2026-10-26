@@ -183,3 +183,23 @@ export function findBlockPage(pages: PagePlan[], blockIndex: number): number {
   }
   return -1;
 }
+
+/**
+ * 블록마다 놓인 쪽(0-based) — 한 번에 다 센다(`findBlockPage` 를 블록마다 부르면 쪽 × 블록이다).
+ * 배치 결과(`paginate`)는 그대로 두고 그 위에서 계산한다 — 엔진 출력의 바이트 동일성을 건드리지 않는다.
+ * 책 목차가 장마다 시작 쪽을 찍는 데 쓴다.
+ * @param pages - 배치 결과
+ * @param blockCount - 블록 수 — 어느 쪽에도 없는 블록(배치 전·잘못된 인덱스)은 -1 로 채운다
+ * @returns 블록 인덱스 → 쪽 인덱스. 인쇄 쪽 번호는 여기에 1을 더한 값이다
+ */
+export function blockPagesOf(pages: readonly PagePlan[], blockCount: number): number[] {
+  const out = Array.from({ length: blockCount }, () => -1);
+  pages.forEach((page, p) => {
+    page.columns.forEach((column) => {
+      column.forEach((index) => {
+        if (index >= 0 && index < blockCount && out[index] === -1) out[index] = p;
+      });
+    });
+  });
+  return out;
+}

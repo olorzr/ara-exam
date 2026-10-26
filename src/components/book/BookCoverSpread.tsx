@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import { COVER_COPY } from '@/lib/problem-paper/cover-copy';
-import { BLEED_MM, spineInkFor, TRIM_H_MM, TRIM_W_MM, type BackFill, type CoverSpreadGeometry } from '@/lib/book';
+import {
+  BLEED_MM, spineInkFor, TRIM_H_MM, TRIM_W_MM, type BackFill, type CoverSpreadGeometry, type SpineFont,
+} from '@/lib/book';
 import BookSpine from './BookSpine';
 
 interface BookCoverSpreadProps {
@@ -8,6 +10,8 @@ interface BookCoverSpreadProps {
   spineColor: string;
   /** 책등 제목 */
   spineTitle: string;
+  /** 책등 제목 글꼴 */
+  spineFont: SpineFont;
   /** 앞표지 내용(`renderCoverSlots(...).coverPage`) */
   front: ReactNode;
   /** 뒷표지 내용 — 표지 창에서 고른 뒷표지(디자인 짝·그림). 없으면 `backFill` 바탕에 학원 이름만 */
@@ -29,7 +33,7 @@ interface BookCoverSpreadProps {
  * ⚠️ 펼침면 안에는 `.a4-sheet` 를 쓰지 않는다 — `break-after: page` 가 걸려 뒤에 빈 장이 붙는다.
  */
 export default function BookCoverSpread({
-  geometry, spineColor, spineTitle, front, back, backFill,
+  geometry, spineColor, spineTitle, spineFont, front, back, backFill,
 }: BookCoverSpreadProps) {
   const { widthMm, heightMm, outerBleedMm, spineXMm, frontXMm, spineMm } = geometry;
   const backBackground = !back && backFill === 'spine' ? spineColor : '#ffffff';
@@ -62,7 +66,7 @@ export default function BookCoverSpread({
             </span>
           )}
         </div>
-        <BookSpine leftMm={spineXMm} widthMm={spineMm} color={spineColor} title={spineTitle} />
+        <BookSpine leftMm={spineXMm} widthMm={spineMm} color={spineColor} title={spineTitle} font={spineFont} />
         <div className="book-cover__front" style={{ left: `${frontXMm}mm`, width: `${TRIM_W_MM + outerBleedMm}mm` }}>
           {page(0, front)}
         </div>

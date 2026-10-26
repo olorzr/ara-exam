@@ -79,6 +79,18 @@ describe('spineTypeSize', () => {
     expect(long).toBeLessThan(short);
     expect(long).toBeGreaterThan(0);
   });
+
+  it('글자 몸이 작은 글꼴은 제목만 키우고(학원 이름은 그대로), 긴 제목은 키운 크기에서 다시 맞춘다', () => {
+    const plain = spineTypeSize('국어 문학', '아라국어논술', 9.5);
+    const scaled = spineTypeSize('국어 문학', '아라국어논술', 9.5, 1.5);
+    expect(scaled.titlePx).toBeCloseTo(plain.titlePx * 1.5, 0);
+    expect(scaled.brandPx).toBe(plain.brandPx);
+    const longTitle = '2026 고등 1학년 2학기 기말고사 대비 현대시·고전시가·현대소설 기출 문제 모음집 · 정답 및 해설';
+    // 같은 자리를 쓰므로 키운 기준에서 출발해도 결과 크기는 키우지 않은 쪽의 1.5 배를 넘지 않는다
+    expect(spineTypeSize(longTitle, '아라국어논술', 9.5, 1.5).titlePx)
+      .toBeLessThanOrEqual(spineTypeSize(longTitle, '아라국어논술', 9.5).titlePx * 1.5 + 0.1);
+    expect(spineTypeSize('국어', '아라국어논술', 9.5, 0).titlePx).toBe(spineTypeSize('국어', '아라국어논술', 9.5).titlePx);
+  });
 });
 
 describe('inner-papers', () => {

@@ -345,7 +345,8 @@ describe('A4Document', () => {
     it('onLayout 은 그린 낱장 수를 알리고, 같은 배치로 다시 그려도 또 부르지 않는다', () => {
       const onLayout = vi.fn();
       const { rerender, container } = render(chapterDoc({ padPagesTo: 4, onLayout }));
-      expect(onLayout).toHaveBeenLastCalledWith({ pageCount: 4 });
+      // 블록마다 놓인 쪽도 함께 — 2장은 'odd' 로 끼운 빈 쪽(2쪽) 다음 3쪽(인덱스 2)
+      expect(onLayout).toHaveBeenLastCalledWith({ pageCount: 4, blockPages: [0, 2] });
       expect(sheets(container)).toHaveLength(4);
       const calls = onLayout.mock.calls.length;
       rerender(chapterDoc({ padPagesTo: 4, onLayout }));

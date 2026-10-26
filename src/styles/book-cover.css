@@ -6,6 +6,8 @@
    ⚠️ 이 파일은 paper-covers/ 밖에 둔다 — 그 폴더는 무채색만 쓰도록 테스트가 고정한다(책등은 색이다).
    ⚠️ 용지 크기(@page)는 여기 없다 — BookCoverSpread 가 <style> 로 덮는다.
    ⚠️ 책등 글자의 자간·줄 높이·여백은 spine.ts 의 SPINE_* 상수와 같아야 한다(글자 크기 맞춤이 그 값으로 잰다).
+   ⚠️ 학원 이름(책등 아래·뒷표지)은 학원 로고 글꼴 — 지마켓 산스 Bold 로 고정한다(원장님 2026-10-26 "무조건 G마켓체").
+      책등 제목 글꼴은 고르는 값이라 BookSpine 이 인라인 style 로 준다(spine-fonts.ts).
    ========================================================= */
 
 .book-cover {
@@ -48,8 +50,9 @@
   position: absolute;
   bottom: calc(3mm + 18mm);
   text-align: center;
+  font-family: 'Gmarket Sans', sans-serif;
   font-size: 10pt;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 3px;
 }
 
@@ -85,14 +88,13 @@
   flex: 1 1 0;
   min-height: 0;
   overflow: hidden;
-  font-family: 'Gmarket Sans', 'Pretendard Variable', Pretendard, sans-serif;
-  font-weight: 700;
   letter-spacing: 0.08em;
 }
 
 .book-spine__brand {
   flex: none;
-  font-weight: 600;
+  font-family: 'Gmarket Sans', sans-serif;
+  font-weight: 700;
   letter-spacing: 0.15em;
 }
 

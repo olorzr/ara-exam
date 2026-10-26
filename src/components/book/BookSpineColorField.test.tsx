@@ -37,8 +37,8 @@ describe('BookSpineColorField — 책등 색 직접 고르기', () => {
   it('바로 고르는 색은 그 자리에서 저장한다', () => {
     const onSettings = vi.fn();
     render(<BookSpineColorField settings={base} disabled={false} onSettings={onSettings} />);
-    fireEvent.click(screen.getByLabelText('버건디'));
-    expect(onSettings).toHaveBeenCalledWith(expect.objectContaining({ spineColor: '#6b1e2e' }));
+    fireEvent.click(screen.getByLabelText('민트'));
+    expect(onSettings).toHaveBeenCalledWith(expect.objectContaining({ spineColor: '#bfe5d9' }));
   });
 
   it('기다리는 사이 화면을 떠나면 고른 색을 그 자리에서 보낸다', () => {

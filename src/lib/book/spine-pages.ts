@@ -1,6 +1,6 @@
 import { innerPaperOf } from './inner-papers';
 import { pageCountFreshness } from './layout';
-import type { BookEdition } from './settings';
+import { EDITION_LABELS, type BookEdition } from './settings';
 import { padPageCount, spineWidthMm } from './spine';
 import type { Book, BookChapter } from './types';
 
@@ -68,4 +68,16 @@ export function storedSpinePages(book: Book, edition: BookEdition): SpinePages |
  */
 export function spineMmOf(book: Book, pages: number): number {
   return spineWidthMm(pages, innerPaperOf(book.settings.innerPaper).thicknessMm);
+}
+
+/**
+ * 책등 제목 — 적은 책등 글자(없으면 책 제목)에 판 이름을 붙인다(학생용은 붙이지 않는다).
+ * 표지 화면(책등에 찍는다)과 표지 설정(글꼴 고르기 칸의 미리보기)이 함께 쓴다.
+ * @param book - 책
+ * @param edition - 판
+ * @returns 책등 위쪽 글
+ */
+export function spineTitleOf(book: Book, edition: BookEdition): string {
+  const base = book.settings.spineText || book.title;
+  return edition === 'student' ? base : `${base} · ${EDITION_LABELS[edition]}`;
 }

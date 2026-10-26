@@ -20,7 +20,7 @@ export const COVER_FONT_SPECS: readonly string[] = [
   'italic 400 1em "Instrument Serif"',
 ];
 
-/** 글꼴을 이만큼 기다려도 안 오면 그냥 인쇄를 연다(fail-open — 모양만 대체 글꼴로 바뀐다) */
+/** 글꼴을 이만큼 기다려도 안 오면 그냥 인쇄를 연다(fail-open — 모양만 대체 글꼴로 바뀐다). 책등 글꼴도 같은 값을 쓴다 */
 export const COVER_FONTS_TIMEOUT_MS = 8000;
 
 /** 표지 글꼴을 받을 때 표지 밖에서 오는 글 */

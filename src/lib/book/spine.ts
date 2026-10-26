@@ -140,12 +140,15 @@ export interface SpineTypeSize {
 /**
  * 책등 글자 크기 — 책등 폭에 맞춘 기준 크기에서 출발해, 제목이 학원 이름과 함께 세로 자리에 다 들어가도록 줄인다
  * (`fitVerticalScale` — 잘라 내지 않는다, 표지 책등 디자인과 같은 규약).
+ * 제목 글꼴마다 글자 몸 크기가 달라 `glyphScale`(글꼴의 `sizeScale`)을 제목 기준 크기에만 곱한다 — 곱한 크기로 자리를 재므로
+ * 키워도 세로 자리를 넘지 않는다. 학원 이름은 늘 같은 글꼴이라 보정하지 않는다.
  * @param title - 책등 제목
  * @param brand - 아래쪽 학원 이름
  * @param spineMm - 책등 폭(mm)
+ * @param glyphScale - 제목 글꼴의 글자 크기 보정(기본 1)
  * @returns 글자 크기
  */
-export function spineTypeSize(title: string, brand: string, spineMm: number): SpineTypeSize {
+export function spineTypeSize(title: string, brand: string, spineMm: number, glyphScale = 1): SpineTypeSize {
   const widthPx = Math.max(1, (spineMm - SPINE_PAD_X_MM * 2) * MM_TO_PX);
   const base = Math.min(30, Math.max(8, spineMm * MM_TO_PX * 0.5));
   // 학원 이름은 얇은 책등에서도 6px(≈4.5pt) 아래로 내리지 않는다 — 80쪽(4.1mm)에서 실제로 너무 작았다
@@ -153,12 +156,13 @@ export function spineTypeSize(title: string, brand: string, spineMm: number): Sp
   const brandLen = [...brand].length;
   const brandHeight = brandLen * brandPx * (1 + SPINE_BRAND_LETTER_SPACING);
   const height = (TRIM_H_MM - SPINE_PAD_Y_MM * 2 - SPINE_GAP_MM) * MM_TO_PX - brandHeight;
+  const titleBase = base * (glyphScale > 0 ? glyphScale : 1);
   const scale = fitVerticalScale(title, {
     height: Math.max(1, height),
     width: widthPx,
-    fontSize: base,
+    fontSize: titleBase,
     letterSpacing: SPINE_LETTER_SPACING,
     lineHeight: SPINE_LINE_HEIGHT,
   });
-  return { titlePx: Math.round(base * scale * 10) / 10, brandPx: Math.round(brandPx * 10) / 10 };
+  return { titlePx: Math.round(titleBase * scale * 10) / 10, brandPx: Math.round(brandPx * 10) / 10 };
 }

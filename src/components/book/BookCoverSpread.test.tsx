@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { render } from '@testing-library/react';
 import { renderCoverSlots } from '@/components/problem-paper/PaperCoverPage';
-import { coverSpreadGeometry, DEFAULT_BOOK_COVER } from '@/lib/book';
+import { coverSpreadGeometry, DEFAULT_BOOK_COVER, spineFontOf } from '@/lib/book';
 import BookCoverSpread from './BookCoverSpread';
 
 const NAVY = '#1f3a5f';
@@ -24,7 +24,9 @@ beforeEach(() => {
 });
 afterEach(() => style.remove());
 
-function renderSpread(spineMm: number, opts: { back?: boolean; backFill?: 'white' | 'spine'; title?: string } = {}) {
+function renderSpread(
+  spineMm: number, opts: { back?: boolean; backFill?: 'white' | 'spine'; title?: string; font?: string } = {},
+) {
   const cover = { ...DEFAULT_BOOK_COVER, backKind: opts.back ? 'design' as const : 'none' as const };
   const slots = renderCoverSlots({ cover, paperTitle: '국어 문학', suffix: '', year: '2026' });
   return render(
@@ -32,6 +34,7 @@ function renderSpread(spineMm: number, opts: { back?: boolean; backFill?: 'white
       geometry={coverSpreadGeometry(spineMm)}
       spineColor={NAVY}
       spineTitle={opts.title ?? '국어 문학'}
+      spineFont={spineFontOf(opts.font ?? 'gmarket')}
       front={slots.coverPage}
       back={slots.backCoverPage}
       backFill={opts.backFill ?? 'white'}
@@ -93,6 +96,19 @@ describe('BookCoverSpread', () => {
     expect(spine.querySelector('.book-spine__title')!.textContent).toBe('국어 문학');
     expect(spine.querySelector('.book-spine__brand')!.textContent).toBe('아라국어논술');
     expect(getComputedStyle(spine.querySelector('.book-spine__title')!).writingMode).toBe('vertical-rl');
+  });
+
+  it('제목은 고른 글꼴, 아래쪽 학원 이름은 늘 지마켓 산스 Bold(학원 로고 글꼴)', () => {
+    const spine = renderSpread(9.5, { font: 'jua' }).querySelector<HTMLElement>('.book-cover__spine')!;
+    const title = spine.querySelector<HTMLElement>('.book-spine__title')!;
+    expect(title.style.fontFamily.startsWith('"Jua"')).toBe(true);
+    expect(title.style.fontWeight).toBe('400');
+    const brand = getComputedStyle(spine.querySelector('.book-spine__brand')!);
+    expect(brand.fontFamily).toContain('Gmarket Sans');
+    expect(brand.fontWeight).toBe('700');
+    const back = renderSpread(9.5, { backFill: 'spine', font: 'nanumpen' }).querySelector('.book-cover__brand')!;
+    expect(getComputedStyle(back).fontFamily).toContain('Gmarket Sans');
+    expect(getComputedStyle(back).fontWeight).toBe('700');
   });
 
   it('책등이 4mm 보다 얇으면 글자를 찍지 않는다', () => {

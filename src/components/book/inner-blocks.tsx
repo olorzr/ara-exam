@@ -8,6 +8,7 @@ import type { PaperItemSnapshot } from '@/types/problem-bank';
 import { renderAnswerKeyBlocks } from '@/components/problem-paper/AnswerKeyBlocks';
 import { renderPaperBlocks } from '@/components/problem-paper/PaperPrintBlocks';
 import BookChapterHeading from './BookChapterHeading';
+import { BookTocHeading, BookTocRow } from './BookToc';
 
 /** 내지 블록을 짓는 데 필요한 것 */
 export interface BookInnerInput {
@@ -24,6 +25,8 @@ export interface BookInnerInput {
 export interface BookInnerBlocks {
   blocks: ReactNode[];
   breakBefore: BreakBefore[];
+  /** 장마다 장 머리 블록의 자리(이 결과 안의 인덱스) — 목차가 장의 시작 쪽을 찾는 데 쓴다 */
+  chapterBlocks: number[];
 }
 
 /**
@@ -40,6 +43,7 @@ export function buildBookInnerBlocks(input: BookInnerInput): BookInnerBlocks {
   const { edition, chapters, itemsByPaper, settings, imageUrls } = input;
   const blocks: ReactNode[] = [];
   const breakBefore: BreakBefore[] = [];
+  const chapterBlocks: number[] = [];
   const push = (node: ReactNode, brk: BreakBefore) => {
     blocks.push(node);
     breakBefore.push(brk);
@@ -47,6 +51,7 @@ export function buildBookInnerBlocks(input: BookInnerInput): BookInnerBlocks {
 
   chapters.forEach((chapter, index) => {
     const items = itemsByPaper.get(chapter.paperId) ?? [];
+    chapterBlocks.push(blocks.length);
     push(
       <BookChapterHeading
         number={index + 1}
@@ -68,5 +73,44 @@ export function buildBookInnerBlocks(input: BookInnerInput): BookInnerBlocks {
     body.forEach((node) => push(node, false));
   });
 
-  return { blocks, breakBefore };
+  return { blocks, breakBefore, chapterBlocks };
+}
+
+/** 목차 블록을 짓는 데 필요한 것 */
+export interface BookTocInput {
+  chapters: readonly BookChapter[];
+  /** 장마다 인쇄 쪽 번호 — 엔진이 배치를 알리기 전에는 null(칸만 세운다) */
+  chapterPages: readonly (number | null)[] | null;
+}
+
+/**
+ * 목차 블록 수 — 머리 하나 + 장마다 한 줄. 내지 화면이 이 수로 목차 몫의 쪽 넘김(전부 `false`)을 먼저 만든다 —
+ * 쪽 번호가 채워져 목차 블록이 바뀌어도 쪽 넘김 배열의 참조가 그대로라야 엔진이 측정 함수를 새로 만들지 않는다.
+ * ⚠️ `buildBookTocBlocks` 의 길이와 같아야 한다(테스트가 고정한다).
+ * @param chapterCount - 장 수
+ * @returns 목차 블록 수(장이 없으면 0)
+ */
+export function tocBlockCount(chapterCount: number): number {
+  return chapterCount > 0 ? chapterCount + 1 : 0;
+}
+
+/**
+ * 목차 블록 — 머리 + 장마다 한 줄(장 번호 · 제목 · 시작 쪽). 내지 맨 앞에 싣고, 쪽 넘김은 모두 없음이다
+ * (1장의 장 머리가 `chapterStart` 로 다음 쪽에서 시작한다). 줄이 블록 하나씩이라 장이 많으면 단·쪽을 넘어 흐른다.
+ * @param input - 장 · 장마다 시작 쪽
+ * @returns 블록(장이 없으면 빈 배열)
+ */
+export function buildBookTocBlocks({ chapters, chapterPages }: BookTocInput): ReactNode[] {
+  if (chapters.length === 0) return [];
+  return [
+    <BookTocHeading key="toc-head" />,
+    ...chapters.map((chapter, index) => (
+      <BookTocRow
+        key={chapter.id}
+        number={index + 1}
+        title={chapterTitleOf(chapter)}
+        page={chapterPages?.[index] ?? null}
+      />
+    )),
+  ];
 }

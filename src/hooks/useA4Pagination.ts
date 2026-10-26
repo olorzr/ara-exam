@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { A4_HEIGHT_PX, getColumnWidth, PAGE_PAD_BOTTOM, PAGE_PAD_TOP } from '@/lib/print/constants';
 import {
-  findBlockPage, paginate, type BreakBefore, type PagePlan, type SplitRequest,
+  blockPagesOf, findBlockPage, paginate, type BreakBefore, type PagePlan, type SplitRequest,
 } from '@/lib/print/paginate';
 
 /** 측정값이 이보다 작으면 아직 레이아웃이 안 잡힌 것으로 본다 */
@@ -14,13 +14,15 @@ const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayout
 
 export interface A4Layout {
   pages: PagePlan[];
+  /** 배치한 블록 수 — 쪽 알림(`blockPages`)의 길이 */
+  blockCount: number;
   /** 블록 인덱스 → 축소 배율. 한 페이지에 안 들어간 블록만 담긴다 */
   oversizedScale: Record<number, number>;
   /** 실측이 끝나 낱장을 그려도 되는 상태 */
   ready: boolean;
 }
 
-const EMPTY_LAYOUT: A4Layout = { pages: [], oversizedScale: {}, ready: false };
+const EMPTY_LAYOUT: A4Layout = { pages: [], blockCount: 0, oversizedScale: {}, ready: false };
 
 /**
  * 배치 직전에 불린다 — 블록 폭이 정해진 뒤에만 할 수 있는 손질(개념지 표의 열 폭 맞춤)용.
@@ -39,6 +41,11 @@ export type SplitRequestHandler = (requests: SplitRequest[], measureRoot: HTMLEl
 export interface A4LayoutInfo {
   /** 그릴 낱장 수 — 빈 쪽·배수 채움까지 센 값(PDF 에 담기는 쪽 수). 표지·뒷표지는 세지 않는다 */
   pageCount: number;
+  /**
+   * 블록마다 놓인 쪽(0-based, 표지는 세지 않는다). 인쇄 쪽 번호는 +1. 책 목차가 장의 시작 쪽을 찍는 데 쓴다.
+   * 어느 쪽에도 없는 블록은 -1.
+   */
+  blockPages: readonly number[];
 }
 
 /** 배치가 바뀔 때마다 불린다 — 안정적인 참조여야 한다(useCallback) */
@@ -139,7 +146,7 @@ export function useA4Pagination({
     // (핸들러는 안정적인 참조여야 하고, 쪼갤 게 없으면 state 를 그대로 두어 루프가 없다)
     if (!refitted && splitRequests.length > 0) onSplitRequest?.(splitRequests, root);
 
-    const next: A4Layout = { pages, oversizedScale, ready: true };
+    const next: A4Layout = { pages, blockCount: blockHeights.length, oversizedScale, ready: true };
     const signature = JSON.stringify(next);
     if (signature === signatureRef.current) return;
     signatureRef.current = signature;
@@ -153,7 +160,7 @@ export function useA4Pagination({
   // 실제로 배치가 바뀐 횟수만큼만 불린다(남의 콜백을 부를 뿐 이 훅의 state 는 건드리지 않는다)
   useEffect(() => {
     if (!layout.ready) return;
-    onLayout?.({ pageCount: layout.pages.length });
+    onLayout?.({ pageCount: layout.pages.length, blockPages: blockPagesOf(layout.pages, layout.blockCount) });
   }, [layout, onLayout]);
 
   useEffect(() => {

@@ -5,10 +5,13 @@ import { Button } from '@/components/ui/button';
 import { renderCoverSlots } from '@/components/problem-paper/PaperCoverPage';
 import { useCoverFontsReady } from '@/hooks/useCoverFontsReady';
 import { useCoverImages } from '@/hooks/useCoverImages';
+import { useFontsReady } from '@/hooks/useFontsReady';
 import {
   coverSpreadGeometry, DEFAULT_BOOK_COVER, EDITION_LABELS, EDITION_SUFFIX, innerPaperOf, MIN_SPINE_TEXT_MM,
-  spineMmOf, type Book, type BookEdition, type SpinePages,
+  SPINE_BRAND_FONT_SPEC, spineFontOf, spineFontSpec, spineMmOf, spineTitleOf,
+  type Book, type BookEdition, type SpinePages,
 } from '@/lib/book';
+import { COVER_COPY } from '@/lib/problem-paper/cover-copy';
 import { coverTeacherName, coverYearOf } from '@/lib/problem-paper/cover-text';
 import BookCoverSpread from './BookCoverSpread';
 
@@ -21,17 +24,6 @@ interface BookCoverModeProps {
    * 책은 내지 화면이 잰 값, 표지만은 직접 넣은 값이다.
    */
   spinePages: SpinePages;
-}
-
-/**
- * 책등 제목 — 적은 책등 글자(없으면 책 제목)에 판 이름을 붙인다(학생용은 붙이지 않는다).
- * @param book - 책
- * @param edition - 판
- * @returns 책등 위쪽 글
- */
-export function spineTitleOf(book: Book, edition: BookEdition): string {
-  const base = book.settings.spineText || book.title;
-  return edition === 'student' ? base : `${base} · ${EDITION_LABELS[edition]}`;
 }
 
 /**
@@ -54,9 +46,16 @@ export default function BookCoverMode({ book, edition, creatorName, spinePages }
   const slots = renderCoverSlots({
     cover, paperTitle: book.title, suffix: EDITION_SUFFIX[edition], images: coverImages, year, teacher,
   });
-  const blocked = coverImages.pending || coverImages.broken || !fontsReady;
+  // 책등 글자의 글꼴 조각도 인쇄 전에 받는다 — 고른 제목 글꼴 + 학원 이름(지마켓 산스). 학원 이름은 책등이 얇아도
+  // 뒷표지에 찍히므로 늘 기다린다(글꼴 조각 하나라 싸다)
+  const spineFont = spineFontOf(book.settings.spineFont);
+  const spineTitle = spineTitleOf(book, edition);
+  const spineFontsReady = useFontsReady(
+    [spineFontSpec(spineFont), SPINE_BRAND_FONT_SPEC], `${spineTitle} ${COVER_COPY.brandKo}`, true,
+  );
+  const blocked = coverImages.pending || coverImages.broken || !fontsReady || !spineFontsReady;
   const printLabel = coverImages.pending ? '표지 준비 중…'
-    : coverImages.broken ? '표지 그림 확인 필요' : !fontsReady ? '글꼴 준비 중…' : '표지 인쇄';
+    : coverImages.broken ? '표지 그림 확인 필요' : !fontsReady || !spineFontsReady ? '글꼴 준비 중…' : '표지 인쇄';
 
   return (
     <div className="space-y-4">
@@ -88,7 +87,8 @@ export default function BookCoverMode({ book, edition, creatorName, spinePages }
           <BookCoverSpread
             geometry={geometry}
             spineColor={book.settings.spineColor}
-            spineTitle={spineTitleOf(book, edition)}
+            spineTitle={spineTitle}
+            spineFont={spineFont}
             front={slots.coverPage}
             back={slots.backCoverPage}
             backFill={book.settings.backFill}

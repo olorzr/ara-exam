@@ -3,7 +3,7 @@ export { default as BookChapterList } from './BookChapterList';
 export { default as BookChapterPicker } from './BookChapterPicker';
 export { default as BookComposePanel } from './BookComposePanel';
 export { default as BookCoverEditor } from './BookCoverEditor';
-export { default as BookCoverMode, spineTitleOf } from './BookCoverMode';
+export { default as BookCoverMode } from './BookCoverMode';
 export { default as BookCoverPanel } from './BookCoverPanel';
 export { default as BookCoverSpread } from './BookCoverSpread';
 export { default as BookCreateDialog } from './BookCreateDialog';
@@ -18,6 +18,8 @@ export { default as BookOrderSummary, YEOLIM_BOOK_ORDER_URL } from './BookOrderS
 export { default as BookSettingsPanel } from './BookSettingsPanel';
 export { default as BookSpine } from './BookSpine';
 export { default as BookSpineColorField } from './BookSpineColorField';
+export { default as BookSpineFontField } from './BookSpineFontField';
 export { default as BookSpinePagesField } from './BookSpinePagesField';
+export { BookTocHeading, BookTocRow } from './BookToc';
 export { default as BookToolbar, INNER_MODES, type BookMode } from './BookToolbar';
-export { buildBookInnerBlocks } from './inner-blocks';
+export { buildBookInnerBlocks, buildBookTocBlocks, tocBlockCount } from './inner-blocks';

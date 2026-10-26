@@ -10,12 +10,13 @@ import type { useBook } from '@/hooks/useBook';
 import { useBookCover } from '@/hooks/useBookCover';
 import { useCoverImages } from '@/hooks/useCoverImages';
 import {
-  BOOK_TITLE_MAX, INNER_PAPERS, SPINE_TEXT_MAX, type BackFill, type Book, type BookEdition, type BookSettings,
+  BOOK_TITLE_MAX, INNER_PAPERS, SPINE_TEXT_MAX, spineTitleOf, type BackFill, type Book, type BookEdition, type BookSettings,
 } from '@/lib/book';
 import { COVER_LAYOUT_LABELS, type PaperCover } from '@/lib/problem-paper/cover';
 import { coverYearOf } from '@/lib/problem-paper/cover-text';
 import BookOrderSummary from './BookOrderSummary';
 import BookSpineColorField from './BookSpineColorField';
+import BookSpineFontField from './BookSpineFontField';
 import BookSpinePagesField from './BookSpinePagesField';
 
 const PAPER_OPTIONS = INNER_PAPERS.map((p) => ({ value: p.code, label: `${p.name} · ${p.thicknessMm}mm` }));
@@ -37,7 +38,7 @@ interface BookCoverPanelProps {
 }
 
 /**
- * 표지 만들기 오른쪽 칸 — 쪽 수 · 내지 용지(책등 두께) · 책등 색과 글자 · 뒷표지 바탕 · 앞·뒤표지 · 주문 요약.
+ * 표지 만들기 오른쪽 칸 — 쪽 수 · 내지 용지(책등 두께) · 책등 색·글꼴·글자 · 뒷표지 바탕 · 앞·뒤표지 · 주문 요약.
  * 고르면 바로 저장하고, 글 칸은 칸을 떠날 때 저장한다. 앞·뒤표지는 문제지 표지 창을 그대로 쓴다.
  */
 export default function BookCoverPanel({ book, edition, state }: BookCoverPanelProps) {
@@ -84,6 +85,8 @@ export default function BookCoverPanel({ book, edition, state }: BookCoverPanelP
         </div>
 
         <BookSpineColorField settings={s} disabled={false} onSettings={saveSettings} />
+
+        <BookSpineFontField settings={s} sample={spineTitleOf(book, edition)} disabled={false} onSettings={saveSettings} />
 
         <label className="block space-y-1 text-sm">
           <span className="text-gray-600">책등 글자</span>

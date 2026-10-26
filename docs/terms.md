@@ -755,12 +755,22 @@
 - 관련 파일: src/lib/book/spine.ts, src/components/book/BookSpine.tsx
 - ⚠️ 쪽 수는 4의 배수로 채운 값을 쓴다(내지 PDF 의 쪽 수와 같다)
 
+## 책등 글꼴 (Spine font)
+- 정의: 책등 위쪽 제목의 글꼴. 원장님이 아홉 가지 가운데 고른다(2026-10-26). 아래쪽 학원 이름은 고르지 않고 학원 로고 글꼴(지마켓 산스 Bold)로 늘 같다
+- 코드에서의 사용: `settings.spineFont`(`SpineFontId`), `SPINE_FONTS`(이름·패밀리·굵기·`sizeScale`), `spineFontOf`, `SPINE_BRAND_FONT_SPEC`
+- 관련 파일: src/lib/book/spine-fonts.ts, src/components/book/BookSpineFontField.tsx, src/app/globals.css(@import)
+
+## 목차 (Table of contents)
+- 정의: 책 내지 첫 쪽의 장 목록 — 장 번호 · 제목 · 시작 쪽. 시작 쪽은 엔진이 실제로 배치한 쪽이다. 내지 설정 '목차 넣기'(기본 켬)
+- 코드에서의 사용: `settings.toc`, `buildBookTocBlocks`, `tocBlockCount`, `BookTocHeading`·`BookTocRow`, `A4LayoutInfo.blockPages`
+- 관련 파일: src/components/book/BookToc.tsx, src/components/book/inner-blocks.tsx, src/components/book/BookInnerView.tsx
+
 ## 재단 사이즈 · 작업사이즈 (Trim size · Bleed size)
 - 정의: 재단 사이즈는 책이 잘려 나오는 크기(A4 210 × 297mm), 작업사이즈는 파일 크기로 재단 사이즈에 사방 3mm 여백을 더한 것. 표지 작업사이즈 = ceil(210 × 2 + 책등 + 6) × 303mm
 - 코드에서의 사용: `TRIM_W_MM`, `TRIM_H_MM`, `BLEED_MM`, `coverSpreadGeometry`
 - 관련 파일: src/lib/book/spine.ts
 
 ## 내지 구성 지문 (Layout key)
-- 정의: 내지 쪽 수를 바꾸는 값(판·책 제목·단 수·장 시작·복합 지문·장 차례와 제목)을 줄인 글자. 저장된 쪽 수가 지금 구성의 것인지 가린다
+- 정의: 내지 쪽 수를 바꾸는 값(판·책 제목·단 수·장 시작·복합 지문·장 차례와 제목·목차)을 줄인 글자. 저장된 쪽 수가 지금 구성의 것인지 가린다
 - 코드에서의 사용: `bookLayoutKey`, `bookLayoutKeyFor`, `pageCountFreshness`
 - 관련 파일: src/lib/book/settings.ts, src/lib/book/layout.ts

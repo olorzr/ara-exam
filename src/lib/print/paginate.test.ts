@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CAPACITY_SAFETY_PX } from './constants';
-import { findBlockPage, paginate } from './paginate';
+import { blockPagesOf, findBlockPage, paginate } from './paginate';
 
 /** 테스트 가독성을 위해 안전 마진을 미리 얹은 본문 높이 */
 const body = (usable: number) => usable + CAPACITY_SAFETY_PX;
@@ -209,6 +209,29 @@ describe('findBlockPage', () => {
     expect(findBlockPage(pages, 0)).toBe(0);
     expect(findBlockPage(pages, 2)).toBe(1);
     expect(findBlockPage(pages, 99)).toBe(-1);
+  });
+});
+
+describe('blockPagesOf', () => {
+  it('블록마다 findBlockPage 와 같은 쪽 — 2단·여러 쪽', () => {
+    const blockHeights = [40, 40, 40, 40, 40, 40, 40, 40, 40, 40];
+    const { pages } = paginate({ blockHeights, columns: 2, firstPageBodyHeight: 120, laterPageBodyHeight: 150 });
+    const got = blockPagesOf(pages, blockHeights.length);
+    expect(got).toEqual(blockHeights.map((_, i) => findBlockPage(pages, i)));
+    expect(got.every((p) => p >= 0)).toBe(true);
+  });
+
+  it("'odd' 로 끼운 빈 쪽을 건너뛴 자리를 준다 — 목차의 장 시작 쪽", () => {
+    const { pages } = paginate({
+      blockHeights: [30, 30], columns: 1, firstPageBodyHeight: 100, laterPageBodyHeight: 100,
+      breakBefore: [false, 'odd'], padPagesTo: 4,
+    });
+    expect(blockPagesOf(pages, 2)).toEqual([0, 2]);
+  });
+
+  it('어느 쪽에도 없는 블록은 -1', () => {
+    expect(blockPagesOf([], 2)).toEqual([-1, -1]);
+    expect(blockPagesOf([{ columns: [[0]] }], 3)).toEqual([0, -1, -1]);
   });
 });
 

@@ -19,7 +19,7 @@ interface BookSettingsPanelProps {
 }
 
 /**
- * 책 설정(내지) — 제목 · 단 수 · 장 시작 · 복합 지문. 고르면 바로 저장하고, 글 칸은 칸을 떠날 때 저장한다.
+ * 책 설정(내지) — 제목 · 단 수 · 장 시작 · 복합 지문 · 목차. 고르면 바로 저장하고, 글 칸은 칸을 떠날 때 저장한다.
  *
  * 표지 쪽 설정(내지 용지 = 책등 두께 · 책등 색과 글자 · 뒷표지 바탕 · 앞·뒤표지)은 표지 만들기 화면에 있다(2026-10-26 —
  * 표지만 만드는 항목도 같은 칸을 쓰게 한 곳으로 모았다).
@@ -67,6 +67,19 @@ export default function BookSettingsPanel({ book, disabled, onTitle, onSettings 
             className="h-4 w-4 accent-[color:var(--primary)]"
           />
           복합 지문은 묻는 작품만 인쇄
+        </label>
+        <label className="flex items-start gap-2 text-sm text-gray-700 sm:col-span-2">
+          <input
+            type="checkbox" checked={s.toc} disabled={disabled}
+            onChange={(e) => patch({ toc: e.target.checked })}
+            className="mt-0.5 h-4 w-4 accent-[color:var(--primary)]"
+          />
+          <span>
+            목차 넣기
+            <span className="block text-xs text-gray-400">
+              첫 쪽에 장 제목과 시작 쪽을 찍고 1장은 그다음 쪽에서 시작해요. 2단이면 목차도 2단으로 흘러요.
+            </span>
+          </span>
         </label>
       </div>
 
