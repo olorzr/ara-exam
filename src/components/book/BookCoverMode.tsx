@@ -8,7 +8,7 @@ import { useCoverImages } from '@/hooks/useCoverImages';
 import { useFontsReady } from '@/hooks/useFontsReady';
 import {
   coverSpreadGeometry, DEFAULT_BOOK_COVER, EDITION_LABELS, EDITION_SUFFIX, innerPaperOf, MIN_SPINE_TEXT_MM,
-  SPINE_BRAND_FONT_SPEC, spineFontOf, spineFontSpec, spineMmOf, spineTitleOf,
+  resolveSpineInk, SPINE_BRAND_FONT_SPEC, spineFontOf, spineFontSpec, spineMmOf, spineTitleOf,
   type Book, type BookEdition, type SpinePages,
 } from '@/lib/book';
 import { COVER_COPY } from '@/lib/problem-paper/cover-copy';
@@ -87,6 +87,7 @@ export default function BookCoverMode({ book, edition, creatorName, spinePages }
           <BookCoverSpread
             geometry={geometry}
             spineColor={book.settings.spineColor}
+            spineInk={resolveSpineInk(book.settings.spineColor, book.settings.spineInk)}
             spineTitle={spineTitle}
             spineFont={spineFont}
             front={slots.coverPage}

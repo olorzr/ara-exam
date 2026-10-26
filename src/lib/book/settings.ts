@@ -61,6 +61,11 @@ export interface BookSettings {
   toc: boolean;
   /** 책등 바탕색 `#rrggbb` */
   spineColor: string;
+  /**
+   * 책등 글자색(제목 · 학원 이름) — `'auto'` 면 바탕과 대비가 큰 쪽(검정/흰색, `spineInkFor`), 아니면 `#rrggbb`.
+   * 그릴 때는 `resolveSpineInk` 한 함수로 정한다. 표지 전용이라 구성 지문에 넣지 않는다
+   */
+  spineInk: string;
   /** 책등 글자 — 비우면 책 제목 */
   spineText: string;
   /** 책등 제목 글꼴(아래쪽 학원 이름은 늘 지마켓 산스) — 표지 전용이라 구성 지문에 넣지 않는다 */
@@ -104,6 +109,24 @@ export const SPINE_COLOR_PRESETS: readonly { value: string; label: string }[] = 
   { value: '#2f3437', label: '먹색' },
 ];
 
+/** 책등 글자색 '자동'(바탕과 대비가 큰 쪽) */
+export const SPINE_INK_AUTO = 'auto';
+
+/**
+ * 책등 글자색 바로 고르기 — 검정 · 흰색과, 파스텔 바탕에 어울리는 짙은 색(원장님 2026-10-26 "책등 글자 색도 바꿀 수 있으면").
+ * ⚠️ 값은 소문자(고른 칸 표시가 글자 그대로 견준다).
+ */
+export const SPINE_INK_PRESETS: readonly { value: string; label: string }[] = [
+  { value: '#111111', label: '검정' },
+  { value: '#ffffff', label: '흰색' },
+  { value: '#2f3437', label: '먹색' },
+  { value: '#1f3a5f', label: '남색' },
+  { value: '#5a3d8a', label: '진보라' },
+  { value: '#a8325e', label: '진분홍' },
+  { value: '#2f6b4f', label: '진초록' },
+  { value: '#6b4630', label: '초코' },
+];
+
 /** 새 책의 설정 */
 export const DEFAULT_BOOK_SETTINGS: BookSettings = {
   innerPaper: DEFAULT_INNER_PAPER,
@@ -112,6 +135,7 @@ export const DEFAULT_BOOK_SETTINGS: BookSettings = {
   trimWorks: true,
   toc: true,
   spineColor: SPINE_COLOR_PRESETS[0].value,
+  spineInk: SPINE_INK_AUTO,
   spineText: '',
   spineFont: DEFAULT_SPINE_FONT,
   backFill: 'white',
@@ -136,6 +160,7 @@ export function normalizeBookSettings(raw: unknown): BookSettings {
     toc: typeof v.toc === 'boolean' ? v.toc : d.toc,
     spineColor: typeof v.spineColor === 'string' && HEX_COLOR.test(v.spineColor)
       ? v.spineColor.toLowerCase() : d.spineColor,
+    spineInk: typeof v.spineInk === 'string' && HEX_COLOR.test(v.spineInk) ? v.spineInk.toLowerCase() : d.spineInk,
     spineText: typeof v.spineText === 'string' ? v.spineText.trim().slice(0, SPINE_TEXT_MAX) : d.spineText,
     spineFont: isSpineFontId(v.spineFont) ? v.spineFont : d.spineFont,
     backFill: v.backFill === 'spine' || v.backFill === 'white' ? v.backFill : d.backFill,

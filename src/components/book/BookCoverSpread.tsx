@@ -1,13 +1,15 @@
 import type { ReactNode } from 'react';
 import { COVER_COPY } from '@/lib/problem-paper/cover-copy';
 import {
-  BLEED_MM, spineInkFor, TRIM_H_MM, TRIM_W_MM, type BackFill, type CoverSpreadGeometry, type SpineFont,
+  BLEED_MM, TRIM_H_MM, TRIM_W_MM, type BackFill, type CoverSpreadGeometry, type SpineFont,
 } from '@/lib/book';
 import BookSpine from './BookSpine';
 
 interface BookCoverSpreadProps {
   geometry: CoverSpreadGeometry;
   spineColor: string;
+  /** 책등 글자색 `#rrggbb` — `resolveSpineInk` 로 정한 값. 책등 색 뒷표지의 학원 이름도 이 색이다 */
+  spineInk: string;
   /** 책등 제목 */
   spineTitle: string;
   /** 책등 제목 글꼴 */
@@ -33,11 +35,12 @@ interface BookCoverSpreadProps {
  * ⚠️ 펼침면 안에는 `.a4-sheet` 를 쓰지 않는다 — `break-after: page` 가 걸려 뒤에 빈 장이 붙는다.
  */
 export default function BookCoverSpread({
-  geometry, spineColor, spineTitle, spineFont, front, back, backFill,
+  geometry, spineColor, spineInk, spineTitle, spineFont, front, back, backFill,
 }: BookCoverSpreadProps) {
   const { widthMm, heightMm, outerBleedMm, spineXMm, frontXMm, spineMm } = geometry;
   const backBackground = !back && backFill === 'spine' ? spineColor : '#ffffff';
-  const backInk = backBackground === '#ffffff' ? '#4b5563' : spineInkFor(spineColor);
+  // 학원 이름 색은 바탕 '선택' 으로 가른다 — 책등 색으로 칠했으면 책등 글자색(책등 색이 마침 흰색이어도), 흰 바탕이면 회색
+  const backInk = !back && backFill === 'spine' ? spineInk : '#4b5563';
   const page = (left: number, content: ReactNode) => (
     <div
       className="book-cover__page pb-sheet"
@@ -66,7 +69,9 @@ export default function BookCoverSpread({
             </span>
           )}
         </div>
-        <BookSpine leftMm={spineXMm} widthMm={spineMm} color={spineColor} title={spineTitle} font={spineFont} />
+        <BookSpine
+          leftMm={spineXMm} widthMm={spineMm} color={spineColor} ink={spineInk} title={spineTitle} font={spineFont}
+        />
         <div className="book-cover__front" style={{ left: `${frontXMm}mm`, width: `${TRIM_W_MM + outerBleedMm}mm` }}>
           {page(0, front)}
         </div>

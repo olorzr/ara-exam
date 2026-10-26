@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { MM_TO_PX } from '@/lib/print/constants';
 import { INNER_PAPERS, innerPaperOf, DEFAULT_INNER_PAPER } from './inner-papers';
 import {
-  BLEED_MM, coverSpreadGeometry, padPageCount, spineInkFor, spineTypeSize, spineWidthMm, TRIM_W_MM,
+  BLEED_MM, contrastRatio, coverSpreadGeometry, padPageCount, resolveSpineInk, spineInkFor, spineTypeSize, spineWidthMm,
+  TRIM_W_MM,
 } from './spine';
 
 describe('spineWidthMm — 열림인쇄 견적 화면과 같은 식', () => {
@@ -63,6 +64,24 @@ describe('spineInkFor', () => {
 
   it('모양이 틀리면 흰 글자', () => {
     expect(spineInkFor('navy')).toBe('#ffffff');
+  });
+});
+
+describe('책등 글자색', () => {
+  it("고른 색이 있으면 그것(소문자로), 'auto'·모양이 틀린 값이면 바탕과 대비가 큰 쪽", () => {
+    expect(resolveSpineInk('#f6c6d0', '#A8325E')).toBe('#a8325e');
+    expect(resolveSpineInk('#f6c6d0', 'auto')).toBe('#111111');
+    expect(resolveSpineInk('#1f3a5f', 'auto')).toBe('#ffffff');
+    expect(resolveSpineInk('#1f3a5f', 'pink')).toBe(spineInkFor('#1f3a5f'));
+  });
+
+  it('대비는 1~21 — 같은 색이면 1, 검정·흰색이면 21, 모양이 틀리면 알리지 않게 21', () => {
+    expect(contrastRatio('#ffffff', '#ffffff')).toBeCloseTo(1, 5);
+    expect(contrastRatio('#000000', '#ffffff')).toBeCloseTo(21, 5);
+    expect(contrastRatio('#ffffff', '#000000')).toBeCloseTo(21, 5);
+    expect(contrastRatio('#ffffff', '#f6c6d0')).toBeLessThan(3);
+    expect(contrastRatio('#111111', '#f6c6d0')).toBeGreaterThan(3);
+    expect(contrastRatio('red', '#ffffff')).toBe(21);
   });
 });
 

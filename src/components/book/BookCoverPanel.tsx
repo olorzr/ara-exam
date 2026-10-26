@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,8 @@ import type { useBook } from '@/hooks/useBook';
 import { useBookCover } from '@/hooks/useBookCover';
 import { useCoverImages } from '@/hooks/useCoverImages';
 import {
-  BOOK_TITLE_MAX, INNER_PAPERS, SPINE_TEXT_MAX, spineTitleOf, type BackFill, type Book, type BookEdition, type BookSettings,
+  BOOK_TITLE_MAX, contrastRatio, INNER_PAPERS, resolveSpineInk, SPINE_INK_MIN_CONTRAST, SPINE_INK_PRESETS, SPINE_TEXT_MAX,
+  spineInkFor, spineTitleOf, type BackFill, type Book, type BookEdition, type BookSettings,
 } from '@/lib/book';
 import { COVER_LAYOUT_LABELS, type PaperCover } from '@/lib/problem-paper/cover';
 import { coverYearOf } from '@/lib/problem-paper/cover-text';
@@ -38,7 +39,7 @@ interface BookCoverPanelProps {
 }
 
 /**
- * 표지 만들기 오른쪽 칸 — 쪽 수 · 내지 용지(책등 두께) · 책등 색·글꼴·글자 · 뒷표지 바탕 · 앞·뒤표지 · 주문 요약.
+ * 표지 만들기 오른쪽 칸 — 쪽 수 · 내지 용지(책등 두께) · 책등 색·글자 색·글꼴·글자 · 뒷표지 바탕 · 앞·뒤표지 · 주문 요약.
  * 고르면 바로 저장하고, 글 칸은 칸을 떠날 때 저장한다. 앞·뒤표지는 문제지 표지 창을 그대로 쓴다.
  */
 export default function BookCoverPanel({ book, edition, state }: BookCoverPanelProps) {
@@ -46,10 +47,23 @@ export default function BookCoverPanel({ book, edition, state }: BookCoverPanelP
   const coverImages = useCoverImages(book.cover);
   const { save } = state;
   const coverSave = useBookCover(book.id, save);
-  // 책등 색의 지연 저장이 렌더마다 다시 걸리지 않게 참조를 고정한다
-  const saveSettings = useCallback((settings: BookSettings) => { void save({ settings }); }, [save]);
   const s = book.settings;
-  const patch = (next: Partial<BookSettings>) => saveSettings({ ...s, ...next });
+  /**
+   * 마지막으로 보낸(또는 받은) 설정 — 바꾼 칸만 받아 **이 위에** 합쳐 저장한다. 렌더의 `s` 로 합치면 같은 렌더 안에서
+   * 저장이 두 번 나갈 때(두 색 칸이 화면을 떠나며 함께 보낸다) 나중 것이 앞의 변경을 되돌린다(코덱스 2026-10-26 1R).
+   * 서버 값·실패 되돌림은 다음 렌더에 따라온다.
+   */
+  const latestRef = useRef(s);
+  useEffect(() => { latestRef.current = book.settings; }, [book.settings]);
+  // 책등 색의 지연 저장이 렌더마다 다시 걸리지 않게 참조를 고정한다
+  const patchSettings = useCallback((partial: Partial<BookSettings>) => {
+    const next = { ...latestRef.current, ...partial };
+    latestRef.current = next;
+    void save({ settings: next });
+  }, [save]);
+  const saveSettings = useCallback((settings: BookSettings) => patchSettings(settings), [patchSettings]);
+  const ink = resolveSpineInk(s.spineColor, s.spineInk);
+  const patch = patchSettings;
 
   return (
     <div className="space-y-4" data-no-print>
@@ -84,9 +98,22 @@ export default function BookCoverPanel({ book, edition, state }: BookCoverPanelP
           <span className="block text-xs text-gray-400">열림인쇄 주문 때 고르는 내지와 같아야 책등 두께가 맞아요.</span>
         </div>
 
-        <BookSpineColorField settings={s} disabled={false} onSettings={saveSettings} />
+        <BookSpineColorField settings={s} disabled={false} onPatch={patchSettings} />
 
-        <BookSpineFontField settings={s} sample={spineTitleOf(book, edition)} disabled={false} onSettings={saveSettings} />
+        <div className="space-y-1">
+          <BookSpineColorField
+            settings={s} disabled={false} onPatch={patchSettings}
+            field="spineInk" legend="책등 글자 색" presets={SPINE_INK_PRESETS}
+            auto={{ label: '자동(바탕에 맞춰 검정/흰색)', preview: spineInkFor(s.spineColor) }}
+          />
+          {contrastRatio(ink, s.spineColor) < SPINE_INK_MIN_CONTRAST && (
+            <p className="text-xs text-amber-700" role="status">글자가 책등 색과 비슷해 잘 안 보일 수 있어요.</p>
+          )}
+        </div>
+
+        <BookSpineFontField
+          settings={s} sample={spineTitleOf(book, edition)} ink={ink} disabled={false} onSettings={saveSettings}
+        />
 
         <label className="block space-y-1 text-sm">
           <span className="text-gray-600">책등 글자</span>

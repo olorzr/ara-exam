@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { render } from '@testing-library/react';
 import { renderCoverSlots } from '@/components/problem-paper/PaperCoverPage';
-import { coverSpreadGeometry, DEFAULT_BOOK_COVER, spineFontOf } from '@/lib/book';
+import { coverSpreadGeometry, DEFAULT_BOOK_COVER, resolveSpineInk, spineFontOf } from '@/lib/book';
 import BookCoverSpread from './BookCoverSpread';
 
 const NAVY = '#1f3a5f';
@@ -25,7 +25,8 @@ beforeEach(() => {
 afterEach(() => style.remove());
 
 function renderSpread(
-  spineMm: number, opts: { back?: boolean; backFill?: 'white' | 'spine'; title?: string; font?: string } = {},
+  spineMm: number,
+  opts: { back?: boolean; backFill?: 'white' | 'spine'; title?: string; font?: string; ink?: string } = {},
 ) {
   const cover = { ...DEFAULT_BOOK_COVER, backKind: opts.back ? 'design' as const : 'none' as const };
   const slots = renderCoverSlots({ cover, paperTitle: '국어 문학', suffix: '', year: '2026' });
@@ -33,6 +34,7 @@ function renderSpread(
     <BookCoverSpread
       geometry={coverSpreadGeometry(spineMm)}
       spineColor={NAVY}
+      spineInk={resolveSpineInk(NAVY, opts.ink ?? 'auto')}
       spineTitle={opts.title ?? '국어 문학'}
       spineFont={spineFontOf(opts.font ?? 'gmarket')}
       front={slots.coverPage}
@@ -109,6 +111,27 @@ describe('BookCoverSpread', () => {
     const back = renderSpread(9.5, { backFill: 'spine', font: 'nanumpen' }).querySelector('.book-cover__brand')!;
     expect(getComputedStyle(back).fontFamily).toContain('Gmarket Sans');
     expect(getComputedStyle(back).fontWeight).toBe('700');
+  });
+
+  it('고른 글자색은 책등 제목·학원 이름과 책등 색 뒷표지의 학원 이름에 함께 찍힌다', () => {
+    const root = renderSpread(9.5, { ink: '#a8325e', backFill: 'spine' });
+    expect(root.querySelector<HTMLElement>('.book-cover__spine')!.style.color).toBe('rgb(168, 50, 94)');
+    expect(root.querySelector<HTMLElement>('.book-cover__brand')!.style.color).toBe('rgb(168, 50, 94)');
+    // 흰 뒷표지의 학원 이름은 그대로 회색
+    const white = renderSpread(9.5, { ink: '#a8325e' }).querySelector<HTMLElement>('.book-cover__brand')!;
+    expect(white.style.color).toBe('rgb(75, 85, 99)');
+  });
+
+  it('책등 색 뒷표지는 책등 색이 마침 흰색이어도 고른 글자색이다 — 회색은 흰 바탕을 고른 때만(코덱스 2026-10-26 1R)', () => {
+    const cover = { ...DEFAULT_BOOK_COVER, backKind: 'none' as const };
+    const slots = renderCoverSlots({ cover, paperTitle: '국어 문학', suffix: '', year: '2026' });
+    const root = render(
+      <BookCoverSpread
+        geometry={coverSpreadGeometry(9.5)} spineColor="#ffffff" spineInk="#a8325e" spineTitle="국어 문학"
+        spineFont={spineFontOf('gmarket')} front={slots.coverPage} back={slots.backCoverPage} backFill="spine"
+      />,
+    ).container;
+    expect(root.querySelector<HTMLElement>('.book-cover__brand')!.style.color).toBe('rgb(168, 50, 94)');
   });
 
   it('책등이 4mm 보다 얇으면 글자를 찍지 않는다', () => {

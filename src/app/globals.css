@@ -9,12 +9,10 @@
 @import url('https://cdn.jsdelivr.net/npm/@fontsource/ibm-plex-mono@5.2.7/400.css');
 @import url('https://cdn.jsdelivr.net/npm/@fontsource/instrument-serif@5.2.8/400.css');
 @import url('https://cdn.jsdelivr.net/npm/@fontsource/instrument-serif@5.2.8/400-italic.css');
-/* 책등 제목 글꼴(책 만들기) — 이름·굵기는 lib/book/spine-fonts.ts 와 같다. 한글 조각이라 쓰는 글자 조각만 받는다 */
+/* 책등 제목 글꼴(책 만들기) — 이름·굵기는 lib/book/spine-fonts.ts 와 같다. 한글 조각이라 쓰는 글자 조각만 받는다.
+   눈누 글꼴은 styles/book-fonts.css 에 @font-face 로 있다 */
 @import url('https://cdn.jsdelivr.net/npm/@fontsource/do-hyeon@5.3.0/400.css');
 @import url('https://cdn.jsdelivr.net/npm/@fontsource/jua@5.3.0/400.css');
-@import url('https://cdn.jsdelivr.net/npm/@fontsource/dongle@5.3.0/700.css');
-@import url('https://cdn.jsdelivr.net/npm/@fontsource/gamja-flower@5.3.0/400.css');
-@import url('https://cdn.jsdelivr.net/npm/@fontsource/yeon-sung@5.3.0/400.css');
 @import url('https://cdn.jsdelivr.net/npm/@fontsource/nanum-pen-script@5.3.0/400.css');
 @import "tailwindcss";
 @import "tw-animate-css";
@@ -34,6 +32,7 @@
 @import "../styles/paper-covers/back.css";
 @import "../styles/book.css";
 @import "../styles/book-cover.css";
+@import "../styles/book-fonts.css";
 
 /* ── 옛한글 글꼴 — 네이버 나눔 옛한글(SIL OFL 1.1, public/fonts 자체 호스팅) ──────────────
    Pretendard 에는 첫가끝 조합형 자모가 없어 중세국어가 깨진 네모로 나온다. 세 얼굴을 둔다:

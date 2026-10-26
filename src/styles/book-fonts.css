@@ -1,0 +1,103 @@
+/* =========================================================
+   책등 제목 글꼴 — 눈누(noonnu.cc) 상업용 무료 글꼴 (2026-10-26)
+
+   글꼴 파일은 눈누가 안내하는 jsdelivr 주소 그대로다(CSP font-src 가 cdn.jsdelivr.net 을 연다).
+   @font-face 는 선언만으로는 아무것도 받지 않는다 — 그 글꼴로 글자를 그릴 때(표지 만들기 화면) 처음 받는다.
+   ⚠️ 고른 기준: 눈누 라이선스 표에서 **인쇄 · 웹사이트 · 임베딩이 모두 '사용 가능'** 인 것만 — 책 표지는 인쇄물이고
+      PDF 에 글꼴이 들어가며, 웹 서버에서 글꼴을 불러 쓰는 것이 '임베딩' 이다. 임베딩이 금지·조건부인 인기 글꼴
+      (메모먼트 꾹꾹체 · GS혜자로운체 · 여기어때 잘난체 · 쿠키런 · 제주돌담체 · 차이 활짝체)은 넣지 않았다.
+   ⚠️ 책등은 세로쓰기라 숫자가 옆으로 눕는다 — 숫자 1 이 막대 하나인 손글씨(교보손글씨 2019 · 온글잎 윤탱체)는 빼었다.
+   ⚠️ 패밀리 이름·굵기는 lib/book/spine-fonts.ts 와 같아야 한다(spine-fonts.test 가 대조한다). 한 굵기만 받으므로
+      굵기는 그 파일의 굵기 하나로 선언한다 — 다른 굵기를 요청하면 브라우저가 가짜 굵게를 만든다.
+   ========================================================= */
+
+@font-face {
+  font-family: 'Paperozi';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2408-3@1.0/Paperlogy-8ExtraBold.woff2') format('woff2');
+  font-weight: 800;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Aggravo';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2108@1.1/SBAggroB.woff') format('woff');
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Cafe24Surround';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2105_2@1.0/Cafe24Ssurround.woff') format('woff');
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'NexonMaplestory';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_20-04@2.1/MaplestoryOTFBold.woff') format('woff');
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'SchoolSafetyRoundedSmile';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2408-5@1.0/HakgyoansimDunggeunmisoTTF-B.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'OngleipKonkon';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2412-1@1.0/Ownglyph_corncorn-Rg.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'TtukttakGamja';
+  src: url('https://cdn.jsdelivr.net/gh/Project-Noonnu/2610081905@tuktakpotato/tuktakpotato/tuktakpotato.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'OkDandan';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2508-2@1.0/OkDanDan-Bold.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'OngleipParkDahyeon';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2411-3@1.0/Ownglyph_ParkDaHyun.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'OmuDaye';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2304-01@1.0/omyu_pretty.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IsYun';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2202-2@1.0/LeeSeoyun.woff') format('woff');
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'GounBatang';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2108@1.1/GowunBatang-Bold.woff') format('woff');
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'BookkMyungjo';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2302@1.0/BookkMyungjo-Bd.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}

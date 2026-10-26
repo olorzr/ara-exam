@@ -96,6 +96,34 @@ export function spineInkFor(hex: string): string {
   return contrastWhite >= contrastDark ? LIGHT_INK : DARK_INK;
 }
 
+/**
+ * 책등에 찍을 글자색 — 고른 색이 있으면 그것, `'auto'`(또는 모양이 틀린 값)면 바탕과 대비가 큰 쪽.
+ * 책등 제목 · 학원 이름 · 책등 색 뒷표지의 학원 이름이 **이 한 함수**로 색을 정한다.
+ * @param spineColor - 책등 바탕색 `#rrggbb`
+ * @param spineInk - 설정의 글자색(`'auto'` 또는 `#rrggbb`)
+ * @returns `#rrggbb`
+ */
+export function resolveSpineInk(spineColor: string, spineInk: string): string {
+  return /^#[0-9a-f]{6}$/i.test(spineInk) ? spineInk.toLowerCase() : spineInkFor(spineColor);
+}
+
+/** 글자색과 바탕의 대비가 이보다 낮으면 '잘 안 보일 수 있어요' 라고 알린다(WCAG 큰 글자 기준 3:1) */
+export const SPINE_INK_MIN_CONTRAST = 3;
+
+/**
+ * 두 색의 WCAG 대비(1~21).
+ * @param a - `#rrggbb`
+ * @param b - `#rrggbb`
+ * @returns 대비. 모양이 틀린 색이 있으면 21(알리지 않는다)
+ */
+export function contrastRatio(a: string, b: string): number {
+  const la = relativeLuminance(a);
+  const lb = relativeLuminance(b);
+  if (la === null || lb === null) return 21;
+  const [hi, lo] = la >= lb ? [la, lb] : [lb, la];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
 /** 책등 글자색 둘 */
 const LIGHT_INK = '#ffffff';
 const DARK_INK = '#111111';

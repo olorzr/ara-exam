@@ -756,9 +756,14 @@
 - ⚠️ 쪽 수는 4의 배수로 채운 값을 쓴다(내지 PDF 의 쪽 수와 같다)
 
 ## 책등 글꼴 (Spine font)
-- 정의: 책등 위쪽 제목의 글꼴. 원장님이 아홉 가지 가운데 고른다(2026-10-26). 아래쪽 학원 이름은 고르지 않고 학원 로고 글꼴(지마켓 산스 Bold)로 늘 같다
-- 코드에서의 사용: `settings.spineFont`(`SpineFontId`), `SPINE_FONTS`(이름·패밀리·굵기·`sizeScale`), `spineFontOf`, `SPINE_BRAND_FONT_SPEC`
-- 관련 파일: src/lib/book/spine-fonts.ts, src/components/book/BookSpineFontField.tsx, src/app/globals.css(@import)
+- 정의: 책등 위쪽 제목의 글꼴. 원장님이 묶음(고딕·제목 / 귀여운 / 손글씨 / 명조) 열아홉 가지 가운데 고른다(2026-10-26 — 구글 글꼴 + 눈누 상업용 무료 글꼴). 아래쪽 학원 이름은 고르지 않고 학원 로고 글꼴(지마켓 산스 Bold)로 늘 같다
+- 코드에서의 사용: `settings.spineFont`(`SpineFontId`), `SPINE_FONTS`(이름·패밀리·굵기·`sizeScale`·`group`·`source`), `spineFontOf`, `SPINE_BRAND_FONT_SPEC`
+- 관련 파일: src/lib/book/spine-fonts.ts, src/components/book/BookSpineFontField.tsx, src/app/globals.css(@import), src/styles/book-fonts.css(눈누 @font-face)
+
+## 책등 글자 색 (Spine ink)
+- 정의: 책등 제목·학원 이름의 색. '자동' 이면 바탕과 대비가 큰 쪽(검정/흰색), 아니면 고른 색. 책등 색으로 칠한 뒷표지의 학원 이름도 같은 색
+- 코드에서의 사용: `settings.spineInk`(`'auto'` | `#rrggbb`), `SPINE_INK_PRESETS`, `resolveSpineInk`, `contrastRatio`, `SPINE_INK_MIN_CONTRAST`
+- 관련 파일: src/lib/book/spine.ts, src/lib/book/settings.ts, src/components/book/BookSpineColorField.tsx
 
 ## 목차 (Table of contents)
 - 정의: 책 내지 첫 쪽의 장 목록 — 장 번호 · 제목 · 시작 쪽. 시작 쪽은 엔진이 실제로 배치한 쪽이다. 내지 설정 '목차 넣기'(기본 켬)

@@ -429,12 +429,12 @@ src/
 ## lib/book (책 만들기 — 원장 전용, 2026-10-25 · 2026-10-26 대분류 분리)
 - 역할: 저장된 문제지를 장으로 묶은 책(A4 무선제본)의 설정·판·쪽 수 기록·책등 두께·표지 펼침면 치수, 그리고 `exam.books`·`exam.book_chapters`(sql/76·77) 읽기·쓰기
 - 의존: lib/print(constants `MM_TO_PX`), lib/problem-paper(cover 모델·cover-scale·settings), lib/problem-bank(storage·query-chain)
-- 주요 파일: inner-papers.ts(열림인쇄 내지 18종과 두께), spine.ts(책등 식·펼침면 치수·책등 글자 크기), spine-fonts.ts(책등 제목 글꼴 아홉·학원 이름 글꼴), settings.ts(설정·판·쪽 수·직접 넣은 쪽 수·내지 지문·목차),
+- 주요 파일: inner-papers.ts(열림인쇄 내지 18종과 두께), spine.ts(책등 식·펼침면 치수·책등 글자 크기), spine-fonts.ts(책등 제목 글꼴 열아홉·묶음·학원 이름 글꼴 — 눈누 글꼴의 @font-face 는 styles/book-fonts.css), settings.ts(설정·판·쪽 수·직접 넣은 쪽 수·내지 지문·목차),
   layout.ts(지문을 책·장에서 만드는 한 함수), spine-pages.ts(책등을 그릴 쪽 수 — 잰 값/직접 넣은 값, 한 함수), cover.ts(표지 jsonb ↔ `PaperCover`), queries.ts, types.ts(종류 `BookKind`), write-queue.ts(책마다 쓰기 줄 — 두 편집 화면이 함께 선다)
 - 종류(sql/77 `kind`): 책(장을 담아 내지까지) / 표지만(장 없이 `settings.manualPages` 로 책등 계산). 다 만든 표시는 `finished_at`
 - 화면(사이드바 '책 만들기' 대분류): `/books/covers`(표지 만들기 — 안 끝난 모든 항목) · `/books/inner`(내지 만들기 — 안 끝난 책) · `/books/done`(다 만든 책). `/books` 는 next.config 리다이렉트
 - components/book — 목록 틀(`BookListFrame`·`BookCreateDialog`), 편집 틀(`BookEditorShell`: 문지기·읽기·스피너),
-  표지 편집(`BookCoverEditor` → `BookCoverMode` → `BookCoverSpread`·`BookSpine` / 오른쪽 `BookCoverPanel`: 쪽 수·내지 용지·책등 색·책등 글꼴(`BookSpineFontField`)·표지 창·주문 요약),
+  표지 편집(`BookCoverEditor` → `BookCoverMode` → `BookCoverSpread`·`BookSpine` / 오른쪽 `BookCoverPanel`: 쪽 수·내지 용지·책등 색·책등 글자 색(둘 다 `BookSpineColorField`)·책등 글꼴(`BookSpineFontField`)·표지 창·주문 요약),
   내지 편집(`BookInnerEditor` → 구성 `BookComposePanel`: 장·내지 설정 / 내지 `BookInnerMode` → `BookInnerView`: `A4Document` + `breakBefore`·`padPagesTo`·`onLayout`, 목차 `BookToc` — 시작 쪽은 `onLayout` 의 `blockPages` 로 채운다)
 - 흐름: 내지 화면이 잰 쪽 수 → `books.page_counts[판] = {pages, key}` → 표지 화면이 지문(key)이 같을 때만 그 쪽 수 × 용지 두께로 책등을 그린다. 표지만은 직접 넣은 쪽 수를 4의 배수로 올려 쓴다(`resolveSpinePages`)
 - 인쇄 엔진 확장(lib/print/paginate.ts): `breakBefore`(장 시작·오른쪽 면), `padPagesTo`(4의 배수 빈 쪽), `PagePlan.blank` — 옵션이 없으면 배치가 그대로다.

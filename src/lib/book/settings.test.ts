@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { bookLayoutKeyFor } from './layout';
 import {
   bookLayoutKey, DEFAULT_BOOK_SETTINGS, EDITION_SUFFIX, MANUAL_PAGES_MAX, normalizeBookSettings, normalizePageCounts,
-  SPINE_COLOR_PRESETS,
+  SPINE_COLOR_PRESETS, SPINE_INK_PRESETS,
 } from './settings';
 import { spineInkFor } from './spine';
 import { DEFAULT_SPINE_FONT } from './spine-fonts';
@@ -17,14 +17,15 @@ describe('normalizeBookSettings', () => {
   it('저장값은 존중하고 모르는 값만 기본으로', () => {
     const s = normalizeBookSettings({
       innerPaper: '1023', columns: 1, chapterStart: 'page', trimWorks: false, toc: false,
-      spineColor: '#ABCDEF', spineText: '  국어  ', spineFont: 'jua', backFill: 'spine',
+      spineColor: '#ABCDEF', spineInk: '#A8325E', spineText: '  국어  ', spineFont: 'jua', backFill: 'spine',
     });
     expect(s).toEqual({
       innerPaper: '1023', columns: 1, chapterStart: 'page', trimWorks: false, toc: false,
-      spineColor: '#abcdef', spineText: '국어', spineFont: 'jua', backFill: 'spine', manualPages: {},
+      spineColor: '#abcdef', spineInk: '#a8325e', spineText: '국어', spineFont: 'jua', backFill: 'spine', manualPages: {},
     });
     const bad = normalizeBookSettings({
       innerPaper: '9', columns: 3, chapterStart: 'x', spineColor: 'red', backFill: 1, toc: 'yes', spineFont: 'comic',
+      spineInk: 'pink',
     });
     expect(bad.innerPaper).toBe(DEFAULT_BOOK_SETTINGS.innerPaper);
     expect(bad.columns).toBe(2);
@@ -33,12 +34,16 @@ describe('normalizeBookSettings', () => {
     expect(bad.backFill).toBe('white');
     expect(bad.toc).toBe(true);
     expect(bad.spineFont).toBe(DEFAULT_SPINE_FONT);
+    expect(bad.spineInk).toBe('auto');
+    // 0.9.59 에 잠깐 있던 글꼴(동글)은 목록에서 빠져 기본 글꼴로 읽는다
+    expect(normalizeBookSettings({ spineFont: 'dongle' }).spineFont).toBe(DEFAULT_SPINE_FONT);
   });
 
   it('새 책은 목차를 넣고, 책등은 파스텔 첫 색 · 지마켓 산스', () => {
     expect(DEFAULT_BOOK_SETTINGS.toc).toBe(true);
     expect(DEFAULT_BOOK_SETTINGS.spineColor).toBe('#f6c6d0');
     expect(DEFAULT_BOOK_SETTINGS.spineFont).toBe('gmarket');
+    expect(DEFAULT_BOOK_SETTINGS.spineInk).toBe('auto');
   });
 
   it('직접 넣은 쪽 수는 알려진 판의 양의 정수·상한 안만 남긴다', () => {
@@ -110,7 +115,7 @@ describe('내지 구성 지문은 표지 쪽 설정에 흔들리지 않는다', 
       ...book,
       settings: {
         ...book.settings, manualPages: { student: 99 }, spineColor: '#000000', innerPaper: '1023',
-        spineFont: 'nanumpen', spineText: '다른 글자', backFill: 'spine',
+        spineFont: 'nanumpen', spineInk: '#a8325e', spineText: '다른 글자', backFill: 'spine',
       },
     };
     expect(bookLayoutKeyFor(other, [], 'student')).toBe(bookLayoutKeyFor(book, [], 'student'));
@@ -122,6 +127,11 @@ describe('책등 색 바로 고르기', () => {
     for (const c of SPINE_COLOR_PRESETS) expect(c.value).toMatch(/^#[0-9a-f]{6}$/);
     expect(new Set(SPINE_COLOR_PRESETS.map((c) => c.value)).size).toBe(SPINE_COLOR_PRESETS.length);
     expect(new Set(SPINE_COLOR_PRESETS.map((c) => c.label)).size).toBe(SPINE_COLOR_PRESETS.length);
+  });
+
+  it('글자색 바로 고르기도 소문자 #rrggbb 이고 이름이 겹치지 않는다', () => {
+    for (const c of SPINE_INK_PRESETS) expect(c.value).toMatch(/^#[0-9a-f]{6}$/);
+    expect(new Set(SPINE_INK_PRESETS.map((c) => c.label)).size).toBe(SPINE_INK_PRESETS.length);
   });
 
   it('파스텔 여덟은 검은 글자, 진한 둘(남색·먹색)은 흰 글자가 읽힌다', () => {
