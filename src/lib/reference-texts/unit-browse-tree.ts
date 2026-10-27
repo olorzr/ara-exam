@@ -1,6 +1,7 @@
 import { naturalCompare } from '@/lib/category-tree';
 import { NO_GRADE_OPTION } from '@/lib/textbook-grade';
 import type { FacetTreeNode } from '@/lib/problem-bank/school-exam-tree';
+import type { ReferenceUnit } from '@/types/reference-text';
 import type { ReferenceFacetRow } from './facets';
 import {
   UNIT_NONE_KEY, axisKey, type ReferenceBrowseAxis, type ReferenceUnitScope,
@@ -11,8 +12,10 @@ import {
  *
  * **학년 › 교과서 › 학기 › 대단원 › 소단원** — 카테고리 관리·문제 은행 교과서 트리와 같은 층이라
  * 선생님이 이미 아는 모양이다. 학기가 빈 단원(학기 구분 없는 교과서 — 고등 선택과목)은 학기 폴더 없이
- * 대단원이 교과서 바로 아래 온다(`category-tree.ts` 와 같은 모양). 학기 폴더가 있으면 그쪽이 앞이다. 마스터 전체가 아니라 **실제로 붙은 단원**으로만 만든다(전문이
- * 없는 단원 폴더를 수백 개 늘어놓으면 찾을 것이 묻힌다).
+ * 대단원이 교과서 바로 아래 온다(`category-tree.ts` 와 같은 모양). 학기 폴더가 있으면 그쪽이 앞이다.
+ * **[2026-10-28] 하나라도 붙은 교과서는 그 교과서의 마스터 단원을 전부 깐다** — 아직 아무것도 안 붙은
+ * 단원이 `(0)` 으로 흐리게 보여, 단원마다 작품·개념을 '꽉꽉' 채웠는지 한눈에 본다(원장님 요청). 아무것도
+ * 안 붙은 교과서는 여전히 그리지 않는다(교과서 수십 권의 빈 폴더가 찾을 것을 묻는다).
  *
  * ⚠️ 건수는 **전문 수**다(단원 수가 아니다). 한 전문이 같은 대단원의 소단원 둘에 붙어 있으면
  *    대단원 폴더에서는 한 번만 센다 — `(n)` 이 그 폴더를 눌렀을 때 나오는 목록 길이와 맞아야 한다.
@@ -42,13 +45,19 @@ interface Bucket {
 
 const newBucket = (): Bucket => ({ ids: new Set(), children: new Map() });
 
-/** 갈래를 찾거나 만들고 전문 id 를 넣는다 */
-function enter(parent: Bucket, name: string, id: string): Bucket {
+/** 갈래를 찾거나 만든다(전문 id 는 넣지 않는다 — 마스터로 빈 갈래를 깔 때) */
+function touch(parent: Bucket, name: string): Bucket {
   let bucket = parent.children.get(name);
   if (!bucket) {
     bucket = newBucket();
     parent.children.set(name, bucket);
   }
+  return bucket;
+}
+
+/** 갈래를 찾거나 만들고 전문 id 를 넣는다 */
+function enter(parent: Bucket, name: string, id: string): Bucket {
+  const bucket = touch(parent, name);
   bucket.ids.add(id);
   return bucket;
 }
@@ -72,12 +81,21 @@ const compareGrades = (a: string, b: string): number =>
 /** 이름과 건수 — 색만으로 알리지 않도록 숫자를 늘 적는다 */
 const labelWith = (name: string, count: number): string => `${name} (${count})`;
 
-/** 범위 잎 하나 (단원 잎이거나 폴더의 `(전체)` 잎) */
+/** 범위 잎 하나 (단원 잎이거나 폴더의 `(전체)` 잎) — 0건이면 흐리게(고를 수는 있다) */
 function unitLeaf(
   unit: ReferenceUnitScope, label: string, count: number,
 ): FacetTreeNode<ReferenceBrowseAxis> {
   const axis: ReferenceBrowseAxis = { kind: 'unit', unit };
-  return { id: axisKey(axis), label: labelWith(label, count), children: [], value: axis };
+  const node: FacetTreeNode<ReferenceBrowseAxis> = { id: axisKey(axis), label: labelWith(label, count), children: [], value: axis };
+  if (count === 0) node.dimmed = true;
+  return node;
+}
+
+/** 폴더 노드 — 0건이면 흐리게 */
+function folder(id: string, label: string, count: number, children: FacetTreeNode<ReferenceBrowseAxis>[]): FacetTreeNode<ReferenceBrowseAxis> {
+  const node: FacetTreeNode<ReferenceBrowseAxis> = { id, label: labelWith(label, count), children };
+  if (count === 0) node.dimmed = true;
+  return node;
 }
 
 /** 폴더 맨 앞의 `(전체)` 잎 — 그 폴더까지의 칸만 든 범위 */
@@ -104,15 +122,11 @@ function majorNode(
   const self: ReferenceUnitScope = { ...scope, unit_path: [major] };
   if (bucket.children.size === 0) return unitLeaf(self, major, bucket.ids.size);
 
-  return {
-    id: `unit-tree:${JSON.stringify([scope.grade, scope.textbook, scope.semester, major])}`,
-    label: labelWith(major, bucket.ids.size),
-    children: [
-      selfLeaf(self, bucket),
-      ...sortedEntries(bucket, compareNames).map(([sub, subBucket]) =>
-        unitLeaf({ ...scope, unit_path: [major, sub] }, sub, subBucket.ids.size)),
-    ],
-  };
+  return folder(`unit-tree:${JSON.stringify([scope.grade, scope.textbook, scope.semester, major])}`, major, bucket.ids.size, [
+    selfLeaf(self, bucket),
+    ...sortedEntries(bucket, compareNames).map(([sub, subBucket]) =>
+      unitLeaf({ ...scope, unit_path: [major, sub] }, sub, subBucket.ids.size)),
+  ]);
 }
 
 /**
@@ -137,11 +151,8 @@ function textbookChildren(
       flat.push(...majors);
       continue;
     }
-    folders.push({
-      id: `unit-tree:${JSON.stringify([grade, textbook, semester])}`,
-      label: labelWith(semester, semesterBucket.ids.size),
-      children: [selfLeaf(scope, semesterBucket), ...majors],
-    });
+    folders.push(folder(`unit-tree:${JSON.stringify([grade, textbook, semester])}`, semester, semesterBucket.ids.size,
+      [selfLeaf(scope, semesterBucket), ...majors]));
   }
   return [...folders, ...flat];
 }
@@ -149,13 +160,24 @@ function textbookChildren(
 /**
  * 전문들의 단원으로 트리를 만든다.
  * @param rows - 패싯 (전문별 분류 칸)
+ * @param master - 카테고리 관리의 단원 전부(`unit-master.ts`) — **붙은 교과서**의 단원만 깔린다. 없으면 붙은 단원만
  * @returns 학년 폴더부터 시작하는 트리 (+ 맨 끝 '분류 없음' 잎)
  */
 export function buildReferenceUnitTree(
   rows: readonly ReferenceFacetRow[],
+  master: readonly ReferenceUnit[] = [],
 ): FacetTreeNode<ReferenceBrowseAxis>[] {
   const root = newBucket();
   let untagged = 0;
+
+  // 하나라도 붙은 교과서(학년 포함)의 마스터 단원을 먼저 깐다 — 빈 단원이 (0) 으로 드러난다
+  const used = new Set(rows.flatMap((row) => row.units.map((u) => JSON.stringify([u.grade, u.textbook]))));
+  for (const unit of master) {
+    const [major, sub] = unit.unit_path;
+    if (!unit.textbook || !major || !used.has(JSON.stringify([unit.grade, unit.textbook]))) continue;
+    const majorBucket = touch(touch(touch(touch(root, unit.grade), unit.textbook), unit.semester), major);
+    if (sub) touch(majorBucket, sub);
+  }
 
   for (const row of rows) {
     if (row.units.length === 0) {
@@ -174,22 +196,16 @@ export function buildReferenceUnitTree(
   }
 
   const tree: FacetTreeNode<ReferenceBrowseAxis>[] = sortedEntries(root, compareGrades)
-    .map(([grade, gradeBucket]) => ({
-      id: `unit-tree:${JSON.stringify([grade])}`,
-      label: labelWith(grade || GRADELESS, gradeBucket.ids.size),
-      children: [
-        selfLeaf({ grade }, gradeBucket),
-        ...sortedEntries(gradeBucket, (a, b) => a.localeCompare(b, 'ko'))
-          .map(([textbook, textbookBucket]) => ({
-            id: `unit-tree:${JSON.stringify([grade, textbook])}`,
-            label: labelWith(textbook, textbookBucket.ids.size),
-            children: [
-              selfLeaf({ grade, textbook }, textbookBucket),
-              ...textbookChildren(grade, textbook, textbookBucket),
-            ],
-          })),
-      ],
-    }));
+    .map(([grade, gradeBucket]) => folder(`unit-tree:${JSON.stringify([grade])}`, grade || GRADELESS, gradeBucket.ids.size, [
+      selfLeaf({ grade }, gradeBucket),
+      ...sortedEntries(gradeBucket, (a, b) => a.localeCompare(b, 'ko'))
+        .map(([textbook, textbookBucket]) => folder(
+          `unit-tree:${JSON.stringify([grade, textbook])}`, textbook, textbookBucket.ids.size, [
+            selfLeaf({ grade, textbook }, textbookBucket),
+            ...textbookChildren(grade, textbook, textbookBucket),
+          ],
+        )),
+    ]));
 
   // 아직 단원을 안 붙인 전문도 이 탭에서 찾을 수 있어야 한다 — 붙이러 들어가는 길이다
   if (untagged > 0) {

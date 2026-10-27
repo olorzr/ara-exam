@@ -115,7 +115,7 @@ export function buildNavSections(isAdmin: boolean): NavSection[] {
         { href: '/print-sheets', label: '학교 프린트 시험지', icon: FileScan },
         // 새로 올리기(/reference-texts/new)와 편집(/reference-texts/[id])도 이 항목이다.
         // 여기 올린 전문은 문제 만들기가 참고자료로 읽는다
-        { href: '/reference-texts', label: '작품 전문', icon: BookText },
+        { href: '/reference-texts', label: '작품 전문 · 개념', icon: BookText },
       ],
     },
     {

@@ -1,5 +1,9 @@
 export { default as BrowseTreeFrame } from './BrowseTreeFrame';
+export { default as ReferenceBodyField } from './ReferenceBodyField';
 export { default as ReferenceClassifySection } from './ReferenceClassifySection';
+export { default as ReferenceKindChips } from './ReferenceKindChips';
+export { default as ReferenceKindField } from './ReferenceKindField';
+export { default as ReferenceTagsField } from './ReferenceTagsField';
 export { default as ReferenceSidePanel } from './ReferenceSidePanel';
 export { default as ReferenceTextForm } from './ReferenceTextForm';
 export { default as ReferenceTextImport } from './ReferenceTextImport';

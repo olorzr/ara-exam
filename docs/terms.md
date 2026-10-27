@@ -327,9 +327,16 @@
 - 관련 파일: src/lib/quiz-references/, src/hooks/useQuizReferences.ts,
   src/components/passage-quiz/QuizReferencesSection.tsx, src/lib/passage-quiz/reference.ts
 
-## 작품 전문 (ReferenceText)
-- 정의: 개념 관리에 올려 두는 **작품 원문 전체**(sql/30 `exam.reference_texts`). `/reference-texts`
-- ⚠️ 본문(`body`)은 **평문**이다(개념지의 `editor_html` 과 다르다) — 서식이 없고 화면은 텍스트 노드로 그린다
+## 작품 전문 · 개념 (ReferenceText)
+- 정의: 개념 관리에 올려 두는 **교과서 단원별 지식 창고**(sql/30·60·79 `exam.reference_texts`). `/reference-texts`, 사이드바 '작품 전문 · 개념'.
+  한 표에 두 갈래가 든다(`kind`, 2026-10-28): **작품**(제재 원문 전체 — 문제 만들기가 참고자료로 읽는다) ·
+  **개념**(단원 핵심 개념·제재 개관 정리 — 표·목록이 든 HTML). ⚠️ **개념지(`concept_sheets`, 빈칸 시험지)와 다른 것**이다
+- 본문 형식(`format`): `text` 평문(작품 기본 — 텍스트 노드로 그린다) · `html`(개념 기본 — 문항 정화기 `sanitizeProblemHTML`
+  프로필, 저장할 때·그릴 때 정화). 편집 화면의 '표·상자 서식으로 바꾸기' 가 오간다
+- 차례(`seq`, 단원 안 순서 0~9999)·태그(`tags`, '핵심 정리'·'제재 개관'·'더 읽어 보기' …, 최대 8).
+  단원으로 훑으면 개념 → 차례 → 제목 순이다. '더 읽어 보기' 제재는 소단원을 따로 만들지 않고 태그로 단다
+- `source_key` — 헤드리스 적재(`~/.claude/tools/ingest-reference-texts.js`)의 멱등 열쇠. 앱은 보내지 않는다
+- 참고자료(문제 만들기) 자동 찾기·직접 고르기는 **작품만** 본다(`kind = '작품'`)
 - 올리는 법: 붙여넣기 · `.txt` · **글자가 박힌** PDF. ⚠️ 스캔한 PDF 는 못 읽는다 —
   그때는 학교 프린트 시험지로 올리면 AI 가 읽어 준다(`pdfImportVerdict` 가 그 길을 알려 준다)
 - ⚠️ PDF 가져오기는 `readPageText` 를 쓴다(`extractPageText` 아님) — 그쪽의 쪽당 200자 문턱은
@@ -342,8 +349,17 @@
   이 칸에 적어 가른다. 거의 같으면 한 편에 단원을 여럿 붙인다. 작품 트리에서는 한 잎에 `(2)` 로 모인다
 - 코드에서의 사용: `ReferenceText`, `ReferenceTextListItem`, `useReferenceTextEditor`, `useReferenceTexts`,
   `useReferenceTextFacets`
-- 관련 파일: sql/30_reference_texts.sql, sql/60_reference_texts_classification.sql, src/lib/reference-texts/,
-  src/types/reference-text.ts, src/app/(main)/reference-texts/, src/components/reference-texts/
+- 관련 파일: sql/30_reference_texts.sql, sql/60_reference_texts_classification.sql, sql/79_reference_texts_kind_format.sql,
+  src/lib/reference-texts/, src/types/reference-text.ts, src/app/(main)/reference-texts/, src/components/reference-texts/
+
+## 평가문제집 (출처 유형)
+- 정의: 출판사가 교과서마다 내는 단원별 **평가문제집** — 기출 출처 유형 `source_type '평가문제집'`(sql/80, 2026-10-28).
+  학교·시험이 없고(`school_name ''`·`exam_type ''`) 교과서(`textbook`)·출판사(`publisher`)·학년·학기로 찾는다
+- 출처 하나 = **소단원 하나**(대단원 평가·종합 문제 묶음은 따로 하나). 출처 제목이 곧 책 이름이다
+  ('동아 중2-1 평가문제집 2-(1) 시와 화자') — 목록·인쇄의 출처 줄도 제목을 쓴다(`sourceLabel`)
+- 문항 번호는 출처 안에서 1부터 다시 매기고, 책의 원래 구역(족집게 예상·소단원 평가 …)은 문항 `tags` 에 단다. 배점은 없다
+- 문제 은행 기출 트리의 맨 뒤 '평가문제집' 가지 — 교과서 › 학년·학기 › 책. 책 잎은 출처 제목 **같음**(`source_title`, 주소 `src`, sql/82)까지 건다
+- 관련 파일: sql/80_problem_source_workbook_type.sql, sql/82_problem_bank_source_title_axis.sql, src/lib/problem-bank/workbook-tree.ts
 
 ## 전문 단원 (ReferenceUnit)
 - 정의: 작품 전문이 실린 교과서 단원 하나 — `{ grade, textbook, semester, unit_path }`(sql/60 `units` 의 원소)

@@ -4,11 +4,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
-  EMPTY_REFERENCE_DRAFT, REFERENCE_DRAFT_KEYS, draftFieldEquals, draftFromReferenceText,
+  REFERENCE_DRAFT_KEYS, draftFieldEquals, draftFromPayload, draftFromReferenceText, emptyReferenceDraft,
   referenceDraftBlocker, referenceDraftEquals, toReferenceTextPayload, type ReferenceTextDraft,
 } from '@/lib/reference-texts/form';
 import { fetchReferenceText } from '@/lib/reference-texts/queries';
 import { insertReferenceText, updateReferenceText } from '@/lib/reference-texts/save';
+import type { ReferenceTextKind } from '@/types/reference-text';
 import { useUnsavedGuard } from './useUnsavedGuard';
 
 /**
@@ -28,6 +29,8 @@ export interface ReferenceTextEditorOptions {
   id: string;
   /** 목록 경로 — 뒤로 가기와 '찾을 수 없음' 이 여기로 돌아가고, 새로 만든 뒤 주소도 이 아래다 */
   listHref: string;
+  /** 새로 만들 때의 종류(주소 `?kind=개념`) — 본문 형식 기본값이 따라온다. 편집할 때는 무시한다 */
+  initialKind?: ReferenceTextKind;
 }
 
 /**
@@ -37,16 +40,18 @@ export interface ReferenceTextEditorOptions {
  * **호출부가 넘기고**, 저장은 `updated_at` 으로 낙관적 동시성을 건다(도메인 전원이 함께 쓰는
  * 표라 안 걸면 마지막 저장이 상대 변경을 통째로 덮는다).
  *
- * 개념지와 다른 점: 본문이 **평문**이라 정화할 마크업이 없고 TipTap 도 쓰지 않는다.
+ * 본문은 형식이 둘이다(sql/79) — 평문이면 입력칸, HTML 이면 문항 편집기(TipTap). HTML 은 저장할 때 정화하고
+ * '고쳤는가' 는 정화한 모양으로 견준다(`draftFieldEquals` — 편집기가 HTML 을 제 모양으로 다시 쓴다).
  */
 export function useReferenceTextEditor(opts: ReferenceTextEditorOptions) {
-  const { id, listHref } = opts;
+  const { id, listHref, initialKind } = opts;
   const router = useRouter();
   const isNew = id === 'new';
 
-  const [draft, setDraft] = useState<ReferenceTextDraft>(EMPTY_REFERENCE_DRAFT);
+  // 새로 만들 때만 종류를 따른다 — 두 칸이 **같은 빈 값**에서 출발해야 처음부터 '고침' 이 되지 않는다
+  const [draft, setDraft] = useState<ReferenceTextDraft>(() => emptyReferenceDraft(isNew ? initialKind : undefined));
   /** 마지막으로 저장된 값 — 고친 것이 있는지 **렌더에서 파생**한다 */
-  const [savedDraft, setSavedDraft] = useState<ReferenceTextDraft>(EMPTY_REFERENCE_DRAFT);
+  const [savedDraft, setSavedDraft] = useState<ReferenceTextDraft>(() => emptyReferenceDraft(isNew ? initialKind : undefined));
   const [savedId, setSavedId] = useState<string | null>(isNew ? null : id);
   const [loadedUpdatedAt, setLoadedUpdatedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(!isNew);
@@ -65,7 +70,7 @@ export function useReferenceTextEditor(opts: ReferenceTextEditorOptions) {
    * 지금 화면 값의 거울 — 저장이 끝난 **그 순간**의 값을 보려고 둔다.
    * 닫아 둔 `draft` 는 저장을 시작할 때의 값이라 그 사이 친 글을 못 본다.
    */
-  const draftRef = useRef<ReferenceTextDraft>(EMPTY_REFERENCE_DRAFT);
+  const draftRef = useRef<ReferenceTextDraft>(draft);
   /**
    * 아직 못 옮긴 주소.
    *
@@ -177,7 +182,7 @@ export function useReferenceTextEditor(opts: ReferenceTextEditorOptions) {
           return;
         }
         setLoadedUpdatedAt(result.updated_at);
-        settle(sent, payload);
+        settle(sent, draftFromPayload(payload));
         toast.success('저장했어요.');
         // 지난번에 미뤄 둔 주소 옮기기가 있으면 깨끗해진 지금 시도한다
         if (pendingNavRef.current) navigateWhenSafe(sent, pendingNavRef.current);
@@ -187,7 +192,7 @@ export function useReferenceTextEditor(opts: ReferenceTextEditorOptions) {
       if (!aliveRef.current) return;
       setSavedId(created.id);
       setLoadedUpdatedAt(created.updated_at);
-      settle(sent, payload);
+      settle(sent, draftFromPayload(payload));
       toast.success('저장했어요.');
       // ⚠️ 주소는 **손댄 것이 없을 때만** 옮긴다(위 pendingNavRef 주석 참고)
       navigateWhenSafe(sent, created.id);

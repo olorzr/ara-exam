@@ -8,7 +8,7 @@
 import type { OcrWarning } from '@/lib/problem-ocr/warnings';
 
 /** 업로드한 원본 문서의 종류 */
-export type ProblemSourceType = '내신기출' | '모의고사' | '문제집' | '프린트';
+export type ProblemSourceType = '내신기출' | '모의고사' | '문제집' | '프린트' | '평가문제집';
 
 /** 출처 처리 단계. 업로드 → 추출중(OCR) → 검수중 → 완료 */
 export type ProblemSourceStatus = '업로드' | '추출중' | '검수중' | '완료';

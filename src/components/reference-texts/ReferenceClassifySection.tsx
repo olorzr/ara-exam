@@ -3,8 +3,9 @@
 import GrammarTagPicker from '@/components/problem-review/GrammarTagPicker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { REFERENCE_NOTE_MAX } from '@/lib/reference-texts/constants';
+import { REFERENCE_NOTE_MAX, REFERENCE_SEQ_MAX } from '@/lib/reference-texts/constants';
 import type { ReferenceTextDraft } from '@/lib/reference-texts/form';
+import ReferenceTagsField from './ReferenceTagsField';
 import ReferenceUnitsField from './ReferenceUnitsField';
 
 interface ReferenceClassifySectionProps {
@@ -13,13 +14,14 @@ interface ReferenceClassifySectionProps {
 }
 
 /**
- * 작품 전문의 **분류** — 교과서 단원(여럿) · 문법 · 판본 메모.
+ * 작품 전문 · 개념의 **분류** — 교과서 단원(여럿) · 문법 · 차례 · 태그 · 판본 메모.
  *
  * 문제 은행처럼 교과서별·작품별로 찾게 하려고 붙인다(sql/60). 학교는 고르지 않는다.
  * 작품은 위의 제목·지은이 칸이 곧 작품이다('작품 고르기' 단추가 문제 은행 작품을 채운다).
  *
  * 판본 메모는 "학교마다 본문이 조금 다를 때" 의 답이다 — 글이 실제로 다르면 전문을 따로
  * 올려 각각 그 교과서 단원만 붙이고 여기 적어 가른다. 거의 같으면 한 편에 단원을 여럿 붙인다.
+ * 차례는 단원으로 훑을 때 줄 세우는 순서다(작을수록 앞 — 핵심 개념 10 · 제재 개관 20 · 작품 30 …).
  * @param props - 편집 중인 값과 고치기 콜백
  * @returns 분류 섹션
  */
@@ -40,9 +42,25 @@ export default function ReferenceClassifySection({ draft, patch }: ReferenceClas
       <GrammarTagPicker
         value={draft.grammar_paths}
         suggested={false}
-        subjectLabel="전문"
+        subjectLabel={draft.kind === '개념' ? '개념' : '전문'}
         onChange={(grammar_paths) => patch({ grammar_paths })}
       />
+
+      <div className="grid gap-4 sm:grid-cols-[8rem_minmax(0,1fr)]">
+        <div className="space-y-1">
+          <Label htmlFor="ref-seq" className="text-xs text-gray-500">단원 안 차례</Label>
+          <Input
+            id="ref-seq"
+            value={draft.seq}
+            inputMode="numeric"
+            placeholder="예: 10"
+            aria-describedby="ref-seq-help"
+            onChange={(e) => patch({ seq: e.target.value })}
+          />
+          <p id="ref-seq-help" className="text-[11px] text-gray-400">0~{REFERENCE_SEQ_MAX}, 작을수록 앞</p>
+        </div>
+        <ReferenceTagsField value={draft.tags} onChange={(tags) => patch({ tags })} />
+      </div>
 
       <div className="space-y-1">
         <div className="flex flex-wrap items-center justify-between gap-2">

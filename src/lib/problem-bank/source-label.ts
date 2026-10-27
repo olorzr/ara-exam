@@ -38,8 +38,11 @@ export type SourceLabelInput = Pick<
 export function sourceLabel(source: SourceLabelInput): string {
   // 모의고사는 **제목**을 쓴다 — 칸을 이으면 '2026 고3 평가원 수능' 이 되어 한 시험의
   // 공통·화법과 작문·언어와 매체(또는 A형·B형)가 같은 줄이 되고, 35번이 둘이 된다.
-  // 제목은 '2026학년도 수능 (언어와 매체)' 처럼 그 차이를 담아 적는다(적재 규약)
-  if (source.source_type === '모의고사' && source.title.trim()) return source.title;
+  // 제목은 '2026학년도 수능 (언어와 매체)' 처럼 그 차이를 담아 적는다(적재 규약).
+  // 평가문제집도 제목이다 — 칸을 이으면 '2026 중2 동아 1학기' 가 되어 소단원 출처 여덟이 같은 줄이 된다(sql/80)
+  if ((source.source_type === '모의고사' || source.source_type === '평가문제집') && source.title.trim()) {
+    return source.title;
+  }
   return sourceMetaLabel(source);
 }
 

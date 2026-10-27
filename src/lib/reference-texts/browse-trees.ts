@@ -41,12 +41,14 @@ export function mapTreeValues<A, B>(
  *
  * 지은이는 처음 만난 비어 있지 않은 값이다(판본마다 비워 둔 것이 섞여도 폴더가 갈리지 않게).
  * 갈래는 모두 문학으로 둔다 — 전문은 영역 축이 없고, 올리는 것도 거의 문학 작품이다.
+ * **개념 정리는 세지 않는다**(sql/79) — '피동 표현 핵심 개념' 이 작품 트리에 잎으로 서면 안 된다.
  * @param rows - 패싯
  * @returns 작품 목록
  */
 export function referenceWorkFacets(rows: readonly ReferenceFacetRow[]): WorkFacet[] {
   const byTitle = new Map<string, WorkFacet>();
   for (const row of rows) {
+    if (row.kind === '개념') continue;
     const title = row.title.trim();
     if (!title) continue;
     const author = row.author.trim();

@@ -73,6 +73,23 @@ describe('ReferenceTextImport', () => {
     expect(window.confirm).toHaveBeenCalled();
   });
 
+  it('⚠️ 읽는 사이 콜백이 바뀌면(본문 형식 전환) 지금 콜백으로 넣는다 — 옛 형식으로 넣지 않는다', async () => {
+    const reading = deferred<{ text: string; pageCount: number; pagesWithText: number }>();
+    readPdfTextLayer.mockReturnValue(reading.promise);
+    const asText = vi.fn();
+    const asHtml = vi.fn();
+
+    const { rerender } = render(<ReferenceTextImport hasBody={false} onText={asText} />);
+    await act(async () => { choose('PDF 파일 고르기', pdf); });
+    rerender(<ReferenceTextImport hasBody={false} onText={asHtml} />);
+
+    await act(async () => {
+      reading.resolve({ text: '읽어 온 글', pageCount: 1, pagesWithText: 1 });
+    });
+    await waitFor(() => expect(asHtml).toHaveBeenCalledWith('읽어 온 글'));
+    expect(asText).not.toHaveBeenCalled();
+  });
+
   it('글자를 한 자도 못 찾으면 넣지 않고 알린다', async () => {
     readPdfTextLayer.mockResolvedValue({ text: '', pageCount: 3, pagesWithText: 0 });
     const onText = vi.fn();

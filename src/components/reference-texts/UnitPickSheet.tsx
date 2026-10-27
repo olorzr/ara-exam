@@ -7,21 +7,9 @@ import {
   Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle,
 } from '@/components/ui/sheet';
 import { useLazyLoad } from '@/hooks/useLazyLoad';
-import { getAllSelectableCategories } from '@/lib/category-master';
-import { EXTERNAL_LEVEL } from '@/lib/constants';
-import type { Category } from '@/types';
+import { loadUnitCategories } from '@/lib/reference-texts/unit-master';
 import type { ReferenceUnit } from '@/types/reference-text';
 import UnitPickBody from './UnitPickBody';
-
-/**
- * 고를 수 있는 단원 카테고리 — 중등·고등만.
- * ⚠️ 외부지문·프린트는 뺀다: 학교 축은 없고(원장님 결정) 교과서 단원도 없다.
- * @returns 카테고리
- */
-async function loadUnitCategories(): Promise<Category[]> {
-  const all = await getAllSelectableCategories();
-  return all.filter((c) => c.level !== EXTERNAL_LEVEL);
-}
 
 interface UnitPickSheetProps {
   value: ReferenceUnit[];

@@ -17,7 +17,7 @@ vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 const { useReferenceTexts } = await import('./useReferenceTexts');
 
 const row = (id: string, title: string, author = '') => ({
-  id, title, author, char_count: 100, units: [], grammar_paths: [], note: '', user_id: 'u',
+  id, title, author, kind: '작품' as const, format: 'text' as const, seq: null, tags: [], source_key: null, char_count: 100, units: [], grammar_paths: [], note: '', user_id: 'u',
   updated_by: null, created_at: '2026-09-01', updated_at: '2026-09-01',
 });
 
@@ -148,8 +148,8 @@ describe('useReferenceTexts — 왼쪽 패널의 축', () => {
     act(() => result.current.setSearch('김'));
     await act(async () => { await vi.advanceTimersByTimeAsync(300); });
 
-    expect(searchReferenceTexts).toHaveBeenCalledWith('김', 'title', expect.any(Number), { title: '봄봄' });
-    expect(searchReferenceTexts).toHaveBeenCalledWith('김', 'author', expect.any(Number), { title: '봄봄' });
+    expect(searchReferenceTexts).toHaveBeenCalledWith('김', 'title', expect.any(Number), { title: '봄봄', kind: '작품' });
+    expect(searchReferenceTexts).toHaveBeenCalledWith('김', 'author', expect.any(Number), { title: '봄봄', kind: '작품' });
   });
 
   it('⚠️ 기다리던 검색은 축을 바꾸면 한 번만 돈다 — 같은 조건을 두 번 묻지 않는다', async () => {
@@ -180,10 +180,10 @@ describe('useReferenceTexts — 왼쪽 패널의 축', () => {
     const { result } = renderHook(() => useReferenceTexts());
     await waitFor(() => expect(result.current.loading).toBe(false));
     act(() => result.current.setAxis({ kind: 'work', title: '봄봄' }));
-    await waitFor(() => expect(fetchReferenceTextList).toHaveBeenLastCalledWith(expect.any(Number), { title: '봄봄' }));
+    await waitFor(() => expect(fetchReferenceTextList).toHaveBeenLastCalledWith(expect.any(Number), { title: '봄봄', kind: '작품' }));
 
     fetchReferenceTextList.mockClear();
     await act(async () => { await result.current.remove(row('1', '봄봄')); });
-    expect(fetchReferenceTextList).toHaveBeenCalledWith(expect.any(Number), { title: '봄봄' });
+    expect(fetchReferenceTextList).toHaveBeenCalledWith(expect.any(Number), { title: '봄봄', kind: '작품' });
   });
 });

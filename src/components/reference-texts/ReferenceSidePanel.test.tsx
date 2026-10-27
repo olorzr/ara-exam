@@ -11,8 +11,8 @@ const unit: ReferenceUnit = {
   grade: '중2', textbook: '천재(노미숙)', semester: '1학기', unit_path: ['1. 문학'],
 };
 const ROWS: ReferenceFacetRow[] = [
-  { id: 'a', title: '봄봄', author: '김유정', units: [unit], grammar_paths: [] },
-  { id: 'b', title: '봄봄', author: '김유정', units: [], grammar_paths: ['담화'] },
+  { id: 'a', title: '봄봄', author: '김유정', kind: '작품', units: [unit], grammar_paths: [] },
+  { id: 'b', title: '봄봄', author: '김유정', kind: '작품', units: [], grammar_paths: ['담화'] },
 ];
 
 function renderPanel(axis: ReferenceBrowseAxis = ALL_REFERENCE_TEXTS) {

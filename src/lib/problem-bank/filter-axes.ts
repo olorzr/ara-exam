@@ -2,7 +2,9 @@ import type { SelectOption } from '@/components/ui/option-select';
 import { SEMESTER_OPTIONS } from '@/lib/constants';
 import { areaPathLabel } from './area-tree';
 import { formatGrammarPath, parseGrammarPath } from './grammar-tree';
-import { examTypeFits, examTypeOptionsFor, levelFromGrade, SCHOOL_LEVEL_OPTIONS, SOURCE_TYPE_OPTIONS } from './source-form';
+import {
+  examTypeFits, examTypeOptionsFor, levelFromGrade, SCHOOL_LEVEL_OPTIONS, SOURCE_TYPE_OPTIONS, WORKBOOK_SOURCE_TYPE,
+} from './source-form';
 import { gradeFitsSchoolLevel, parseSchoolLevel } from './school-level';
 import { UNSPECIFIED_AXIS, type ProblemFilters } from './filters';
 import { QUESTION_KINDS, QUESTION_KIND_LABELS } from './question-kind';
@@ -108,6 +110,11 @@ interface BuildInput {
   grammarOptions: SelectOption[];
 }
 
+/** 바꾸면 책 제목 축(`source_title`)을 함께 푸는 출처 칸 */
+const SOURCE_TITLE_PARENTS: ReadonlySet<string> = new Set<string>([
+  'source_type', 'school_name', 'year', 'school_level', 'grade', 'semester', 'exam_type', 'textbook',
+]);
+
 /**
  * 필터 줄에 그릴 칸 목록.
  * @param input - 지금 필터와 패싯들
@@ -141,6 +148,8 @@ export function buildFilterAxes(input: BuildInput): FilterAxis[] {
       source_type: next,
       ...(examTypeFits(next, filters.exam_type) ? {} : { exam_type: '' }),
       ...(next === '모의고사' ? { school_name: '', semester: '' } : {}),
+      // 평가문제집은 학교가 없다(sql/80) — 학교를 고른 채 바꾸면 늘 0건이다
+      ...(next === WORKBOOK_SOURCE_TYPE ? { school_name: '' } : {}),
       page: 0,
     };
   };
@@ -227,5 +236,14 @@ export function buildFilterAxes(input: BuildInput): FilterAxis[] {
     QUESTION_KINDS.map((kind) => ({ value: kind, label: QUESTION_KIND_LABELS[kind] })),
   );
 
+  // 책 제목 축(평가문제집 잎, sql/82)은 위쪽 줄에 칸이 없다 — 그 책을 가른 출처 칸(유형·학교·학년도·학교급·학년·학기·시험·
+  // 교과서)을 바꾸면 함께 푼다. 남기면 '해냄 ∩ 동아 책' 이 화면에 드러나지 않는 조건으로 조용히 0건이 된다(코덱스 3R)
+  if (filters.source_title) {
+    for (const axis of axes) {
+      if (!SOURCE_TITLE_PARENTS.has(axis.key)) continue;
+      const toPatch = axis.toPatch;
+      axis.toPatch = (v) => ({ ...toPatch(v), source_title: '' });
+    }
+  }
   return axes;
 }

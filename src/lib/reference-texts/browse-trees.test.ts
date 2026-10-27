@@ -11,7 +11,7 @@ const unit = (over: Partial<ReferenceUnit> = {}): ReferenceUnit => ({
 });
 
 const row = (id: string, over: Partial<ReferenceFacetRow> = {}): ReferenceFacetRow => ({
-  id, title: '봄봄', author: '김유정', units: [], grammar_paths: [], ...over,
+  id, title: '봄봄', author: '김유정', kind: '작품', units: [], grammar_paths: [], ...over,
 });
 
 /** 라벨로 자식 노드를 찾는다 */
@@ -177,5 +177,46 @@ describe('buildReferenceGrammarTree', () => {
     expect(tree[tree.length - 1]).toMatchObject({
       id: GRAMMAR_NONE_KEY, label: '분류 없음 (1)', value: { kind: 'grammar-none' },
     });
+  });
+});
+
+describe('단원 트리 — 마스터로 빈 단원을 깐다 (2026-10-28)', () => {
+  const master = [
+    unit(),
+    unit({ unit_path: ['1. 문학', '(2) 소설'] }),
+    unit({ unit_path: ['2. 문법', '(1) 피동 표현'] }),
+    unit({ textbook: '동아', unit_path: ['1. 소통'] }),
+  ];
+
+  it('붙은 교과서의 마스터 단원은 0건이어도 (0) 으로 흐리게 나온다', () => {
+    const tree = buildReferenceUnitTree([row('a', { units: [unit()] })], master);
+    const semester = child(child(child(tree, '중2 (1)').children, '천재(노미숙) (1)').children, '1학기 (1)');
+    const novel = child(child(semester.children, '1. 문학 (1)').children, '(2) 소설 (0)');
+    expect(novel.dimmed).toBe(true);
+    const grammar = child(semester.children, '2. 문법 (0)');
+    expect(grammar.dimmed).toBe(true);
+    expect(child(grammar.children, '(1) 피동 표현 (0)').value).toEqual({
+      kind: 'unit', unit: unit({ unit_path: ['2. 문법', '(1) 피동 표현'] }),
+    });
+  });
+
+  it('아무것도 안 붙은 교과서는 마스터에 있어도 그리지 않는다 — 빈 폴더가 찾을 것을 묻는다', () => {
+    const tree = buildReferenceUnitTree([row('a', { units: [unit()] })], master);
+    const grade = child(tree, '중2 (1)');
+    expect(grade.children.map((n) => n.label)).not.toContain('동아 (0)');
+  });
+
+  it('마스터에 없는 붙은 단원도 그대로 나온다', () => {
+    const odd = unit({ unit_path: ['9. 옛 단원'] });
+    const tree = buildReferenceUnitTree([row('a', { units: [odd] })], master);
+    const semester = child(child(child(tree, '중2 (1)').children, '천재(노미숙) (1)').children, '1학기 (1)');
+    expect(semester.children.map((n) => n.label)).toContain('9. 옛 단원 (1)');
+  });
+});
+
+describe('작품 트리는 개념 정리를 세지 않는다 (sql/79)', () => {
+  it('개념 행은 작품 잎이 되지 않는다', () => {
+    const facets = referenceWorkFacets([row('a'), row('b', { kind: '개념', title: '피동 표현 — 핵심 개념' })]);
+    expect(facets.map((f) => f.title)).toEqual(['봄봄']);
   });
 });

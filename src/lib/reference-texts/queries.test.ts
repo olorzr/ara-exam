@@ -96,3 +96,41 @@ describe('searchReferenceTexts — 검색어와 축이 함께 걸린다', () => 
     expect(lastParam('limit')).toBe('30');
   });
 });
+
+describe('종류(작품 · 개념) 칩과 단원 축의 차례 (sql/79)', () => {
+  it('종류를 고르면 kind=eq. 로 건다', async () => {
+    await fetchReferenceTextList(200, toReferenceTextQuery({ kind: 'all' }, '개념'));
+    expect(lastParam('kind')).toBe('eq.개념');
+  });
+
+  it('검색도 같은 종류 조건을 함께 건다 — 참고자료 찾기는 작품만 묻는다', async () => {
+    await searchReferenceTexts('봄', 'title', 20, { kind: '작품' });
+    expect(lastParam('kind')).toBe('eq.작품');
+    expect(lastParam('title')).toBe('ilike.%봄%');
+  });
+
+  it('단원으로 훑으면 개념 → 차례 → 제목 순 — ⚠️ 갈래 글자 순서(개념 < 작품)에 기댄다', async () => {
+    await fetchReferenceTextList(200, toReferenceTextQuery({ kind: 'unit', unit }));
+    expect(lastParam('order')).toBe('kind.asc,seq.asc.nullslast,title.asc,updated_at.desc');
+    expect('개념' < '작품').toBe(true);
+  });
+
+  it('단원 축이 없으면 예전처럼 최근 고친 순', async () => {
+    await fetchReferenceTextList();
+    expect(lastParam('order')).toBe('updated_at.desc');
+    expect(lastParam('kind')).toBeNull();
+  });
+});
+
+describe('작품 잎은 작품만 — 같은 제목의 개념 정리가 섞이지 않는다 (코덱스 3R)', () => {
+  it('작품 축은 kind=eq.작품 을 함께 건다', async () => {
+    await fetchReferenceTextList(200, toReferenceTextQuery({ kind: 'work', title: '봄봄' }));
+    expect(lastParam('title')).toBe('eq.봄봄');
+    expect(lastParam('kind')).toBe('eq.작품');
+  });
+
+  it('작품 잎 + 개념 칩은 교집합이 비어 아무것도 걸리지 않는다', async () => {
+    await fetchReferenceTextList(200, toReferenceTextQuery({ kind: 'work', title: '봄봄' }, '개념'));
+    expect(captured[captured.length - 1].searchParams.getAll('kind')).toEqual(['eq.작품', 'eq.']);
+  });
+});

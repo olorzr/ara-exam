@@ -245,3 +245,19 @@ describe('문법 축', () => {
     expect(a.value).toBe('옛분류 > 옛개념');
   });
 });
+
+describe('책 제목 축(평가문제집 잎) — 출처 칸을 바꾸면 함께 푼다 (코덱스 3R)', () => {
+  it('교과서·학년·학기·유형을 바꾸면 source_title 을 비운다 — 화면에 없는 조건으로 0건이 되지 않게', () => {
+    const axes = build(
+      { source_type: '평가문제집', textbook: '동아', grade: '중2', semester: '1학기', source_title: '동아 책' },
+      { textbooks: ['동아', '해냄'], grades: ['중2'], semesters: ['1학기'] },
+    );
+    for (const key of ['textbook', 'grade', 'semester', 'source_type']) {
+      expect(axis(axes, key)?.toPatch(ALL_AXIS)).toMatchObject({ source_title: '' });
+    }
+  });
+
+  it('책 제목이 없으면 칸 패치에 끼어들지 않는다', () => {
+    expect(axis(build({}, { textbooks: ['동아'] }), 'textbook')?.toPatch('동아')).not.toHaveProperty('source_title');
+  });
+});

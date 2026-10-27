@@ -1,4 +1,6 @@
-/** 작품 전문의 정책값 */
+import type { ReferenceTextFormat, ReferenceTextKind } from '@/types/reference-text';
+
+/** 작품 전문 · 개념의 정책값 */
 
 /**
  * 전문 한 편의 길이 상한 (글자).
@@ -34,3 +36,26 @@ export const REFERENCE_NOTE_MAX = 200;
  */
 export const REFERENCE_FACET_CHUNK = 1000;
 export const REFERENCE_FACET_MAX_ROWS = 20_000;
+
+/** 종류 — 화면 순서가 곧 이 순서다 */
+export const REFERENCE_KINDS: readonly ReferenceTextKind[] = ['작품', '개념'];
+
+/** 종류마다 새로 만들 때의 본문 형식 — 작품은 원문 그대로(평문), 개념은 표·목록이 든 정리(HTML) */
+export const DEFAULT_FORMAT_BY_KIND: Readonly<Record<ReferenceTextKind, ReferenceTextFormat>> = {
+  작품: 'text',
+  개념: 'html',
+};
+
+/** 태그 수 상한 — DB CHECK `reference_texts_tags_max`(sql/79)와 같다 */
+export const REFERENCE_TAGS_MAX = 8;
+
+/** 태그 하나의 길이 상한 (글자) — 앱만의 값(DB 는 개수만 본다) */
+export const REFERENCE_TAG_MAX_LEN = 30;
+
+/** 단원 안 차례 상한 — DB CHECK `reference_texts_seq_range`(sql/79)와 같다 */
+export const REFERENCE_SEQ_MAX = 9999;
+
+/** 태그 입력칸의 제안 — 평가문제집 적재가 쓰는 이름과 같다 */
+export const REFERENCE_TAG_SUGGESTIONS: readonly string[] = [
+  '핵심 정리', '제재 개관', '제재', '더 읽어 보기', '학습 목표', '맞춤법',
+];

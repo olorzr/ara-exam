@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { ReferenceUnit } from '@/types/reference-text';
+import type { ReferenceTextKind, ReferenceUnit } from '@/types/reference-text';
 import { REFERENCE_FACET_CHUNK, REFERENCE_FACET_MAX_ROWS } from './constants';
 import { isReferenceUnit } from './units';
 
@@ -16,6 +16,8 @@ export interface ReferenceFacetRow {
   id: string;
   title: string;
   author: string;
+  /** 작품 / 개념 — 작품 트리는 작품만 센다 */
+  kind: ReferenceTextKind;
   units: ReferenceUnit[];
   grammar_paths: string[];
 }
@@ -31,6 +33,7 @@ function toFacetRow(raw: Record<string, unknown>): ReferenceFacetRow | null {
     id: raw.id,
     title: typeof raw.title === 'string' ? raw.title : '',
     author: typeof raw.author === 'string' ? raw.author : '',
+    kind: raw.kind === '개념' ? '개념' : '작품',
     units: Array.isArray(raw.units) ? raw.units.filter(isReferenceUnit) : [],
     grammar_paths: Array.isArray(raw.grammar_paths)
       ? raw.grammar_paths.filter((p): p is string => typeof p === 'string')
@@ -54,7 +57,7 @@ export async function fetchReferenceTextFacets(): Promise<ReferenceFacetRow[]> {
   for (let from = 0; from < REFERENCE_FACET_MAX_ROWS; from += REFERENCE_FACET_CHUNK) {
     const { data, error } = await supabase
       .from('reference_texts')
-      .select('id,title,author,units,grammar_paths')
+      .select('id,title,author,kind,units,grammar_paths')
       .order('id')
       .range(from, from + REFERENCE_FACET_CHUNK - 1);
     if (error) {

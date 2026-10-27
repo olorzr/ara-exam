@@ -74,3 +74,12 @@ describe('sourceLabelWithType', () => {
     expect(sourceLabelWithType(source())).toBe('내신기출 · 2026 중2 상현중 1학기 중간');
   });
 });
+
+describe('평가문제집은 제목을 쓴다 (sql/80)', () => {
+  it('칸을 이으면 소단원 출처 여덟이 같은 줄이 된다 — 제목으로 가른다', () => {
+    expect(sourceLabel({
+      source_type: '평가문제집', title: '동아 중2-1 평가문제집 2-(1) 시와 화자', year: '2026', grade: '중2',
+      school_name: '', publisher: '동아출판', semester: '1학기', exam_type: '',
+    })).toBe('동아 중2-1 평가문제집 2-(1) 시와 화자');
+  });
+});

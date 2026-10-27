@@ -3,6 +3,8 @@ import { naturalCompare } from '@/lib/category-tree';
 import { EXAM_TYPE_OPTIONS, isKiceRound, levelFromGrade, type SchoolLevel } from './source-form';
 import { GRAMMAR_AXIS_CLEARED, UNSPECIFIED_AXIS, type ProblemFilters } from './filters';
 import { buildMockExamNodes } from './mock-exam-tree';
+import { buildWorkbookNodes, workbookFilterPatch, workbookKey, WORKBOOK_ROOT_LABEL, type WorkbookFacet } from './workbook-tree';
+import { WORKBOOK_SOURCE_TYPE } from './source-form';
 
 /**
  * 기출 트리 (순수 함수).
@@ -22,13 +24,17 @@ import { buildMockExamNodes } from './mock-exam-tree';
 
 /** 기출 한 갈래 — 출처 행에서 뽑은 값 묶음 */
 export interface SchoolExamFacet {
-  /** '내신기출' 또는 '모의고사' — 어느 가지에 달릴지 정한다 */
+  /** '내신기출' · '모의고사' · '평가문제집' — 어느 가지에 달릴지 정한다 */
   source_type: string;
   school_name: string;
   year: string;
   grade: string;
   semester: string;
   exam_type: string;
+  /** 평가문제집 잎만 — 교과서 (workbook-tree.ts) */
+  textbook?: string;
+  /** 평가문제집 잎만 — 출처 제목(책) */
+  title?: string;
 }
 
 /** 어떤 값이든 잎에 달 수 있는 트리 노드 */
@@ -64,7 +70,7 @@ function axisValue(value: string): string {
 
 /** 학교 축을 통째로 비우는 패치 — 다른 트리로 넘어갈 때 쓴다 */
 export const SCHOOL_AXES_CLEARED: Partial<ProblemFilters> = {
-  source_type: '', school_name: '', year: '', grade: '', semester: '', exam_type: '',
+  source_type: '', school_name: '', year: '', grade: '', semester: '', exam_type: '', source_title: '',
 };
 
 /**
@@ -73,6 +79,10 @@ export const SCHOOL_AXES_CLEARED: Partial<ProblemFilters> = {
  * @returns 중복 판정·강조에 쓰는 문자열
  */
 export function schoolExamKey(facet: SchoolExamFacet): string {
+  // 평가문제집 잎은 교과서·책 제목으로 갈린다 — 학교 잎 열쇠의 모양은 그대로 둔다(테스트가 고정)
+  if (facet.source_type === WORKBOOK_SOURCE_TYPE) {
+    return workbookKey({ textbook: facet.textbook ?? '', grade: facet.grade, semester: facet.semester, title: facet.title ?? '' });
+  }
   return JSON.stringify([
     facet.source_type, facet.school_name, facet.year, facet.grade, facet.semester, facet.exam_type,
   ]);
@@ -185,6 +195,7 @@ function buildSchoolNodes(
  */
 export function buildSchoolExamTree(
   tuples: readonly SchoolExamFacet[],
+  workbooks: readonly WorkbookFacet[] = [],
 ): FacetTreeNode<SchoolExamFacet>[] {
   const seen = new Set<string>();
   const schoolRows: SchoolExamFacet[] = [];
@@ -218,6 +229,8 @@ export function buildSchoolExamTree(
   if (mockRows.length > 0) {
     roots.push({ id: 'mock', label: MOCK_ROOT_LABEL, children: buildMockExamNodes(mockRows, schoolExamKey) });
   }
+  const workbookNodes = buildWorkbookNodes(workbooks);
+  if (workbookNodes.length > 0) roots.push({ id: 'workbook', label: WORKBOOK_ROOT_LABEL, children: workbookNodes });
   return roots;
 }
 
@@ -232,6 +245,7 @@ export function buildSchoolExamTree(
  */
 export function schoolExamFilterPatch(facet: SchoolExamFacet): Partial<ProblemFilters> {
   if (facet.source_type === MOCK_EXAM_SOURCE_TYPE) return mockExamFilterPatch(facet);
+  if (facet.source_type === WORKBOOK_SOURCE_TYPE) return workbookFilterPatch(facet);
   return {
     source_type: SCHOOL_EXAM_SOURCE_TYPE,
     school_name: facet.school_name,
@@ -243,6 +257,7 @@ export function schoolExamFilterPatch(facet: SchoolExamFacet): Partial<ProblemFi
     semester: axisValue(facet.semester),
     exam_type: axisValue(facet.exam_type),
     textbook: '',
+    source_title: '',
     unit_path: [],
     // 작품·문법 트리도 같은 이유로 비운다 — 네 트리는 서로의 축을 남기지 않는다
     work_title: '',
@@ -269,32 +284,10 @@ function mockExamFilterPatch(facet: SchoolExamFacet): Partial<ProblemFilters> {
     semester: '',
     exam_type: axisValue(facet.exam_type),
     textbook: '',
+    source_title: '',
     unit_path: [],
     work_title: '',
     ...GRAMMAR_AXIS_CLEARED,
     page: 0,
   };
-}
-
-/** 아카이브 왼쪽 패널의 탭 */
-export type ArchiveSideTab = 'units' | 'schools' | 'works' | 'grammar';
-
-/**
- * 주소로 들어왔을 때 왼쪽 패널의 첫 탭.
- *
- * 링크를 받아 열었는데 엉뚱한 트리가 켜져 있으면 왜 이 목록인지 알 수 없다 —
- * 걸린 조건을 만든 트리를 보여 준다.
- * @param filters - 주소에서 복원한 필터
- * @returns 켤 탭
- */
-export function initialSideTab(
-  filters: Pick<ProblemFilters, 'source_type' | 'school_name' | 'unit_path' | 'work_title' | 'grammar_path'>,
-): ArchiveSideTab {
-  // 문법을 가장 먼저 본다 — 다른 세 축은 위쪽 필터 줄에도 드러나지만, 문법 개념은
-  // 트리에서 봐야 어느 가지인지 알 수 있다
-  if (filters.grammar_path.length > 0 && filters.unit_path.length === 0) return 'grammar';
-  if (filters.work_title && filters.unit_path.length === 0) return 'works';
-  // 모의고사는 학교가 없다 — 유형만으로 기출 탭을 켠다(그 트리에 모의고사·수능 가지가 있다)
-  const examPicked = Boolean(filters.school_name) || filters.source_type === MOCK_EXAM_SOURCE_TYPE;
-  return examPicked && filters.unit_path.length === 0 ? 'schools' : 'units';
 }

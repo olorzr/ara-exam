@@ -14,6 +14,8 @@ import type { SchoolExamFacet } from './school-exam-tree';
 export interface SourceFacetRow extends SchoolExamFacet {
   textbook: string;
   source_type: string;
+  /** 출처 제목 — **평가문제집만** 값이 있고 나머지는 ''(sql/82). 옛 캐시에 칸이 없어도 '' 로 읽는다 */
+  title: string;
 }
 
 /** 문법 태그 묶음(문항의 `grammar_paths` 그대로)과 그 묶음을 가진 문항 수 */
@@ -92,6 +94,8 @@ function pickSource(item: unknown): SourceFacetRow | null {
   return {
     school_name: row.school_name, year: row.year, grade: row.grade, textbook: row.textbook,
     source_type: row.source_type, semester: row.semester, exam_type: row.exam_type,
+    // 선택 칸 — 없거나 글자가 아니면 '' (sql/82 전의 캐시·다른 유형)
+    title: typeof item.title === 'string' ? item.title : '',
   };
 }
 

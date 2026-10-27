@@ -83,6 +83,7 @@ function ArchiveContent() {
           <ArchiveSidePanel
             filters={archive.filters}
             schoolExams={archive.facets.schoolExams}
+            workbooks={archive.facets.workbooks}
             works={archive.workFacets}
             grammarCounts={archive.grammarCounts}
             onChange={patch}

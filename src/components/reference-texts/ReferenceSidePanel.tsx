@@ -72,7 +72,7 @@ export default function ReferenceSidePanel({
               nodes={unitTree}
               selectedId={selectedId}
               onSelect={onChange}
-              emptyText="단원을 붙인 전문이 아직 없어요. 전문을 열어 '단원 고르기' 로 붙이면 여기 나와요."
+              emptyText="단원을 붙인 작품 전문·개념이 아직 없어요. 열어서 '단원 고르기' 로 붙이면 그 교과서 단원이 전부 여기 나와요."
             />
           </BrowseTreeFrame>
         )}

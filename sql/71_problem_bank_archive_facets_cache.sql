@@ -2,6 +2,8 @@
 -- 71. 기출 아카이브 패싯 서버 캐시 — archive_facets() 는 캐시를 돌려주고, 쓰기는 트랜잭션 id 로그만 남긴다
 -- 실행: node /Users/ara/Projects/Ara-system/scripts/run-sql.js /Users/ara/Projects/ara-exam/sql/71_problem_bank_archive_facets_cache.sql
 -- =============================================
+-- ⚠️⚠️ [2026-10-28] exam.archive_facets_refresh() 의 정식 정의는 이제 sql/82 다(평가문제집 출처 제목). 이 파일을 다시 돌리면 제목이 조용히 빠진다 —
+--       다시 돌렸으면 sql/82 를 뒤이어 돌릴 것.
 -- 배경 (2026-10-15 "여전히 작품 보기나 문법 보기를 하면 로딩이 너무 오래 걸려", 문항 30,191 · 지문 6,644 · 출처 1,131)
 --   pg_stat_statements: exam.archive_facets() 9회 · 평균 5.3초 · 최대 7.1초. 문항 표(heap 86 MB = 11,028쪽)를 네 번,
 --   지문 표(706쪽)를 한 번 훑는다. 이 인스턴스(shared_buffers 224 MB · work_mem 2 MB)는 최근 안 건드린 쪽을 첫 접근에

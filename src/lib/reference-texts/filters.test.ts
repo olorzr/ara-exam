@@ -16,7 +16,8 @@ describe('toReferenceTextQuery', () => {
   it('갈래마다 조건 하나', () => {
     expect(toReferenceTextQuery({ kind: 'unit', unit })).toEqual({ unit });
     expect(toReferenceTextQuery({ kind: 'unit-none' })).toEqual({ unitsEmpty: true });
-    expect(toReferenceTextQuery({ kind: 'work', title: '봄봄' })).toEqual({ title: '봄봄' });
+    // 작품 잎은 작품만 — 같은 제목의 개념 정리를 섞지 않는다(코덱스 3R)
+    expect(toReferenceTextQuery({ kind: 'work', title: '봄봄' })).toEqual({ title: '봄봄', kind: '작품' });
     expect(toReferenceTextQuery({ kind: 'grammar-none' })).toEqual({ grammarEmpty: true });
   });
 

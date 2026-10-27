@@ -27,6 +27,11 @@ export interface ProblemFilters {
   exam_type: string;
   /** 교과서(= 출처의 textbook) */
   textbook: string;
+  /**
+   * 출처 제목 **같음** — 평가문제집 가지의 책(소단원 출처) 잎이 건다(sql/82, 주소 `src`).
+   * 자유 텍스트라 '미지정만' 을 쓰지 않는다. 위쪽 필터 줄에는 칸이 없다(트리에서만 건다).
+   */
+  source_title: string;
   area_path: string[];
   /** 교과서 단원 이름 경로 [대단원, 소단원] */
   unit_path: string[];
@@ -61,7 +66,7 @@ export interface ProblemFilters {
 
 export const EMPTY_FILTERS: ProblemFilters = {
   source_type: '', school_name: '', year: '', school_level: '', grade: '', semester: '', exam_type: '', textbook: '',
-  area_path: [], unit_path: [], grammar_path: [], question_kind: '', work_title: '', solo: false,
+  source_title: '', area_path: [], unit_path: [], grammar_path: [], question_kind: '', work_title: '', solo: false,
   search: '', page: 0,
 };
 
@@ -121,6 +126,7 @@ export function filtersToQueryString(filters: ProblemFilters): string {
   if (filters.semester) params.set('sem', filters.semester);
   if (filters.exam_type) params.set('exam', filters.exam_type);
   if (filters.textbook) params.set('book', filters.textbook);
+  if (filters.source_title) params.set('src', filters.source_title);
   if (filters.area_path.length > 0) params.set('area', filters.area_path.join(AREA_SEPARATOR));
   if (filters.unit_path.length > 0) params.set('unit', filters.unit_path.join(AREA_SEPARATOR));
   if (filters.grammar_path.length > 0) params.set('gram', filters.grammar_path.join(AREA_SEPARATOR));
@@ -152,6 +158,7 @@ export function filtersFromParams(params: URLSearchParams): ProblemFilters {
     semester: params.get('sem') ?? '',
     exam_type: params.get('exam') ?? '',
     textbook: params.get('book') ?? '',
+    source_title: params.get('src') ?? '',
     area_path: area ? area.split(AREA_SEPARATOR).filter(Boolean) : [],
     unit_path: unit ? unit.split(AREA_SEPARATOR).filter(Boolean) : [],
     grammar_path: grammar ? grammar.split(AREA_SEPARATOR).filter(Boolean) : [],
@@ -196,6 +203,7 @@ export function toProblemQuery(filters: ProblemFilters): ProblemQuery {
     ...axisEntry('semester', filters.semester, true),
     ...axisEntry('exam_type', filters.exam_type, true),
     ...axisEntry('textbook', filters.textbook),
+    ...axisEntry('source_title', filters.source_title),
     ...(filters.area_path.length > 0 ? { area_path: filters.area_path } : {}),
     ...(filters.unit_path.length > 0 ? { unit_path: filters.unit_path } : {}),
     // 고른 마디와 **그 아래 경로 전부**(중간 마디 포함)로 편다 — 저장값이 경로 문자열이라
@@ -221,7 +229,7 @@ export function toProblemQuery(filters: ProblemFilters): ProblemQuery {
 export function hasActiveFilters(filters: ProblemFilters): boolean {
   return Boolean(
     filters.source_type || filters.school_name || filters.year || filters.school_level || filters.grade
-    || filters.semester || filters.exam_type || filters.textbook || filters.area_path.length > 0
+    || filters.semester || filters.exam_type || filters.textbook || filters.source_title || filters.area_path.length > 0
     || filters.unit_path.length > 0 || filters.grammar_path.length > 0
     || filters.question_kind || filters.work_title || filters.search
     // 축 없이 켜져만 있는 칸은 조건이 아니다 — 그것 때문에 '조건 지우기' 가 뜨면 눌러도 목록이 그대로다

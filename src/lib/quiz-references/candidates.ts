@@ -3,6 +3,13 @@ import { escapeIlike } from '@/lib/problem-bank/queries';
 import { splitWorkTitles } from '@/lib/problem-bank/work-title';
 import { searchPassagesByTitle, type PassagePickRow } from '@/lib/problem-bank/passage-search';
 import { searchReferenceTexts } from '@/lib/reference-texts/queries';
+import type { ReferenceTextQuery } from '@/lib/reference-texts/filters';
+
+/**
+ * 참고자료로 찾는 '전문' 은 **작품 전문만**이다(sql/79) — 개념 정리는 제목·지은이 신호로 붙일 근거가 없고,
+ * 붙으면 '전문 · 피동 표현 핵심 개념' 이 지문의 원문인 것처럼 실린다.
+ */
+const WORKS_ONLY: ReferenceTextQuery = { kind: '작품' };
 import type { ReferenceTextListItem } from '@/types/reference-text';
 import { QUIZ_REFERENCE_CANDIDATE_LIMIT } from './constants';
 import {
@@ -144,7 +151,7 @@ export async function fetchReferenceCandidates(
     });
 
     jobs.push(async () => {
-      const rows = await searchReferenceTexts(title, 'title', QUIZ_REFERENCE_CANDIDATE_LIMIT);
+      const rows = await searchReferenceTexts(title, 'title', QUIZ_REFERENCE_CANDIDATE_LIMIT, WORKS_ONLY);
       return textHits(rows, 'title', `제목에 '${title}'`);
     });
 
@@ -158,7 +165,7 @@ export async function fetchReferenceCandidates(
 
   for (const author of splitWorkTitles(signals.author)) {
     jobs.push(async () => {
-      const rows = await searchReferenceTexts(author, 'author', QUIZ_REFERENCE_CANDIDATE_LIMIT);
+      const rows = await searchReferenceTexts(author, 'author', QUIZ_REFERENCE_CANDIDATE_LIMIT, WORKS_ONLY);
       return textHits(rows, 'author', `지은이 '${author}'`);
     });
   }

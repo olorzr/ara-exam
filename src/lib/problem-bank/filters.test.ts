@@ -249,3 +249,14 @@ describe('hasActiveFilters', () => {
     expect(hasActiveFilters({ ...EMPTY_FILTERS, page: 3 })).toBe(false);
   });
 });
+
+describe('출처 제목 축 (평가문제집 책 잎, sql/82)', () => {
+  it('주소 src 로 오가고 조회 조건 source_title 이 된다', () => {
+    const filters = { ...EMPTY_FILTERS, source_type: '평가문제집', source_title: '동아 중2-1 평가문제집 2-(1) 시와 화자' };
+    const qs = filtersToQueryString(filters);
+    expect(qs).toContain('src=');
+    expect(filtersFromParams(new URLSearchParams(qs.slice(1))).source_title).toBe(filters.source_title);
+    expect(toProblemQuery(filters).source_title).toBe(filters.source_title);
+    expect(hasActiveFilters({ ...EMPTY_FILTERS, source_title: 'x' })).toBe(true);
+  });
+});

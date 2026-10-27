@@ -61,7 +61,8 @@ describe('useReferenceTextEditor — 새로 만들기', () => {
     await act(async () => { await result.current.save(); });
 
     expect(insertReferenceText).toHaveBeenCalledWith({
-      title: '봄봄', author: '', body: '장인님!\n\n다음', units: [], grammar_paths: [], note: '',
+      title: '봄봄', author: '', body: '장인님!\n\n다음', kind: '작품', format: 'text', seq: null, tags: [],
+      units: [], grammar_paths: [], note: '',
     });
     expect(result.current.draft.title).toBe('봄봄');
     expect(result.current.dirty).toBe(false);
@@ -150,7 +151,8 @@ describe('useReferenceTextEditor — 분류 칸', () => {
 describe('useReferenceTextEditor — 고치기', () => {
   const existing = {
     id: 'r1', title: '봄봄', author: '김유정', body: '본문',
-    char_count: 2, units: [], grammar_paths: [], note: '', user_id: 'u', updated_by: null,
+    char_count: 2, kind: '작품' as const, format: 'text' as const, seq: null, tags: [], source_key: null,
+    units: [], grammar_paths: [], note: '', user_id: 'u', updated_by: null,
     created_at: 'c', updated_at: 't0',
   };
 
@@ -159,7 +161,8 @@ describe('useReferenceTextEditor — 고치기', () => {
     const { result } = renderHook(() => useReferenceTextEditor({ ...opts, id: 'r1' }));
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.draft).toEqual({
-      title: '봄봄', author: '김유정', body: '본문', units: [], grammar_paths: [], note: '',
+      title: '봄봄', author: '김유정', body: '본문', kind: '작품', format: 'text', seq: '', tags: [],
+      units: [], grammar_paths: [], note: '',
     });
     expect(result.current.dirty).toBe(false);
   });

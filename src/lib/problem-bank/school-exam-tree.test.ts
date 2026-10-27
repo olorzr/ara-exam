@@ -1,7 +1,8 @@
+import { initialSideTab } from './archive-side-tab';
 import { describe, it, expect } from 'vitest';
 import { EMPTY_FILTERS, UNSPECIFIED_AXIS } from './filters';
 import {
-  buildSchoolExamTree, initialSideTab, schoolExamFilterPatch, schoolExamKey,
+  buildSchoolExamTree, schoolExamFilterPatch, schoolExamKey,
   schoolExamLeafLabel, type FacetTreeNode, type SchoolExamFacet,
 } from './school-exam-tree';
 
@@ -153,7 +154,7 @@ describe('schoolExamFilterPatch — 모의고사', () => {
     }));
     expect(patch).toEqual({
       source_type: '모의고사', school_name: '', year: '2027', grade: '', school_level: '',
-      semester: '', exam_type: '6월 모평', textbook: '', unit_path: [], work_title: '',
+      semester: '', exam_type: '6월 모평', textbook: '', source_title: '', unit_path: [], work_title: '',
       grammar_path: [], page: 0,
     });
   });
@@ -186,7 +187,7 @@ describe('schoolExamFilterPatch', () => {
     const patch = schoolExamFilterPatch(facet());
     expect(patch).toEqual({
       source_type: '내신기출', school_name: '상현중', year: '2026', grade: '중2', school_level: '',
-      semester: '1학기', exam_type: '중간', textbook: '', unit_path: [], work_title: '',
+      semester: '1학기', exam_type: '중간', textbook: '', source_title: '', unit_path: [], work_title: '',
       grammar_path: [], page: 0,
     });
   });
@@ -260,5 +261,37 @@ describe('initialSideTab', () => {
   it('단원 조건이 함께 있으면 교과서 탭 (문법이어도)', () => {
     expect(initialSideTab({ ...EMPTY_FILTERS, grammar_path: ['음운'], unit_path: ['1. 문학'] }))
       .toBe('units');
+  });
+});
+
+describe('평가문제집 가지 (sql/80·82)', () => {
+  const book = (title: string, over: Partial<SchoolExamFacet> = {}) => ({
+    source_type: '평가문제집', school_name: '', year: '2026', grade: '중2', semester: '1학기', exam_type: '',
+    textbook: '동아', title, ...over,
+  });
+
+  it('모의고사 뒤에 붙고 교과서 › 학년·학기 › 책 으로 묶인다', () => {
+    const tree = buildSchoolExamTree([], [book('동아 중2-1 평가문제집 2-(1) 시와 화자'), book('동아 중2-1 평가문제집 1-(1) 효과적으로 듣고 말하기')]);
+    expect(tree.map((n) => n.label)).toEqual(['평가문제집']);
+    const term = tree[0].children[0].children[0];
+    expect(term.label).toBe('중2 1학기');
+    expect(term.children.map((n) => n.label)).toEqual(['1-(1) 효과적으로 듣고 말하기', '2-(1) 시와 화자']);
+  });
+
+  it('잎 열쇠는 교과서·책 제목으로 갈린다 — 학교 잎 열쇠 모양은 그대로', () => {
+    expect(schoolExamKey(book('가'))).not.toBe(schoolExamKey(book('나')));
+    expect(schoolExamKey({ source_type: '내신기출', school_name: '상현중', year: '2026', grade: '중2', semester: '1학기', exam_type: '중간' }))
+      .toBe(JSON.stringify(['내신기출', '상현중', '2026', '중2', '1학기', '중간']));
+  });
+
+  it('책을 고르면 그 출처 제목까지 걸고 다른 트리 축은 비운다', () => {
+    expect(schoolExamFilterPatch(book('동아 중2-1 평가문제집 2-(1) 시와 화자'))).toMatchObject({
+      source_type: '평가문제집', textbook: '동아', grade: '중2', semester: '1학기',
+      source_title: '동아 중2-1 평가문제집 2-(1) 시와 화자', school_name: '', exam_type: '', unit_path: [], work_title: '',
+    });
+  });
+
+  it('평가문제집이 걸려 있으면 기출 탭부터 연다', () => {
+    expect(initialSideTab({ ...EMPTY_FILTERS, source_type: '평가문제집' })).toBe('schools');
   });
 });

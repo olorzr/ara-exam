@@ -40,6 +40,12 @@ export default function ReferenceTextImport({ hasBody, onText }: ReferenceTextIm
    */
   const hasBodyRef = useRef(hasBody);
   useEffect(() => { hasBodyRef.current = hasBody; }, [hasBody]);
+  /**
+   * 넣는 콜백 — **지금 것**. 읽는 사이 본문 형식(평문 ↔ 서식)이 바뀌면 콜백이 감싸는 법도 바뀐다 —
+   * 시작할 때 닫아 둔 콜백을 부르면 옛 형식으로 넣는다(평문에 `<p>`, 서식에 이스케이프 안 된 글, 코덱스 1R).
+   */
+  const onTextRef = useRef(onText);
+  useEffect(() => { onTextRef.current = onText; }, [onText]);
 
   /** 가져온 글을 넣는다. 이미 쓴 글이 있으면 먼저 묻는다 */
   const apply = (text: string) => {
@@ -48,7 +54,7 @@ export default function ReferenceTextImport({ hasBody, onText }: ReferenceTextIm
       return;
     }
     if (hasBodyRef.current && !window.confirm('붙여 넣은 본문을 파일 내용으로 바꿀까요?')) return;
-    onText(text);
+    onTextRef.current(text);
   };
 
   /** 고른 파일을 읽는다. 같은 파일을 다시 고를 수 있게 값을 비운다 */

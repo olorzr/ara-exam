@@ -3,6 +3,7 @@ import { GRAMMAR_SELF_LEAF, grammarNodeKey } from '@/lib/problem-bank/grammar-br
 import { unitPathLabel } from '@/lib/problem-bank/unit-tree';
 import { workKey } from '@/lib/problem-bank/work-tree';
 import { NO_GRADE_OPTION } from '@/lib/textbook-grade';
+import type { ReferenceTextKind } from '@/types/reference-text';
 
 /**
  * 작품 전문 목록을 **무엇으로 훑고 있는가** (순수 함수).
@@ -67,6 +68,10 @@ export interface ReferenceTextQuery {
   grammar_paths?: string[];
   /** `grammar_paths = '{}'` */
   grammarEmpty?: true;
+  /** `kind = …` — 목록 위 칩이 걸거나, 작품 축이 '작품' 으로 못 박는다 */
+  kind?: ReferenceTextKind;
+  /** 칩과 축이 서로 다른 종류를 요구한다 — 아무것도 걸리지 않아야 한다(작품 잎 + 개념 칩) */
+  noMatch?: true;
 }
 
 /** '분류 없음' 잎의 열쇠 — 트리와 강조가 같은 값을 쓴다 */
@@ -103,15 +108,30 @@ export function unitScopeLabel(scope: ReferenceUnitScope): string {
 }
 
 /**
- * 축을 조회 조건으로.
+ * 축(과 종류 칩)을 조회 조건으로.
  * @param axis - 지금 축
- * @returns 조회 조건 (축이 없으면 빈 객체)
+ * @param kind - 종류 칩 (없으면 둘 다)
+ * @returns 조회 조건 (축·칩이 없으면 빈 객체)
  */
-export function toReferenceTextQuery(axis: ReferenceBrowseAxis): ReferenceTextQuery {
+export function toReferenceTextQuery(axis: ReferenceBrowseAxis, kind?: ReferenceTextKind): ReferenceTextQuery {
+  const query = axisQuery(axis);
+  if (!kind) return query;
+  // 축이 이미 종류를 못 박았으면(작품 잎) 칩은 교집합이다 — 어긋나면 빈 목록
+  if (query.kind && query.kind !== kind) return { ...query, noMatch: true };
+  return { ...query, kind };
+}
+
+/**
+ * 축 하나만 조회 조건으로.
+ * @param axis - 지금 축
+ * @returns 조회 조건
+ */
+function axisQuery(axis: ReferenceBrowseAxis): ReferenceTextQuery {
   switch (axis.kind) {
     case 'unit': return { unit: axis.unit };
     case 'unit-none': return { unitsEmpty: true };
-    case 'work': return { title: axis.title };
+    // 작품 트리는 작품만 센다(`referenceWorkFacets`) — 같은 제목의 개념 정리까지 나오면 (n) 이 거짓이 된다(코덱스 3R)
+    case 'work': return { title: axis.title, kind: '작품' };
     // 상위 개념을 고르면 그 아래 경로를 펴서 겹침(&&)으로 찾는다 — 문제 은행과 같은 규칙
     case 'grammar': return { grammar_paths: grammarPathsUnder(axis.path) };
     case 'grammar-none': return { grammarEmpty: true };
@@ -159,10 +179,10 @@ export function tabForAxis(axis: ReferenceBrowseAxis): ReferenceSideTab {
 export function describeAxis(axis: ReferenceBrowseAxis): string {
   switch (axis.kind) {
     case 'unit': return unitScopeLabel(axis.unit);
-    case 'unit-none': return '교과서 단원을 안 붙인 전문';
+    case 'unit-none': return '교과서 단원을 안 붙인 것';
     case 'work': return `작품 · ${axis.title}`;
     case 'grammar': return `문법 · ${formatGrammarPath(axis.path)}`;
-    case 'grammar-none': return '문법 분류를 안 붙인 전문';
+    case 'grammar-none': return '문법 분류를 안 붙인 것';
     default: return '';
   }
 }

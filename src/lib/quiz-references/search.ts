@@ -2,6 +2,10 @@ import { supabase } from '@/lib/supabase';
 import { escapeIlike } from '@/lib/problem-bank/queries';
 import { searchPassages } from '@/lib/problem-bank/passage-search';
 import { fetchRecentReferenceTexts, searchReferenceTexts } from '@/lib/reference-texts/queries';
+import type { ReferenceTextQuery } from '@/lib/reference-texts/filters';
+
+/** '전문' 고르기는 작품 전문만 — 개념 정리는 참고자료 갈래가 아니다(sql/79, candidates.ts 와 같다) */
+const WORKS_ONLY: ReferenceTextQuery = { kind: '작품' };
 import { REFERENCE_TEXT_PICK_LIMIT } from '@/lib/reference-texts/constants';
 import { QUIZ_REFERENCE_CANDIDATE_LIMIT } from './constants';
 import { passageHits, textHits } from './candidates';
@@ -106,13 +110,13 @@ export async function searchReferenceCandidates(
 
   const keyword = term.trim();
   if (keyword === '') {
-    const rows = await fetchRecentReferenceTexts(Math.min(limit, REFERENCE_TEXT_PICK_LIMIT));
+    const rows = await fetchRecentReferenceTexts(Math.min(limit, REFERENCE_TEXT_PICK_LIMIT), WORKS_ONLY);
     return textHits(rows, 'title', '').map((entry) => entry.candidate);
   }
 
   const [byTitle, byAuthor] = await Promise.all([
-    searchReferenceTexts(keyword, 'title', limit),
-    searchReferenceTexts(keyword, 'author', limit),
+    searchReferenceTexts(keyword, 'title', limit, WORKS_ONLY),
+    searchReferenceTexts(keyword, 'author', limit, WORKS_ONLY),
   ]);
   const merged = new Map<string, ReferenceCandidate>();
   for (const entry of textHits([...byTitle, ...byAuthor], 'title', '')) {

@@ -2,6 +2,8 @@
 -- 72. 기출 아카이브 작품·문법 목록 — GIN 인덱스를 타는 SECURITY DEFINER 함수 (PostgREST 가 그 결과에 나머지 조건을 건다)
 -- 실행: node /Users/ara/Projects/Ara-system/scripts/run-sql.js /Users/ara/Projects/ara-exam/sql/72_problem_bank_archive_list_rpc.sql
 -- =============================================
+-- ⚠️⚠️ [2026-10-28] exam.problems_for_archive() 의 정식 정의는 이제 sql/82 다(평가문제집 출처 제목). 이 파일을 다시 돌리면 제목이 조용히 빠진다 —
+--       다시 돌렸으면 sql/82 를 뒤이어 돌릴 것.
 -- 배경 (2026-10-15, sql/71 과 같은 제보)
 --   pg_stat_statements: 작품 목록(`work_titles @>`) 667회 · 평균 243 ms · 최대 4.9초, 문법 목록(`grammar_paths &&`) 106회 ·
 --   평균 479 ms · 최대 5.8초. RLS 아래에서는 `@>`·`&&`·배열 `=` 가 leakproof 가 아니라 GIN 인덱스가 조건이 될 수 없어

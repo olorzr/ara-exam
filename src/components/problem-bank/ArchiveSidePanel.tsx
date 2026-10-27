@@ -7,16 +7,18 @@ import SchoolExamTreePanel from '@/components/problem-bank/SchoolExamTreePanel';
 import UnitTreePanel from '@/components/problem-bank/UnitTreePanel';
 import WorkTreePanel from '@/components/problem-bank/WorkTreePanel';
 import type { WorkFacet } from '@/lib/problem-bank/facets';
+import { initialSideTab, type ArchiveSideTab } from '@/lib/problem-bank/archive-side-tab';
 import type { ProblemFilters } from '@/lib/problem-bank/filters';
-import {
-  initialSideTab, type ArchiveSideTab, type SchoolExamFacet,
-} from '@/lib/problem-bank/school-exam-tree';
+import type { SchoolExamFacet } from '@/lib/problem-bank/school-exam-tree';
+import type { WorkbookFacet } from '@/lib/problem-bank/workbook-tree';
 
 const TABS: ArchiveSideTab[] = ['units', 'schools', 'works', 'grammar'];
 
 interface ArchiveSidePanelProps {
   filters: ProblemFilters;
   schoolExams: SchoolExamFacet[];
+  /** 평가문제집 책들 — 기출 트리의 평가문제집 가지(sql/80·82) */
+  workbooks: WorkbookFacet[];
   works: WorkFacet[];
   /** 문법 경로별 문항 수 — 트리는 마스터로 그리고 건수만 얹는다 */
   grammarCounts: ReadonlyMap<string, number>;
@@ -37,7 +39,7 @@ interface ArchiveSidePanelProps {
  * 아카이브(`/problems/archive`)와 문제지 조합(`/problems/papers/new`)이 이 패널을 함께 쓴다.
  */
 export default function ArchiveSidePanel({
-  filters, schoolExams, works, grammarCounts, onChange,
+  filters, schoolExams, workbooks, works, grammarCounts, onChange,
 }: ArchiveSidePanelProps) {
   const [tab, setTab] = useState<ArchiveSideTab>(() => initialSideTab(filters));
   /**
@@ -82,7 +84,7 @@ export default function ArchiveSidePanel({
       </TabsContent>
       <TabsContent value="schools" keepMounted>
         {seen.has('schools') && (
-          <SchoolExamTreePanel filters={filters} tuples={schoolExams} onChange={onChange} />
+          <SchoolExamTreePanel filters={filters} tuples={schoolExams} workbooks={workbooks} onChange={onChange} />
         )}
       </TabsContent>
       <TabsContent value="works" keepMounted>

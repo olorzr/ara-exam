@@ -5,7 +5,7 @@ describe('parseArchiveFacets', () => {
   const good = {
     sources: [{
       school_name: '상현중', year: '2026', grade: '중2', textbook: '천재(정호웅)',
-      source_type: '내신기출', semester: '1학기', exam_type: '중간',
+      source_type: '내신기출', semester: '1학기', exam_type: '중간', title: '',
     }],
     area_paths: [['문학', '운문 문학']],
     unit_paths: [['1. 나를 깨우는, 문학']],
@@ -29,6 +29,12 @@ describe('parseArchiveFacets', () => {
     expect(parsed.work_titles).toEqual([]);
     expect(parsed.area_paths).toEqual([]);
     expect(parsed.passage_works).toHaveLength(1);
+  });
+
+  it('출처 제목(sql/82)이 빠진 옛 캐시도 받는다 — 빈 제목으로 읽는다', () => {
+    const { title: _omit, ...old } = good.sources[0];
+    void _omit;
+    expect(parseArchiveFacets({ ...good, sources: [old] }).sources[0].title).toBe('');
   });
 
   it('출처 칸의 null 은 빈 문자열로 읽는다(DB 의 빈 값 규약)', () => {

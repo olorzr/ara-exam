@@ -1,19 +1,35 @@
 /**
- * 작품 전문 (sql/30 `exam.reference_texts`).
+ * 작품 전문 · 개념 (sql/30 · 60 · 79 `exam.reference_texts`).
  *
- * 개념 관리에 올려 두는 **작품 원문 전체**다. 문제 만들기(O,X·단답형)가 참고자료로
- * 함께 읽어, 잘린 지문만으로는 낼 수 없는 문항의 근거를 여기서 가져온다.
+ * 교과서 단원별 지식 창고다. 한 표에 두 갈래가 든다(`kind`):
+ * - **작품** — 제재 원문 전체. 문제 만들기(O,X·단답형)가 참고자료로 함께 읽어, 잘린 지문만으로는
+ *   낼 수 없는 문항의 근거를 여기서 가져온다.
+ * - **개념** — 단원의 핵심 개념 정리·제재 개관(표·목록이 든 HTML). 개념지(`concept_sheets`,
+ *   빈칸 시험지)와는 다른 것이다.
  *
- * ⚠️ `body` 는 **평문**이다(개념지의 `editor_html` 과 다르다). 서식이 필요 없고,
- *    평문이면 화면이 텍스트 노드로만 그려 정화를 한 겹 더 두는 것보다 확실하다.
+ * ⚠️ `body` 의 모양은 `format` 이 정한다 — `text` 는 평문(텍스트 노드로만 그린다), `html` 은 문항 정화기
+ *    (`sanitizeProblemHTML`) 프로필 HTML 이다(저장할 때·그릴 때 둘 다 정화한다).
  */
 export interface ReferenceText {
   id: string;
   /** 작품명. 자동 매칭이 이 이름으로 지문을 찾는다 */
   title: string;
   author: string;
-  /** 작품 전문 (평문) */
+  /** 본문 — `format` 이 `text` 면 평문, `html` 이면 정화한 HTML */
   body: string;
+  /** 작품 전문 / 개념 정리 (sql/79) */
+  kind: ReferenceTextKind;
+  /** 본문 형식 (sql/79) */
+  format: ReferenceTextFormat;
+  /** 단원 안 차례 — 작을수록 앞, 없으면 맨 뒤 (0~9999) */
+  seq: number | null;
+  /** 구역·성격 꼬리표 ('핵심 정리'·'제재 개관'·'더 읽어 보기' …, 최대 8) */
+  tags: string[];
+  /**
+   * 헤드리스 적재의 멱등 열쇠(`평가문제집|…`). **앱은 보내지 않는다** — 읽기만 한다.
+   * 화면에서 만든 행은 null 이다.
+   */
+  source_key: string | null;
   /**
    * 본문 글자 수.
    *
@@ -38,6 +54,12 @@ export interface ReferenceText {
   created_at: string;
   updated_at: string;
 }
+
+/** 작품 전문 / 개념 정리 */
+export type ReferenceTextKind = '작품' | '개념';
+
+/** 본문 형식 — 평문 / 문항 정화기 프로필 HTML */
+export type ReferenceTextFormat = 'text' | 'html';
 
 /**
  * 목록용 경량 타입 — 무거운 `body` 는 뺀다.

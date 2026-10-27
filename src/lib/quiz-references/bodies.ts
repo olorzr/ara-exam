@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { htmlToPlainText } from '@/lib/concept-pick/plain-text';
 import { fetchPassagesByIds } from '@/lib/problem-bank/detail-queries';
-import { fetchReferenceBodies } from '@/lib/reference-texts/queries';
+import { fetchReferenceBodies, type ReferenceBodyRow } from '@/lib/reference-texts/queries';
 import type { QuizReferenceKind } from './types';
 
 /**
@@ -59,9 +59,19 @@ export async function loadReferencePlain(
     const plain = ref.kind === 'passage'
       ? passagePlain.get(ref.id)
       : ref.kind === 'text'
-        ? texts.get(ref.id)
+        ? textPlain(texts.get(ref.id))
         : sheetPlain.get(ref.id);
     if (plain !== undefined) out.set(ref.key, plain);
   }
   return out;
+}
+
+/**
+ * 작품 전문 본문을 평문으로 — HTML 형식(sql/79)이면 태그째 보내지 않는다(개념지·지문과 같은 변환).
+ * @param row - 본문·형식 (없으면 undefined)
+ * @returns 평문
+ */
+function textPlain(row: ReferenceBodyRow | undefined): string | undefined {
+  if (!row) return undefined;
+  return row.format === 'html' ? htmlToPlainText(row.body) : row.body;
 }

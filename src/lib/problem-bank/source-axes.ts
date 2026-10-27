@@ -25,6 +25,11 @@ export interface SourceAxisQuery {
   exam_type?: string;
   /** 교과서 (출처의 textbook) */
   textbook?: string;
+  /**
+   * 출처 제목 **같음** — 평가문제집 책 단위 잎이 건다(sql/82, 컬럼 `title`).
+   * ⚠️ 이름이 `title` 이 아닌 까닭: 올라간 기출 목록의 조회 조건은 `title` 을 **제목 검색(ilike)** 으로 쓴다.
+   */
+  source_title?: string;
 }
 
 /**
@@ -34,6 +39,8 @@ export interface SourceAxisQuery {
  */
 export type SourceAxisArgs = Partial<Record<(typeof SOURCE_EQ_AXES)[number], string>> & {
   grades?: string[];
+  /** 출처 제목 같음 — sql/82 가 받는 키 이름은 컬럼 그대로 `title` 이다 */
+  title?: string;
 };
 
 /** 조건을 걸 수 있는 요청 — PostgREST 필터 빌더의 필요한 부분만 */
@@ -60,6 +67,7 @@ export function applySourceAxes<T extends SourceAxisFilterable<T>>(
     const value = query[key];
     if (value !== undefined) next = next.eq(`${prefix}${key}`, value);
   }
+  if (query.source_title !== undefined) next = next.eq(`${prefix}title`, query.source_title);
   // 학교급을 편 학년들 — 학년 칸(eq)과 **따로** 건다(둘 다 걸리면 교집합)
   if (query.grades && query.grades.length > 0) next = next.in(`${prefix}grade`, query.grades);
   return next;
@@ -80,6 +88,7 @@ export function sourceAxisArgs(query: SourceAxisQuery): SourceAxisArgs {
     const value = query[key];
     if (value !== undefined) out[key] = value;
   }
+  if (query.source_title !== undefined) out.title = query.source_title;
   if (query.grades && query.grades.length > 0) out.grades = [...query.grades];
   return out;
 }

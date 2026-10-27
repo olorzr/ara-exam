@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { buildReferenceGrammarTree } from '@/lib/reference-texts/browse-trees';
 import { fetchReferenceTextFacets, type ReferenceFacetRow } from '@/lib/reference-texts/facets';
 import { buildReferenceUnitTree } from '@/lib/reference-texts/unit-browse-tree';
+import { loadReferenceUnitMaster } from '@/lib/reference-texts/unit-master';
+import type { ReferenceUnit } from '@/types/reference-text';
 
 /**
  * 작품 전문 왼쪽 패널의 재료 — 모든 전문의 분류 칸과 거기서 나온 트리.
@@ -14,11 +16,22 @@ import { buildReferenceUnitTree } from '@/lib/reference-texts/unit-browse-tree';
  *
  * ⚠️ 다시 읽다 실패하면 **이전 트리를 남긴다** — 트리가 조금 낡는 편이 통째로 비는 것보다 낫다
  *    (목록은 그와 별개로 그대로 쓸 수 있다).
+ * 단원 마스터(카테고리 관리)는 **화면에 들어올 때 한 번만** 읽는다(표 여섯 개) — 지우고 다시 읽을 때마다
+ * 읽지 않는다. 못 읽으면 빈 목록이라 트리가 '붙은 단원만' 으로 물러선다(빈 단원 (0) 표시만 빠진다).
  */
 export function useReferenceTextFacets() {
   const [rows, setRows] = useState<ReferenceFacetRow[]>([]);
   /** 다시 읽기 세대 — 올리면 효과가 다시 돈다 */
   const [generation, setGeneration] = useState(0);
+  const [master, setMaster] = useState<ReferenceUnit[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    loadReferenceUnitMaster()
+      .then((next) => { if (alive) setMaster(next); })
+      .catch(() => { /* 붙은 단원만으로 그린다 */ });
+    return () => { alive = false; };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -28,7 +41,7 @@ export function useReferenceTextFacets() {
     return () => { alive = false; };
   }, [generation]);
 
-  const unitTree = useMemo(() => buildReferenceUnitTree(rows), [rows]);
+  const unitTree = useMemo(() => buildReferenceUnitTree(rows, master), [rows, master]);
   const grammarTree = useMemo(() => buildReferenceGrammarTree(rows), [rows]);
   const reload = useCallback(() => setGeneration((n) => n + 1), []);
 

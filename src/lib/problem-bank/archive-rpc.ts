@@ -30,9 +30,13 @@ export interface ArchiveRpcArgs {
   p_source: SourceAxisArgs;
 }
 
-/** 함수가 거르는 조회 칸 — 체인에는 이것을 뺀 나머지만 넘긴다 */
+/**
+ * 함수가 거르는 조회 칸 — 체인에는 이것을 뺀 나머지만 넘긴다.
+ * ⚠️ 출처 칸은 **전부** 여기 있어야 한다 — 하나라도 나머지에 남으면 체인이 함수 결과의 임베드에
+ *    `source.…=eq.` 를 걸고 운영 PostgREST 14.5 가 그 요청을 거절한다(평가문제집 책 제목 `source_title`, 코덱스 1R).
+ */
 const RPC_COVERED_KEYS = [
-  'work_title', 'only_work', 'grammar_paths', ...SOURCE_EQ_AXES, 'grades',
+  'work_title', 'only_work', 'grammar_paths', ...SOURCE_EQ_AXES, 'source_title', 'grades',
 ] as const satisfies readonly (keyof ProblemQuery)[];
 
 /** 함수 인자와 체인에 넘길 나머지 조건 */

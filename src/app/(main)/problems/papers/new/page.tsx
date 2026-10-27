@@ -116,6 +116,7 @@ export default function PaperComposePage() {
           <ArchiveSidePanel
             filters={archive.filters}
             schoolExams={archive.facets.schoolExams}
+            workbooks={archive.facets.workbooks}
             works={archive.workFacets}
             grammarCounts={archive.grammarCounts}
             onChange={bulk.patch}

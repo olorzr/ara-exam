@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { pgArrayLiteral } from '@/lib/pg-array-literal';
 import { escapeIlike } from '@/lib/problem-bank/queries';
-import type { ReferenceText, ReferenceTextListItem } from '@/types/reference-text';
+import type { ReferenceText, ReferenceTextFormat, ReferenceTextListItem } from '@/types/reference-text';
 import { REFERENCE_TEXT_LIST_LIMIT, REFERENCE_TEXT_PICK_LIMIT } from './constants';
 import type { ReferenceTextQuery } from './filters';
 
@@ -15,7 +15,7 @@ import type { ReferenceTextQuery } from './filters';
 
 // ⚠️ 한 줄로 둘 것 — `+` 로 이으면 리터럴 타입이 string 으로 넓어져 PostgREST 의 행 타입
 //    추론이 통째로 풀린다. `ReferenceTextListItem` 과 **1:1** 로 맞춰 둘 것
-export const REFERENCE_TEXT_LIST_COLUMNS = 'id,title,author,char_count,units,grammar_paths,note,user_id,updated_by,created_at,updated_at';
+export const REFERENCE_TEXT_LIST_COLUMNS = 'id,title,author,kind,format,seq,tags,source_key,char_count,units,grammar_paths,note,user_id,updated_by,created_at,updated_at';
 
 /** 조건을 걸 수 있는 요청 — PostgREST 필터 빌더의 필요한 부분만(`applySourceAxes` 와 같은 규약) */
 interface ReferenceQueryFilterable<T> {
@@ -47,7 +47,36 @@ export function applyReferenceQuery<T extends ReferenceQueryFilterable<T>>(
     next = next.overlaps('grammar_paths', pgArrayLiteral(query.grammar_paths));
   }
   if (query.grammarEmpty) next = next.eq('grammar_paths', '{}');
+  if (query.kind) next = next.eq('kind', query.kind);
+  // 칩과 축이 어긋난 교집합 — `kind` 는 CHECK 로 두 값뿐이라 빈 값과 같은 행은 없다
+  if (query.noMatch) next = next.eq('kind', '');
   return next;
+}
+
+/** 줄을 세울 수 있는 요청 — PostgREST 빌더의 필요한 부분만 */
+interface ReferenceQueryOrderable<T> {
+  order(column: string, options?: { ascending?: boolean; nullsFirst?: boolean }): T;
+}
+
+/**
+ * 줄 세우기 — 목록과 검색이 **이 한 곳**을 탄다.
+ *
+ * 단원으로 훑을 때는 그 단원의 **공부 차례**로 — 개념이 먼저(핵심 정리 → 제재 개관), 그다음 작품,
+ * 같은 갈래 안에서는 차례(`seq`, 없으면 맨 뒤) → 제목. 그 밖에는 최근 고친 순(예전 그대로).
+ * ⚠️ 갈래 순서는 글자 순서('개념' < '작품', C·ko 정렬 모두)에 기댄다 — 이름을 바꾸면 queries.test 가 잡는다.
+ * @param request - 빌더
+ * @param query - 조건
+ * @returns 줄을 세운 빌더
+ */
+export function applyReferenceOrder<T extends ReferenceQueryOrderable<T>>(
+  request: T, query: ReferenceTextQuery,
+): T {
+  if (!query.unit) return request.order('updated_at', { ascending: false });
+  return request
+    .order('kind', { ascending: true })
+    .order('seq', { ascending: true, nullsFirst: false })
+    .order('title', { ascending: true })
+    .order('updated_at', { ascending: false });
 }
 
 /**
@@ -64,8 +93,7 @@ export async function fetchReferenceTextList(
   const request = supabase
     .from('reference_texts')
     .select(REFERENCE_TEXT_LIST_COLUMNS);
-  const { data, error } = await applyReferenceQuery(request, query)
-    .order('updated_at', { ascending: false })
+  const { data, error } = await applyReferenceOrder(applyReferenceQuery(request, query), query)
     .limit(limit);
   if (error) throw error;
   return (data ?? []) as ReferenceTextListItem[];
@@ -111,8 +139,7 @@ export async function searchReferenceTexts(
     .from('reference_texts')
     .select(REFERENCE_TEXT_LIST_COLUMNS)
     .ilike(field, `%${escapeIlike(keyword)}%`);
-  const { data, error } = await applyReferenceQuery(request, query)
-    .order('updated_at', { ascending: false })
+  const { data, error } = await applyReferenceOrder(applyReferenceQuery(request, query), query)
     .limit(limit);
   if (error) throw error;
   return (data ?? []) as ReferenceTextListItem[];
@@ -121,28 +148,39 @@ export async function searchReferenceTexts(
 /**
  * 최근에 고친 전문 몇 건 (검색어 없이 고르기 창을 열었을 때).
  * @param limit - 최대 줄 수
+ * @param query - 조건 (참고자료 고르기는 `{ kind: '작품' }` 을 넘긴다)
  * @returns 목록
  * @throws 조회 실패 시
  */
 export function fetchRecentReferenceTexts(
   limit: number = REFERENCE_TEXT_PICK_LIMIT,
+  query: ReferenceTextQuery = {},
 ): Promise<ReferenceTextListItem[]> {
-  return fetchReferenceTextList(limit);
+  return fetchReferenceTextList(limit, query);
+}
+
+/** 참고자료로 실을 본문 한 편 — 형식을 함께 든다(html 이면 부르는 쪽이 평문으로 바꾼다) */
+export interface ReferenceBodyRow {
+  body: string;
+  format: ReferenceTextFormat;
 }
 
 /**
  * 전문 여러 건의 **본문만** 읽는다 (참고자료로 붙일 때).
  * @param ids - 전문 id 들
- * @returns id → 본문 지도 (없는 id 는 빠진다)
+ * @returns id → 본문·형식 지도 (없는 id 는 빠진다)
  * @throws 조회 실패 시
  */
-export async function fetchReferenceBodies(ids: readonly string[]): Promise<Map<string, string>> {
+export async function fetchReferenceBodies(ids: readonly string[]): Promise<Map<string, ReferenceBodyRow>> {
   const unique = [...new Set(ids.filter(Boolean))];
   if (unique.length === 0) return new Map();
   const { data, error } = await supabase
     .from('reference_texts')
-    .select('id, body')
+    .select('id, body, format')
     .in('id', unique);
   if (error) throw error;
-  return new Map((data ?? []).map((row) => [row.id as string, (row.body as string) ?? '']));
+  return new Map((data ?? []).map((row) => [row.id as string, {
+    body: (row.body as string) ?? '',
+    format: row.format === 'html' ? 'html' : 'text',
+  }]));
 }

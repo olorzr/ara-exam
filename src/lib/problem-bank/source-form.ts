@@ -14,7 +14,8 @@ import type { ProblemSourceType } from '@/types/problem-bank';
  */
 
 /** 출처 유형 선택지 — 화면 순서가 곧 이 순서다 */
-export const SOURCE_TYPE_OPTIONS: ProblemSourceType[] = ['내신기출', '모의고사', '문제집', '프린트'];
+// ⚠️ sql/80 의 CHECK 와 같아야 한다 — 평가문제집(2026-10-28)은 출판사 교과서 평가문제집(학교 없음)
+export const SOURCE_TYPE_OPTIONS: ProblemSourceType[] = ['내신기출', '모의고사', '문제집', '프린트', '평가문제집'];
 
 /** filters.ts 의 `UNSPECIFIED_AXIS` 와 같은 값 — 그 모듈을 부르면 순환하므로 값만 둔다 */
 const UNSPECIFIED_AXIS_VALUE = '__none__';
@@ -54,8 +55,14 @@ export function isKiceRound(examType: string): boolean {
  * @returns 모의고사면 회차, 그 밖에는 중간·기말
  */
 export function examTypeOptionsFor(type: string): readonly string[] {
-  return type === '모의고사' ? MOCK_EXAM_TYPE_OPTIONS : EXAM_TYPE_OPTIONS;
+  if (type === '모의고사') return MOCK_EXAM_TYPE_OPTIONS;
+  // 평가문제집은 시험이 없다 — 학교 시험이 아니라 교과서 단원별 문제집이다(sql/80)
+  if (type === WORKBOOK_SOURCE_TYPE) return [];
+  return EXAM_TYPE_OPTIONS;
 }
+
+/** 평가문제집 유형 — 학교·시험이 없고 교과서·학기·책(출처 제목)으로 찾는다(sql/80·82) */
+export const WORKBOOK_SOURCE_TYPE = '평가문제집';
 
 /**
  * 유형을 바꿨을 때 지금 고른 시험 구분을 남겨도 되는가 — 새 유형의 선택지에 있어야 한다.
@@ -220,6 +227,7 @@ export function visibleFields(type: ProblemSourceType): (keyof SourceFormValues)
   if (type === '내신기출') return [...base, 'school_name', 'semester', 'exam_type'];
   if (type === '모의고사') return [...base, 'publisher'];
   if (type === '문제집') return [...base, 'publisher'];
+  if (type === '평가문제집') return [...base, 'publisher', 'semester'];
   return [...base, 'school_name'];
 }
 

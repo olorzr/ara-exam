@@ -10,10 +10,10 @@ import {
 } from '@/lib/reference-texts/filters';
 import { fetchReferenceTextList, searchReferenceTexts } from '@/lib/reference-texts/queries';
 import { deleteReferenceText } from '@/lib/reference-texts/save';
-import type { ReferenceTextListItem } from '@/types/reference-text';
+import type { ReferenceTextKind, ReferenceTextListItem } from '@/types/reference-text';
 
 /**
- * 작품 전문 목록 화면의 상태.
+ * 작품 전문 · 개념 목록 화면의 상태.
  *
  * 목록은 **최근 고친 순으로 상한(`REFERENCE_TEXT_LIST_LIMIT`)까지**만 읽는다.
  *
@@ -22,6 +22,7 @@ import type { ReferenceTextListItem } from '@/types/reference-text';
  *    고치거나 지울 길이 아예 사라진다. 글자마다 물으면 왕복이 너무 늘어 잠깐 기다렸다 묻는다.
  * 왼쪽 패널의 축(교과서 단원·작품·문법)도 같은 이유로 **서버에서** 건다 — 검색어와 함께 걸린다.
  * 트리를 누르면 기다리지 않고 바로 묻는다(타이핑이 아니다).
+ * 종류 칩(전체 · 작품 · 개념)은 축과 **따로** 함께 걸린다 — 검색어와 같은 결이다.
  */
 export function useReferenceTexts() {
   const [rows, setRows] = useState<ReferenceTextListItem[]>([]);
@@ -30,6 +31,7 @@ export function useReferenceTexts() {
   const [loading, setLoading] = useState(true);
   const [search, setSearchValue] = useState('');
   const [axis, setAxisValue] = useState<ReferenceBrowseAxis>(ALL_REFERENCE_TEXTS);
+  const [kind, setKindValue] = useState<ReferenceTextKind | undefined>(undefined);
   const [busyId, setBusyId] = useState<string | null>(null);
   const aliveRef = useRef(true);
   /** 지우기가 겹치지 않게 하는 잠금. ⚠️ state 가 아니라 ref 다 — 화면의 disabled 는 렌더 뒤다 */
@@ -50,6 +52,8 @@ export function useReferenceTexts() {
    * 바뀌어도 다시 읽기가 **지금 축**으로 묻는다.
    */
   const axisRef = useRef<ReferenceBrowseAxis>(ALL_REFERENCE_TEXTS);
+  /** 지금 종류 칩의 거울 — 축 거울과 같은 이유다 */
+  const kindRef = useRef<ReferenceTextKind | undefined>(undefined);
 
   /**
    * 목록을 **지금 조건**(검색어 거울 + 축 거울)으로 읽는다. 검색어가 있으면 제목·지은이를
@@ -64,7 +68,8 @@ export function useReferenceTexts() {
     const id = queryIdRef.current;
     const term = searchRef.current.trim();
     const currentAxis = axisRef.current;
-    const query = toReferenceTextQuery(currentAxis);
+    const currentKind = kindRef.current;
+    const query = toReferenceTextQuery(currentAxis, currentKind);
     try {
       let list: ReferenceTextListItem[];
       if (term === '') {
@@ -83,8 +88,8 @@ export function useReferenceTexts() {
       }
       if (!aliveRef.current || id !== queryIdRef.current) return;
       setRows(list);
-      // 검색·축이 걸려 있으면 '아예 없음' 을 판정하지 않는다 — 그 조건에 없는 것뿐이다
-      if (term === '' && currentAxis.kind === 'all') setEmpty(list.length === 0);
+      // 검색·축·종류가 걸려 있으면 '아예 없음' 을 판정하지 않는다 — 그 조건에 없는 것뿐이다
+      if (term === '' && currentAxis.kind === 'all' && currentKind === undefined) setEmpty(list.length === 0);
     } catch (e) {
       if (aliveRef.current) {
         toast.error(e instanceof Error ? e.message : '전문 목록을 불러오지 못했어요.');
@@ -125,15 +130,27 @@ export function useReferenceTexts() {
   }, [load]);
 
   /**
-   * 전문 하나를 지운다(확인을 묻는다).
+   * 종류 칩을 바꾼다 — 누른 것이라 바로 묻는다(축과 같다).
+   * @param next - 작품 · 개념 · 없으면 둘 다
+   */
+  const setKind = useCallback((next: ReferenceTextKind | undefined) => {
+    kindRef.current = next;
+    setKindValue(next);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    void load();
+  }, [load]);
+
+  /**
+   * 하나를 지운다(확인을 묻는다).
    * @param row - 지울 줄
    * @returns 실제로 지웠으면 true — 왼쪽 트리를 다시 읽을지 부르는 쪽이 정한다
    */
   const remove = useCallback(async (row: ReferenceTextListItem): Promise<boolean> => {
     if (busyRef.current) return false;
     if (!window.confirm(
-      `"${row.title}" 전문을 지울까요?\n`
-      + '되돌릴 수 없고, 문제 만들기에서 참고자료로 쓸 수 없게 됩니다.',
+      row.kind === '개념'
+        ? `"${row.title}" 개념 정리를 지울까요?\n되돌릴 수 없습니다.`
+        : `"${row.title}" 전문을 지울까요?\n되돌릴 수 없고, 문제 만들기에서 참고자료로 쓸 수 없게 됩니다.`,
     )) return false;
 
     busyRef.current = true;
@@ -142,7 +159,7 @@ export function useReferenceTexts() {
     try {
       await deleteReferenceText(row.id);
       deleted = true;
-      toast.success('전문을 지웠어요.');
+      toast.success('지웠어요.');
       // 지운 뒤에는 **보고 있던 조건 그대로** 다시 읽는다 — 지역에서 행만 빼면 상한 너머의
       // 다음 작품이 올라오지 않아 목록이 한 줄씩 줄어든 채로 남는다.
       // ⚠️ 닫아 둔 값이 아니라 **지금 검색어·축**이다(지우는 사이에 바뀌었을 수 있다)
@@ -165,6 +182,8 @@ export function useReferenceTexts() {
     setSearch,
     axis,
     setAxis,
+    kind,
+    setKind,
     reload: load,
     remove,
   };

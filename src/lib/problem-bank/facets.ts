@@ -9,7 +9,8 @@ import {
   MOCK_EXAM_SOURCE_TYPE, SCHOOL_EXAM_SOURCE_TYPE, schoolExamKey, type SchoolExamFacet,
 } from './school-exam-tree';
 import { collectSchoolsByLevel } from './school-level';
-import type { SchoolLevel } from './source-form';
+import { WORKBOOK_SOURCE_TYPE, type SchoolLevel } from './source-form';
+import { workbookKey, type WorkbookFacet } from './workbook-tree';
 import { parseArchiveFacets, type ArchiveFacetsPayload, type SourceFacetRow } from './facets-payload';
 import { cachedArchiveFacets } from './facets-cache';
 
@@ -56,13 +57,15 @@ export interface SourceFacets {
   semesters: string[];
   /** 기출 트리를 만들 갈래 (학교가 있는 내신기출 + 모의고사, 중복 없음) */
   schoolExams: SchoolExamFacet[];
+  /** 평가문제집 책들 (기출 트리의 평가문제집 가지, 중복 없음) */
+  workbooks: WorkbookFacet[];
   /** 학교급 → 그 학교급 학년의 출처가 있는 학교들 (학교 칸을 좁힌다) */
   schoolsByLevel: Record<SchoolLevel, string[]>;
 }
 
 /** 아직 못 읽었을 때 쓰는 빈 선택지 */
 export const EMPTY_SOURCE_FACETS: SourceFacets = {
-  schools: [], years: [], grades: [], textbooks: [], semesters: [], schoolExams: [],
+  schools: [], years: [], grades: [], textbooks: [], semesters: [], schoolExams: [], workbooks: [],
   schoolsByLevel: { 중등: [], 고등: [] },
 };
 
@@ -83,6 +86,7 @@ export async function fetchSourceFacets(): Promise<SourceFacets> {
     textbooks: uniq(rows.map((r) => r.textbook)),
     semesters: uniq(rows.map((r) => r.semester)),
     schoolExams: collectSchoolExams(rows),
+    workbooks: collectWorkbooks(rows),
     schoolsByLevel: collectSchoolsByLevel(rows),
   };
 }
@@ -104,6 +108,24 @@ function collectSchoolExams(rows: readonly SourceFacetRow[]): SchoolExamFacet[] 
     out.push(facet);
   }
   return out;
+}
+
+/**
+ * 평가문제집 행에서 책(출처 제목)을 중복 없이 모은다 — 패싯은 평가문제집에만 제목을 싣는다(sql/82).
+ * @param rows - 패싯 출처 행
+ * @returns 책들
+ */
+export function collectWorkbooks(rows: readonly SourceFacetRow[]): WorkbookFacet[] {
+  const seen = new Map<string, WorkbookFacet>();
+  for (const row of rows) {
+    if (row.source_type !== WORKBOOK_SOURCE_TYPE) continue;
+    const facet: WorkbookFacet = {
+      source_type: row.source_type, school_name: '', year: row.year, grade: row.grade, semester: row.semester,
+      exam_type: '', textbook: row.textbook, title: row.title,
+    };
+    seen.set(workbookKey(facet), facet);
+  }
+  return [...seen.values()];
 }
 
 /**
