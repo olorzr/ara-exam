@@ -25,7 +25,8 @@ interface ReferenceTextListProps {
   rows: ReferenceTextListItem[];
   /** 지우는 중인 줄 */
   busyId: string | null;
-  onDelete: (row: ReferenceTextListItem) => void;
+  /** 원장만 넘긴다 — 없으면 지우기 단추를 그리지 않는다(sql/84: 지우기는 원장만, 눌리는데 조용한 단추를 두지 않는다) */
+  onDelete?: (row: ReferenceTextListItem) => void;
 }
 
 /**
@@ -78,15 +79,17 @@ export default function ReferenceTextList({ rows, busyId, onDelete }: ReferenceT
               </ul>
             )}
           </div>
-          <button
-            type="button"
-            disabled={busyId !== null}
-            onClick={() => onDelete(row)}
-            aria-label={`${row.title} 지우기`}
-            className="h-8 w-8 shrink-0 rounded text-gray-400 hover:bg-gray-100 hover:text-red-600 disabled:opacity-50"
-          >
-            <Trash2 className="mx-auto h-4 w-4" />
-          </button>
+          {onDelete && (
+            <button
+              type="button"
+              disabled={busyId !== null}
+              onClick={() => onDelete(row)}
+              aria-label={`${row.title} 지우기`}
+              className="h-8 w-8 shrink-0 rounded text-gray-400 hover:bg-gray-100 hover:text-red-600 disabled:opacity-50"
+            >
+              <Trash2 className="mx-auto h-4 w-4" />
+            </button>
+          )}
         </li>
       ))}
     </ul>

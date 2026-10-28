@@ -57,7 +57,8 @@ describe('useReferenceTextEditor — 새로 만들기', () => {
 
   it('저장하면 정규화된 값으로 굳고 주소를 옮긴다', async () => {
     const { result } = renderHook(() => useReferenceTextEditor(opts));
-    act(() => result.current.patch({ title: ' 봄봄 ', body: '장인님!  \n\n\n\n다음' }));
+    // 평문 정규화 경로를 본다 — 새 작품의 기본 형식은 이제 서식(html)이라 평문으로 바꿔 둔다(옛 평문 행과 같은 경로)
+    act(() => result.current.patch({ title: ' 봄봄 ', format: 'text', body: '장인님!  \n\n\n\n다음' }));
     await act(async () => { await result.current.save(); });
 
     expect(insertReferenceText).toHaveBeenCalledWith({

@@ -4,6 +4,7 @@ import ProblemHtmlEditor from '@/components/problem-editor/ProblemHtmlEditor';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { bodyLength, bodyPlainText, htmlToText, textToHtml } from '@/lib/reference-texts/body-format';
+import { stripWorkbookNotes } from '@/lib/reference-texts/workbook-plain';
 import { REFERENCE_TEXT_BODY_MAX } from '@/lib/reference-texts/constants';
 import type { ReferenceTextDraft } from '@/lib/reference-texts/form';
 import ReferenceTextImport from './ReferenceTextImport';
@@ -20,8 +21,8 @@ const HTML_EDITOR_MIN_HEIGHT = 480;
  * 본문 — 형식(평문 / 서식)에 따라 입력칸이 다르다.
  *
  * - 평문: 입력칸 그대로(줄바꿈을 지킨다 — 시는 행갈이가 곧 내용이다).
- * - 서식: 문항 편집기(`ProblemHtmlEditor`) — 표·〈보기〉 상자·원문·풀이 나란히 표를 그대로 쓴다.
- *   저장할 때 문항 정화기를 지나므로 화면·인쇄 규칙이 기출 지문과 한 벌이다.
+ * - 서식: 문항 편집기(`ProblemHtmlEditor`)를 **참고자료 프로필**로 — 표·〈보기〉 상자·나란히 표에 더해
+ *   문제집 서식(말머리 상자·어휘 풀이·여백 해설·도식·형광펜)을 쓴다. 화면은 보기 쪽과 같은 CSS(`reference-sheet.css`)다.
  * 형식 전환: 평문 → 서식은 문단을 그대로 옮기고, 서식 → 평문은 표·상자가 사라지므로 한 번 묻는다.
  * 글자 수는 **보이는 글자** 기준이다(빈 편집기는 `<p></p>` 라 글자열 길이로 재면 거짓이 된다).
  * @param props - 편집 중인 값과 고치기 콜백
@@ -39,8 +40,12 @@ export default function ReferenceBodyField({ draft, patch }: ReferenceBodyFieldP
       patch({ format: 'html', body: textToHtml(draft.body) });
       return;
     }
-    if (plain.trim() !== '' && !window.confirm('표·상자·굵게 같은 서식이 사라지고 글자만 남아요. 평문으로 바꿀까요?')) return;
-    patch({ format: 'text', body: htmlToText(draft.body) });
+    const message = draft.kind === '작품'
+      ? '여백 해설·어휘 풀이·말머리 상자가 사라지고 원문 글자만 남아요. 평문으로 바꿀까요?'
+      : '표·상자·굵게 같은 서식이 사라지고 글자만 남아요. 평문으로 바꿀까요?';
+    if (plain.trim() !== '' && !window.confirm(message)) return;
+    // 작품은 해설을 걷고 원문만 — 해설 글자가 원문 사이에 섞여 들면 참고자료가 그것을 작품의 글로 읽는다
+    patch({ format: 'text', body: htmlToText(draft.kind === '작품' ? stripWorkbookNotes(draft.body) : draft.body) });
   };
 
   return (
@@ -68,6 +73,7 @@ export default function ReferenceBodyField({ draft, patch }: ReferenceBodyFieldP
             minHeight={HTML_EDITOR_MIN_HEIGHT}
             ariaLabel="본문"
             serif={draft.kind === '작품'}
+            profile="reference"
           />
         ) : (
           <Textarea

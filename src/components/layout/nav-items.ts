@@ -113,8 +113,9 @@ export function buildNavSections(isAdmin: boolean): NavSection[] {
         // 스캔 올리기(/print-sheets/upload)·직접 입력(/print-sheets/new)과 시험지(/print-sheets/[bundleId])도 이 항목이다.
         // 개념지와 경로가 갈려 있어 서로를 켜지 않는다(세그먼트 접두사 비교).
         { href: '/print-sheets', label: '학교 프린트 시험지', icon: FileScan },
-        // 새로 올리기(/reference-texts/new)와 편집(/reference-texts/[id])도 이 항목이다.
-        // 여기 올린 전문은 문제 만들기가 참고자료로 읽는다
+        // 새로 올리기(/reference-texts/new)와 보기·편집(/reference-texts/[id])도 이 항목이다.
+        // 여기 올린 전문은 문제 만들기가 참고자료로 읽는다. 메뉴는 전원 — 읽기는 선생님 모두,
+        // 올리기·고치기·지우기만 원장이다(화면은 단추를 숨기고, 권위는 sql/84 RLS)
         { href: '/reference-texts', label: '작품 전문 · 개념', icon: BookText },
       ],
     },

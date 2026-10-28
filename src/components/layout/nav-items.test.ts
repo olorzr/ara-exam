@@ -178,3 +178,10 @@ describe('buildNavSections', () => {
     expect(admin.items.map((i) => i.href)).toEqual(['/admin/audit']);
   });
 });
+
+describe('작품 전문 · 개념 메뉴', () => {
+  it('선생님에게도 원장에게도 보인다 — 읽기는 전원, 올리기·고치기·지우기만 원장(sql/84)', () => {
+    expect(findItem(buildNavSections(false), '/reference-texts').label).toBe('작품 전문 · 개념');
+    expect(findItem(buildNavSections(true), '/reference-texts').label).toBe('작품 전문 · 개념');
+  });
+});

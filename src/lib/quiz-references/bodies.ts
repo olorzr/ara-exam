@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { htmlToPlainText } from '@/lib/concept-pick/plain-text';
 import { fetchPassagesByIds } from '@/lib/problem-bank/detail-queries';
 import { fetchReferenceBodies, type ReferenceBodyRow } from '@/lib/reference-texts/queries';
+import { referenceBodyPlainText } from '@/lib/reference-texts/workbook-plain';
 import type { QuizReferenceKind } from './types';
 
 /**
@@ -67,11 +68,13 @@ export async function loadReferencePlain(
 }
 
 /**
- * 작품 전문 본문을 평문으로 — HTML 형식(sql/79)이면 태그째 보내지 않는다(개념지·지문과 같은 변환).
+ * 작품 전문 본문을 **원문** 평문으로 — 서식 본문(sql/79)이면 여백 해설·어휘 풀이·말머리 상자를 걷는다.
+ *
+ * ⚠️ 해설이 섞이면 AI 가 출판사의 풀이를 작품의 글로 알고 그것을 근거로 문항을 낸다(2026-10-28 — 작품도 문제집 서식).
  * @param row - 본문·형식 (없으면 undefined)
- * @returns 평문
+ * @returns 원문 평문
  */
 function textPlain(row: ReferenceBodyRow | undefined): string | undefined {
   if (!row) return undefined;
-  return row.format === 'html' ? htmlToPlainText(row.body) : row.body;
+  return referenceBodyPlainText(row.body, row.format);
 }

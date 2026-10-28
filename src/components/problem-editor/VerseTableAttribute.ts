@@ -11,29 +11,46 @@ import { VERSE_LAYOUT } from '@/lib/sanitize-problem';
  *
  * ⚠️ TipTap 의 Table 노드는 **모르는 속성을 버린다.** 이게 없으면 그런 지문을 한 글자만 고쳐
  *    저장해도 `data-layout` 이 빠지고, 인쇄에 칸선이 되살아난다. 값 검증은 정화(sanitize-problem.ts)
- *    가 하므로 여기서는 verse 일 때만 통과시킨다.
+ *    가 하므로 여기서는 받을 값(문항은 verse 하나)일 때만 통과시킨다.
  */
-export const VerseTableAttribute = Extension.create({
-  name: 'verseTableAttribute',
-  addGlobalAttributes() {
-    return [{
-      types: ['table'],
-      attributes: {
-        layout: {
-          default: null,
-          parseHTML: (element: HTMLElement) =>
-            (element.getAttribute('data-layout') === VERSE_LAYOUT ? VERSE_LAYOUT : null),
-          renderHTML: (attributes: Record<string, unknown>) =>
-            (attributes.layout === VERSE_LAYOUT ? { 'data-layout': VERSE_LAYOUT } : {}),
+export const VerseTableAttribute = createTableLayoutAttribute(new Set([VERSE_LAYOUT]), 'verseTableAttribute');
+
+/**
+ * 표의 `data-layout` 을 살려 두는 전역 속성을 만든다 — 받는 값만 다르다.
+ * 문항 편집기는 verse 하나, 작품 전문·개념 편집기는 verse·gloss(여백 해설)·vocab(어휘 풀이)(workbook-markup.ts).
+ * @param allowed - 받을 `data-layout` 값
+ * @param name - 확장 이름(편집기 안에서 겹치지 않게)
+ * @returns TipTap 확장
+ */
+export function createTableLayoutAttribute(allowed: ReadonlySet<string>, name: string) {
+  return Extension.create({
+    name,
+    addGlobalAttributes() {
+      return [{
+        types: ['table'],
+        attributes: {
+          layout: {
+            default: null,
+            parseHTML: (element: HTMLElement) => {
+              const value = element.getAttribute('data-layout');
+              return value && allowed.has(value) ? value : null;
+            },
+            renderHTML: (attributes: Record<string, unknown>) => {
+              const value = attributes.layout;
+              return typeof value === 'string' && allowed.has(value) ? { 'data-layout': value } : {};
+            },
+          },
         },
-      },
-    }];
-  },
-});
+      }];
+    },
+  });
+}
 
 /** 노드 속성 → 화면의 `<table>` 에 `data-layout` 을 맞춘다 */
 function syncLayout(table: HTMLTableElement, node: ProseMirrorNode): void {
-  if (node.attrs.layout === VERSE_LAYOUT) table.setAttribute('data-layout', VERSE_LAYOUT);
+  // 받을 값은 속성 확장이 이미 걸렀다 — 무엇이든 그대로 단다(verse·gloss·vocab)
+  const layout: unknown = node.attrs.layout;
+  if (typeof layout === 'string' && layout) table.setAttribute('data-layout', layout);
   else table.removeAttribute('data-layout');
 }
 

@@ -160,9 +160,10 @@ describe('종류 · 본문 형식 · 차례 · 태그 (sql/79)', () => {
     expect(referenceDraftEquals(draft({ format: 'text', body: '<p>가</p>' }), draft({ format: 'text', body: '<p>가</p> ' }))).toBe(false);
   });
 
-  it('개념으로 새로 만들면 본문 형식이 HTML 로 시작한다', () => {
+  it('새로 만들면 작품·개념 모두 본문 형식이 HTML 로 시작한다', () => {
     expect(emptyReferenceDraft('개념')).toMatchObject({ kind: '개념', format: 'html' });
-    expect(emptyReferenceDraft()).toMatchObject({ kind: '작품', format: 'text' });
+    // 작품도 문제집 서식(원문 옆 여백 해설·어휘 풀이)으로 시작한다(2026-10-28)
+    expect(emptyReferenceDraft()).toMatchObject({ kind: '작품', format: 'html' });
   });
 
   it('저장한 값(차례 숫자)을 화면 값(입력칸 글자)으로 되돌린다', () => {

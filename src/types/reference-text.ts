@@ -7,8 +7,9 @@
  * - **개념** — 단원의 핵심 개념 정리·제재 개관(표·목록이 든 HTML). 개념지(`concept_sheets`,
  *   빈칸 시험지)와는 다른 것이다.
  *
- * ⚠️ `body` 의 모양은 `format` 이 정한다 — `text` 는 평문(텍스트 노드로만 그린다), `html` 은 문항 정화기
- *    (`sanitizeProblemHTML`) 프로필 HTML 이다(저장할 때·그릴 때 둘 다 정화한다).
+ * ⚠️ `body` 의 모양은 `format` 이 정한다 — `text` 는 평문(텍스트 노드로만 그린다, 옛 행), `html` 은 **참고자료 정화기**
+ *    (`sanitizeReferenceHTML` — 문항 프로필 + 문제집 서식: 말머리 상자·어휘 풀이·여백 해설·도식·형광펜) HTML 이다
+ *    (저장할 때·그릴 때 둘 다 정화한다). 작품의 서식 본문을 참고자료로 보낼 때는 `referenceBodyPlainText` 로 원문만.
  */
 export interface ReferenceText {
   id: string;
@@ -58,7 +59,7 @@ export interface ReferenceText {
 /** 작품 전문 / 개념 정리 */
 export type ReferenceTextKind = '작품' | '개념';
 
-/** 본문 형식 — 평문 / 문항 정화기 프로필 HTML */
+/** 본문 형식 — 평문 / 참고자료 정화기 프로필 HTML */
 export type ReferenceTextFormat = 'text' | 'html';
 
 /**

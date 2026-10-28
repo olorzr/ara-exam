@@ -8,10 +8,12 @@ import { Table, TableRow } from '@tiptap/extension-table';
 import { Extension } from '@tiptap/core';
 import { CustomTableCell, CustomTableHeader } from '@/components/exam-builder/CustomTableCell';
 import { sanitizeProblemHTML } from '@/lib/sanitize-problem';
+import { sanitizeReferenceHTML } from '@/lib/sanitize-reference';
 import { hasYetHangul } from '@/lib/yet-hangul';
 import { FigurePlaceholderNode } from './FigurePlaceholderNode';
 import ProblemEditorToolbar from './ProblemEditorToolbar';
 import { VerseTableAttribute, VerseTableView } from './VerseTableAttribute';
+import { ReferenceTableLayoutAttribute, WORKBOOK_EXTENSIONS } from './WorkbookExtensions';
 
 /**
  * 〈보기〉 상자를 살려 두는 blockquote.
@@ -53,6 +55,12 @@ interface ProblemHtmlEditorProps {
   serif?: boolean;
   /** 원본의 (가) 글자를 유지한 채 구역만 표시하는 지문 */
   literalPassageLabels?: boolean;
+  /**
+   * 정화 프로필 — 기본은 문항(기출 지문·발문). `reference` 는 작품 전문 · 개념 본문:
+   * 정화기가 `sanitizeReferenceHTML` 로 바뀌고 문제집 서식 확장·단추가 붙는다(workbook-markup.ts).
+   * 편집기를 만들 때 한 번만 읽는다(확장 셋은 바꿀 수 없다).
+   */
+  profile?: 'problem' | 'reference';
 }
 
 /**
@@ -65,8 +73,11 @@ interface ProblemHtmlEditorProps {
  *    남아 있을 수 있어, 편집기에 넣기 **전에** 막는다(개념지에서 실제로 겪은 경로다).
  */
 export default function ProblemHtmlEditor({
-  value, onChange, minHeight = 120, ariaLabel, serif = false, literalPassageLabels = false,
+  value, onChange, minHeight = 120, ariaLabel, serif = false, literalPassageLabels = false, profile = 'problem',
 }: ProblemHtmlEditorProps) {
+  const reference = profile === 'reference';
+  // ⚠️ 넣을 때·바깥 값을 갈아 끼울 때 같은 정화기여야 한다 — 문항 정화기로 넣으면 말머리 상자가 편집기에 닿기도 전에 사라진다
+  const sanitize = reference ? sanitizeReferenceHTML : sanitizeProblemHTML;
   /**
    * 우리가 마지막으로 밖에 내보낸 HTML.
    *
@@ -90,13 +101,15 @@ export default function ProblemHtmlEditor({
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       // 크기 조절 표는 NodeView 가 <table> 을 직접 그려서 data-layout 을 따로 맞춰 줘야 한다
       Table.configure({ resizable: true, View: VerseTableView }),
-      // 없으면 칸선 없는 나란히 표가 저장할 때 보통 표로 돌아간다
-      VerseTableAttribute,
+      // 없으면 칸선 없는 나란히 표가 저장할 때 보통 표로 돌아간다 — 참고자료는 여백 해설·어휘 풀이 모양까지 받는다
+      reference ? ReferenceTableLayoutAttribute : VerseTableAttribute,
       TableRow,
       CustomTableCell,
       CustomTableHeader,
+      // 없으면 말머리 상자·형광펜·도식이 한 글자만 고쳐도 사라진다(WorkbookExtensions.ts)
+      ...(reference ? WORKBOOK_EXTENSIONS : []),
     ],
-    content: sanitizeProblemHTML(value),
+    content: sanitize(value),
     editorProps: {
       attributes: {
         class: 'prose-sm max-w-none focus:outline-none',
@@ -115,7 +128,7 @@ export default function ProblemHtmlEditor({
     if (!editor) return;
     // 내가 방금 낸 값이 그대로 돌아온 것이면 아무것도 하지 않는다
     if (value === lastEmitted.current) return;
-    const next = sanitizeProblemHTML(value);
+    const next = sanitize(value);
     if (next === editor.getHTML()) return;
     editor.commands.setContent(next, { emitUpdate: false });
     lastEmitted.current = next;
@@ -130,8 +143,8 @@ export default function ProblemHtmlEditor({
   const yetClass = hasYetHangul(value) ? ` ${serif ? 'yet-hangul-serif' : 'yet-hangul'}` : '';
 
   return (
-    <div className={`pb-editor rounded-md border border-gray-200${yetClass}${literalPassageLabels ? ' pb-editor--literal-passage-labels' : ''}`}>
-      <ProblemEditorToolbar editor={editor} />
+    <div className={`pb-editor rounded-md border border-gray-200${yetClass}${literalPassageLabels ? ' pb-editor--literal-passage-labels' : ''}${reference ? ' pb-editor--reference' : ''}`}>
+      <ProblemEditorToolbar editor={editor} profile={profile} />
       <EditorContent editor={editor} className="px-3 py-2" style={{ minHeight }} />
     </div>
   );

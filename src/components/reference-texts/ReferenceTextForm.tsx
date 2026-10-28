@@ -17,6 +17,11 @@ import ReferenceKindField from './ReferenceKindField';
 interface ReferenceTextFormProps {
   editor: ReferenceTextEditorState;
   backHref: string;
+  /**
+   * 보기 화면으로 돌아가기(이미 있는 전문을 고칠 때) — 저장하지 않은 것이 있으면 한 번 묻는다.
+   * ⚠️ `useUnsavedGuard` 는 다른 주소로 떠날 때만 묻는다 — 같은 주소 안의 보기 ↔ 편집 전환은 여기서 묻는다.
+   */
+  onBack?: () => void;
 }
 
 /**
@@ -24,7 +29,7 @@ interface ReferenceTextFormProps {
  * @param props - 편집기 상태와 목록 경로
  * @returns 편집 화면
  */
-export default function ReferenceTextForm({ editor, backHref }: ReferenceTextFormProps) {
+export default function ReferenceTextForm({ editor, backHref, onBack }: ReferenceTextFormProps) {
   const { draft, patch, blocker, dirty, loading, saving, save, isNew } = editor;
 
   if (loading) {
@@ -46,6 +51,17 @@ export default function ReferenceTextForm({ editor, backHref }: ReferenceTextFor
           <Link href={backHref}>
             <Button type="button" variant="outline">목록</Button>
           </Link>
+          {onBack && (
+            <Button
+              type="button" variant="outline" disabled={saving}
+              onClick={() => {
+                if (dirty && !window.confirm('저장하지 않은 내용이 있어요. 보기로 돌아갈까요?')) return;
+                onBack();
+              }}
+            >
+              보기로
+            </Button>
+          )}
           <Button type="button" disabled={saving || blocker !== null} onClick={() => void save()}>
             {saving ? '저장 중…' : '저장'}
           </Button>

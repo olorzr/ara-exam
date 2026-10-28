@@ -1,0 +1,285 @@
+/*
+ * 작품 전문 · 개념 — 평가문제집 쪽처럼 보이는 본문 (`/reference-texts/[id]` 보기 화면 · 원장 편집기).
+ *
+ * 서식 어휘는 lib/workbook-markup.ts 가 단일 출처다(말머리 상자 · 어휘 풀이 · 여백 해설 · 도식 · 형광펜).
+ * 보기 화면은 `.pb-sheet.pb-sheet--screen.ref-sheet` 이라 〈보기〉 상자 · (가) 구역 · 나란히 표 · 네모 표시 ·
+ * 각주는 problem-paper.css 의 규칙이 그대로 그린다 — 여기서는 문제집 서식만 얹는다.
+ *
+ * 선택자는 `:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror)` 하나로 보기 · 편집기를 함께 적는다
+ * (사본을 두 벌 두면 한쪽만 고쳐진다). ⚠️ `:is()` 의 특이성은 **가장 센 인자**(0,3,0)다 — 편집기 쪽
+ * `.pb-editor .ProseMirror blockquote:not([data-box])`(0,3,1, globals.css 본문이라 이 파일보다 뒤)를 이기려는 것이다.
+ * 그래서 문항용 규칙(나란히 표의 th 등)을 덮지 않게 대상을 좁게 적는다(`table:not([data-layout])`).
+ * ⚠️ 여백 해설 · 어휘 풀이 표의 격자 배치는 **보기 화면에만** 건다 — 편집기에서 표를 격자로 바꾸면 칸 고르기·크기 조절이 깨진다.
+ */
+
+.pb-sheet.ref-sheet {
+  --ref-accent: #0f766e;
+  --ref-accent-line: #81d8d0;
+  --ref-muted: #6b7280;
+  --ref-line: #cbd5e1;
+  font-size: 15px;
+  line-height: 1.75;
+  color: #1f2937;
+}
+
+/* ── 제목 · 문단 · 목록 · 글자 ─────────────────────── */
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) h3 {
+  margin: 1.5em 0 0.6em;
+  padding-left: 0.5em;
+  border-left: 4px solid var(--ref-accent-line, #81d8d0);
+  font-size: 1.18em;
+  font-weight: 800;
+  line-height: 1.4;
+  color: #111827;
+}
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) h4 {
+  margin: 1.1em 0 0.35em;
+  font-size: 1.03em;
+  font-weight: 700;
+  color: var(--ref-accent, #0f766e);
+}
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) h4::before {
+  content: '●';
+  margin-right: 0.4em;
+  font-size: 0.65em;
+  vertical-align: 0.2em;
+}
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) > :is(h3, h4):first-child { margin-top: 0; }
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) p { margin: 0 0 6px; }
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) p:last-child { margin-bottom: 0; }
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) :is(ul, ol):not([data-flow]) {
+  margin: 4px 0 8px;
+  padding-left: 1.4em;
+}
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) ul:not([data-flow]) { list-style: disc outside; }
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) ol { list-style: decimal outside; }
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) li { margin: 2px 0; }
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) li::marker { color: var(--ref-accent, #0f766e); }
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) :is(li, td, th) > p { margin: 0; }
+/* 핵심어 형광펜 — 글자 아래쪽 절반만 칠한다(문제집의 색 강조처럼) */
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) mark {
+  padding: 0 1px;
+  background: linear-gradient(transparent 55%, #fde68a 55%);
+  color: inherit;
+}
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) small {
+  font-size: 0.82em;
+  font-weight: 400;
+  color: var(--ref-muted, #6b7280);
+}
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) u {
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+
+/* ── 표식 표(갈래 | 자유시) — 라벨 칸을 음영으로 ───────── */
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) table:not([data-layout]) :is(th, td) {
+  padding: 6px 9px;
+  border-color: var(--ref-line, #cbd5e1);
+  font-size: inherit;
+  vertical-align: middle;
+}
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) table:not([data-layout]) th {
+  background: #ecfdf9;
+  color: #134e4a;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* ── 말머리 상자 — 학습 목표 · 핵심 포인트 · 쌤의 비밀 노트 … ─ */
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) blockquote:is([data-callout], [data-tone]) {
+  --ref-chip: #4b5563;
+  --ref-box-line: #d1d5db;
+  --ref-fill: #ffffff;
+  position: relative;
+  margin: 18px 0 12px;
+  padding: 16px 14px 10px;
+  border: 1.5px solid var(--ref-box-line);
+  border-radius: 10px;
+  background: var(--ref-fill);
+}
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) blockquote[data-callout]::before {
+  content: attr(data-callout);
+  position: absolute;
+  top: 0;
+  left: 12px;
+  transform: translateY(-55%);
+  padding: 1px 10px;
+  border-radius: 999px;
+  background: var(--ref-chip);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.6;
+  letter-spacing: 0.01em;
+}
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) blockquote[data-tone='goal'] { --ref-chip: #7c3aed; --ref-box-line: #c4b5fd; --ref-fill: #faf5ff; }
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) blockquote[data-tone='point'] { --ref-chip: #15803d; --ref-box-line: #86efac; --ref-fill: #f0fdf4; }
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) blockquote[data-tone='note'] { --ref-chip: #c2410c; --ref-box-line: #fdba74; --ref-fill: #fff7ed; }
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) blockquote[data-tone='vocab'] { --ref-chip: #4d7c0f; --ref-box-line: #bef264; --ref-fill: #f7fee7; }
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) blockquote[data-tone='check'] { --ref-chip: #1d4ed8; --ref-box-line: #93c5fd; --ref-fill: #eff6ff; }
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) blockquote[data-tone='more'] { --ref-chip: #b45309; --ref-box-line: #fcd34d; --ref-fill: #fffbeb; }
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) blockquote[data-tone='exam'] { --ref-chip: #be185d; --ref-box-line: #f9a8d4; --ref-fill: #fdf2f8; }
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) blockquote[data-tone='answer'] { --ref-chip: #4b5563; --ref-box-line: #d1d5db; --ref-fill: #f9fafb; }
+/* 상자 안 제목은 여백을 줄이고, 안에 든 〈보기〉 상자의 말머리 바탕은 상자 색을 따른다 */
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) blockquote:is([data-callout], [data-tone]) :is(h3, h4) { margin-top: 0.4em; }
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) blockquote:is([data-callout], [data-tone]) > :first-child { margin-top: 0; }
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) blockquote:is([data-callout], [data-tone]) blockquote[data-box]::before { background: var(--ref-fill); }
+
+/* ── 화살표 도식 — 전 ↓ 중 ↓ 후 / 화자 → 청자 ───────────── */
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) ul[data-flow] {
+  display: flex;
+  margin: 10px 0;
+  padding: 0;
+  list-style: none;
+}
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) ul[data-flow] > li {
+  position: relative;
+  margin: 0;
+  padding: 6px 12px;
+  border: 1.5px solid var(--ref-line, #cbd5e1);
+  border-radius: 8px;
+  background: #f8fafc;
+}
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) ul[data-flow] > li + li::before {
+  position: absolute;
+  color: var(--ref-accent, #0f766e);
+  font-weight: 800;
+}
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) ul[data-flow='right'] {
+  flex-flow: row wrap;
+  align-items: stretch;
+  gap: 8px 2em;
+}
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) ul[data-flow='right'] > li { flex: 1 1 8em; }
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) ul[data-flow='right'] > li + li::before {
+  content: '→';
+  top: 50%;
+  left: -1.45em;
+  transform: translateY(-50%);
+}
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) ul[data-flow='down'] {
+  flex-direction: column;
+  gap: 1.7em;
+}
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) ul[data-flow='down'] > li + li::before {
+  content: '↓';
+  top: -1.55em;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* ── 여백 해설 · 어휘 풀이 — 편집기: 점선 칸 + 둘째 칸 작은 회색 글 ── */
+.pb-editor.pb-editor--reference .ProseMirror table:is([data-layout='gloss'], [data-layout='vocab']) td {
+  border: 1px dashed #d1d5db;
+  background: none;
+}
+.pb-editor.pb-editor--reference .ProseMirror table:is([data-layout='gloss'], [data-layout='vocab']) td:nth-child(2) {
+  color: var(--ref-muted, #6b7280);
+  font-size: 0.9em;
+}
+.pb-editor.pb-editor--reference .ProseMirror table[data-layout='vocab'] td:first-child { font-weight: 700; }
+
+/* ── 여백 해설 — 보기 화면: 원문 | → 해설 두 칸(나란히 표와 같은 격자 가드) ─ */
+.ref-sheet table[data-layout='gloss'] { width: 100%; margin: 6px 0 10px; }
+.ref-sheet table[data-layout='gloss'] :is(td, th) {
+  border: 0;
+  padding: 0;
+  background: none;
+  font-size: inherit;
+  font-weight: inherit;
+  text-align: left;
+  vertical-align: top;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.ref-sheet table[data-layout='gloss']:not(:has(> tbody > tr > :nth-child(3), > tbody > tr > :only-child, [colspan]:not([colspan='1']), [rowspan]:not([rowspan='1']))) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(8em, 38%);
+  gap: 0.9em 1.4em;
+}
+.ref-sheet table[data-layout='gloss']:not(:has(> tbody > tr > :nth-child(3), > tbody > tr > :only-child, [colspan]:not([colspan='1']), [rowspan]:not([rowspan='1']))) :is(tbody, tr) {
+  display: contents;
+}
+.ref-sheet table[data-layout='gloss'] :is(td, th):first-child > p { margin: 0 0 0.6em; }
+.ref-sheet table[data-layout='gloss'] :is(td, th):first-child > p:last-child { margin-bottom: 0; }
+.ref-sheet table[data-layout='gloss'] :is(td, th):nth-child(2) {
+  display: block;
+  align-self: start;
+  padding-left: 0.7em;
+  border-left: 2px solid var(--ref-accent-line, #81d8d0);
+  color: #4b5563;
+  font-size: 0.86em;
+  line-height: 1.6;
+}
+.ref-sheet table[data-layout='gloss'] :is(td, th):nth-child(2) > p:first-child::before,
+.ref-sheet table[data-layout='gloss'] :is(td, th):nth-child(2):not(:has(> p))::before {
+  content: '→ ';
+  color: var(--ref-accent, #0f766e);
+  font-weight: 700;
+}
+@media (max-width: 640px) {
+  .ref-sheet table[data-layout='gloss'] { grid-template-columns: minmax(0, 1fr) !important; row-gap: 0.4em; }
+  .ref-sheet table[data-layout='gloss'] :is(td, th):nth-child(2) { margin: 0 0 0.6em 1em; }
+}
+
+/* ── 어휘 풀이 — 보기 화면: 밑줄 친 낱말, 바로 밑에 풀이 ───── */
+.ref-sheet table[data-layout='vocab'],
+.ref-sheet table[data-layout='vocab'] :is(tbody, tr, td, th) {
+  display: block;
+  width: auto;
+  border: 0;
+  padding: 0;
+  background: none;
+  font-size: inherit;
+  text-align: left;
+}
+.ref-sheet table[data-layout='vocab'] { margin: 6px 0 10px; }
+.ref-sheet table[data-layout='vocab'] tr { margin: 0 0 0.75em; }
+.ref-sheet table[data-layout='vocab'] tr:last-child { margin-bottom: 0; }
+.ref-sheet table[data-layout='vocab'] :is(td, th):first-child {
+  color: #134e4a;
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: var(--ref-accent-line, #81d8d0);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+.ref-sheet table[data-layout='vocab'] :is(td, th):nth-child(2) { margin-top: 2px; padding-left: 1em; color: #374151; }
+
+/* ── 작품 원문은 명조, 옛 평문 작품은 줄을 지킨다 ───────── */
+/* ⚠️ 옛한글 작품(`yet-hangul-serif`)은 건드리지 않는다 — 바깥 래퍼의 나눔 옛한글 글꼴을 덮으면 첫가끝 자모가 깨진다(코덱스 1R) */
+.ref-sheet--work:not(.yet-hangul-serif) > p,
+.ref-sheet--work:not(.yet-hangul-serif) > table[data-layout='gloss'] :is(td, th):first-child { font-family: 'Noto Serif KR', serif; }
+.ref-sheet--plain p { white-space: pre-wrap; }
+
+/* ── 브라우저 인쇄(보기 화면의 '인쇄') — 회색 한 벌. 위 규칙과 특이성이 같아야 뒤에 적은 이쪽이 이긴다(같은 접두를 쓴다) ── */
+@media print {
+  /* 쪽 여백은 보기 쪽이 그리는 `@page` 가 준다(ReferenceTextView 의 PRINT_PAGE_STYLE — 전역 @page 는 여백 0) */
+  .ref-page__body { border: 0; padding: 0; }
+  .pb-sheet.ref-sheet { font-size: 10.5pt; line-height: 1.6; color: #000; }
+  :is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) h3 { border-left-color: #999; }
+  :is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) h4 { color: #222; }
+  :is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) mark { background: none; text-decoration: underline; text-decoration-thickness: 2px; }
+  :is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) table:not([data-layout]) th { background: #eee; color: #000; }
+  :is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) blockquote:is([data-callout], [data-tone]) {
+    --ref-chip: #444;
+    --ref-box-line: #999;
+    --ref-fill: #fff;
+    padding-top: 8px;
+    break-inside: avoid;
+  }
+  /* 말머리 칩을 상자 안에 둔다 — 위 테두리에 걸쳐 두면 상자가 다음 쪽으로 넘어갈 때 칩만 앞 쪽 끝에 남는다 */
+  :is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) blockquote[data-callout]::before {
+    position: static;
+    display: inline-block;
+    margin-bottom: 6px;
+    transform: none;
+  }
+  :is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) ul[data-flow] > li { border-color: #999; background: #fff; }
+  :is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) ul[data-flow] > li + li::before { color: #333; }
+  .ref-sheet table[data-layout='gloss'] :is(td, th):nth-child(2) { border-left-color: #999; color: #444; }
+  .ref-sheet table[data-layout='gloss'] :is(td, th):nth-child(2) > p:first-child::before,
+  .ref-sheet table[data-layout='gloss'] :is(td, th):nth-child(2):not(:has(> p))::before { color: #333; }
+  .ref-sheet table[data-layout='vocab'] :is(td, th):first-child { color: #000; text-decoration-color: #999; }
+}

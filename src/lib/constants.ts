@@ -34,7 +34,8 @@ export const EXTERNAL_LEVEL = '외부지문 및 프린트' as const;
 /**
  * 관리자(원장) 이메일.
  * ⚠️ DB 정책들이 같은 리터럴을 든다 — 바꾸면 함께 고칠 것:
- *    sql/03(감사 로그 읽기) · sql/57·65(올라간 기출 삭제) · sql/76(책 만들기 두 표).
+ *    sql/03(감사 로그 읽기) · sql/57·65(올라간 기출 삭제) · sql/76(책 만들기 두 표) ·
+ *    sql/84(작품 전문 · 개념 올리기·고치기·지우기).
  */
 export const ADMIN_EMAIL = 'ara0723@araeducation.co.kr';
 

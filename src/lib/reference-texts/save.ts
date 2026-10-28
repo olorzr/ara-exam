@@ -2,11 +2,24 @@ import { supabase } from '@/lib/supabase';
 import type { ReferenceTextPayload } from './form';
 
 /**
- * 작품 전문 쓰기 (sql/30).
+ * 작품 전문 · 개념 쓰기 (sql/30) — **원장만** 된다(sql/84 RLS, 읽기는 도메인 전원).
  *
  * ⚠️ `user_id` 와 `char_count` 를 보내지 않는다 — DB 트리거가 채우고(UPDATE 에서 잠근다),
  *    보내도 무시된다.
  */
+
+/** 원장이 아닌 계정이 쓰려 할 때(sql/84 RLS 위반, PostgREST 42501) 보여 줄 말 */
+export const REFERENCE_OWNER_ONLY_MESSAGE = '작품 전문·개념은 원장님만 올리고 고칠 수 있어요.';
+
+/**
+ * 쓰기 오류를 사람이 읽을 말로 — RLS 위반(42501)이면 원장 전용이라고 알린다.
+ * @param error - PostgREST 오류
+ * @returns 던질 오류
+ */
+function writeError(error: { code?: string; message?: string }): Error {
+  if (error.code === '42501') return new Error(REFERENCE_OWNER_ONLY_MESSAGE);
+  return error instanceof Error ? error : new Error(error.message ?? '저장하지 못했어요.');
+}
 
 /** 저장 뒤 돌려받는 버전 — 다음 저장의 낙관적 동시성 기준이다 */
 export interface ReferenceTextVersion {
@@ -28,7 +41,8 @@ export async function insertReferenceText(
     .insert(payload)
     .select('id, updated_at')
     .single();
-  if (error || !data) throw error ?? new Error('전문을 저장하지 못했어요.');
+  if (error) throw writeError(error);
+  if (!data) throw new Error('전문을 저장하지 못했어요.');
   return { id: data.id as string, updated_at: data.updated_at as string };
 }
 
@@ -52,7 +66,7 @@ export async function updateReferenceText(
   if (loadedUpdatedAt) request = request.eq('updated_at', loadedUpdatedAt);
 
   const { data, error } = await request.select('updated_at').maybeSingle();
-  if (error) throw error;
+  if (error) throw writeError(error);
   if (!data) return null;
   return { updated_at: data.updated_at as string };
 }

@@ -1,5 +1,6 @@
 export { default as BrowseTreeFrame } from './BrowseTreeFrame';
 export { default as ReferenceBodyField } from './ReferenceBodyField';
+export { default as ReferenceBodyView } from './ReferenceBodyView';
 export { default as ReferenceClassifySection } from './ReferenceClassifySection';
 export { default as ReferenceKindChips } from './ReferenceKindChips';
 export { default as ReferenceKindField } from './ReferenceKindField';
@@ -8,6 +9,7 @@ export { default as ReferenceSidePanel } from './ReferenceSidePanel';
 export { default as ReferenceTextForm } from './ReferenceTextForm';
 export { default as ReferenceTextImport } from './ReferenceTextImport';
 export { default as ReferenceTextList } from './ReferenceTextList';
+export { default as ReferenceTextView } from './ReferenceTextView';
 export { default as ReferenceUnitsField } from './ReferenceUnitsField';
 export { default as ReferenceWorkPickDialog } from './ReferenceWorkPickDialog';
 export { default as ReferenceWorkTreePanel } from './ReferenceWorkTreePanel';

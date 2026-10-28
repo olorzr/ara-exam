@@ -72,8 +72,11 @@ export function bodyPlainText(body: string, format: ReferenceTextFormat): string
   return decodeHtmlEntities(text).replace(/\s+/g, ' ').trim();
 }
 
-/** 글자 사이에 끼는 줄 안 태그 — 정화기 인라인 프로필(`sanitizeInlineHTML`)의 태그와 같다(br 은 줄바꿈이라 뺀다) */
-const INLINE_TAG = /<\/?(strong|em|u|s|code|span)\b[^>]*>/gi;
+/**
+ * 글자 사이에 끼는 줄 안 태그 — 정화기 인라인 프로필(`sanitizeInlineHTML`)의 태그 + 문제집 서식의 `mark`·`small`
+ * (br 은 줄바꿈이라 뺀다)
+ */
+const INLINE_TAG = /<\/?(strong|em|u|s|code|span|mark|small)\b[^>]*>/gi;
 
 /**
  * 태그 칸 — 다듬고(이름 정규화·길이), 겹침을 빼고, 상한까지.

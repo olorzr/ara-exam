@@ -21,6 +21,9 @@
 --
 -- ⚠️ 앞으로 exam 스키마에 정책을 새로 만들 때도 **이 꼴**로 쓴다(CLAUDE.md 2026-10-11 항목).
 --
+-- ⚠️ [2026-10-28] reference_texts 정책의 정식 정의는 sql/84 다 — 이 파일은 그것이 적용된 DB 에서 그 표를 건너뛰고,
+--    정책 수 검사는 `15 + reference_texts 정책 수(1 또는 4)` 다.
+--
 -- ⛳️ 되돌릴 때: 같은 이름으로 감싸지 않은 식을 다시 CREATE 하면 된다(sql/17·57 의 원래 정의).
 --
 -- ⚠️ 정책 교체는 표마다 배타 잠금을 잡는다 — 적재 스크립트가 돌 때 다시 돌리면 교착(deadlock)으로
@@ -122,10 +125,23 @@ CREATE POLICY "Authenticated users can manage print_bundles" ON exam.print_bundl
   USING      ((select auth.role()) = 'authenticated' AND (select exam.is_allowed_domain()))
   WITH CHECK ((select auth.role()) = 'authenticated' AND (select exam.is_allowed_domain()));
 
-DROP POLICY IF EXISTS "Authenticated users can manage reference_texts" ON exam.reference_texts;
-CREATE POLICY "Authenticated users can manage reference_texts" ON exam.reference_texts
-  USING      ((select auth.role()) = 'authenticated' AND (select exam.is_allowed_domain()))
-  WITH CHECK ((select auth.role()) = 'authenticated' AND (select exam.is_allowed_domain()));
+-- ⚠️ reference_texts 정책의 정식 정의는 이제 sql/84(읽기 전원 · 쓰기 원장, 2026-10-28) — 그것이 적용된 DB 에서는 건너뛴다.
+--    건너뛰지 않으면 이 파일을 다시 돌리는 순간 FOR ALL 이 되살아나(정책은 OR 로 합쳐진다) 선생님 쓰기가 다시 열린다.
+--    sql/84 전의 신규 부트스트랩 순서에서는 예전처럼 감싼 FOR ALL 을 만든다(그 뒤에 84 가 갈아 끼운다).
+DO $reference_texts$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_policies
+              WHERE schemaname = 'exam' AND tablename = 'reference_texts'
+                AND policyname = 'Admin can update reference_texts') THEN
+    RAISE NOTICE 'sql/65: reference_texts 는 sql/84 가 정식 정의라 건너뜀';
+    RETURN;
+  END IF;
+  DROP POLICY IF EXISTS "Authenticated users can manage reference_texts" ON exam.reference_texts;
+  CREATE POLICY "Authenticated users can manage reference_texts" ON exam.reference_texts
+    USING      ((select auth.role()) = 'authenticated' AND (select exam.is_allowed_domain()))
+    WITH CHECK ((select auth.role()) = 'authenticated' AND (select exam.is_allowed_domain()));
+END
+$reference_texts$;
 
 -- ---------------------------------------------
 -- 4. 작품명 대장 (sql/46 · 47 · 51 — 읽기 전용, TO authenticated 그대로)
@@ -158,6 +174,8 @@ DECLARE
   v_left  TEXT;
   v_count INT;
   v_all   INT;
+  -- reference_texts 의 정책 수 — sql/84 전 1(FOR ALL), 뒤 4(읽기 + 원장 쓰기 셋)
+  v_ref   INT;
 BEGIN
   -- 감싼 호출(`SELECT auth.role()` · `SELECT exam.is_allowed_domain()` · `SELECT (auth.jwt() …`)을 지우고
   -- 남은 글에 함수 호출이 있으면 그 정책은 아직 행마다 평가된다
@@ -171,10 +189,22 @@ BEGIN
     RAISE EXCEPTION 'sql/65: 아직 감싸지 않은 정책이 있다: %', v_bad;
   END IF;
 
-  -- 정책 수가 그대로인가(DROP 만 되고 CREATE 가 빠진 정책이 없게)
+  -- 정책 수가 그대로인가(DROP 만 되고 CREATE 가 빠진 정책이 없게). reference_texts 는 sql/84 가 넷으로 쪼갰다
+  SELECT count(*) INTO v_ref FROM pg_policies WHERE schemaname = 'exam' AND tablename = 'reference_texts';
+  IF v_ref NOT IN (1, 4) THEN
+    RAISE EXCEPTION 'sql/65: reference_texts 정책이 1개(sql/84 전) 또는 4개(뒤)여야 하는데 %개', v_ref;
+  END IF;
   SELECT count(*) INTO v_count FROM pg_policies WHERE schemaname = 'exam' AND tablename = ANY (v_tables);
-  IF v_count <> 16 THEN
-    RAISE EXCEPTION 'sql/65: 정책이 16개여야 하는데 %개', v_count;
+  IF v_count <> 15 + v_ref THEN
+    RAISE EXCEPTION 'sql/65: 정책이 %개여야 하는데 %개', 15 + v_ref, v_count;
+  END IF;
+  -- sql/84 불변식: 넷이면 ALL 없음, 쓰기 셋은 원장 이메일
+  IF v_ref = 4 AND (
+       EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'exam' AND tablename = 'reference_texts' AND cmd = 'ALL')
+    OR (SELECT count(*) FROM pg_policies WHERE schemaname = 'exam' AND tablename = 'reference_texts'
+         AND cmd IN ('INSERT', 'UPDATE', 'DELETE')
+         AND coalesce(qual, with_check) LIKE '%ara0723@araeducation.co.kr%') <> 3) THEN
+    RAISE EXCEPTION 'sql/65: reference_texts 쓰기 정책이 원장 전용(sql/84)이 아니다';
   END IF;
 
   -- sql/57 불변식: problem_sources 는 4개, ALL 없음, DELETE 는 원장 이메일
@@ -196,7 +226,7 @@ BEGIN
      AND regexp_replace(coalesce(qual, '') || ' ' || coalesce(with_check, ''),
            'SELECT \(?(auth\.(role|jwt)\(\)|exam\.is_allowed_domain\(\))', '', 'g')
          ~ '(auth\.(role|jwt)\(\)|is_allowed_domain\(\))';
-  RAISE NOTICE 'sql/65 정책 모양 확인: 16개 전부 (select …) 꼴. 범위 밖 감싸지 않은 표: %', coalesce(v_left, '(없음)');
+  RAISE NOTICE 'sql/65 정책 모양 확인: %개 전부 (select …) 꼴(reference_texts %개). 범위 밖 감싸지 않은 표: %', 15 + v_ref, v_ref, coalesce(v_left, '(없음)');
 END
 $verify_shape$;
 

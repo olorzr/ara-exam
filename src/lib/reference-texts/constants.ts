@@ -40,9 +40,13 @@ export const REFERENCE_FACET_MAX_ROWS = 20_000;
 /** 종류 — 화면 순서가 곧 이 순서다 */
 export const REFERENCE_KINDS: readonly ReferenceTextKind[] = ['작품', '개념'];
 
-/** 종류마다 새로 만들 때의 본문 형식 — 작품은 원문 그대로(평문), 개념은 표·목록이 든 정리(HTML) */
+/**
+ * 종류마다 새로 만들 때의 본문 형식 — 둘 다 문제집 서식(HTML).
+ * 작품도 평가문제집 쪽처럼 원문 옆 여백 해설·어휘 풀이를 함께 담는다(2026-10-28 원장 결정).
+ * 옛 평문(`text`) 행은 그대로 읽히고, 참고자료로는 해설을 걷은 원문만 간다(`referenceBodyPlainText`).
+ */
 export const DEFAULT_FORMAT_BY_KIND: Readonly<Record<ReferenceTextKind, ReferenceTextFormat>> = {
-  작품: 'text',
+  작품: 'html',
   개념: 'html',
 };
 

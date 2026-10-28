@@ -5,6 +5,7 @@ import { useEditorState, type Editor } from '@tiptap/react';
 import { Bold, Italic, Minus, Table as TableIcon, Underline as UnderlineIcon, WrapText } from 'lucide-react';
 import { BOX_LABEL_OPTIONS } from '@/lib/box-labels';
 import { VERSE_LAYOUT } from '@/lib/sanitize-problem';
+import WorkbookToolbarControls from './WorkbookToolbarControls';
 import YetHangulDialog from './YetHangulDialog';
 
 /** '상자 아님' 센티널 — 빈 문자열 option 은 브라우저마다 다루기가 다르다 */
@@ -12,6 +13,8 @@ const NO_BOX = '__none__';
 
 interface ProblemEditorToolbarProps {
   editor: Editor;
+  /** 작품 전문 · 개념 편집기(참고자료 프로필)면 문제집 서식 단추를 붙인다 — 문항 편집기는 그대로 */
+  profile?: 'problem' | 'reference';
 }
 
 /**
@@ -21,7 +24,8 @@ interface ProblemEditorToolbarProps {
  *    `useEditor` 는 `shouldRerenderOnTransaction` 이 기본 false 라, 커서를 옮겨도
  *    다시 그려지지 않아 버튼과 선택 칸이 옛 상태에 머문다. `useEditorState` 로 구독한다.
  */
-export default function ProblemEditorToolbar({ editor }: ProblemEditorToolbarProps) {
+export default function ProblemEditorToolbar({ editor, profile = 'problem' }: ProblemEditorToolbarProps) {
+  const reference = profile === 'reference';
   /** 옛한글 넣기 창 — 아래아·반치음은 보통 입력기로 칠 수 없다 */
   const [yetOpen, setYetOpen] = useState(false);
   const state = useEditorState({
@@ -48,7 +52,10 @@ export default function ProblemEditorToolbar({ editor }: ProblemEditorToolbarPro
       return;
     }
     if (!state.blockquote) chain.setBlockquote();
-    chain.updateAttributes('blockquote', { 'data-box': value }).run();
+    // 참고자료 편집기는 말머리 상자와 〈보기〉 상자를 한 blockquote 에 두지 않는다(그쪽 속성은 그 편집기에만 있다)
+    chain.updateAttributes('blockquote', reference
+      ? { 'data-box': value, 'data-callout': null, 'data-tone': null }
+      : { 'data-box': value }).run();
   };
 
   return (
@@ -92,7 +99,7 @@ export default function ProblemEditorToolbar({ editor }: ProblemEditorToolbarPro
       >
         <TableIcon className="h-3.5 w-3.5" />
       </button>
-      {state.table && (
+      {state.table && !reference && (
         <button
           type="button" className={buttonClass(state.verse)}
           onClick={() => editor.chain().focus()
@@ -124,6 +131,8 @@ export default function ProblemEditorToolbar({ editor }: ProblemEditorToolbarPro
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}
       </select>
+      {/* 참고자료 편집기는 표 모양 고르기(나란히·여백 해설·어휘 풀이)가 나란히 표 단추를 대신한다 */}
+      {reference && <WorkbookToolbarControls editor={editor} />}
     </div>
   );
 }

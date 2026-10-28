@@ -19,6 +19,7 @@
 @import "shadcn/tailwind.css";
 @import "../styles/print-a4.css";
 @import "../styles/problem-paper.css";
+@import "../styles/reference-sheet.css";
 @import "../styles/print-qa.css";
 @import "../styles/print-booklet.css";
 @import "../styles/paper-cover.css";
@@ -867,4 +868,20 @@
   border-left: 2px solid #e5e7eb;
   padding-left: 8px;
   margin: 8px 0;
+}
+
+/*
+ * 제목·목록·네모 표시 — Tailwind 리셋이 제목 크기·목록 점을 지워 편집 중에는 맨 글로 보였다(2026-10-28).
+ * 인쇄(problem-paper.css)와 같은 뜻으로 옅게. 작품 전문 · 개념 편집기는 reference-sheet.css 가 그 위에 문제집 모양을 얹는다.
+ */
+.pb-editor .ProseMirror h3 { margin: 10px 0 4px; font-size: 1.12em; font-weight: 700; }
+.pb-editor .ProseMirror h4 { margin: 8px 0 4px; font-size: 1.02em; font-weight: 700; }
+.pb-editor .ProseMirror ul { list-style: disc outside; padding-left: 1.4em; margin: 4px 0; }
+.pb-editor .ProseMirror ol { list-style: decimal outside; padding-left: 1.4em; margin: 4px 0; }
+.pb-editor .ProseMirror li > p { margin: 0; }
+.pb-editor .ProseMirror code {
+  border: 1px solid currentColor;
+  padding: 0 2px;
+  background: transparent;
+  font: inherit;
 }

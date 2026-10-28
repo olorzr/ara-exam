@@ -801,6 +801,31 @@
 - 코드에서의 사용: `<table data-layout="verse">`, `VERSE_LAYOUT`(sanitize-problem.ts), `VerseTableAttribute`(편집기), 적재 도구 `layout-lint.cjs` 의 `toVerseTables`
 - 관련 파일: src/lib/sanitize-problem.ts, src/components/problem-editor/VerseTableAttribute.ts, src/styles/problem-paper.css
 
+## 문제집 서식 (workbook markup)
+- 정의: 작품 전문 · 개념 본문이 평가문제집 쪽처럼 보이게 하는 표시 다섯 가지 — 말머리 상자 · 어휘 풀이 표 · 여백 해설 표 · 흐름 목록(화살표 도식) · 형광펜. 문항 정화기는 하나도 받지 않는다
+- 코드에서의 사용: `CALLOUT_TONES`·`CALLOUT_PRESETS`·`GLOSS_LAYOUT`·`VOCAB_LAYOUT`·`REFERENCE_TABLE_LAYOUTS`(workbook-markup.ts), `sanitizeReferenceHTML`, `WORKBOOK_EXTENSIONS`
+- 관련 파일: src/lib/workbook-markup.ts, src/lib/sanitize-reference.ts, src/styles/reference-sheet.css, src/components/problem-editor/WorkbookExtensions.ts
+
+## 말머리 상자 (callout)
+- 정의: 문제집의 '학습 목표'·'핵심 포인트'·'쌤의 비밀 노트' 같은 이름 붙은 색 상자. 이름은 책에 인쇄된 그대로(24자까지), 색은 갈래 여덟 가지
+- 코드에서의 사용: `<blockquote data-callout="학습 목표" data-tone="goal">`, `CalloutAttribute`(편집기)
+- 관련 파일: src/lib/workbook-markup.ts, src/styles/reference-sheet.css
+
+## 여백 해설 (gloss)
+- 정의: 작품 원문(연·문단) 옆에 붙는 출판사 해설('→ 1~2연: …'). 원문 칸 · 해설 칸 두 칸 표로 담고, 화살표는 화면이 그린다. 참고자료로 보낼 때는 해설 칸을 걷는다
+- 코드에서의 사용: `<table data-layout="gloss">`, `GLOSS_LAYOUT`, `stripWorkbookNotes`
+- 관련 파일: src/lib/workbook-markup.ts, src/lib/reference-texts/workbook-plain.ts
+
+## 어휘 풀이 표 (vocab table)
+- 정의: 낱말 칸 · 풀이 칸 두 칸 표(한자는 `<small>`). 화면은 밑줄 친 낱말 바로 밑에 풀이를 놓는다
+- 코드에서의 사용: `<table data-layout="vocab">`, `VOCAB_LAYOUT`
+- 관련 파일: src/lib/workbook-markup.ts, src/styles/reference-sheet.css
+
+## 흐름 목록 (flow list)
+- 정의: 화살표 도식(전 ↓ 중 ↓ 후, 화자 → 청자)을 담는 점 목록. 항목마다 상자, 사이에 화살표를 화면이 그린다
+- 코드에서의 사용: `<ul data-flow="down|right">`, `FlowAttribute`
+- 관련 파일: src/lib/workbook-markup.ts, src/styles/reference-sheet.css
+
 ## 각주 (footnote)
 - 정의: 지문·〈보기〉 끝에 `* 낱말 : 풀이` 꼴로 단 단어 설명. 참고사항이라 작은 글씨로 찍는다(데이터는 그대로, 그릴 때 알아본다)
 - 코드에서의 사용: `markFootnotes`, `FOOTNOTE_CLASS`(`pb-note`)

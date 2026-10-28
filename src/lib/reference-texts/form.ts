@@ -1,5 +1,5 @@
 import { normalizeGrammarPaths } from '@/lib/problem-bank/grammar-tree';
-import { sanitizeProblemHTML } from '@/lib/sanitize-problem';
+import { sanitizeReferenceHTML } from '@/lib/sanitize-reference';
 import type {
   ReferenceText, ReferenceTextFormat, ReferenceTextKind, ReferenceUnit,
 } from '@/types/reference-text';
@@ -13,7 +13,10 @@ import { isReferenceUnit, normalizeReferenceUnits, stringsEqual, unitsEqual } fr
  * 작품 전문 · 개념 편집 화면의 입력값과 그 검사 (순수 함수).
  *
  * 본문은 형식(`format`)이 둘이다 — 작품은 대개 **평문**(텍스트 노드로만 그린다), 개념은 표·목록이 든
- * **HTML**(문항 정화기 `sanitizeProblemHTML` 프로필 — 저장할 때 정화하고 그릴 때 또 정화한다).
+ * **HTML**(참고자료 정화기 `sanitizeReferenceHTML` — 문항 프로필 + 문제집 서식, 저장할 때 정화하고 그릴 때 또 정화한다).
+ *
+ * ⚠️ 저장(`toReferenceTextPayload`)·읽기(`draftFromReferenceText`)·견주기(`bodyEquals`) **셋이 같은 정화기**여야 한다.
+ *    견주기만 문항 프로필로 두면 말머리 상자 하나로 '저장 안 됨' 이 영영 안 풀리고 새로 만든 뒤 주소 옮기기가 멈춘다.
  */
 
 /** 편집 화면이 들고 있는 값 */
@@ -38,6 +41,9 @@ export interface ReferenceTextDraft {
   note: string;
 }
 
+/**
+ * 칸마다 빈 값 — 형식은 평문(옛 행의 모양). 새로 만들 때는 `emptyReferenceDraft` 가 종류의 기본 형식(서식)을 고른다.
+ */
 export const EMPTY_REFERENCE_DRAFT: ReferenceTextDraft = {
   title: '', author: '', body: '', kind: '작품', format: 'text', seq: '', tags: [],
   units: [], grammar_paths: [], note: '',
@@ -131,7 +137,7 @@ export function toReferenceTextPayload(draft: ReferenceTextDraft): ReferenceText
   return {
     title: draft.title.trim(),
     author: draft.author.trim(),
-    body: draft.format === 'html' ? sanitizeProblemHTML(draft.body).trim() : normalizeBody(draft.body),
+    body: draft.format === 'html' ? sanitizeReferenceHTML(draft.body).trim() : normalizeBody(draft.body),
     kind: draft.kind,
     format: draft.format,
     // 차단 조건이 잘못된 차례를 먼저 막는다 — 여기 닿았으면 숫자이거나 빈칸이다
@@ -165,7 +171,7 @@ export function draftFromReferenceText(row: ReferenceText): ReferenceTextDraft {
     title: row.title,
     author: row.author,
     // HTML 은 읽을 때도 정화한다(직접 DB 쓰기·옛 값이 남을 수 있다 — 개념지와 같은 규약)
-    body: format === 'html' ? sanitizeProblemHTML(row.body) : row.body,
+    body: format === 'html' ? sanitizeReferenceHTML(row.body) : row.body,
     kind: row.kind === '개념' ? '개념' : '작품',
     format,
     seq: typeof row.seq === 'number' ? String(row.seq) : '',
@@ -212,7 +218,7 @@ export function draftFieldEquals(
 function bodyEquals(a: ReferenceTextDraft, b: ReferenceTextDraft): boolean {
   if (a.body === b.body) return true;
   if (a.format !== 'html' || b.format !== 'html') return false;
-  return sanitizeProblemHTML(a.body).trim() === sanitizeProblemHTML(b.body).trim();
+  return sanitizeReferenceHTML(a.body).trim() === sanitizeReferenceHTML(b.body).trim();
 }
 
 /**
