@@ -3,59 +3,35 @@
 import { useEffect, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { htmlToPlainText } from '@/lib/concept-pick/plain-text';
 import { fetchPassagesByIds } from '@/lib/problem-bank/detail-queries';
 import { passagePickName, searchPassages, type PassagePickRow } from '@/lib/problem-bank/passage-search';
+import type { PickGate } from '@/hooks/usePickGate';
 import { sourceLabel } from '@/lib/problem-bank/source-label';
-import type { PickedPassageMeta } from '@/lib/quiz-references/types';
+import type { PickedPassage } from '@/lib/quiz-references/types';
 
 /**
- * 아카이브에 쌓인 지문을 골라 오는 창.
+ * 지문 불러오기 창의 **기출 지문** 탭 — 아카이브에 쌓인 기출 지문을 골라 온다.
  *
  * 기출을 읽어 두면 같은 글을 다시 타이핑할 이유가 없다 — 지문을 고르면 평문으로 펴서 넣는다.
  * 본문(`html`)은 **고른 하나만** 따로 읽는다(목록에 실으면 응답이 무거워진다).
+ * 창이 열릴 때 마운트되므로(`QuizSourcePickerDialog`) 상태가 저절로 초기화된다.
  */
 
-/** 고른 지문에서 폼으로 넘기는 값 */
-export interface PickedPassage {
-  text: string;
-  title: string;
-  author: string;
-  /**
-   * 참고자료 자동 매칭이 쓰는 정보 — 단원·교과서·학교.
-   *
-   * 붙여넣기로는 알 수 없는 **강한 신호**다. 같은 교과서의 같은 단원 개념지는 그 지문을
-   * 가르치려고 만든 것이라, 작품명이 안 맞아도 쓸모가 있다.
-   */
-  meta: PickedPassageMeta;
-}
-
-interface PassagePickerDialogProps {
-  open: boolean;
+interface PassagePickBodyProps {
+  /** 창 전체가 함께 쓰는 '하나만 불러오기' 잠금 — 다른 탭에서 읽는 중이면 여기 단추도 잠긴다 */
+  gate: PickGate;
   onClose: () => void;
   onPick: (picked: PickedPassage) => void;
 }
 
 /**
- * 지문 고르기 창을 그린다.
- * @param props - 열림 여부와 닫기·고르기 콜백
- * @returns 창 (닫혀 있으면 속을 그리지 않는다)
+ * 기출 지문 고르기를 그린다.
+ * @param props - 잠금과 닫기·고르기 콜백
+ * @returns 검색칸과 지문 목록
  */
-export default function PassagePickerDialog({ open, onClose, onPick }: PassagePickerDialogProps) {
-  return (
-    <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
-      <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
-        {/* 창을 다시 열면 처음부터 — 마운트를 갈아 끼우면 옛 검색어·목록이 남지 않는다 */}
-        {open && <PickerBody onClose={onClose} onPick={onPick} />}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-/** 실제 내용 — 열릴 때 마운트되므로 상태가 저절로 초기화된다 */
-function PickerBody({ onClose, onPick }: Omit<PassagePickerDialogProps, 'open'>) {
+export default function PassagePickBody({ gate, onClose, onPick }: PassagePickBodyProps) {
   const [term, setTerm] = useState('');
   const [rows, setRows] = useState<PassagePickRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -101,7 +77,14 @@ function PickerBody({ onClose, onPick }: Omit<PassagePickerDialogProps, 'open'>)
     load(term, '찾지 못했어요.');
   };
 
+  const fail = (message: string) => {
+    gate.end();
+    setError(message);
+    setBusyId(null);
+  };
+
   const pick = (row: PassagePickRow) => {
+    if (!gate.begin()) return;
     setBusyId(row.id);
     fetchPassagesByIds([row.id])
       .then(([passage]) => {
@@ -109,8 +92,7 @@ function PickerBody({ onClose, onPick }: Omit<PassagePickerDialogProps, 'open'>)
         // 닫아 놓고 직접 쓴 지문이 뒤늦게 덮이면 쓴 사람은 영문을 모른다
         if (!aliveRef.current) return;
         if (!passage) {
-          setError('지문을 불러오지 못했어요.');
-          setBusyId(null);
+          fail('지문을 불러오지 못했어요.');
           return;
         }
         onPick({
@@ -119,6 +101,7 @@ function PickerBody({ onClose, onPick }: Omit<PassagePickerDialogProps, 'open'>)
           author: passage.author,
           meta: {
             id: passage.id,
+            source: 'passage',
             unitPath: passage.unit_path ?? [],
             textbook: row.source.textbook ?? '',
             grade: row.source.grade ?? '',
@@ -130,19 +113,15 @@ function PickerBody({ onClose, onPick }: Omit<PassagePickerDialogProps, 'open'>)
       })
       .catch((e) => {
         if (!aliveRef.current) return;
-        setError(e instanceof Error ? e.message : '지문을 불러오지 못했어요.');
-        setBusyId(null);
+        fail(e instanceof Error ? e.message : '지문을 불러오지 못했어요.');
       });
   };
 
   return (
     <div className="space-y-3">
-      <div>
-        <DialogTitle className="text-base">아카이브에서 지문 불러오기</DialogTitle>
-        <p className="mt-1 text-sm text-gray-500">
-          읽어 둔 기출 지문을 골라 넣습니다. 글로 저장된 지문만 보여요.
-        </p>
-      </div>
+      <p className="text-sm text-gray-500">
+        읽어 둔 기출 지문을 골라 넣습니다. 글로 저장된 지문만 보여요.
+      </p>
 
       <div className="flex items-center gap-2">
         <Input
@@ -173,7 +152,7 @@ function PickerBody({ onClose, onPick }: Omit<PassagePickerDialogProps, 'open'>)
               <button
                 type="button"
                 onClick={() => pick(row)}
-                disabled={busyId !== null}
+                disabled={gate.busy}
                 className="w-full px-1 py-2 text-left hover:bg-gray-50 disabled:opacity-50"
               >
                 <span className="text-sm font-medium text-gray-900">{passagePickName(row)}</span>

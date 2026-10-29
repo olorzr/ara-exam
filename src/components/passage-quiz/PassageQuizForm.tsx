@@ -7,8 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  PASSAGE_QUIZ_MAX_PER_TYPE, PASSAGE_QUIZ_TEXT_LIMIT, draftBlocker,
-  type PassageQuizDraft,
+  PASSAGE_QUIZ_MAX_PER_TYPE, PASSAGE_QUIZ_TEXT_LIMIT, applyQuizTypeMode, draftBlocker, quizTypeMode,
+  type PassageQuizDraft, type QuizTypeMode,
 } from '@/lib/passage-quiz';
 
 /**
@@ -16,7 +16,18 @@ import {
  *
  * 개수 칸은 **비워 두는 것이 기본**이다 — 지문을 보기 전에 개수를 정하면 짧은 지문을 억지로
  * 채우고 긴 지문에서 빠뜨린다(개념지 빈칸 추천에서 같은 판단을 했다).
+ *
+ * 만들 유형(섞어서 · O,X 만 · 단답형만)은 따로 저장하지 않고 **개수 칸에서 읽는다**(`quizTypeMode`) —
+ * 단추는 개수 칸을 고칠 뿐이다. 그래서 섞어서 모드에서 칸에 직접 0 을 적으면 단추가 그 유형만으로 넘어가고
+ * 0 인 칸이 접힌다. 뜻이 같아(그 유형은 안 만든다) 화면이 사실대로 말하는 것이다.
  */
+
+/** 유형 단추 — 화면 차례 */
+const TYPE_MODES: readonly { mode: QuizTypeMode; label: string }[] = [
+  { mode: 'mix', label: '섞어서' },
+  { mode: 'ox', label: 'O,X 만' },
+  { mode: 'short', label: '단답형만' },
+];
 
 interface PassageQuizFormProps {
   draft: PassageQuizDraft;
@@ -45,6 +56,7 @@ export default function PassageQuizForm({
 }: PassageQuizFormProps) {
   const blocker = draftBlocker(draft) ?? extraBlocker;
   const tooLong = draft.text.length > PASSAGE_QUIZ_TEXT_LIMIT;
+  const typeMode = quizTypeMode(draft);
 
   return (
     <section className="space-y-3 rounded-lg border border-gray-200 p-4">
@@ -80,7 +92,7 @@ export default function PassageQuizForm({
             </span>
             <Button type="button" variant="outline" size="sm" onClick={onOpenPicker}>
               <FolderOpen className="h-3.5 w-3.5" />
-              <span className="ml-1">아카이브에서 불러오기</span>
+              <span className="ml-1">지문 불러오기</span>
             </Button>
           </div>
         </div>
@@ -88,30 +100,55 @@ export default function PassageQuizForm({
           id="quiz-text"
           value={draft.text}
           rows={12}
-          placeholder="문학 작품이나 비문학 지문을 붙여 넣어 주세요."
+          placeholder="문학 작품이나 비문학 지문을 붙여 넣어 주세요. '지문 불러오기' 로 작품 전문·개념·기출 지문을 골라도 돼요."
           className="min-h-56 font-normal"
           onChange={(e) => onChange({ text: e.target.value })}
         />
       </div>
 
+      <div className="flex flex-wrap items-center gap-2">
+        <span id="quiz-type-label" className="text-sm font-medium text-gray-700">만들 유형</span>
+        <div className="flex gap-1" role="group" aria-labelledby="quiz-type-label">
+          {TYPE_MODES.map(({ mode, label }) => (
+            <Button
+              key={mode}
+              type="button"
+              size="sm"
+              variant={typeMode === mode ? 'default' : 'outline'}
+              // 색만으로 알리지 않는다 — 화면 낭독기도 무엇이 골라졌는지 말할 수 있어야 한다
+              aria-pressed={typeMode === mode}
+              onClick={() => onChange(applyQuizTypeMode(draft, mode))}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+      </div>
+
       <div className="grid gap-3 sm:grid-cols-2">
-        <CountField
-          id="quiz-ox-count"
-          label="O,X 개수"
-          value={draft.oxCount}
-          onChange={(oxCount) => onChange({ oxCount })}
-        />
-        <CountField
-          id="quiz-short-count"
-          label="단답형 개수"
-          value={draft.shortCount}
-          onChange={(shortCount) => onChange({ shortCount })}
-        />
+        {typeMode !== 'short' && (
+          <CountField
+            id="quiz-ox-count"
+            label="O,X 개수"
+            value={draft.oxCount}
+            onChange={(oxCount) => onChange({ oxCount })}
+          />
+        )}
+        {typeMode !== 'ox' && (
+          <CountField
+            id="quiz-short-count"
+            label="단답형 개수"
+            value={draft.shortCount}
+            onChange={(shortCount) => onChange({ shortCount })}
+          />
+        )}
       </div>
 
       <p className="text-xs text-gray-500">
-        개수를 비워 두면 지문을 보고 <b>AI 가 정합니다</b>(유형마다 최대 {PASSAGE_QUIZ_MAX_PER_TYPE}개).
-        0 을 적으면 그 유형은 만들지 않아요. 근거가 지문·참고자료에 없는 문항은 자동으로 빠집니다.
+        개수를 비워 두면 지문을 보고 <b>AI 가 정합니다</b>
+        ({typeMode === 'mix' ? '유형마다 ' : ''}최대 {PASSAGE_QUIZ_MAX_PER_TYPE}개).
+        {typeMode === 'mix' && ' 0 을 적으면 그 유형은 만들지 않아요.'}
+        {' '}근거가 지문·참고자료에 없는 문항은 자동으로 빠집니다.
         AI 는 선생님 컴퓨터의 ChatGPT 를 씁니다 —{' '}
         <Link href="/settings/ai" className="text-primary underline underline-offset-2">
           AI 연결

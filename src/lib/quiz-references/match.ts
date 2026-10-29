@@ -1,5 +1,36 @@
 import { KIND_BONUS, MATCH_MIN_SCORE, MATCH_WEIGHTS } from './constants';
-import type { CandidateHit, MatchHit, MatchSignal, RankedReference } from './types';
+import type {
+  CandidateHit, MatchHit, MatchSignal, QuizMatchSignals, RankedReference,
+} from './types';
+
+/**
+ * 찾아 온 자료 가운데 **지금 다루는 글 자신**을 뺀다.
+ *
+ * - 학교 프린트의 문답에 자료를 붙일 때(`excludeSheetId`): 그 프린트로 만든 시험지가 '같은 학교'·
+ *   '제목에 …' 으로 걸려 스스로 붙는다 — 본문은 이미 프롬프트에 통째로 실려 있어 두 번 싣는 셈이고,
+ *   답이 비어 있는 그 글이 근거 자료로 둔갑한다.
+ * - 작품 전문을 **지문으로** 불러왔을 때(`excludeTextId`): 제목·지은이 조회가 그 전문을 다시 찾아와
+ *   같은 글이 지문과 참고자료로 두 번 실리고, 정답표에 근거가 '전문 · …' 에서 나온 것처럼 찍힌다.
+ *
+ * 조회마다 빼지 않고 한 번에 거르는 까닭: 개념지를 긁는 조회가 넷이라 한 곳만 빠뜨려도 조용히
+ * 되살아난다. 종류까지 맞춰 뺀다 — 표가 달라 id 가 겹칠 일은 없지만 지울 대상의 표를 분명히 해 둔다.
+ * @param hits - 찾아 온 알갱이들
+ * @param signals - 뺄 id 를 든 신호
+ * @returns 자기 자신을 뺀 알갱이들 (뺄 것이 없으면 그 배열 그대로)
+ */
+export function dropSelfHits(
+  hits: CandidateHit[],
+  signals: Pick<QuizMatchSignals, 'excludeSheetId' | 'excludeTextId'>,
+): CandidateHit[] {
+  const { excludeSheetId, excludeTextId } = signals;
+  if (!excludeSheetId && !excludeTextId) return hits;
+  return hits.filter(({ candidate }) => {
+    const isSheet = candidate.kind === 'sheet' || candidate.kind === 'print';
+    if (excludeSheetId && isSheet && candidate.id === excludeSheetId) return false;
+    if (excludeTextId && candidate.kind === 'text' && candidate.id === excludeTextId) return false;
+    return true;
+  });
+}
 
 /**
  * 찾아 온 자료들에 점수를 매겨 줄 세운다 (순수 함수).

@@ -48,6 +48,45 @@ export function draftCounts(draft: PassageQuizDraft): PassageQuizCounts {
   return { ox: parseCountInput(draft.oxCount), short: parseCountInput(draft.shortCount) };
 }
 
+/** 만들 유형 — 둘 다 / O,X 만 / 단답형만 */
+export type QuizTypeMode = 'mix' | 'ox' | 'short';
+
+/**
+ * 지금 입력값이 어느 유형을 만드는가 — **개수에서 파생**한다.
+ *
+ * 유형 칸을 따로 저장하지 않는 까닭: '단답형 0개' 와 'O,X 만' 은 뜻이 같다. 칸을 둘 두면 두 값이 갈리는
+ * 길(유형은 O,X 만인데 단답형 개수 칸에 3)이 생기고, 생성은 개수만 보므로 화면이 거짓말을 한다.
+ * 그래서 개수 칸에 직접 0 을 적어도 그 유형만 만드는 모드로 읽힌다(뜻이 같다).
+ * @param draft - 화면 입력값
+ * @returns 한 유형이 0 이고 다른 유형은 0 이 아니면 그 유형만, 그 밖에는 섞어서
+ */
+export function quizTypeMode(draft: Pick<PassageQuizDraft, 'oxCount' | 'shortCount'>): QuizTypeMode {
+  const { ox, short } = draftCounts({ ...EMPTY_DRAFT, ...draft });
+  if (short === 0 && ox !== 0) return 'ox';
+  if (ox === 0 && short !== 0) return 'short';
+  return 'mix';
+}
+
+/**
+ * 유형을 고른 대로 개수 칸을 고친다.
+ *
+ * - O,X 만 → 단답형을 0 으로. O,X 가 0 이었으면 '자동' 으로 되돌린다(0 이면 둘 다 0 이라 못 만든다)
+ * - 단답형만 → 거꾸로
+ * - 섞어서 → 0 인 칸만 '자동' 으로 되돌린다(적어 둔 개수는 남긴다)
+ * @param draft - 화면 입력값
+ * @param mode - 고른 유형
+ * @returns 바꿀 칸만
+ */
+export function applyQuizTypeMode(
+  draft: Pick<PassageQuizDraft, 'oxCount' | 'shortCount'>,
+  mode: QuizTypeMode,
+): Pick<PassageQuizDraft, 'oxCount' | 'shortCount'> {
+  const zeroOrAuto = (raw: string) => (parseCountInput(raw) === 0 ? '' : raw);
+  if (mode === 'ox') return { oxCount: zeroOrAuto(draft.oxCount), shortCount: '0' };
+  if (mode === 'short') return { oxCount: '0', shortCount: zeroOrAuto(draft.shortCount) };
+  return { oxCount: zeroOrAuto(draft.oxCount), shortCount: zeroOrAuto(draft.shortCount) };
+}
+
 /**
  * 지금 만들 수 없는 까닭. 버튼을 잠그고 그대로 보여 준다.
  * @param draft - 화면 입력값

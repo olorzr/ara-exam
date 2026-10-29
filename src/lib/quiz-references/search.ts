@@ -19,7 +19,7 @@ import type { QuizReferenceKind, ReferenceCandidate } from './types';
  * (제목이 안 맞거나, 옛 표기로 저장돼 자동으로 안 걸리는 자료). 그 길이 여기다.
  *
  * ⚠️ 여기서도 `.or()` 를 쓰지 않는다 — 칸마다 따로 물어 id 로 합친다
- *    (`PassagePickerDialog` 와 같은 규약).
+ *    (`PassagePickBody` 와 같은 규약).
  */
 
 /** 개념지 목록 컬럼. ⚠️ 한 줄로 둘 것 */

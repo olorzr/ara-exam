@@ -5,8 +5,8 @@ import { Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
-  PassagePickerDialog, PassageQuizForm, PassageQuizKeyView, PassageQuizList, PassageQuizPaperView,
-  QuizReferencesSection, ReferencePickerDialog,
+  PassageQuizForm, PassageQuizKeyView, PassageQuizList, PassageQuizPaperView,
+  QuizReferencesSection, QuizSourcePickerDialog, ReferencePickerDialog,
   type PickedPassage,
 } from '@/components/passage-quiz';
 import { useAiEnabled } from '@/hooks/useAiEnabled';
@@ -47,7 +47,7 @@ export default function PassageQuizPage() {
   const [mode, setMode] = useState<ViewMode>('edit');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [refPickerOpen, setRefPickerOpen] = useState(false);
-  /** 아카이브에서 고른 지문의 단원·학교 — 붙여넣기면 null */
+  /** 불러온 지문(기출 지문·작품 전문·개념)의 단원·학교 — 붙여넣기면 null */
   const [pickedMeta, setPickedMeta] = useState<PickedPassageMeta | null>(null);
 
   const hasItems = quiz.items.length > 0;
@@ -67,14 +67,14 @@ export default function PassageQuizPage() {
    *    그대로라 **앞 지문의 자료가 새 문항의 근거로 실린다.** 지문 칸은 `onBlur` 로 다시 찾지
    *    않으므로(글자마다 조회할 수는 없다) 여기서 걷어내는 수밖에 없다 — 새 자료는 제목·지은이를
    *    적거나 '참고자료 찾기' 를 누르면 곧바로 붙는다(`dropAuto` 가 마지막 신호 기억도 지운다).
-   *    ⚠️ **아카이브에서 골랐는지와 무관하게** 걷어낸다: 붙여넣기로 쓴 경우에도 같은 일이 난다.
+   *    ⚠️ **불러왔는지와 무관하게** 걷어낸다: 붙여넣기로 쓴 경우에도 같은 일이 난다.
    *    직접 고른 자료는 남는다 — 사람이 그 지문을 보고 고른 것일 수 있다.
    *    제목·지은이만 고치는 것은 그대로 둔다(그쪽은 `onBlur` 가 다시 찾는다).
    * @param patch - 바뀐 칸
    */
   const changeDraft = (patch: Partial<PassageQuizDraft>) => {
     if (patch.text !== undefined && patch.text !== draft.text) {
-      // 아카이브에서 물려받은 교과서·단원·학교는 **그 지문의 것**이라 함께 버린다
+      // 불러온 지문에서 물려받은 교과서·단원·학교는 **그 지문의 것**이라 함께 버린다
       if (pickedMeta) setPickedMeta(null);
       refs.dropAuto();
     }
@@ -84,13 +84,14 @@ export default function PassageQuizPage() {
   const applyPicked = (picked: PickedPassage) => {
     if (draft.text.trim() && !window.confirm('입력한 지문을 고른 지문으로 바꿀까요?')) return;
     // 제목·지은이는 **고른 지문의 것으로 바꾼다.** 비어 있다고 앞의 값을 남기면
-    // 엉뚱한 작품 이름이 다른 글 위에 찍히고 AI 에게도 그렇게 넘어간다
+    // 엉뚱한 작품 이름이 다른 글 위에 찍히고 AI 에게도 그렇게 넘어간다(개념 정리는 지은이가 늘 비어 있다)
     setDraft((prev) => ({
       ...prev, text: picked.text, title: picked.title, author: picked.author,
     }));
     setPickedMeta(picked.meta);
     // ⚠️ 신호를 **고른 값으로 직접** 만든다 — state 는 아직 안 바뀌어 있어 `signals` 를 쓰면
-    //    앞 지문의 신호로 찾는다. 지문이 바뀌었으니 같은 신호여도 다시 찾는다(`force`)
+    //    앞 지문의 신호로 찾는다. 지문이 바뀌었으니 같은 신호여도 다시 찾는다(`force`).
+    //    작품 전문을 불러왔으면 그 전문은 참고자료 후보에서 빠진다(`excludeTextId`)
     void refs.suggest(
       signalsFromDraft({ title: picked.title, author: picked.author }, picked.meta),
       { force: true },
@@ -186,7 +187,7 @@ export default function PassageQuizPage() {
             onClear={quiz.clear}
           />
 
-          <PassagePickerDialog
+          <QuizSourcePickerDialog
             open={pickerOpen}
             onClose={() => setPickerOpen(false)}
             onPick={applyPicked}

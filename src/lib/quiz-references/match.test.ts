@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { MATCH_MIN_SCORE } from './constants';
-import { matchReason, rankReferenceCandidates } from './match';
+import { dropSelfHits, matchReason, rankReferenceCandidates } from './match';
 import type { CandidateHit, MatchSignal, QuizReferenceKind } from './types';
 
 const hit = (
@@ -111,5 +111,28 @@ describe('matchReason', () => {
 
   it('맞은 신호가 없으면 빈 문자열', () => {
     expect(matchReason([])).toBe('');
+  });
+});
+
+describe('dropSelfHits', () => {
+  const none = { excludeSheetId: null, excludeTextId: null };
+
+  it('뺄 것이 없으면 그대로 돌려준다', () => {
+    const hits = [hit('sheet:a', 'title'), hit('text:b', 'title', { kind: 'text' })];
+    expect(dropSelfHits(hits, none)).toBe(hits);
+  });
+
+  it('지문으로 불러온 전문은 참고자료 후보에서 빠진다 — 같은 글이 두 번 실리면 안 된다', () => {
+    const hits = [hit('text:t1', 'title', { kind: 'text' }), hit('text:t2', 'author', { kind: 'text' })];
+    expect(dropSelfHits(hits, { ...none, excludeTextId: 't1' }).map((h) => h.candidate.key)).toEqual(['text:t2']);
+  });
+
+  it('자기 시험지(개념지·프린트)는 빠지고, 같은 id 라도 종류가 다르면 남는다', () => {
+    const hits = [
+      hit('sheet:s1', 'school'),
+      hit('print:s1', 'title', { kind: 'print' }),
+      hit('text:s1', 'title', { kind: 'text' }),
+    ];
+    expect(dropSelfHits(hits, { ...none, excludeSheetId: 's1' }).map((h) => h.candidate.key)).toEqual(['text:s1']);
   });
 });

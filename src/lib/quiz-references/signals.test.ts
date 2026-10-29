@@ -31,6 +31,16 @@ describe('signalsFromDraft', () => {
     expect(s.unitPath).toEqual(['1. 문학의 갈래', '(1) 소설']);
     expect(s.textbook).toBe('천재(정호웅)');
     expect(s.excludePassageId).toBe('p1');
+    expect(s.excludeTextId).toBeNull();
+  });
+
+  it('작품 전문·개념에서 불러온 지문은 그 전문을 빼고, 기출 지문은 빼지 않는다', () => {
+    const fromText: PickedPassageMeta = { ...picked, id: 't1', source: 'text', schoolName: '', year: '' };
+    const s = signalsFromDraft({ title: '봄봄', author: '' }, fromText);
+    expect(s.excludeTextId).toBe('t1');
+    expect(s.excludePassageId).toBeNull();
+    // 단원 신호는 그대로 쓴다 — 같은 단원 개념지를 찾는 강한 단서다
+    expect(s.unitPath).toEqual(['1. 문학의 갈래', '(1) 소설']);
   });
 });
 
@@ -69,6 +79,12 @@ describe('signalsKey', () => {
     const base = signalsFromDraft({ title: '봄봄', author: '' }, null);
     expect(signalsKey({ ...base, excludeSheetId: 'a' }))
       .not.toBe(signalsKey({ ...base, excludeSheetId: 'b' }));
+  });
+
+  it('불러온 전문이 다르면 다른 신호다 — 같은 제목의 다른 전문으로 바꿔도 다시 찾는다', () => {
+    const base = signalsFromDraft({ title: '봄봄', author: '' }, null);
+    expect(signalsKey({ ...base, excludeTextId: 'a' }))
+      .not.toBe(signalsKey({ ...base, excludeTextId: 'b' }));
   });
 });
 

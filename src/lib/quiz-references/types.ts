@@ -74,10 +74,15 @@ export interface AttachedReference extends ReferenceCandidate {
   truncated: boolean;
 }
 
-/** 아카이브에서 고른 지문이 함께 들고 오는 정보 — 매칭 신호가 된다 */
+/** 불러온 지문이 함께 들고 오는 정보 — 매칭 신호가 된다 */
 export interface PickedPassageMeta {
   /** 그 지문 자신. 후보에서 뺀다 */
   id: string;
+  /**
+   * 어디서 불러왔는가 — 기출 지문(`passages`)이냐 작품 전문·개념(`reference_texts`)이냐.
+   * 둘은 다른 표라 id 가 겹칠 수 없지만, **어느 후보에서 뺄지**가 갈린다. 없으면 기출 지문이다.
+   */
+  source?: 'passage' | 'text';
   /** 교과서 단원 이름 경로 [대단원, 소단원] */
   unitPath: string[];
   /** 교과서 이름 (개념지의 publisher 와 같은 값이다) */
@@ -85,6 +90,21 @@ export interface PickedPassageMeta {
   grade: string;
   schoolName: string;
   year: string;
+}
+
+/** 불러온 지문에서 폼으로 넘기는 값 — 기출 지문 탭과 작품 전문·개념 탭이 같은 모양을 낸다 */
+export interface PickedPassage {
+  /** 평문 지문 */
+  text: string;
+  title: string;
+  author: string;
+  /**
+   * 참고자료 자동 매칭이 쓰는 정보 — 단원·교과서·학교.
+   *
+   * 붙여넣기로는 알 수 없는 **강한 신호**다. 같은 교과서의 같은 단원 개념지는 그 지문을
+   * 가르치려고 만든 것이라, 작품명이 안 맞아도 쓸모가 있다.
+   */
+  meta: PickedPassageMeta;
 }
 
 /** 자료를 찾을 때 쓰는 신호 묶음 */
@@ -101,6 +121,13 @@ export interface QuizMatchSignals {
    * 통째로 실려 있어 두 번 싣는 셈이고, 답이 비어 있는 그 글이 근거 자료로 둔갑한다.
    */
   excludeSheetId: string | null;
+  /**
+   * 후보에서 뺄 작품 전문 id — 그 전문을 **지문으로** 불러온 경우.
+   *
+   * 안 빼면 제목·지은이 신호로 **그 전문 자신**이 참고자료로 붙는다. 같은 글을 두 번 싣는 셈이고,
+   * 정답표에는 지문의 근거가 '전문 · …' 참고자료에서 나온 것처럼 찍힌다.
+   */
+  excludeTextId: string | null;
   unitPath: string[];
   textbook: string;
   grade: string;

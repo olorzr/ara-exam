@@ -305,10 +305,16 @@
   없으면 그 문항을 버리고 몇 개를 왜 뺐는지 화면에 적는다 — 프롬프트와 파서는 한 쌍이라
   한쪽만 느슨하게 하지 말 것
 - 개수는 비우면 AI 가 정하고(유형마다 최대 `PASSAGE_QUIZ_MAX_PER_TYPE`), 숫자를 적으면 그만큼, 0 이면 안 낸다
+- **만들 유형**(섞어서 · O,X 만 · 단답형만)은 따로 저장하지 않고 개수에서 읽는다(`quizTypeMode`) —
+  단추는 개수 칸을 고칠 뿐이다(`applyQuizTypeMode`: O,X 만 = 단답형 0). 칸에 직접 0 을 적어도 같은 뜻이다
+- **지문 불러오기**는 두 곳이다 — 작품 전문·개념(기본, 교과서 단원·작품·문법 트리와 작품/개념 칩으로 고른다)
+  과 기출 지문. 붙여넣기는 그대로다. 작품은 해설을 뺀 원문, 개념은 상자·표 내용까지 평문으로 들어간다
+  (`pickedFromReferenceText`). 불러온 전문은 참고자료 후보에서 빠진다(`excludeTextId`)
 - 기능 플래그는 `passage_quiz`(마스터는 `AI_OCR_BETA`)
-- 코드에서의 사용: `runPassageQuiz`, `parsePassageQuiz`, `usePassageQuiz`, `QuizItem`, `numberQuizItems`
+- 코드에서의 사용: `runPassageQuiz`, `parsePassageQuiz`, `usePassageQuiz`, `QuizItem`, `numberQuizItems`,
+  `QuizTypeMode`, `PickedPassage`
 - 관련 파일: src/lib/passage-quiz/, src/hooks/usePassageQuiz.ts, src/components/passage-quiz/,
-  src/app/(main)/problems/quiz/page.tsx, src/lib/problem-bank/passage-search.ts
+  src/app/(main)/problems/quiz/page.tsx, src/lib/problem-bank/passage-search.ts, src/lib/quiz-references/picked.ts
 
 ## 참고자료 (quiz reference)
 - 정의: 문제 만들기(O,X·단답형)가 지문과 **함께 읽는** 글. 네 곳에서 온다 —

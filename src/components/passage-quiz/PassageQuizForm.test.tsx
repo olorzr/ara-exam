@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import PassageQuizForm from './PassageQuizForm';
 import { EMPTY_DRAFT, PASSAGE_QUIZ_TEXT_LIMIT } from '@/lib/passage-quiz';
 
@@ -63,6 +63,35 @@ describe('PassageQuizForm', () => {
   it('실행 중이 아니면 취소를 보여 주지 않는다', () => {
     render(<PassageQuizForm {...props()} />);
     expect(screen.queryByRole('button', { name: '취소' })).toBeNull();
-    expect(screen.getByRole('button', { name: /아카이브에서 불러오기/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /지문 불러오기/ })).toBeTruthy();
+  });
+
+  it('만들 유형은 섞어서가 기본이고 두 개수 칸이 다 보인다', () => {
+    render(<PassageQuizForm {...props()} />);
+    expect(screen.getByRole('button', { name: '섞어서' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: 'O,X 만' }).getAttribute('aria-pressed')).toBe('false');
+    expect(screen.getByLabelText('O,X 개수')).toBeTruthy();
+    expect(screen.getByLabelText('단답형 개수')).toBeTruthy();
+  });
+
+  it('O,X 만을 누르면 단답형 개수를 0 으로 고친다 — 생성은 개수만 본다', () => {
+    const onChange = vi.fn();
+    render(<PassageQuizForm {...props({ onChange })} />);
+    fireEvent.click(screen.getByRole('button', { name: 'O,X 만' }));
+    expect(onChange).toHaveBeenCalledWith({ oxCount: '', shortCount: '0' });
+  });
+
+  it('단답형이 0 이면 O,X 만으로 읽고 단답형 칸을 접는다', () => {
+    render(<PassageQuizForm {...props({ draft: { ...EMPTY_DRAFT, text: '지문', shortCount: '0' } })} />);
+    expect(screen.getByRole('button', { name: 'O,X 만' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByLabelText('O,X 개수')).toBeTruthy();
+    expect(screen.queryByLabelText('단답형 개수')).toBeNull();
+  });
+
+  it('단답형만이면 O,X 칸을 접는다', () => {
+    render(<PassageQuizForm {...props({ draft: { ...EMPTY_DRAFT, text: '지문', oxCount: '0' } })} />);
+    expect(screen.getByRole('button', { name: '단답형만' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.queryByLabelText('O,X 개수')).toBeNull();
+    expect(screen.getByLabelText('단답형 개수')).toBeTruthy();
   });
 });

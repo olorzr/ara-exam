@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   PASSAGE_QUIZ_BUNDLE_LIMIT, PASSAGE_QUIZ_MAX_PER_TYPE, PASSAGE_QUIZ_TEXT_LIMIT,
 } from './constants';
-import { EMPTY_DRAFT, draftBlocker, draftCounts, parseCountInput, referenceBlocker } from './draft';
+import {
+  EMPTY_DRAFT, applyQuizTypeMode, draftBlocker, draftCounts, parseCountInput, quizTypeMode, referenceBlocker,
+} from './draft';
 
 const draft = (over: Partial<typeof EMPTY_DRAFT> = {}) => ({ ...EMPTY_DRAFT, text: '지문', ...over });
 
@@ -77,5 +79,49 @@ describe('referenceBlocker', () => {
   it('참고자료가 없거나 짧으면 막지 않는다', () => {
     expect(referenceBlocker(draft(), idle)).toBeNull();
     expect(referenceBlocker(draft(), { referenceChars: 5_000, loading: false })).toBeNull();
+  });
+});
+
+describe('quizTypeMode', () => {
+  it('기본(둘 다 자동)은 섞어서다 — 예전과 같다', () => {
+    expect(quizTypeMode(EMPTY_DRAFT)).toBe('mix');
+    expect(quizTypeMode(draft({ oxCount: '5', shortCount: '3' }))).toBe('mix');
+  });
+
+  it('한 유형이 0 이고 다른 유형이 0 이 아니면 그 유형만이다 — 칸에 0 을 직접 적어도 같다', () => {
+    expect(quizTypeMode(draft({ shortCount: '0' }))).toBe('ox');
+    expect(quizTypeMode(draft({ oxCount: '7', shortCount: ' 00 ' }))).toBe('ox');
+    expect(quizTypeMode(draft({ oxCount: '0', shortCount: '4' }))).toBe('short');
+  });
+
+  it('둘 다 0 이면 섞어서로 본다 — 만들 수 없는 상태는 draftBlocker 가 알린다', () => {
+    expect(quizTypeMode(draft({ oxCount: '0', shortCount: '0' }))).toBe('mix');
+  });
+});
+
+describe('applyQuizTypeMode', () => {
+  it('O,X 만 — 단답형을 0 으로, 적어 둔 O,X 개수는 남긴다', () => {
+    expect(applyQuizTypeMode(draft({ oxCount: '6', shortCount: '3' }), 'ox')).toEqual({ oxCount: '6', shortCount: '0' });
+  });
+
+  it('⚠️ O,X 가 0 이던 채로 O,X 만을 고르면 자동으로 되돌린다 — 둘 다 0 이면 못 만든다', () => {
+    const patch = applyQuizTypeMode(draft({ oxCount: '0', shortCount: '4' }), 'ox');
+    expect(patch).toEqual({ oxCount: '', shortCount: '0' });
+    expect(quizTypeMode(patch)).toBe('ox');
+    expect(draftBlocker(draft(patch))).toBeNull();
+  });
+
+  it('단답형만 — 거꾸로다', () => {
+    expect(applyQuizTypeMode(draft({ shortCount: '0' }), 'short')).toEqual({ oxCount: '0', shortCount: '' });
+  });
+
+  it('섞어서 — 0 인 칸만 자동으로 되돌리고 적어 둔 개수는 남긴다', () => {
+    expect(applyQuizTypeMode(draft({ oxCount: '5', shortCount: '0' }), 'mix')).toEqual({ oxCount: '5', shortCount: '' });
+  });
+
+  it('고른 모드가 그대로 읽힌다 — 세 모드 모두 왕복한다', () => {
+    for (const mode of ['mix', 'ox', 'short'] as const) {
+      expect(quizTypeMode(applyQuizTypeMode(EMPTY_DRAFT, mode))).toBe(mode);
+    }
   });
 });

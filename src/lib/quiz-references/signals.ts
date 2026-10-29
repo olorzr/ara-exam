@@ -19,7 +19,7 @@ export interface SignalDraft {
 }
 
 const EMPTY_SIGNALS: QuizMatchSignals = {
-  title: '', author: '', excludePassageId: null, excludeSheetId: null,
+  title: '', author: '', excludePassageId: null, excludeSheetId: null, excludeTextId: null,
   unitPath: [], textbook: '', grade: '', schoolName: '', year: '',
 };
 
@@ -39,13 +39,15 @@ function matchName(value: string, min: number): string {
 /**
  * 지금 화면에서 자료를 찾을 신호를 만든다.
  * @param draft - 작품명·지은이
- * @param picked - 아카이브에서 고른 지문의 정보 (붙여넣기면 null)
+ * @param picked - 불러온 지문의 정보 (붙여넣기면 null)
  * @returns 찾기 신호
  */
 export function signalsFromDraft(
   draft: SignalDraft,
   picked: PickedPassageMeta | null,
 ): QuizMatchSignals {
+  // 작품 전문·개념에서 불러왔으면 **그 전문**을, 기출에서 불러왔으면 그 지문을 후보에서 뺀다
+  const fromText = picked?.source === 'text';
   return {
     ...EMPTY_SIGNALS,
     title: matchName(draft.title, QUIZ_MATCH_TITLE_MIN),
@@ -53,7 +55,8 @@ export function signalsFromDraft(
     author: matchName(draft.author, QUIZ_MATCH_TITLE_MIN),
     ...(picked
       ? {
-        excludePassageId: picked.id,
+        excludePassageId: fromText ? null : picked.id,
+        excludeTextId: fromText ? picked.id : null,
         unitPath: picked.unitPath,
         textbook: picked.textbook,
         grade: picked.grade,
@@ -128,7 +131,7 @@ export function hasMatchSignals(signals: QuizMatchSignals): boolean {
  */
 export function signalsKey(signals: QuizMatchSignals): string {
   return JSON.stringify([
-    signals.title, signals.author, signals.excludePassageId, signals.excludeSheetId,
+    signals.title, signals.author, signals.excludePassageId, signals.excludeSheetId, signals.excludeTextId,
     signals.unitPath, signals.textbook, signals.grade, signals.schoolName, signals.year,
   ]);
 }
