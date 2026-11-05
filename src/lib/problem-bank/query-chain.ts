@@ -109,6 +109,7 @@ function topLevelColumns(select: string): string[] {
 /** 조건과 정렬을 걸 수 있는 요청 — PostgREST 필터 빌더(표·함수 결과 둘 다)의 필요한 부분만 */
 export interface ProblemChain<T> {
   eq(column: string, value: string): T;
+  neq(column: string, value: string): T;
   in(column: string, values: readonly string[]): T;
   contains(column: string, value: string): T;
   overlaps(column: string, value: string): T;

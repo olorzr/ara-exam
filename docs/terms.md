@@ -364,7 +364,8 @@
 - 출처 하나 = **소단원 하나**(대단원 평가·종합 문제 묶음은 따로 하나). 출처 제목이 곧 책 이름이다
   ('동아 중2-1 평가문제집 2-(1) 시와 화자') — 목록·인쇄의 출처 줄도 제목을 쓴다(`sourceLabel`)
 - 문항 번호는 출처 안에서 1부터 다시 매기고, 책의 원래 구역(족집게 예상·소단원 평가 …)은 문항 `tags` 에 단다. 배점은 없다
-- 문제 은행 기출 트리의 맨 뒤 '평가문제집' 가지 — 교과서 › 학년·학기 › 책. 책 잎은 출처 제목 **같음**(`source_title`, 주소 `src`, sql/82)까지 건다
+- **문제 은행에서는 숨긴다**(2026-11-05, sql/85) — 책 만들기의 '문제지 만들기'(`/books/papers/new`, 필터 칸 `with_workbook`)에서만 보인다
+- 그 화면의 기출 트리 맨 뒤 '평가문제집' 가지 — 교과서 › 학년·학기 › 책. 책 잎은 출처 제목 **같음**(`source_title`, 주소 `src`, sql/82)까지 건다
 - 관련 파일: sql/80_problem_source_workbook_type.sql, sql/82_problem_bank_source_title_axis.sql, src/lib/problem-bank/workbook-tree.ts
 
 ## 전문 단원 (ReferenceUnit)

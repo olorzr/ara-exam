@@ -66,6 +66,17 @@ describe('유형 칸 — 시험 구분과 맞추기', () => {
   });
 });
 
+describe('유형 칸 — 평가문제집은 보이는 화면에서만', () => {
+  it('문제 은행에서는 고를 수 없다', () => {
+    expect(values(axis(build(), 'source_type')!)).not.toContain('평가문제집');
+    expect(values(axis(build(), 'source_type')!)).toContain('내신기출');
+  });
+
+  it('책 만들기의 문제지 만들기에서는 고른다', () => {
+    expect(values(axis(build({ with_workbook: true }), 'source_type')!)).toContain('평가문제집');
+  });
+});
+
 describe("'미지정' 칸", () => {
   /**
    * 빈 문자열은 이 필터에서 '전체' 라 '미지정인 것만' 을 따로 표시해야 한다.

@@ -30,22 +30,30 @@ export interface SourceAxisQuery {
    * ⚠️ 이름이 `title` 이 아닌 까닭: 올라간 기출 목록의 조회 조건은 `title` 을 **제목 검색(ilike)** 으로 쓴다.
    */
   source_title?: string;
+  /**
+   * 이 유형은 **뺀다**(`neq`) — 문제 은행이 평가문제집을 숨길 때 건다(sql/85).
+   * 값을 고르는 칸이 아니라 화면 모드에서 온다(filters.ts 의 `with_workbook`).
+   */
+  exclude_source_type?: string;
 }
 
 /**
  * 함수 인자로 보내는 출처 조건(sql/72 `problems_for_archive` 의 `p_source`) — **키가 있으면 건다**.
- * 칸 이름은 `SOURCE_EQ_AXES` + `grades` 그대로이고 sql/72 가 같은 목록 밖의 키를 거절한다
- * (archive-rpc.test.ts 가 두 목록을 대조한다).
+ * 칸 이름은 `SOURCE_EQ_AXES` + `grades` + `exclude_source_type` 그대로이고 정식 정의 sql/85 가 같은 목록
+ * 밖의 키를 거절한다(archive-rpc.test.ts 가 두 목록을 대조한다).
  */
 export type SourceAxisArgs = Partial<Record<(typeof SOURCE_EQ_AXES)[number], string>> & {
   grades?: string[];
   /** 출처 제목 같음 — sql/82 가 받는 키 이름은 컬럼 그대로 `title` 이다 */
   title?: string;
+  /** 이 유형은 뺀다 — 이 키만 '같음' 이 아니라 '다름' 이다(sql/85) */
+  exclude_source_type?: string;
 };
 
 /** 조건을 걸 수 있는 요청 — PostgREST 필터 빌더의 필요한 부분만 */
 interface SourceAxisFilterable<T> {
   eq(column: string, value: string): T;
+  neq(column: string, value: string): T;
   in(column: string, values: readonly string[]): T;
 }
 
@@ -68,6 +76,7 @@ export function applySourceAxes<T extends SourceAxisFilterable<T>>(
     if (value !== undefined) next = next.eq(`${prefix}${key}`, value);
   }
   if (query.source_title !== undefined) next = next.eq(`${prefix}title`, query.source_title);
+  if (query.exclude_source_type !== undefined) next = next.neq(`${prefix}source_type`, query.exclude_source_type);
   // 학교급을 편 학년들 — 학년 칸(eq)과 **따로** 건다(둘 다 걸리면 교집합)
   if (query.grades && query.grades.length > 0) next = next.in(`${prefix}grade`, query.grades);
   return next;
@@ -89,6 +98,7 @@ export function sourceAxisArgs(query: SourceAxisQuery): SourceAxisArgs {
     if (value !== undefined) out[key] = value;
   }
   if (query.source_title !== undefined) out.title = query.source_title;
+  if (query.exclude_source_type !== undefined) out.exclude_source_type = query.exclude_source_type;
   if (query.grades && query.grades.length > 0) out.grades = [...query.grades];
   return out;
 }

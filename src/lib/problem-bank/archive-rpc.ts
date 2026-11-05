@@ -36,7 +36,7 @@ export interface ArchiveRpcArgs {
  *    `source.…=eq.` 를 걸고 운영 PostgREST 14.5 가 그 요청을 거절한다(평가문제집 책 제목 `source_title`, 코덱스 1R).
  */
 const RPC_COVERED_KEYS = [
-  'work_title', 'only_work', 'grammar_paths', ...SOURCE_EQ_AXES, 'source_title', 'grades',
+  'work_title', 'only_work', 'grammar_paths', ...SOURCE_EQ_AXES, 'source_title', 'grades', 'exclude_source_type',
 ] as const satisfies readonly (keyof ProblemQuery)[];
 
 /** 함수 인자와 체인에 넘길 나머지 조건 */

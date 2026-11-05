@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  EMPTY_FILTERS, filtersFromParams, filtersToQueryString, hasActiveFilters, toProblemQuery,
+  EMPTY_FILTERS, filtersFromParams, filtersToQueryString, hasActiveFilters, hideWorkbookAxes, toProblemQuery,
   UNSPECIFIED_AXIS,
 } from './filters';
 
@@ -107,7 +107,7 @@ describe('filters ↔ 주소', () => {
 
 describe('toProblemQuery', () => {
   it('빈 값은 조건으로 만들지 않는다 — 빈 문자열 eq 는 미지정 행만 걸린다', () => {
-    expect(toProblemQuery(EMPTY_FILTERS)).toEqual({ page: 0 });
+    expect(toProblemQuery(EMPTY_FILTERS)).toEqual({ exclude_source_type: '평가문제집', page: 0 });
   });
 
   it('검색어 앞뒤 공백을 다듬는다', () => {
@@ -218,7 +218,7 @@ describe('toProblemQuery', () => {
   });
 
   it('축 없이 켜져만 있으면 아무 조건도 만들지 않는다', () => {
-    expect(toProblemQuery({ ...EMPTY_FILTERS, solo: true })).toEqual({ page: 0 });
+    expect(toProblemQuery({ ...EMPTY_FILTERS, solo: true })).toEqual({ exclude_source_type: '평가문제집', page: 0 });
     // 꺼져 있으면 축이 있어도 예전 그대로다
     const q = toProblemQuery({ ...EMPTY_FILTERS, work_title: '서시', grammar_path: ['음운'] });
     expect('only_work' in q).toBe(false);
@@ -247,6 +247,41 @@ describe('hasActiveFilters', () => {
 
   it('쪽 번호만으로는 조건이 아니다', () => {
     expect(hasActiveFilters({ ...EMPTY_FILTERS, page: 3 })).toBe(false);
+  });
+});
+
+describe('평가문제집 숨기기 (2026-11-05)', () => {
+  it('문제 은행은 늘 평가문제집을 뺀다 — 보이는 화면만 그 조건이 없다', () => {
+    expect(toProblemQuery(EMPTY_FILTERS).exclude_source_type).toBe('평가문제집');
+    expect('exclude_source_type' in toProblemQuery({ ...EMPTY_FILTERS, with_workbook: true })).toBe(false);
+  });
+
+  it('화면 모드는 주소에 안 실린다 — 주소로 평가문제집을 열 수 없다', () => {
+    expect(filtersToQueryString({ ...EMPTY_FILTERS, with_workbook: true })).toBe('');
+    expect(filtersFromParams(new URLSearchParams('with_workbook=1')).with_workbook).toBe(false);
+  });
+
+  it("화면 모드는 조건이 아니다 — '조건 지우기' 를 띄우지 않는다", () => {
+    expect(hasActiveFilters({ ...EMPTY_FILTERS, with_workbook: true })).toBe(false);
+  });
+
+  it("옛 링크의 평가문제집 칸을 푼다 — 남으면 '평가문제집만' 과 '빼고' 가 함께 걸려 0건이다", () => {
+    const old = filtersFromParams(new URLSearchParams('type=평가문제집&src=동아 책&book=동아&grade=중2'));
+    expect(hideWorkbookAxes(old)).toEqual({ ...old, source_type: '', source_title: '' });
+    // 교과서·학년은 다른 유형에도 뜻이 있어 남긴다
+    expect(hideWorkbookAxes(old).textbook).toBe('동아');
+  });
+
+  it('책 제목만 남은 주소도 푼다 — 그 칸은 평가문제집 잎만 건다', () => {
+    const old = filtersFromParams(new URLSearchParams('type=내신기출&src=동아 책'));
+    expect(hideWorkbookAxes(old)).toEqual({ ...old, source_title: '' });
+  });
+
+  it('보이는 화면과 다른 유형은 그대로 돌려준다', () => {
+    const shown = { ...EMPTY_FILTERS, with_workbook: true, source_type: '평가문제집', source_title: '동아 책' };
+    expect(hideWorkbookAxes(shown)).toBe(shown);
+    const other = { ...EMPTY_FILTERS, source_type: '내신기출' };
+    expect(hideWorkbookAxes(other)).toBe(other);
   });
 });
 

@@ -15,7 +15,24 @@ describe('parseArchiveFacets', () => {
   };
 
   it('서버 모양을 그대로 옮긴다', () => {
-    expect(parseArchiveFacets(good)).toEqual(good);
+    expect(parseArchiveFacets(good)).toEqual({ ...good, workbook: EMPTY_ARCHIVE_FACETS.workbook });
+  });
+
+  it('평가문제집 몫(sql/85)은 workbook 으로 모은다 — 네 묶음에 섞이지 않는다', () => {
+    const parsed = parseArchiveFacets({
+      ...good,
+      area_paths_workbook: [['화법과 언어', '언어'], 'x'],
+      unit_paths_workbook: [['1. 평가 단원']],
+      grammar_paths_workbook: [{ paths: ['음운'], n: 2 }, { paths: ['음운'], n: 0 }],
+      work_titles_workbook: [{ titles: ['양반전'], n: 7 }],
+    });
+    expect(parsed.workbook).toEqual({
+      area_paths: [['화법과 언어', '언어']],
+      unit_paths: [['1. 평가 단원']],
+      grammar_paths: [{ paths: ['음운'], n: 2 }],
+      work_titles: [{ titles: ['양반전'], n: 7 }],
+    });
+    expect(parsed.work_titles).toEqual(good.work_titles);
   });
 
   it('응답이 객체가 아니면 빈 패싯이다 — 화면이 죽지 않게', () => {

@@ -128,6 +128,26 @@ describe('fetchProblemPage — 작품·문법 축은 함수에서 출발한다(s
   });
 });
 
+describe('fetchProblemPage — 평가문제집 빼기 (sql/85)', () => {
+  it('표 경로는 출처 임베드에 다름(neq)으로 건다', async () => {
+    await fetchProblemPage({ exclude_source_type: '평가문제집' });
+    expect(last().url.pathname).toBe(TABLE_PATH);
+    expect(lastParam('source.source_type')).toBe('neq.평가문제집');
+  });
+
+  it('함수 경로는 본문으로 보낸다 — URL 에 source. 가 남으면 운영 PostgREST 가 거절한다', async () => {
+    await fetchProblemPage({ work_title: '양반전', exclude_source_type: '평가문제집' });
+    expect(last().url.pathname).toBe(RPC_PATH);
+    expect(last().body).toMatchObject({ p_source: { exclude_source_type: '평가문제집' } });
+    expect([...last().url.searchParams.keys()].filter((k) => k.startsWith('source.'))).toEqual([]);
+  });
+
+  it('조건이 없으면 걸지 않는다 — 책 만들기의 문제지 만들기', async () => {
+    await fetchProblemPage({});
+    expect(lastParam('source.source_type')).toBeNull();
+  });
+});
+
 describe("fetchProblemPage — '그 작품만 · 그 문법만'", () => {
   it('작품 하나만 묻는 문항은 본문의 p_only_work 로 건다 — 함수가 배열 같음(=)을 더 건다', async () => {
     await fetchProblemPage({ work_title: '소녀, 두드리다', only_work: true });

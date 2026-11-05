@@ -61,9 +61,18 @@ describe('주소 ↔ 필터', () => {
 
 describe('toSourceListQuery', () => {
   it('걸린 칸만 싣는다', () => {
-    expect(toSourceListQuery(EMPTY_SOURCE_LIST_FILTERS)).toEqual({ sort: 'recent' });
+    expect(toSourceListQuery(EMPTY_SOURCE_LIST_FILTERS))
+      .toEqual({ exclude_source_type: '평가문제집', sort: 'recent' });
     expect(toSourceListQuery(filters({ school_name: '상현중', title: '  봄봄 ' })))
-      .toEqual({ school_name: '상현중', title: '봄봄', sort: 'recent' });
+      .toEqual({ exclude_source_type: '평가문제집', school_name: '상현중', title: '봄봄', sort: 'recent' });
+  });
+
+  it('평가문제집은 이 목록에 안 나온다 — 옛 주소의 유형은 풀고, 칸에서도 못 고른다', () => {
+    const fromLink = sourceListFiltersFromParams(new URLSearchParams('type=평가문제집&book=동아'));
+    expect(fromLink.source_type).toBe('');
+    expect(fromLink.textbook).toBe('동아');
+    const typeAxis = buildSourceAxes(EMPTY_SOURCE_LIST_FILTERS, facets()).find((a) => a.key === 'source_type');
+    expect(typeAxis?.options.map((o) => o.value)).not.toContain('평가문제집');
   });
 
   it("'미지정만' 은 빈 값 조건이 된다 — 아카이브와 같은 규칙이다", () => {

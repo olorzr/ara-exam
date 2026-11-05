@@ -1,6 +1,7 @@
 import { grammarPathsUnder } from './grammar-tree';
 import { QUESTION_KIND_TYPES, parseQuestionKind, type QuestionKindFilter } from './question-kind';
 import { gradesForSchoolLevel, parseSchoolLevel, type SchoolLevelFilter } from './school-level';
+import { WORKBOOK_SOURCE_TYPE } from './source-form';
 import type { ProblemQuery } from './queries';
 import { GRAMMAR_SOLO_PASSAGE_AREAS, soloApplies, soloAxisOf } from './solo-filter';
 
@@ -60,6 +61,14 @@ export interface ProblemFilters {
    *    바꿔 가며 훑는 것이 보통이다. '조건 지우기'(`EMPTY_FILTERS`)만 끈다.
    */
   solo: boolean;
+  /**
+   * 평가문제집을 **보이는가** — 조건이 아니라 화면 모드다. 책 만들기의 '문제지 만들기' 만 켠다(2026-11-05).
+   * 꺼져 있으면 `toProblemQuery` 가 그 유형을 빼는 조건을 싣는다 — 목록·폴더 담기·비율 담기가 전부 이 값에서
+   * 조회 조건을 만들므로 한 칸으로 셋이 같이 따라온다.
+   * ⚠️ 주소에 싣지 않는다 — 문제 은행 주소에 값을 얹어 평가문제집을 열 수 있으면 안 되고, 책 화면은 주소를 안 읽는다.
+   * ⚠️ '조건 지우기' 도 지우지 않는다(`useProblemArchive.reset`).
+   */
+  with_workbook: boolean;
   search: string;
   page: number;
 }
@@ -67,7 +76,7 @@ export interface ProblemFilters {
 export const EMPTY_FILTERS: ProblemFilters = {
   source_type: '', school_name: '', year: '', school_level: '', grade: '', semester: '', exam_type: '', textbook: '',
   source_title: '', area_path: [], unit_path: [], grammar_path: [], question_kind: '', work_title: '', solo: false,
-  search: '', page: 0,
+  with_workbook: false, search: '', page: 0,
 };
 
 /** 영역 경로를 주소에 실을 때 쓰는 구분자 — 이름에 들어갈 일이 없는 글자 */
@@ -165,10 +174,26 @@ export function filtersFromParams(params: URLSearchParams): ProblemFilters {
     question_kind: parseQuestionKind(params.get('kind')),
     work_title: params.get('work') ?? '',
     solo: params.get('solo') === '1',
+    with_workbook: false,
     search: params.get('q') ?? '',
     // 주소는 사람이 읽는 1-based, 내부는 0-based
     page: Number.isFinite(rawPage) && rawPage > 1 ? rawPage - 1 : 0,
   };
+}
+
+/**
+ * 평가문제집을 숨기는 화면에서 그 유형을 가리키는 칸을 비운다.
+ *
+ * 옛 링크(`?type=평가문제집&src=…`)가 살아 있다. 그대로 두면 '평가문제집만' 과 '평가문제집 빼고' 가 함께 걸려
+ * 목록이 조용히 0건이 되고, 칸에 고를 수 없는 값이 남는다. 책 제목(`source_title`)은 평가문제집 잎만 거는 칸이라 함께 푼다.
+ * @param filters - 화면 필터
+ * @returns 숨기는 화면에서 걸 수 있는 필터 (보이는 화면이면 그대로)
+ */
+export function hideWorkbookAxes(filters: ProblemFilters): ProblemFilters {
+  if (filters.with_workbook) return filters;
+  const isWorkbook = filters.source_type === WORKBOOK_SOURCE_TYPE;
+  if (!isWorkbook && !filters.source_title) return filters;
+  return { ...filters, source_type: isWorkbook ? '' : filters.source_type, source_title: '' };
 }
 
 /**
@@ -204,6 +229,8 @@ export function toProblemQuery(filters: ProblemFilters): ProblemQuery {
     ...axisEntry('exam_type', filters.exam_type, true),
     ...axisEntry('textbook', filters.textbook),
     ...axisEntry('source_title', filters.source_title),
+    // 문제 은행은 평가문제집을 뺀다 — 드롭다운·트리만 숨기면 조건 없는 목록과 단원·작품·문법에 그대로 남는다
+    ...(filters.with_workbook ? {} : { exclude_source_type: WORKBOOK_SOURCE_TYPE }),
     ...(filters.area_path.length > 0 ? { area_path: filters.area_path } : {}),
     ...(filters.unit_path.length > 0 ? { unit_path: filters.unit_path } : {}),
     // 고른 마디와 **그 아래 경로 전부**(중간 마디 포함)로 편다 — 저장값이 경로 문자열이라

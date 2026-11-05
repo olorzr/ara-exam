@@ -4,6 +4,7 @@ import {
   BookMarked,
   BookOpen,
   BookText,
+  FilePlus2,
   FileScan,
   FileStack,
   FileText,
@@ -162,7 +163,7 @@ export function buildNavSections(isAdmin: boolean): NavSection[] {
       ],
     },
     // 책 만들기 — 원장 전용 대분류(화면·DB 정책 sql/76 도 원장만, 2026-10-26 문제 은행에서 떼어 냈다).
-    // 소분류 셋은 경로가 갈려 있어 서로를 켜지 않는다(세그먼트 접두사 비교). 편집 화면 /books/covers/[id] 는
+    // 소분류는 경로가 갈려 있어 서로를 켜지 않는다(세그먼트 접두사 비교). 편집 화면 /books/covers/[id] 는
     // 표지 만들기, /books/inner/[id] 는 내지 만들기 아래다. `/books` 는 next.config 리다이렉트로 표지 만들기에 간다
     ...(isAdmin
       ? ([
@@ -172,6 +173,8 @@ export function buildNavSections(isAdmin: boolean): NavSection[] {
             label: '책 만들기',
             icon: BookMarked,
             items: [
+              // 평가문제집이 보이는 유일한 문제지 조합 — 문제 은행의 조합 화면과 같은 화면이다(2026-11-05)
+              { href: '/books/papers/new', label: '문제지 만들기', icon: FilePlus2 },
               { href: '/books/covers', label: '표지 만들기', icon: BookImage },
               { href: '/books/inner', label: '내지 만들기', icon: FileText },
               { href: '/books/done', label: '다 만든 책', icon: BookCheck },

@@ -10,6 +10,8 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 
 const fetchProblemPage = vi.fn();
 const toastError = vi.fn();
+const fetchSourceFacets = vi.fn<(withWorkbook?: boolean) => Promise<object>>(async () => ({}));
+const fetchWorkFacets = vi.fn<(withWorkbook?: boolean) => Promise<unknown[]>>(async () => []);
 
 vi.mock('@/lib/problem-bank/queries', () => ({
   fetchProblemPage: (...a: unknown[]) => fetchProblemPage(...a),
@@ -19,13 +21,14 @@ vi.mock('@/lib/problem-bank/facets', () => ({
   EMPTY_SOURCE_FACETS: {},
   fetchAreaFacets: async () => [],
   fetchGrammarFacets: async () => [],
-  fetchSourceFacets: async () => ({}),
+  fetchSourceFacets: (withWorkbook?: boolean) => fetchSourceFacets(withWorkbook),
   fetchUnitFacets: async () => [],
-  fetchWorkFacets: async () => [],
+  fetchWorkFacets: (withWorkbook?: boolean) => fetchWorkFacets(withWorkbook),
 }));
 vi.mock('sonner', () => ({ toast: { error: (...a: unknown[]) => toastError(...a) } }));
 
 const { useProblemArchive } = await import('./useProblemArchive');
+const { EMPTY_FILTERS } = await import('@/lib/problem-bank/filters');
 
 function deferred<T>() {
   let resolve!: (v: T) => void;
@@ -39,6 +42,8 @@ const page = (id: string, total = 50) => ({ rows: [{ id }], total });
 beforeEach(() => {
   fetchProblemPage.mockReset();
   toastError.mockReset();
+  fetchSourceFacets.mockClear();
+  fetchWorkFacets.mockClear();
 });
 
 /** 처음 목록(old)을 읽어 둔 훅 */
@@ -49,6 +54,39 @@ async function loaded() {
   expect(hook.result.current.rows.map((r) => r.id)).toEqual(['old-middle']);
   return hook;
 }
+
+describe('useProblemArchive — 평가문제집 (2026-11-05)', () => {
+  it('문제 은행은 패싯·목록 모두 평가문제집을 뺀다', async () => {
+    fetchProblemPage.mockResolvedValue(page('a'));
+    const hook = renderHook(() => useProblemArchive());
+    await waitFor(() => expect(hook.result.current.loading).toBe(false));
+    expect(fetchSourceFacets).toHaveBeenCalledWith(false);
+    expect(fetchWorkFacets).toHaveBeenCalledWith(false);
+    expect(fetchProblemPage.mock.calls[0][0]).toMatchObject({ exclude_source_type: '평가문제집' });
+  });
+
+  it("보이는 화면은 둘 다 평가문제집을 읽고, '조건 지우기' 뒤에도 그대로다", async () => {
+    fetchProblemPage.mockResolvedValue(page('a'));
+    const hook = renderHook(() => useProblemArchive({ ...EMPTY_FILTERS, with_workbook: true }));
+    await waitFor(() => expect(hook.result.current.loading).toBe(false));
+    expect(fetchSourceFacets).toHaveBeenCalledWith(true);
+    expect(fetchProblemPage.mock.calls[0][0]).not.toHaveProperty('exclude_source_type');
+
+    act(() => hook.result.current.patch({ grade: '중2' }));
+    await waitFor(() => expect(hook.result.current.filters.grade).toBe('중2'));
+    act(() => hook.result.current.reset());
+    await waitFor(() => expect(hook.result.current.filters.grade).toBe(''));
+    expect(hook.result.current.filters.with_workbook).toBe(true);
+  });
+
+  it('옛 링크의 평가문제집 조건은 풀고 시작한다 — 남으면 조용히 0건이다', async () => {
+    fetchProblemPage.mockResolvedValue(page('a'));
+    const hook = renderHook(() => useProblemArchive({ ...EMPTY_FILTERS, source_type: '평가문제집', source_title: '동아 책' }));
+    await waitFor(() => expect(hook.result.current.loading).toBe(false));
+    expect(hook.result.current.filters.source_type).toBe('');
+    expect(fetchProblemPage.mock.calls[0][0]).not.toHaveProperty('source_type');
+  });
+});
 
 describe('useProblemArchive — 새 조건 조회 실패', () => {
   const changes: [string, Record<string, unknown>][] = [

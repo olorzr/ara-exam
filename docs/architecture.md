@@ -366,13 +366,13 @@ src/
 - 의존: lib/supabase, lib/supabase-public(읽기 전용), lib/category-master(단원 마스터)
 - 주요 파일: queries.ts(아카이브 목록 — `runProblemQuery` 가 출발점을 고르고 체인을 건다),
   query-chain.ts(필터 체인·정렬 **한 벌** — `applyProblemFilters`·`applyProblemOrder`·`withOrderColumns`),
-  archive-rpc.ts(작품·문법 축이면 GIN 을 타는 함수 `exam.problems_for_archive`(sql/72)에서 출발 — 그 함수가 거른
+  archive-rpc.ts(작품·문법 축이면 GIN 을 타는 함수 `exam.problems_for_archive`(정식 정의 sql/85)에서 출발 — 그 함수가 거른
   작품·문법·출처 칸을 뺀 나머지만 체인에 넘긴다), source-axes.ts(출처 칸 조건
   `applySourceAxes` — 올라간 기출 목록과 한 벌, 함수 인자 모양 `sourceAxisArgs` 도 같은 규칙), solo-filter.ts('그 작품만 · 그 문법만' — 작품 축은 `work_titles` 같음,
   문법 축은 지문 대영역 복제 칸 `passage_area`(sql/67) in), passage-shape.ts(지문 저장이 딸린 문항 행을 움직이는가),
   source-list.ts·source-list-filters.ts(올라간 기출 목록 — 칸 규칙은 `buildFilterAxes` 를 빌려 쓴다, 문항 수는 계산 열 `problem_count`(sql/74)),
   source-queries.ts(한 출처를 통째로 — 시험지 화면),
-  facets.ts(트리·선택지 재료 — `exam.archive_facets()` RPC 한 번(POST), 서버 캐시 sql/71)·facets-payload.ts(응답 검사)·
+  facets.ts(트리·선택지 재료 — `exam.archive_facets()` RPC 한 번(POST), 서버 캐시 sql/71. 평가문제집 몫은 서버가 갈라 주고 `withWorkbook` 일 때만 합친다, sql/85)·facets-payload.ts(응답 검사)·
     facets-cache.ts(탭 안 캐시 5분 — 쓰기 함수가 무효화한다, 의존성 없음),
   mutations.ts, mutations-source.ts, review-data.ts,
   storage.ts, storage-paths.ts, bbox.ts, figure-placeholders.ts, figure-capture.ts,
@@ -437,7 +437,7 @@ src/
 - 주요 파일: inner-papers.ts(열림인쇄 내지 18종과 두께), spine.ts(책등 식·펼침면 치수·책등 글자 크기), spine-fonts.ts(책등 제목 글꼴 열아홉·묶음·학원 이름 글꼴 — 눈누 글꼴의 @font-face 는 styles/book-fonts.css), settings.ts(설정·판·쪽 수·직접 넣은 쪽 수·내지 지문·목차),
   layout.ts(지문을 책·장에서 만드는 한 함수), spine-pages.ts(책등을 그릴 쪽 수 — 잰 값/직접 넣은 값, 한 함수), cover.ts(표지 jsonb ↔ `PaperCover`), queries.ts, types.ts(종류 `BookKind`), write-queue.ts(책마다 쓰기 줄 — 두 편집 화면이 함께 선다)
 - 종류(sql/77 `kind`): 책(장을 담아 내지까지) / 표지만(장 없이 `settings.manualPages` 로 책등 계산). 다 만든 표시는 `finished_at`
-- 화면(사이드바 '책 만들기' 대분류): `/books/covers`(표지 만들기 — 안 끝난 모든 항목) · `/books/inner`(내지 만들기 — 안 끝난 책) · `/books/done`(다 만든 책). `/books` 는 next.config 리다이렉트
+- 화면(사이드바 '책 만들기' 대분류): `/books/papers/new`(문제지 만들기 — 문제 은행의 조합 화면 `PaperComposeScreen` 을 평가문제집까지 보이게 그린다) · `/books/covers`(표지 만들기 — 안 끝난 모든 항목) · `/books/inner`(내지 만들기 — 안 끝난 책) · `/books/done`(다 만든 책). `/books` 는 next.config 리다이렉트
 - components/book — 목록 틀(`BookListFrame`·`BookCreateDialog`), 편집 틀(`BookEditorShell`: 문지기·읽기·스피너),
   표지 편집(`BookCoverEditor` → `BookCoverMode` → `BookCoverSpread`·`BookSpine` / 오른쪽 `BookCoverPanel`: 쪽 수·내지 용지·책등 색·책등 글자 색(둘 다 `BookSpineColorField`)·책등 글꼴(`BookSpineFontField`)·표지 창·주문 요약),
   내지 편집(`BookInnerEditor` → 구성 `BookComposePanel`: 장·내지 설정 / 내지 `BookInnerMode` → `BookInnerView`: `A4Document` + `breakBefore`·`padPagesTo`·`onLayout`, 목차 `BookToc` — 시작 쪽은 `onLayout` 의 `blockPages` 로 채운다)

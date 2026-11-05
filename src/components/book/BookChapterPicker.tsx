@@ -23,8 +23,8 @@ interface BookChapterPickerProps {
 /**
  * 장 고르기 창 — 저장된 문제지(누가 만들었든) 가운데 하나를 골라 맨 뒤 장으로 담는다. 창은 열린 채로 여러 장을 담는다.
  *
- * 아카이브에서 문항을 골라 장을 만들고 싶으면 '문제지 조합' 에서 문제지를 먼저 만든다(그 화면을 그대로 쓴다 —
- * 책 전용 문항 담기를 새로 만들지 않았다, 2026-10-25 계획).
+ * 문항을 골라 장을 만들고 싶으면 책 만들기의 '문제지 만들기' 에서 문제지를 먼저 만든다. 문제 은행의 문제지 조합과
+ * 같은 화면이고 평가문제집이 보이는 유일한 곳이다(책 전용 문항 담기를 새로 만들지 않았다, 2026-10-25 계획 · 2026-11-05).
  */
 export default function BookChapterPicker({ open, onClose, addedPaperIds, busy, onPick }: BookChapterPickerProps) {
   return (
@@ -98,9 +98,9 @@ function PickerBody({ addedPaperIds, busy, onPick }: Omit<BookChapterPickerProps
         <p className="text-xs text-gray-400">최근 {PAPER_PICKER_LIMIT}개만 보여요 — 제목으로 찾아 주세요.</p>
       )}
       <p className="text-xs text-gray-500">
-        아카이브에서 문항을 골라 새 장을 만들려면{' '}
-        <Link href="/problems/papers/new" className="text-primary underline underline-offset-2">문제지 조합</Link>
-        에서 문제지를 먼저 만든 뒤 여기서 담으세요.
+        문항을 골라 새 장을 만들려면{' '}
+        <Link href="/books/papers/new" className="text-primary underline underline-offset-2">문제지 만들기</Link>
+        에서 문제지를 먼저 만든 뒤 여기서 담으세요. 평가문제집 문항은 거기서만 보여요.
       </p>
     </div>
   );

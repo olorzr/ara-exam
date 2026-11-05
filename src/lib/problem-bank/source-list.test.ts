@@ -53,6 +53,11 @@ describe('fetchSources — 조건', () => {
     expect(last().searchParams.get('grade')).toBe('in.(중1,중2)');
   });
 
+  it('평가문제집 빼기는 표 자체의 유형에 다름으로 건다(sql/85)', async () => {
+    await fetchSources({ query: { exclude_source_type: '평가문제집', sort: 'recent' } });
+    expect(last().searchParams.get('source_type')).toBe('neq.평가문제집');
+  });
+
   it('제목 검색은 와일드카드를 막고 ilike 로 건다', async () => {
     await fetchSources({ query: { title: '100%_봄', sort: 'recent' } });
     expect(last().searchParams.get('title')).toBe('ilike.%100\\%\\_봄%');

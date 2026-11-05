@@ -13,6 +13,14 @@ describe('splitArchiveRpc — 출처 칸은 전부 함수가 거른다', () => {
   });
 });
 
+describe('splitArchiveRpc — 평가문제집 빼기도 함수가 거른다 (sql/85)', () => {
+  it('나머지에 남지 않고 p_source 로 간다 — 남으면 함수 결과의 임베드 필터가 되어 운영 PostgREST 가 거절한다', () => {
+    const split = splitArchiveRpc({ grammar_paths: ['음운'], exclude_source_type: '평가문제집', page: 2 });
+    expect(split?.rest).toEqual({ page: 2 });
+    expect(split?.args.p_source).toEqual({ exclude_source_type: '평가문제집' });
+  });
+});
+
 describe('splitArchiveRpc — 작품·문법 축이 있을 때만 함수에서 출발한다', () => {
   it('작품·문법이 없으면 표에서 출발한다(null)', () => {
     expect(splitArchiveRpc({})).toBeNull();
@@ -67,17 +75,17 @@ describe('sourceAxisArgs — applySourceAxes 와 같은 규칙', () => {
   });
 });
 
-describe('sql/82 거울 (problems_for_archive 의 정식 정의 — sql/72 를 대신한다)', () => {
-  it('함수가 받는 출처 키 목록이 SOURCE_EQ_AXES + grades 와 같다 — 어긋나면 조건이 빠지거나 목록이 오류를 낸다', () => {
-    const sql = readFileSync(path.resolve(__dirname, '../../../sql/82_problem_bank_source_title_axis.sql'), 'utf8');
+describe('sql/85 거울 (problems_for_archive 의 정식 정의 — sql/72·82 를 대신한다)', () => {
+  it('함수가 받는 출처 키 목록이 SOURCE_EQ_AXES + grades + exclude_source_type 과 같다 — 어긋나면 조건이 빠지거나 목록이 오류를 낸다', () => {
+    const sql = readFileSync(path.resolve(__dirname, '../../../sql/85_problem_bank_hide_workbook.sql'), 'utf8');
     const match = sql.match(/WHERE k NOT IN \(([^)]*)\)/);
     expect(match).not.toBeNull();
     const keys = [...(match?.[1] ?? '').matchAll(/'([a-z_]+)'/g)].map((m) => m[1]).sort();
-    expect(keys).toEqual([...SOURCE_EQ_AXES, 'title', 'grades'].sort());
+    expect(keys).toEqual([...SOURCE_EQ_AXES, 'title', 'grades', 'exclude_source_type'].sort());
   });
 
   it('함수 매개변수 이름이 인자 객체의 키와 같다 — PostgREST 는 이름으로 짝짓는다', () => {
-    const sql = readFileSync(path.resolve(__dirname, '../../../sql/82_problem_bank_source_title_axis.sql'), 'utf8');
+    const sql = readFileSync(path.resolve(__dirname, '../../../sql/85_problem_bank_hide_workbook.sql'), 'utf8');
     const head = sql.slice(sql.indexOf('CREATE OR REPLACE FUNCTION exam.problems_for_archive('));
     const params = [...head.slice(0, head.indexOf(')')).matchAll(/\b(p_[a-z_]+)\b/g)].map((m) => m[1]);
     const args = splitArchiveRpc({ work_title: '동백꽃' })?.args ?? {};

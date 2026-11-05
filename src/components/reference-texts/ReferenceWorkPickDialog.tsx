@@ -12,6 +12,9 @@ interface ReferenceWorkPickDialogProps {
   onPick: (work: PickedWork) => void;
 }
 
+/** 작품 전문은 평가문제집에서 옮겨 적은 작품도 고른다 — 문제 은행의 숨김과 상관없다(2026-11-05) */
+const fetchEveryWork = () => fetchWorkFacets(true);
+
 /**
  * '작품 고르기' 단추와 문제 은행 작품 창.
  *
@@ -23,7 +26,7 @@ interface ReferenceWorkPickDialogProps {
  */
 export default function ReferenceWorkPickDialog({ onPick }: ReferenceWorkPickDialogProps) {
   const [open, setOpen] = useState(false);
-  const { data: facets, failed, ensureLoaded } = useLazyLoad(fetchWorkFacets);
+  const { data: facets, failed, ensureLoaded } = useLazyLoad(fetchEveryWork);
 
   const openDialog = () => {
     ensureLoaded();

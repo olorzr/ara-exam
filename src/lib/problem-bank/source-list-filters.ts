@@ -2,7 +2,7 @@ import type { SelectOption } from '@/components/ui/option-select';
 import type { SourceFacets } from './facets';
 import { buildFilterAxes, type FilterAxis } from './filter-axes';
 import {
-  EMPTY_FILTERS, filtersFromParams, filtersToQueryString, toProblemQuery, type ProblemFilters,
+  EMPTY_FILTERS, filtersFromParams, filtersToQueryString, hideWorkbookAxes, toProblemQuery, type ProblemFilters,
 } from './filters';
 import { SOURCE_EQ_AXES, type SourceAxisQuery } from './source-axes';
 
@@ -14,6 +14,8 @@ import { SOURCE_EQ_AXES, type SourceAxisQuery } from './source-axes';
  *    ([filter-axes.ts](./filter-axes.ts))에 있다. 여기서는 아카이브 필터 모양으로 바꿔
  *    그 함수를 부르고, 출처 칸만 골라 쓴다 — 두 화면이 같은 조건에 다른 목록을 내면 안 된다.
  * 주소 키도 아카이브와 같다(`school`·`year`·`q` …). 제목 검색이 아카이브의 `q` 자리다.
+ * ⚠️ 이 목록은 늘 평가문제집을 뺀다 — 숨기는 화면이라 `with_workbook` 이 꺼진 채로 빌려 쓴다(2026-11-05).
+ *    그래서 평가문제집 출처에는 목록으로 닿지 못한다(적재·교정은 헤드리스 도구로 한다).
  */
 
 /** 출처 목록이 쓰는 칸 — 그릴 차례이기도 하다 */
@@ -88,7 +90,7 @@ export function parseSourceSort(value: string | null): SourceSort {
  * @returns 필터 (아카이브 전용 키는 무시한다)
  */
 export function sourceListFiltersFromParams(params: URLSearchParams): SourceListFilters {
-  const archive = filtersFromParams(params);
+  const archive = hideWorkbookAxes(filtersFromParams(params));
   return {
     ...EMPTY_SOURCE_LIST_FILTERS,
     ...pickAxes(archive),
@@ -122,6 +124,7 @@ export function toSourceListQuery(filters: SourceListFilters): SourceListQuery {
     if (archive[key] !== undefined) out[key] = archive[key];
   }
   if (archive.grades) out.grades = archive.grades;
+  if (archive.exclude_source_type !== undefined) out.exclude_source_type = archive.exclude_source_type;
   const title = filters.title.trim();
   if (title) out.title = title;
   return out;

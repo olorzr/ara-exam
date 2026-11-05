@@ -38,19 +38,31 @@ export interface PassageWorkVote {
   n: number;
 }
 
-/** 아카이브 패싯 재료 전부 */
-export interface ArchiveFacetsPayload {
-  sources: SourceFacetRow[];
+/** 문항을 세는 네 묶음 — 평가문제집 몫을 서버가 갈라 준다(sql/85) */
+export interface ProblemFacetRows {
   area_paths: string[][];
   unit_paths: string[][];
   grammar_paths: WeightedGrammarPaths[];
   work_titles: WeightedWorkTitles[];
+}
+
+/**
+ * 아카이브 패싯 재료 전부.
+ *
+ * ⚠️ 네 묶음(`ProblemFacetRows`)은 **평가문제집을 뺀** 값이고 `workbook` 이 그 몫이다(sql/85 의 `*_workbook` 키).
+ *    묶어 센 가중치 행이라 앱에서 빼낼 수 없다 — 합치는 일은 `facets.ts` 가 화면 모드에 따라 한다.
+ */
+export interface ArchiveFacetsPayload extends ProblemFacetRows {
+  sources: SourceFacetRow[];
   passage_works: PassageWorkVote[];
+  /** 평가문제집 문항의 몫 — 옛 캐시에 키가 없으면 비어 있다 */
+  workbook: ProblemFacetRows;
 }
 
 /** 아직 못 읽었거나 읽지 못했을 때 */
 export const EMPTY_ARCHIVE_FACETS: ArchiveFacetsPayload = {
   sources: [], area_paths: [], unit_paths: [], grammar_paths: [], work_titles: [], passage_works: [],
+  workbook: { area_paths: [], unit_paths: [], grammar_paths: [], work_titles: [] },
 };
 
 const SOURCE_TEXT_KEYS = [
@@ -139,5 +151,11 @@ export function parseArchiveFacets(raw: unknown): ArchiveFacetsPayload {
     grammar_paths: pickAll(raw.grammar_paths, pickGrammar),
     work_titles: pickAll(raw.work_titles, pickTitles),
     passage_works: pickAll(raw.passage_works, pickVote),
+    workbook: {
+      area_paths: pickAll(raw.area_paths_workbook, pickPath),
+      unit_paths: pickAll(raw.unit_paths_workbook, pickPath),
+      grammar_paths: pickAll(raw.grammar_paths_workbook, pickGrammar),
+      work_titles: pickAll(raw.work_titles_workbook, pickTitles),
+    },
   };
 }

@@ -29,6 +29,8 @@ import { cachedArchiveFacets } from './facets-cache';
  *    다시 표를 긁는 길을 만들지 말 것.
  * ⚠️ 서버는 DISTINCT·GROUP BY 개수만 한다. 세는 규칙(문법 조상 펴기·문학/문법/비문학 표결·지은이 다수결)은
  *    여기서 부르는 `grammar-counts.ts`·`work-counts.ts` 가 그대로 맡는다 — SQL 에 거울을 두지 않는다.
+ * ⚠️ 평가문제집은 책 만들기에서만 보인다(2026-11-05). 함수마다 `withWorkbook`(기본 false)을 받고, 서버가 갈라 준
+ *    몫(sql/85)을 켜졌을 때만 이어 붙인다 — 받아 온 재료는 그대로라 캐시는 두 화면이 함께 쓴다.
  */
 
 /** RPC 를 부르고 응답을 검사한다 */
@@ -36,6 +38,11 @@ async function fetchArchiveFacets(): Promise<ArchiveFacetsPayload> {
   const { data, error } = await supabase.rpc('archive_facets');
   if (error) throw error;
   return parseArchiveFacets(data);
+}
+
+/** 평가문제집 몫을 이어 붙인다 — 가중치 행이라 같은 집계 함수가 그대로 합친다 */
+function withShare<T>(own: readonly T[], share: readonly T[], withWorkbook: boolean): readonly T[] {
+  return withWorkbook ? [...own, ...share] : own;
 }
 
 /**
@@ -74,10 +81,13 @@ export const EMPTY_SOURCE_FACETS: SourceFacets = {
  *
  * 기출 트리의 갈래도 **같은 재료**에서 뽑는다 — 서버가 7칸의 서로 다른 조합을 돌려주므로
  * 아래의 중복 제거(`uniq`·`collectSchoolExams`)가 그대로 맞다.
+ * ⚠️ 숨길 때는 평가문제집 행을 **먼저** 걷는다 — 평가문제집에만 있는 교과서·학년도가 칸에 남으면 골랐을 때 0건이다.
+ * @param withWorkbook - 평가문제집을 보이는 화면인가 (기본 숨김)
  * @returns 학교·학년도·학년·교과서·학기 목록과 기출 갈래
  */
-export async function fetchSourceFacets(): Promise<SourceFacets> {
-  const rows = (await loadArchiveFacets()).sources;
+export async function fetchSourceFacets(withWorkbook = false): Promise<SourceFacets> {
+  const all = (await loadArchiveFacets()).sources;
+  const rows = withWorkbook ? all : all.filter((r) => r.source_type !== WORKBOOK_SOURCE_TYPE);
   const uniq = (values: string[]) => [...new Set(values.filter(Boolean))].sort();
   return {
     schools: uniq(rows.map((r) => r.school_name)),
@@ -170,11 +180,12 @@ export interface WorkFacet {
  * 지은이와 갈래(문학/비문학)는 `problems` 에 없다 — 지문(`passages.works`·`area_path`)에서
  * 같은 제목을 찾아 붙인다. 폴더를 지은이로 나누고 문학·비문학으로 가르기 때문이다.
  * 세는 규칙은 `work-counts.ts` 에 있다.
+ * @param withWorkbook - 평가문제집 문항까지 세는가 (기본 숨김)
  * @returns 작품 목록 (제목 한글 사전순)
  */
-export async function fetchWorkFacets(): Promise<WorkFacet[]> {
+export async function fetchWorkFacets(withWorkbook = false): Promise<WorkFacet[]> {
   const payload = await loadArchiveFacets();
-  const counts = tallyWorkCounts(payload.work_titles);
+  const counts = tallyWorkCounts(withShare(payload.work_titles, payload.workbook.work_titles, withWorkbook));
   if (counts.size === 0) return [];
   // 지문 표는 (제목, 지은이, 영역) 하나씩이라 지은이 표·갈래 표가 같은 행을 함께 쓴다
   const rows: PassageWorkRow[] = payload.passage_works.map((v) => ({
@@ -187,17 +198,23 @@ export async function fetchWorkFacets(): Promise<WorkFacet[]> {
 
 /**
  * 아카이브에 쓰인 영역 경로 목록.
+ * @param withWorkbook - 평가문제집 문항까지 보는가 (기본 숨김)
  * @returns 중복 없는 경로 목록
  */
-export const fetchAreaFacets = async (): Promise<string[][]> =>
-  sortPaths((await loadArchiveFacets()).area_paths);
+export async function fetchAreaFacets(withWorkbook = false): Promise<string[][]> {
+  const payload = await loadArchiveFacets();
+  return sortPaths(withShare(payload.area_paths, payload.workbook.area_paths, withWorkbook));
+}
 
 /**
  * 아카이브에 쓰인 교과서 단원 경로 목록.
+ * @param withWorkbook - 평가문제집 문항까지 보는가 (기본 숨김)
  * @returns 중복 없는 경로 목록
  */
-export const fetchUnitFacets = async (): Promise<string[][]> =>
-  sortPaths((await loadArchiveFacets()).unit_paths);
+export async function fetchUnitFacets(withWorkbook = false): Promise<string[][]> {
+  const payload = await loadArchiveFacets();
+  return sortPaths(withShare(payload.unit_paths, payload.workbook.unit_paths, withWorkbook));
+}
 
 /** 문법 개념 하나 — 경로와 그 아래(자기 자신 포함) 문항 수 */
 export interface GrammarFacet {
@@ -217,10 +234,14 @@ export interface GrammarFacet {
  * ⚠️ 선택지는 이것으로 만들지 **않는다.** 태깅된 경로만 모으므로 아무도 안 붙인 개념은
  *    영영 안 나온다 — 선택지·트리는 마스터(`GRAMMAR_ALL_PATHS`)에서 만들고 여기 건수를
  *    얹는다. 이 함수는 '얼마나 쌓였나' 만 답한다.
+ * @param withWorkbook - 평가문제집 문항까지 세는가 (기본 숨김)
  * @returns 경로와 문항 수 (교재 목차 순서, 마스터에 없는 옛 경로는 뒤로)
  */
-export async function fetchGrammarFacets(): Promise<GrammarFacet[]> {
-  const counts = tallyWeightedGrammarCounts((await loadArchiveFacets()).grammar_paths);
+export async function fetchGrammarFacets(withWorkbook = false): Promise<GrammarFacet[]> {
+  const payload = await loadArchiveFacets();
+  const counts = tallyWeightedGrammarCounts(
+    withShare(payload.grammar_paths, payload.workbook.grammar_paths, withWorkbook),
+  );
   return expandGrammarAncestors([...counts.keys()])
     .map((path) => ({ path, count: counts.get(path) ?? 0 }));
 }

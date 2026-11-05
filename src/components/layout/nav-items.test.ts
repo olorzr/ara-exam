@@ -136,7 +136,7 @@ describe('buildNavSections', () => {
     expect(etc.items.map((i) => i.label)).toEqual(['카테고리 관리', 'AI 연결']);
   });
 
-  it('책 만들기는 원장에게만 따로 된 대분류다 — 표지 만들기 · 내지 만들기 · 다 만든 책', () => {
+  it('책 만들기는 원장에게만 따로 된 대분류다 — 문제지 만들기 · 표지 만들기 · 내지 만들기 · 다 만든 책', () => {
     // 선생님 메뉴에는 그룹이 없고, 문제 은행에도 남지 않는다
     expect(sections.some((s) => s.id === 'books')).toBe(false);
     expect(sections.flatMap((s) => s.items).some((i) => i.href.startsWith('/books'))).toBe(false);
@@ -150,12 +150,17 @@ describe('buildNavSections', () => {
     expect(books.kind).toBe('group');
     expect(books.kind === 'group' && books.label).toBe('책 만들기');
     expect(books.items.map((i) => [i.label, i.href])).toEqual([
+      ['문제지 만들기', '/books/papers/new'],
       ['표지 만들기', '/books/covers'],
       ['내지 만들기', '/books/inner'],
       ['다 만든 책', '/books/done'],
     ]);
 
-    const [covers, inner, done] = books.items;
+    const [papers, covers, inner, done] = books.items;
+    // 평가문제집이 보이는 조합 화면 — 다른 책 메뉴도, 문제 은행의 문제지 메뉴도 켜지 않는다
+    expect(isNavItemActive('/books/papers/new', papers)).toBe(true);
+    expect(isNavItemActive('/books/papers/new', covers)).toBe(false);
+    expect(isNavItemActive('/books/papers/new', findItem(admin, '/problems/papers'))).toBe(false);
     // 편집 화면은 그 소분류만 켠다 — 소분류끼리 서로를 켜지 않는다
     expect(isNavItemActive('/books/covers/abc-123', covers)).toBe(true);
     expect(isNavItemActive('/books/covers/abc-123', inner)).toBe(false);

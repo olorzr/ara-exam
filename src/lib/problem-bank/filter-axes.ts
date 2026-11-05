@@ -3,7 +3,8 @@ import { SEMESTER_OPTIONS } from '@/lib/constants';
 import { areaPathLabel } from './area-tree';
 import { formatGrammarPath, parseGrammarPath } from './grammar-tree';
 import {
-  examTypeFits, examTypeOptionsFor, levelFromGrade, SCHOOL_LEVEL_OPTIONS, SOURCE_TYPE_OPTIONS, WORKBOOK_SOURCE_TYPE,
+  BANK_SOURCE_TYPE_OPTIONS, examTypeFits, examTypeOptionsFor, levelFromGrade, SCHOOL_LEVEL_OPTIONS,
+  SOURCE_TYPE_OPTIONS, WORKBOOK_SOURCE_TYPE,
 } from './source-form';
 import { gradeFitsSchoolLevel, parseSchoolLevel } from './school-level';
 import { UNSPECIFIED_AXIS, type ProblemFilters } from './filters';
@@ -137,7 +138,11 @@ export function buildFilterAxes(input: BuildInput): FilterAxis[] {
     });
   };
 
-  simple('source_type', '유형', 'w-32', SOURCE_TYPE_OPTIONS.map(plain));
+  // 평가문제집은 그 유형을 보이는 화면(책 만들기의 문제지 만들기)에서만 고른다
+  simple(
+    'source_type', '유형', 'w-32',
+    (filters.with_workbook ? SOURCE_TYPE_OPTIONS : BANK_SOURCE_TYPE_OPTIONS).map(plain),
+  );
   // 유형을 바꿀 때 새 유형과 맞지 않는 칸을 함께 비운다(코덱스 리뷰 2R·3R) — 남기면 DB 에
   // 있을 수 없는 조합이라 목록이 조용히 0건이 된다: '수능' 을 고른 채 내신기출로, 또는
   // 학교·학기를 고른 채 모의고사로(모의고사는 학교·학기를 늘 비워 저장한다)

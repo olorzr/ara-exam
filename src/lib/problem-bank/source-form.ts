@@ -65,6 +65,13 @@ export function examTypeOptionsFor(type: string): readonly string[] {
 export const WORKBOOK_SOURCE_TYPE = '평가문제집';
 
 /**
+ * 문제 은행 화면에서 고를 수 있는 출처 유형 — 평가문제집은 책 만들기에서만 보인다(sql/85).
+ * `SOURCE_TYPE_OPTIONS` 는 DB CHECK 의 거울이라 그대로 둔다.
+ */
+export const BANK_SOURCE_TYPE_OPTIONS: ProblemSourceType[] =
+  SOURCE_TYPE_OPTIONS.filter((type) => type !== WORKBOOK_SOURCE_TYPE);
+
+/**
  * 유형을 바꿨을 때 지금 고른 시험 구분을 남겨도 되는가 — 새 유형의 선택지에 있어야 한다.
  * 모의고사 회차('수능')를 내신에 남기면 조건이 불가능한 조합이 되고, 내신의 '중간' 을
  * 모의고사에 남기면 회차 칸에 없는 값이 된다.

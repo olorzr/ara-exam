@@ -35,6 +35,8 @@ const PAYLOAD = {
   sources: [
     { school_name: '상현중', year: '2026', grade: '중2', textbook: '천재', source_type: '내신기출', semester: '1학기', exam_type: '중간' },
     { school_name: '도선고', year: '2025', grade: '고2', textbook: '', source_type: '내신기출', semester: '1학기', exam_type: '기말' },
+    // 평가문제집에만 있는 학년도·학년·교과서 — 숨기는 화면의 칸에 남으면 골랐을 때 0건이다
+    { school_name: '', year: '2024', grade: '중3', textbook: '동아', source_type: '평가문제집', semester: '2학기', exam_type: '', title: '동아 책' },
   ],
   area_paths: [['문학', '운문 문학'], ['독서와 작문', '독서']],
   unit_paths: [['3. 역사와 함께 흐르는, 문학', '(3) 조선 시대 문학']],
@@ -43,7 +45,13 @@ const PAYLOAD = {
   passage_works: [
     { title: '사미인곡', author: '정철', area_path: ['문학', '운문 문학'], n: 9 },
     { title: '속미인곡', author: '정철', area_path: ['문학'], n: 2 },
+    { title: '양반전', author: '박지원', area_path: ['문학'], n: 1 },
   ],
+  // 평가문제집 몫(sql/85) — 기본 화면에서는 어디에도 안 든다
+  area_paths_workbook: [['화법과 언어', '언어']],
+  unit_paths_workbook: [['1. 평가 단원', '(1) 소단원']],
+  grammar_paths_workbook: [{ paths: ['단어 > 품사 > 명사'], n: 2 }],
+  work_titles_workbook: [{ titles: ['사미인곡'], n: 5 }, { titles: ['양반전'], n: 7 }],
 };
 
 function ok(): Response {
@@ -75,6 +83,44 @@ describe('아카이브 패싯', () => {
       { title: '사미인곡', author: '정철', count: 10, kind: 'literary' },
       { title: '속미인곡', author: '정철', count: 4, kind: 'literary' },
     ]);
+  });
+
+  it('기본은 평가문제집을 뺀다 — 출처 칸·책 가지·건수 어디에도 안 든다', async () => {
+    const [source, area, unit, grammar, works] = await Promise.all([
+      facets.fetchSourceFacets(), facets.fetchAreaFacets(), facets.fetchUnitFacets(),
+      facets.fetchGrammarFacets(), facets.fetchWorkFacets(),
+    ]);
+    expect(source.years).toEqual(['2026', '2025']);
+    expect(source.grades).not.toContain('중3');
+    expect(source.textbooks).toEqual(['천재']);
+    expect(source.semesters).toEqual(['1학기']);
+    expect(source.workbooks).toEqual([]);
+    expect(area).toHaveLength(2);
+    expect(unit).toHaveLength(1);
+    expect(grammar.find((g) => g.path === '단어')?.count).toBe(3);
+    expect(works.map((w) => [w.title, w.count])).toEqual([['사미인곡', 10], ['속미인곡', 4]]);
+  });
+
+  it('보이는 화면은 평가문제집 몫을 더한다 — 같은 작품은 건수가 합쳐진다', async () => {
+    const [source, area, unit, grammar, works] = await Promise.all([
+      facets.fetchSourceFacets(true), facets.fetchAreaFacets(true), facets.fetchUnitFacets(true),
+      facets.fetchGrammarFacets(true), facets.fetchWorkFacets(true),
+    ]);
+    expect(source.years).toEqual(['2026', '2025', '2024']);
+    expect(source.textbooks).toEqual(['동아', '천재']);
+    expect(source.workbooks.map((w) => w.title)).toEqual(['동아 책']);
+    expect(area).toHaveLength(3);
+    expect(unit).toHaveLength(2);
+    expect(grammar.find((g) => g.path === '단어')?.count).toBe(5);
+    expect(works.map((w) => [w.title, w.author, w.count])).toEqual([
+      ['사미인곡', '정철', 15], ['속미인곡', '정철', 4], ['양반전', '박지원', 7],
+    ]);
+  });
+
+  it('두 화면이 같은 캐시를 쓴다 — 모드마다 RPC 를 다시 부르지 않는다', async () => {
+    await facets.fetchWorkFacets();
+    await facets.fetchWorkFacets(true);
+    expect(requests).toHaveLength(1);
   });
 
   it('RPC 는 POST 다 — GET 은 PostgREST 가 읽기 전용 트랜잭션으로 돌려 서버 캐시를 다시 지을 수 없다(sql/71)', async () => {

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
-  EMPTY_FILTERS, toProblemQuery, type ProblemFilters,
+  EMPTY_FILTERS, hideWorkbookAxes, toProblemQuery, type ProblemFilters,
 } from '@/lib/problem-bank/filters';
 import {
   EMPTY_SOURCE_FACETS, fetchAreaFacets, fetchGrammarFacets, fetchSourceFacets, fetchUnitFacets,
@@ -48,7 +48,8 @@ const NO_ROWS: ArchiveRow[] = [];
  * @param initial - 첫 필터 (주소에서 복원한 값)
  */
 export function useProblemArchive(initial: ProblemFilters = EMPTY_FILTERS) {
-  const [filters, setFilters] = useState<ProblemFilters>(initial);
+  // 옛 링크의 `type=평가문제집` 은 여기서 푼다 — 남으면 '평가문제집만' 과 '빼고' 가 함께 걸려 0건이다
+  const [filters, setFilters] = useState<ProblemFilters>(() => hideWorkbookAxes(initial));
   /**
    * 목록과 개수는 **그 결과를 만든 조건과 한 덩어리**로 든다(2026-10-15 리뷰 5번).
    *
@@ -76,18 +77,19 @@ export function useProblemArchive(initial: ProblemFilters = EMPTY_FILTERS) {
   // 다섯 패싯은 RPC 한 번(sql/66 → 서버 캐시 sql/71)을 나눠 쓴다 — 캐시(facets-cache.ts)가 한 요청만 보낸다.
   // `reload()`(선택 삭제·일괄 태깅 뒤)에도 다시 읽는다: 그 쓰기가 캐시를 이미 무효화해 두었다.
   // ⚠️ 늦게 끝난 옛 응답이 새 응답을 덮지 않게, 정리된 효과의 결과는 버린다.
+  const withWorkbook = filters.with_workbook;
   useEffect(() => {
     let alive = true;
     const keep = <T,>(set: (v: T) => void) => (v: T) => { if (alive) set(v); };
-    fetchSourceFacets().then(keep(setFacets)).catch(() => { /* 선택지가 없어도 목록은 본다 */ });
-    fetchAreaFacets().then(keep(setAreaFacets)).catch(() => { /* 영역 필터만 빠진다 */ });
-    fetchUnitFacets().then(keep(setUnitFacets)).catch(() => { /* 단원 필터만 빠진다 */ });
-    fetchGrammarFacets().then(keep(setGrammarFacets)).catch(() => { /* 문법 건수만 빠진다 */ });
-    fetchWorkFacets().then(keep(setWorkFacets)).catch(() => { /* 작품 트리만 빠진다 */ });
+    fetchSourceFacets(withWorkbook).then(keep(setFacets)).catch(() => { /* 선택지가 없어도 목록은 본다 */ });
+    fetchAreaFacets(withWorkbook).then(keep(setAreaFacets)).catch(() => { /* 영역 필터만 빠진다 */ });
+    fetchUnitFacets(withWorkbook).then(keep(setUnitFacets)).catch(() => { /* 단원 필터만 빠진다 */ });
+    fetchGrammarFacets(withWorkbook).then(keep(setGrammarFacets)).catch(() => { /* 문법 건수만 빠진다 */ });
+    fetchWorkFacets(withWorkbook).then(keep(setWorkFacets)).catch(() => { /* 작품 트리만 빠진다 */ });
     return () => {
       alive = false;
     };
-  }, [reloadSeq]);
+  }, [reloadSeq, withWorkbook]);
 
   /**
    * 경로 → 문항 수. 트리·선택지가 마스터를 그리면서 여기서 건수만 얹는다.
@@ -150,7 +152,8 @@ export function useProblemArchive(initial: ProblemFilters = EMPTY_FILTERS) {
     setFilters((f) => ({ ...f, ...next }));
   }, []);
 
-  const reset = useCallback(() => setFilters(EMPTY_FILTERS), []);
+  // ⚠️ 화면 모드는 조건이 아니다 — 통째로 비우면 책 화면의 '조건 지우기' 가 평가문제집을 숨긴다
+  const reset = useCallback(() => setFilters((f) => ({ ...EMPTY_FILTERS, with_workbook: f.with_workbook })), []);
 
   /** 조건은 그대로 두고 목록만 다시 읽는다 (선택 삭제 뒤) */
   const reload = useCallback(() => setReloadSeq((n) => n + 1), []);

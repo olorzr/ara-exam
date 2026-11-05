@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { PASSAGE_PICK_LIMIT } from '@/lib/passage-quiz/constants';
 import type { Passage, ProblemSource } from '@/types/problem-bank';
 import { escapeIlike } from './queries';
+import { WORKBOOK_SOURCE_TYPE } from './source-form';
 import type { SourceLabelInput } from './source-label';
 
 /**
@@ -30,13 +31,17 @@ export interface PassagePickRow {
 //    행 타입 추론이 통째로 풀린다(`useConceptList.LIST_COLUMNS` 와 같은 규약).
 const COLUMNS = 'id, label, title, author, page_no, unit_path, source:problem_sources!inner(source_type, title, school_name, year, grade, exam_type, publisher, textbook)';
 
-/** 글로 인쇄하는 지문만 — 이미지 지문은 평문으로 옮길 수 없다 */
+/**
+ * 글로 인쇄하는 지문만 — 이미지 지문은 평문으로 옮길 수 없다.
+ * 평가문제집 지문은 뺀다 — 책 만들기에서만 쓴다(2026-11-05). 임베드가 `!inner` 라 그 조건이 지문 행을 거른다.
+ */
 function baseQuery(limit: number) {
   return supabase
     .from('passages')
     .select(COLUMNS)
     .eq('render_mode', 'text')
     .neq('html', '')
+    .neq('source.source_type', WORKBOOK_SOURCE_TYPE)
     .order('created_at', { ascending: false })
     .order('id')
     .limit(limit);
