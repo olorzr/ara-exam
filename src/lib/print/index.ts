@@ -1,5 +1,6 @@
 export * from './booklet';
 export * from './constants';
+export * from './fonts-ready';
 export * from './paginate';
 export * from './sheet-columns';
 export * from './split-html-blocks';

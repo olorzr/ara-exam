@@ -3,7 +3,10 @@ import { render } from '@testing-library/react';
 import { DEFAULT_BOOK_SETTINGS, type Book, type BookChapter } from '@/lib/book';
 import type { PaperItemSnapshot, ProblemPaper } from '@/types/problem-bank';
 import BookInnerView from './BookInnerView';
-import { buildBookInnerBlocks, buildBookTocBlocks, tocBlockCount } from './inner-blocks';
+import {
+  BOOK_SPLIT_ADAPTER, buildBookInnerBlocks, buildBookInnerList, buildBookTocBlocks, renderBookInnerBlocks, tocBlockCount,
+  type BookBlock,
+} from './inner-blocks';
 
 const FOOTER_H = 20;
 
@@ -103,6 +106,50 @@ describe('buildBookInnerBlocks', () => {
     const { container } = render(<>{blocks.map((b, i) => <div key={i}>{b}</div>)}</>);
     const nums = Array.from(container.querySelectorAll('.pb-answer-row .pb-answer-num')).map((el) => el.textContent);
     expect(nums).toEqual(['1', '2', '1']);
+  });
+});
+
+describe('내지 목록 — 지문을 쪼갠 뒤에도 자리가 맞는다', () => {
+  const part = (key: string) => ({
+    kind: 'passage-part' as const, key, html: '<p>글</p>', serif: false, first: false, last: false,
+  });
+  const context = { edition: 'student' as const, chapters, settings: { chapterStart: 'odd' as const }, imageUrls: new Map() };
+
+  it('한 칸을 조각 둘로 바꿔도 블록·쪽 넘김 길이가 같고 장 머리 자리가 쪽 넘김 자리다', () => {
+    const list = buildBookInnerList({
+      edition: 'student', chapters, itemsByPaper, settings: { chapterStart: 'odd', trimWorks: true },
+    });
+    const at = list.findIndex((entry) => entry.kind === 'paper');
+    const entry = list[at];
+    const split: BookBlock[] = [
+      ...list.slice(0, at), BOOK_SPLIT_ADAPTER.wrap(entry, part('a')), BOOK_SPLIT_ADAPTER.wrap(entry, part('b')),
+      ...list.slice(at + 1),
+    ];
+    const { blocks, breakBefore, chapterBlocks } = renderBookInnerBlocks(split, context);
+    expect(blocks).toHaveLength(split.length);
+    expect(breakBefore).toHaveLength(split.length);
+    expect(chapterBlocks).toEqual(breakBefore.flatMap((b, i) => (b ? [i] : [])));
+    expect(chapterBlocks[1]).toBeGreaterThan(chapterBlocks[0] + 1);
+  });
+
+  it('어댑터는 지문 글 조각만 꺼내고 장 번호를 지킨다', () => {
+    const entry: BookBlock = { kind: 'paper', chapterIndex: 3, block: part('a') };
+    expect(BOOK_SPLIT_ADAPTER.partOf(entry)).toEqual(part('a'));
+    expect(BOOK_SPLIT_ADAPTER.wrap(entry, part('b'))).toEqual({ kind: 'paper', chapterIndex: 3, block: part('b') });
+    expect(BOOK_SPLIT_ADAPTER.partOf({ kind: 'head', node: null })).toBeNull();
+    expect(BOOK_SPLIT_ADAPTER.partOf({ kind: 'paper', chapterIndex: 0, block: { kind: 'passage-header', key: 'h', text: '' } }))
+      .toBeNull();
+  });
+
+  it('장마다 그 문제지의 설정으로 그린다 — 출처 표시가 장을 넘어 섞이지 않는다', () => {
+    const noSource = { ...paper('p2', '고전'), settings: { columns: 2 as const, showScore: false, showSource: false, omr: false } };
+    const mixed: BookChapter[] = [chapters[0], { ...chapters[1], paper: noSource }];
+    const list = buildBookInnerList({
+      edition: 'student', chapters: mixed, itemsByPaper, settings: { chapterStart: 'page', trimWorks: true },
+    });
+    const { blocks } = renderBookInnerBlocks(list, { ...context, chapters: mixed });
+    const { container } = render(<>{blocks.map((b, i) => <div key={i}>{b}</div>)}</>);
+    expect(container.querySelectorAll('.pb-q__source')).toHaveLength(2);
   });
 });
 

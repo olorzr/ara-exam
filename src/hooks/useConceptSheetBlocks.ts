@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { areFontsReady } from '@/lib/print/fonts-ready';
 import { splitHtmlBlocks, splitTableByRows } from '@/lib/print/split-html-blocks';
 import { applyColumnWidths, fitColumnWidths } from '@/lib/print/table-col-fit';
 import { tableRowCount } from '@/lib/print/table-dom';
@@ -69,11 +70,6 @@ const initialState = (bodyHTML: string): BlocksState => ({
 });
 
 const sum = (values: readonly number[]) => values.reduce((total, value) => total + value, 0);
-
-/** 웹폰트 로딩이 끝났는가 (지원하지 않는 환경이면 끝난 것으로 본다) */
-function areFontsReady(): boolean {
-  return typeof document === 'undefined' || document.fonts?.status !== 'loading';
-}
 
 /**
  * 표 블록의 열 폭을 컬럼 폭에 맞춰 박는다.

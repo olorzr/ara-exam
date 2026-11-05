@@ -837,3 +837,8 @@
 - 정의: 지문·〈보기〉 끝에 `* 낱말 : 풀이` 꼴로 단 단어 설명. 참고사항이라 작은 글씨로 찍는다(데이터는 그대로, 그릴 때 알아본다)
 - 코드에서의 사용: `markFootnotes`, `FOOTNOTE_CLASS`(`pb-note`)
 - 관련 파일: src/lib/problem-bank/footnotes.ts, src/styles/problem-paper.css
+
+## 이어지는 조각 (continues)
+- 정의: 긴 지문 문단이 단·쪽 끝에서 잘려 다음 블록으로 이어지는 앞쪽 조각. 같은 문단이라 조각 사이에 문단 간격을 두지 않는다
+- 코드에서의 사용: `PassagePartBlock.continues`, CSS `.pb-passage-part--continues`
+- 관련 파일: src/hooks/usePassageSplit.ts, src/lib/problem-paper/part-split-plan.ts

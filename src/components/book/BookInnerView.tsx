@@ -3,10 +3,13 @@
 import { useCallback, useMemo, useState } from 'react';
 import { A4Document, CompactPageHeader } from '@/components/print';
 import type { LayoutHandler } from '@/hooks/useA4Pagination';
+import { usePassageSplit } from '@/hooks/usePassageSplit';
 import type { BreakBefore } from '@/lib/print/paginate';
 import { EDITION_SUFFIX, type Book, type BookChapter, type BookEdition } from '@/lib/book';
 import type { PaperItemSnapshot } from '@/types/problem-bank';
-import { buildBookInnerBlocks, buildBookTocBlocks, tocBlockCount } from './inner-blocks';
+import {
+  BOOK_SPLIT_ADAPTER, buildBookInnerList, buildBookTocBlocks, renderBookInnerBlocks, tocBlockCount,
+} from './inner-blocks';
 
 /** 무선제본 내지는 쪽 수가 4의 배수여야 한다(열림인쇄 가이드) */
 export const BOOK_PAGE_MULTIPLE = 4;
@@ -41,18 +44,26 @@ function samePages(a: ChapterPages | null, b: ChapterPages): boolean {
  * 같다 → 엔진의 배치 서명이 그대로라 알림이 다시 오지 않는다(수렴). 쪽 넘김 배열은 번호와 무관한 값(`tocCount`)으로만
  * 만든다 — 번호가 채워질 때 참조가 바뀌면 엔진이 측정 함수를 새로 만들어 관찰자를 다시 건다.
  * 상태는 `BookInnerMode` 가 구성 지문(`key`)으로 다시 마운트할 때 비워진다.
+ *
+ * **긴 지문 문단**은 문제지 인쇄와 같은 훅(`usePassageSplit`)이 자리에 맞춰 쪼갠다. ⚠️ 목차는 그 훅의 목록 밖에
+ * 둔다(`blockOffset`) — 쪽 번호가 채워질 때 목록이 바뀌면 쪼갠 것이 풀리고 다시 재서 수렴이 깨진다.
  */
 export default function BookInnerView({
   book, edition, chapters, itemsByPaper, imageUrls, onLayout,
 }: BookInnerViewProps) {
   const { chapterStart, trimWorks, columns, toc } = book.settings;
-  // 본문 블록은 쪽 번호와 무관하다 — 번호가 채워져도 문항 블록을 다시 만들지 않게 따로 든다
+  const tocCount = toc ? tocBlockCount(chapters.length) : 0;
+  // 본문 목록은 쪽 번호·이미지와 무관하다 — 번호가 채워지거나 서명이 와도 쪼갠 것이 풀리지 않게 따로 든다
+  const list = useMemo(
+    () => buildBookInnerList({ edition, chapters, itemsByPaper, settings: { chapterStart, trimWorks } }),
+    [edition, chapters, itemsByPaper, chapterStart, trimWorks],
+  );
+  const split = usePassageSplit(list, BOOK_SPLIT_ADAPTER, tocCount);
   const body = useMemo(
-    () => buildBookInnerBlocks({ edition, chapters, itemsByPaper, settings: { chapterStart, trimWorks }, imageUrls }),
-    [edition, chapters, itemsByPaper, chapterStart, trimWorks, imageUrls],
+    () => renderBookInnerBlocks(split.blocks, { edition, chapters, settings: { chapterStart }, imageUrls }),
+    [split.blocks, edition, chapters, chapterStart, imageUrls],
   );
   const [chapterPages, setChapterPages] = useState<ChapterPages | null>(null);
-  const tocCount = toc ? tocBlockCount(chapters.length) : 0;
   const tocBlocks = useMemo(
     () => (tocCount > 0 ? buildBookTocBlocks({ chapters, chapterPages }) : []),
     [tocCount, chapters, chapterPages],
@@ -61,6 +72,10 @@ export default function BookInnerView({
   const breakBefore = useMemo<BreakBefore[]>(
     () => [...Array.from({ length: tocCount }, () => false as const), ...body.breakBefore],
     [tocCount, body.breakBefore],
+  );
+  const splittable = useMemo<boolean[]>(
+    () => [...Array.from({ length: tocCount }, () => false), ...split.splittable],
+    [tocCount, split.splittable],
   );
   const chapterBlocks = useMemo(
     () => body.chapterBlocks.map((i) => i + tocCount),
@@ -83,6 +98,8 @@ export default function BookInnerView({
   return (
     <A4Document
       blocks={blocks}
+      splittable={splittable}
+      onSplitRequest={split.handleSplitRequest}
       breakBefore={breakBefore}
       padPagesTo={BOOK_PAGE_MULTIPLE}
       onLayout={handleLayout}

@@ -28,7 +28,7 @@ import MatrixChoiceTable from '@/components/problem-bank/MatrixChoiceTable';
  */
 
 interface RenderArgs {
-  blocks: PaperBlock[];
+  blocks: readonly PaperBlock[];
   settings: PaperSettings;
   /** Storage 경로 → 서명 URL */
   imageUrls: Map<string, string>;
@@ -70,7 +70,7 @@ export function renderPaperBlocks({
         // 옛한글 지문은 명조로 — 판정은 blocks.ts 가 지문 전체로 한 번 해서 모든 조각에 싣는다
         const className = `pb-passage-part${block.sourceAccurate ? ' pb-passage-part--unframed' : ''}${block.literalLabels ? ' pb-passage-part--literal-labels' : ''}${block.first ? ' pb-passage-part--first' : ''}${
           block.last ? ' pb-passage-part--last' : ''
-        }${block.serif ? ' yet-hangul-serif' : ''}`;
+        }${block.continues ? ' pb-passage-part--continues' : ''}${block.serif ? ' yet-hangul-serif' : ''}`;
         // 〈보기〉 상자·표 안에 남은 그림 자리표시자를 여기서 끼운다 — 구조를 자르지 않는다
         const body = { __html: renderFiguresInHtml(block.html, block.figures ?? [], imageUrls) };
         // 상자 밖 조각은 예전 DOM 그대로 — 틀을 더 두르면 잰 높이와 CSS 가 달라진다

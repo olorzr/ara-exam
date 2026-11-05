@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { render } from '@testing-library/react';
-import { buildPaperBlocks } from '@/lib/problem-paper/blocks';
+import { buildPaperBlocks, type PaperBlock } from '@/lib/problem-paper/blocks';
 import { EXPLANATION_INLINE_MAX_CHARS } from '@/lib/problem-paper/answers';
 import type { PaperItemSnapshot, PaperSettings, ProblemPaper } from '@/types/problem-bank';
 import ProblemPaperView from './ProblemPaperView';
@@ -359,5 +359,29 @@ describe('구역 상자 조각', () => {
     const container = draw(withPassage('<blockquote data-box="가"><p>\u1112\u119E\u11AB</p><p>b</p></blockquote>'), false);
 
     expect(container.querySelectorAll('.pb-passage-part.yet-hangul-serif > blockquote.pb-box-part')).toHaveLength(2);
+  });
+});
+
+describe('renderPaperBlocks — 자리에 맞춰 쪼갠 문단', () => {
+  const chunk = (over: Partial<Extract<PaperBlock, { kind: 'passage-part' }>>) => ({
+    kind: 'passage-part' as const, key: 'k', html: '<p>글</p>', serif: false, first: false, last: false, ...over,
+  });
+  const drawParts = (blocks: PaperBlock[]) => render(
+    <div>{renderPaperBlocks({ blocks, settings: SETTINGS, imageUrls: new Map() })}</div>,
+  ).container;
+
+  it('이어지는 조각에만 표시가 붙는다', () => {
+    const c = drawParts([chunk({ key: 'a', continues: true }), chunk({ key: 'b' })]);
+    expect(Array.from(c.querySelectorAll('.pb-passage-part')).map((el) => el.classList.contains('pb-passage-part--continues')))
+      .toEqual([true, false]);
+  });
+
+  it('상자 조각의 처음·끝 표시가 그대로 틀이 된다', () => {
+    const c = drawParts([
+      chunk({ key: 'a', first: true, continues: true, box: { label: '나', first: true, last: false } }),
+      chunk({ key: 'b', last: true, box: { label: '나', first: false, last: true } }),
+    ]);
+    const boxes = Array.from(c.querySelectorAll('blockquote[data-box="나"]'));
+    expect(boxes.map((box) => box.className)).toEqual(['pb-box-part pb-box-part--first', 'pb-box-part pb-box-part--last']);
   });
 });

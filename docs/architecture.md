@@ -115,6 +115,8 @@ src/
   - `src/lib/print/sheet-columns.ts` — 개념지 단 수 결정(글자 수 300자 초과 → 2단). 루트 표 열 수는 보지 않고(열 폭 맞춤이 칸에 맞춘다), 래퍼 안의 넓은 표만 1단 폴백
   - `src/hooks/useA4Pagination.ts` — 숨김 컨테이너 실측 + 재측정(fonts.ready / ResizeObserver / img load / beforeprint)
   - `src/hooks/useConceptSheetBlocks.ts` — 개념지 블록 상태 + 표 열 폭 맞춤(배치 전) + 남은 자리를 채우는 표 재분할(패스당 표 하나, 최대 32)
+  - `src/hooks/usePassageSplit.ts` — 문제지·책 내지의 긴 지문 문단을 남은 자리에 맞춰 쪼갠다(패스당 그 라운드 전부, 글꼴이 온 뒤에만). 자리 찾기·자르기는 `lib/problem-paper/part-cuts.ts`, 재기는 `part-measure.ts`, 계획은 `part-split-plan.ts`
+  - `src/lib/print/fonts-ready.ts` — 웹폰트 로딩이 끝났는가(개념지·지문 쪼개기가 같이 쓴다)
   - `src/components/print/{A4Document,A4Sheet,CompactPageHeader}.tsx` — 측정 컨테이너 + 낱장 렌더
   - `src/components/print/A4CoverSheet.tsx` — 표지 한 장(여백·머리글·푸터 없음, 쪽 번호에 안 센다). `A4Document` 의 `coverPage` 가 그린다
   - `src/lib/print/booklet.ts` — 순수 계산: 중철 제본 면 배정(`bookletSheets` — 장마다 앞·뒷면의 [왼쪽, 오른쪽] 쪽)
@@ -122,7 +124,7 @@ src/
   - `src/styles/print-a4.css` — 낱장·푸터·페이지 브레이크 CSS (globals.css 에서 @import)
   - `src/styles/print-booklet.css` — 중철 면·빈 면·화면 축소(zoom 0.5, 측정 무관)·면 안 쪽 넘김 억제·왼쪽 면 쪽 번호를 바깥쪽(왼쪽 아래)으로. 면 높이는 쪽보다 40px 낮다(`BOOKLET_SIDE_HEIGHT_PX`, 프린터 여백에도 면마다 빈 쪽이 안 붙게)
 - 소비자: `components/exam/{ExamPaperView,MultipleChoiceView,MultipleChoiceAnswerView,WordBookView}.tsx`, `components/exam-builder/ExamSheetRenderer.tsx`, `components/problem-paper/{ProblemPaperView,ProblemAnswerKeyView}.tsx`(표지·중철을 쓰는 유일한 소비자)
-- 블록 단위: 시험지=문항 1개, 객관식 답안지=5문항 1줄, 단어장=단어 1줄, 개념지=본문 HTML 최상위 요소 1개
+- 블록 단위: 시험지=문항 1개, 객관식 답안지=5문항 1줄, 단어장=단어 1줄, 개념지=본문 HTML 최상위 요소 1개, 문제지 지문=문단 1개(긴 문단은 자리에 맞춘 조각)
 - 개념지 단 수: 본문 글자 수 300 초과면 2단이지만, **열 3개 이상인 표가 하나라도 있으면 1단**으로 되돌린다(2단 칸 ≈328px 에 넓은 표가 안 들어간다). 표 셀은 `overflow-wrap: anywhere` + 박스 묶음 줄바꿈 허용으로 칸을 넘지 않는다
 
 ### lib/naesin-scope (ara-system 내신 관리 연동, 읽기 전용)
@@ -448,7 +450,8 @@ src/
 ## lib/problem-paper
 - 역할: 문제지 조합 규칙(지문 묶음 연속성)과 인쇄 블록 조립
 - 의존: lib/print(splitHtmlBlocks), lib/shuffle
-- 주요 파일: compose.ts, dnd.ts, blocks.ts, passage-blocks.ts(지문 묶음 블록), box-parts.ts, answers.ts, bulk-add.ts,
+- 주요 파일: compose.ts, dnd.ts, blocks.ts, passage-blocks.ts(지문 묶음 블록), box-parts.ts,
+  part-cuts.ts·part-measure.ts·part-split-plan.ts(긴 문단을 자리에 맞춰 쪼개기), answers.ts, bulk-add.ts,
   html-trim.ts, settings.ts, shuffle-groups.ts, cover.ts, cover-image.ts, cover-queries.ts, print-layout-pref.ts,
   trim-works.ts(복합 지문에서 묻지 않는 작품 구역 빼기), print-label.ts(인쇄 단추 글자),
   cover-text.ts·cover-scale.ts·cover-copy.ts·cover-fonts.ts(디자인 표지의 글 나누기·크기 계산 도구·고정 문구·글꼴),
@@ -516,3 +519,5 @@ src/
 최상위 **구역 상자**(`blockquote[data-box]`)도 자식 단위로 터뜨린다(`box-parts.ts`, 2026-09-27) —
 조각마다 `box` 표시를 싣고 렌더러가 React 로 상자 틀을 두르며, 말머리·윗선은 첫 조각·아랫선은
 마지막 조각에만 간다(`.pb-box-part--first/--last`).
+문단 하나가 남은 자리에 안 들어가면 `usePassageSplit` 이 그 문단을 더 쪼갠다(2026-11-06) — 시는 행 경계,
+산문은 문장 끝에서만, 양쪽에 두 줄 이상 남긴다. 표·목록·상자 안 상자와 문항은 쪼개지 않는다.

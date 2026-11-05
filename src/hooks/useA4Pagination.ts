@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { A4_HEIGHT_PX, getColumnWidth, PAGE_PAD_BOTTOM, PAGE_PAD_TOP } from '@/lib/print/constants';
 import {
-  blockPagesOf, findBlockPage, paginate, type BreakBefore, type PagePlan, type SplitRequest,
+  blockPagesOf, findBlockPage, paginate, type BreakBefore, type PagePlan, type PaginateInput, type SplitRequest,
 } from '@/lib/print/paginate';
 
 /** 측정값이 이보다 작으면 아직 레이아웃이 안 잡힌 것으로 본다 */
@@ -33,9 +33,11 @@ export type BeforePaginateHandler = (measureRoot: HTMLElement, columnWidth: numb
 
 /**
  * 남은 자리에 안 들어간 분할 가능 블록이 나왔을 때 호출된다.
- * 블록을 더 잘게 쪼갤 수 있는 쪽(개념지의 긴 표)이 받아서 블록 목록을 갱신한다.
+ * 블록을 더 잘게 쪼갤 수 있는 쪽(개념지의 긴 표, 문제지의 긴 지문 문단)이 받아서 블록 목록을 갱신한다.
+ * `input` 은 방금 배치에 쓴 입력이다 — 여러 곳을 한 번에 자르는 쪽이 `paginate` 를 순수하게 다시 돌려
+ * 뒤 요청의 자리를 알아낸다(part-split-plan.ts). 쓰지 않아도 된다.
  */
-export type SplitRequestHandler = (requests: SplitRequest[], measureRoot: HTMLElement) => void;
+export type SplitRequestHandler = (requests: SplitRequest[], measureRoot: HTMLElement, input: PaginateInput) => void;
 
 /** 배치가 끝났을 때 알려 주는 값 */
 export interface A4LayoutInfo {
@@ -119,7 +121,7 @@ export function useA4Pagination({
     // 옛 HTML 기준이라 아래에서 분할 요청만 건너뛴다 — 배치는 그대로 반영해야 화면이 비지 않는다
     const refitted = onBeforePaginate?.(root, getColumnWidth(columns)) ?? false;
 
-    const { pages, oversized, splitRequests } = paginate({
+    const input: PaginateInput = {
       blockHeights,
       columns,
       firstPageBodyHeight,
@@ -128,7 +130,8 @@ export function useA4Pagination({
       splittable,
       breakBefore,
       padPagesTo,
-    });
+    };
+    const { pages, oversized, splitRequests } = paginate(input);
 
     const oversizedScale: Record<number, number> = {};
     oversized.forEach((index) => {
@@ -144,7 +147,7 @@ export function useA4Pagination({
     // 남은 자리에 안 들어간 표는 호출부가 나눠 준다 — 지금 페이지를 채우고 다음으로 이어진다.
     // 배치 결과가 그대로여도 콘텐츠가 바뀌었을 수 있으므로 아래 bail-out 보다 먼저 호출한다.
     // (핸들러는 안정적인 참조여야 하고, 쪼갤 게 없으면 state 를 그대로 두어 루프가 없다)
-    if (!refitted && splitRequests.length > 0) onSplitRequest?.(splitRequests, root);
+    if (!refitted && splitRequests.length > 0) onSplitRequest?.(splitRequests, root, input);
 
     const next: A4Layout = { pages, blockCount: blockHeights.length, oversizedScale, ready: true };
     const signature = JSON.stringify(next);

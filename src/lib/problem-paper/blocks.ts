@@ -47,6 +47,8 @@ export type PaperBlock =
      * 상자를 통째로 한 블록에 두면 3,000자 (가) 지문이 한 쪽을 넘겨 깨알같이 줄어든다(box-parts.ts)
      */
     box?: BoxPart;
+    /** 자리에 맞춰 쪼갠 문단이 다음 블록으로 이어진다 — 조각 사이에 문단 간격을 두지 않는다(part-split-plan.ts) */
+    continues?: true;
   }
   | { kind: 'passage-image'; key: string; path: string; label: string; sourceAccurate?: boolean }
   /** 지문 본문 제자리에 끼울 그림 한 장 — 문단 조각들 사이에 낀다. 상자 안이면 같은 틀을 두른다 */
@@ -79,6 +81,9 @@ export type PaperBlock =
      */
     snapshot: PaperItemSnapshot;
   };
+
+/** 지문 글 조각 블록 — 자리가 모자라면 더 쪼개질 수 있는 유일한 블록이다(usePassageSplit) */
+export type PassagePartBlock = Extract<PaperBlock, { kind: 'passage-part' }>;
 
 /**
  * 이 문항을 **잘라 둔 이미지 한 장으로** 인쇄하는가.

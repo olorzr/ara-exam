@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
+import type { PassageSplitAdapter } from '@/hooks/usePassageSplit';
 import { buildAnswerRows, explanationEntries } from '@/lib/problem-paper/answers';
-import { buildPaperBlocks } from '@/lib/problem-paper/blocks';
+import { buildPaperBlocks, type PaperBlock } from '@/lib/problem-paper/blocks';
 import { DEFAULT_PAPER_SETTINGS } from '@/lib/problem-paper/settings';
 import type { BreakBefore } from '@/lib/print/paginate';
 import { chapterTitleOf, type BookChapter, type BookEdition, type BookSettings } from '@/lib/book';
@@ -30,17 +31,72 @@ export interface BookInnerBlocks {
 }
 
 /**
- * 책 내지의 블록 — 장마다 장 머리 + 그 문제지의 본문(학생용·교사용) 또는 답지(정답 및 해설).
+ * 내지 목록의 한 칸 — 긴 지문을 자리에 맞춰 쪼갤 수 있게 그리기 전의 모양으로 든다(`usePassageSplit`).
+ * ⚠️ 이미지 URL 에 기대지 않는 값만 담는다 — 서명이 뒤늦게 왔다고 목록이 바뀌면 쪼갠 것이 풀린다.
+ */
+export type BookBlock =
+  | { kind: 'head'; node: ReactNode }
+  | { kind: 'paper'; block: PaperBlock; chapterIndex: number }
+  /** 정답 및 해설 판의 답지 블록 */
+  | { kind: 'node'; node: ReactNode };
+
+/** 책의 지문 쪼개기 어댑터 */
+export const BOOK_SPLIT_ADAPTER: PassageSplitAdapter<BookBlock> = {
+  partOf: (entry) => (entry.kind === 'paper' && entry.block.kind === 'passage-part' ? entry.block : null),
+  wrap: (entry, chunk) => (entry.kind === 'paper' ? { ...entry, block: chunk } : entry),
+};
+
+/**
+ * 책 내지의 목록 — 장마다 장 머리 + 그 문제지의 본문(학생용·교사용) 또는 답지(정답 및 해설).
+ *
+ * 본문은 문제지 인쇄와 **같은 함수**(`buildPaperBlocks`·`renderAnswerKeyBlocks`)로 짓는다 —
+ * 번호는 장마다 1부터(문제지 안의 자리)다.
+ * @param input - 판·장·항목·설정
+ * @returns 내지 목록
+ */
+export function buildBookInnerList(input: Omit<BookInnerInput, 'imageUrls'>): BookBlock[] {
+  const { edition, chapters, itemsByPaper, settings } = input;
+  const list: BookBlock[] = [];
+  chapters.forEach((chapter, index) => {
+    const items = itemsByPaper.get(chapter.paperId) ?? [];
+    list.push({
+      kind: 'head',
+      node: (
+        <BookChapterHeading
+          number={index + 1}
+          title={chapterTitleOf(chapter)}
+          sources={chapter.paper?.source_labels ?? []}
+        />
+      ),
+    });
+    if (edition === 'key') {
+      renderAnswerKeyBlocks(buildAnswerRows(items), explanationEntries(items), `ch${index}-`)
+        .forEach((node) => list.push({ kind: 'node', node }));
+      return;
+    }
+    buildPaperBlocks(items, edition === 'teacher', { trimWorks: settings.trimWorks })
+      .forEach((block) => list.push({ kind: 'paper', block, chapterIndex: index }));
+  });
+  return list;
+}
+
+/** 목록을 그리는 데 필요한 것 */
+type BookRenderContext = Pick<BookInnerInput, 'edition' | 'chapters' | 'imageUrls'> & {
+  settings: Pick<BookSettings, 'chapterStart'>;
+};
+
+/**
+ * 목록을 엔진에 넘길 블록으로 그린다.
  *
  * ⚠️ 블록과 `breakBefore` 를 **한 루프에서** 함께 만든다 — 따로 만들면 길이·자리가 어긋나 엉뚱한 블록 앞에서
- *    쪽이 넘어간다. 장 머리만 `settings.chapterStart` 를 받고 나머지는 `false` 다.
- * 본문은 문제지 인쇄와 **같은 함수**(`buildPaperBlocks`·`renderPaperBlocks`·`renderAnswerKeyBlocks`)로 그린다 —
- * 번호는 장마다 1부터(문제지 안의 자리), 출처 표시는 그 문제지의 설정을 따른다.
- * @param input - 판·장·항목·설정·이미지
+ *    쪽이 넘어간다. 장 머리만 `settings.chapterStart` 를 받고 나머지는 `false` 다. 지문을 쪼갠 **뒤의** 목록을
+ *    넘기므로 장 머리 자리도 쪼갠 뒤의 자리다. 출처 표시는 그 문제지의 설정을 따른다.
+ * @param list - 내지 목록
+ * @param context - 판·장·설정·이미지
  * @returns 블록과 쪽 넘김
  */
-export function buildBookInnerBlocks(input: BookInnerInput): BookInnerBlocks {
-  const { edition, chapters, itemsByPaper, settings, imageUrls } = input;
+export function renderBookInnerBlocks(list: readonly BookBlock[], context: BookRenderContext): BookInnerBlocks {
+  const { edition, chapters, settings, imageUrls } = context;
   const blocks: ReactNode[] = [];
   const breakBefore: BreakBefore[] = [];
   const chapterBlocks: number[] = [];
@@ -49,31 +105,44 @@ export function buildBookInnerBlocks(input: BookInnerInput): BookInnerBlocks {
     breakBefore.push(brk);
   };
 
-  chapters.forEach((chapter, index) => {
-    const items = itemsByPaper.get(chapter.paperId) ?? [];
-    chapterBlocks.push(blocks.length);
-    push(
-      <BookChapterHeading
-        number={index + 1}
-        title={chapterTitleOf(chapter)}
-        sources={chapter.paper?.source_labels ?? []}
-      />,
-      settings.chapterStart,
-    );
+  // 문제지 블록은 장마다 한 번에 그린다 — 그 문제지의 설정을 쓴다
+  let run: PaperBlock[] = [];
+  let runChapter = -1;
+  const flush = () => {
+    if (run.length === 0) return;
+    renderPaperBlocks({
+      blocks: run,
+      settings: chapters[runChapter]?.paper?.settings ?? DEFAULT_PAPER_SETTINGS,
+      imageUrls,
+      showAnswers: edition === 'teacher',
+      omrSheetCount: 0,
+    }).forEach((node) => push(node, false));
+    run = [];
+  };
 
-    const body = edition === 'key'
-      ? renderAnswerKeyBlocks(buildAnswerRows(items), explanationEntries(items), `ch${index}-`)
-      : renderPaperBlocks({
-        blocks: buildPaperBlocks(items, edition === 'teacher', { trimWorks: settings.trimWorks }),
-        settings: chapter.paper?.settings ?? DEFAULT_PAPER_SETTINGS,
-        imageUrls,
-        showAnswers: edition === 'teacher',
-        omrSheetCount: 0,
-      });
-    body.forEach((node) => push(node, false));
-  });
+  for (const entry of list) {
+    if (entry.kind === 'paper') {
+      if (entry.chapterIndex !== runChapter) flush();
+      runChapter = entry.chapterIndex;
+      run.push(entry.block);
+      continue;
+    }
+    flush();
+    if (entry.kind === 'head') chapterBlocks.push(blocks.length);
+    push(entry.node, entry.kind === 'head' ? settings.chapterStart : false);
+  }
+  flush();
 
   return { blocks, breakBefore, chapterBlocks };
+}
+
+/**
+ * 쪼개지 않은 내지 블록 — 목록을 짓고 그대로 그린다.
+ * @param input - 판·장·항목·설정·이미지
+ * @returns 블록과 쪽 넘김
+ */
+export function buildBookInnerBlocks(input: BookInnerInput): BookInnerBlocks {
+  return renderBookInnerBlocks(buildBookInnerList(input), input);
 }
 
 /** 목차 블록을 짓는 데 필요한 것 */
