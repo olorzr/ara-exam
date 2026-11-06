@@ -5,6 +5,7 @@ import { trimEdgeEmptyParagraphs } from './html-trim';
 import type { PaperItemSnapshot } from '@/types/problem-bank';
 import { groupRangeLabel, groupsOf, type PaperItem } from './compose';
 import { passageBlocksOf, passagePrintsAsImage } from './passage-blocks';
+import { questionUnits, type QuestionRange, type QuestionUnit } from './question-units';
 import { trimmedFigurePaths } from './trim-works';
 
 /**
@@ -13,7 +14,7 @@ import { trimmedFigurePaths } from './trim-works';
  * 인쇄 엔진(`A4Document`)의 블록 하나는 **쪽을 넘겨 쪼갤 수 없는 최소 단위**다.
  * 그래서 지문을 통째로 한 블록에 넣으면 안 된다 — 한 쪽에 안 들어가는 순간
  * `transform: scale()` 로 깨알같이 줄어든다. 지문은 **문단 단위로 쪼개** 흘려 보내고,
- * 문항은 하나가 한 블록이다(발문과 선지가 갈리면 읽을 수 없다).
+ * 문항은 처음엔 한 블록이되 자리가 모자라면 단위 사이에서 갈린다(`usePaperSplit`, question-units.ts).
  *
  * ⚠️ 정화(sanitize)를 여기서 한 번 더 한다. 저장 시점에 이미 걸렀지만 스냅샷은
  *    jsonb 라 나중에 DB 를 직접 건드린 값이 섞일 수 있고, 렌더 진입은
@@ -53,7 +54,18 @@ export type PaperBlock =
   | { kind: 'passage-image'; key: string; path: string; label: string; sourceAccurate?: boolean }
   /** 지문 본문 제자리에 끼울 그림 한 장 — 문단 조각들 사이에 낀다. 상자 안이면 같은 틀을 두른다 */
   | { kind: 'passage-figure'; key: string; path: string; label: string; box?: BoxPart; sourceAccurate?: boolean; literalLabels?: boolean }
-  | { kind: 'problem'; key: string; number: number; snapshot: PaperItemSnapshot }
+  | {
+    kind: 'problem';
+    key: string;
+    number: number;
+    snapshot: PaperItemSnapshot;
+    /** 단 끝에서 자를 수 있는 단위들 — 쪼개도 조각마다 같은 배열이다 */
+    units: QuestionUnit[];
+    /** 조각이면 맡은 범위. 없으면 문항 전체 */
+    range?: QuestionRange;
+    /** 단 끝에 앉히려고 문항 사이 간격을 뗐다 — 뒤 블록은 다음 단에서 시작한다(usePaperSplit) */
+    tight?: true;
+  }
   /**
    * 교사용에서 **따로 흘려 보내는** 해설 조각.
    *
@@ -82,8 +94,11 @@ export type PaperBlock =
     snapshot: PaperItemSnapshot;
   };
 
-/** 지문 글 조각 블록 — 자리가 모자라면 더 쪼개질 수 있는 유일한 블록이다(usePassageSplit) */
+/** 지문 글 조각 블록 — 자리가 모자라면 문단 안에서 더 쪼개진다(usePaperSplit) */
 export type PassagePartBlock = Extract<PaperBlock, { kind: 'passage-part' }>;
+
+/** 글 문항 블록 — 자리가 모자라면 단위 사이에서 갈린다 */
+export type PaperProblemBlock = Extract<PaperBlock, { kind: 'problem' }>;
 
 /**
  * 이 문항을 **잘라 둔 이미지 한 장으로** 인쇄하는가.
@@ -158,7 +173,7 @@ export function buildPaperBlocks(
           snapshot,
         });
       } else {
-        blocks.push({ kind: 'problem', key: `q-${i}`, number, snapshot });
+        blocks.push({ kind: 'problem', key: `q-${i}`, number, snapshot, units: questionUnits(snapshot, showAnswers) });
       }
 
       // 긴 해설은 문단 단위로 갈라 흘려 보낸다 — 문항 블록에 두면 한 쪽을 넘기는 순간
@@ -229,6 +244,7 @@ export {
   buildAnswerRows, explanationEntries, formatAnswer, MISSING_ANSWER_LABEL,
   type AnswerRow, type ExplanationEntry,
 } from './answers';
+export { longestPassageChars } from './passage-blocks';
 
 /**
  * 이미지로 출제한 문항 중 **인쇄 번호와 원본 번호가 다른** 것들.
@@ -276,18 +292,4 @@ export function renumberedPrintConfirmMessage(
     '',
     '그대로 인쇄할까요?',
   ].join('\n');
-}
-
-/** 가장 긴 지문의 글자 수 — 1단 권유 판단에 쓴다 */
-export function longestPassageChars(items: readonly PaperItemSnapshot[]): number {
-  let longest = 0;
-  const seen = new Set<string>();
-  for (const item of items) {
-    const passage = item.passage;
-    if (!passage || seen.has(passage.id)) continue;
-    seen.add(passage.id);
-    const chars = passage.html.replace(/<[^>]*>/g, '').replace(/\s+/g, '').length;
-    if (chars > longest) longest = chars;
-  }
-  return longest;
 }

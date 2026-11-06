@@ -13,8 +13,12 @@ export const PRINT_CHARS_PER_LINE = 40;
 export const PRINT_TOP_CHROME = 10;
 /** 끝 조각의 아래 군살 */
 export const PRINT_BOTTOM_CHROME = 12;
-/** 문항 블록 높이 */
-export const PRINT_QUESTION_H = 120;
+/** 문항의 윗여백 */
+export const PRINT_QUESTION_TOP = 6;
+/** 문항 사이 간격 */
+export const PRINT_QUESTION_GAP = 94;
+/** 답 쓰는 빈칸 높이 */
+const BLANK_H = 48;
 
 const FOOTER_H = 20;
 
@@ -52,9 +56,34 @@ function paragraphRect(p: Element) {
   return rect(chromeOf(p).top, linesOfNodes(p, p.childNodes.length) * PRINT_LINE_H);
 }
 
+/** 문항 단위 하나의 높이 */
+function unitHeight(el: Element): number {
+  if (el.classList.contains('pb-q__blank')) return BLANK_H;
+  const paragraphs = Array.from(el.querySelectorAll('p'));
+  if (paragraphs.length === 0) return PRINT_LINE_H;
+  return paragraphs.reduce((sum, p) => sum + linesOfNodes(p, p.childNodes.length) * PRINT_LINE_H, 0);
+}
+
+/** 문항 안의 단위 요소들 */
+const unitsOf = (question: Element) => Array.from(question.querySelectorAll('[data-q-unit]'));
+
+/** 단위의 자리 — 앞 단위 높이를 더한 곳이다 */
+function unitRect(el: Element) {
+  const question = el.closest('.pb-q');
+  const before = question ? unitsOf(question).slice(0, unitsOf(question).indexOf(el)) : [];
+  return rect(PRINT_QUESTION_TOP + before.reduce((sum, unit) => sum + unitHeight(unit), 0), unitHeight(el));
+}
+
+/** 문항 블록의 높이 */
+function questionHeight(question: Element): number {
+  const gap = question.classList.contains('pb-q--split') ? 0 : PRINT_QUESTION_GAP;
+  return PRINT_QUESTION_TOP + unitsOf(question).reduce((sum, unit) => sum + unitHeight(unit), 0) + gap;
+}
+
 /** 측정 블록의 높이 */
 function blockHeight(el: Element): number {
-  if (el.querySelector('.pb-q')) return PRINT_QUESTION_H;
+  const question = el.querySelector('.pb-q');
+  if (question) return questionHeight(question);
   const p = el.querySelector('.pb-passage-part p');
   if (!p) return Number((el as HTMLElement).dataset?.h ?? el.querySelector<HTMLElement>('[data-h]')?.dataset.h ?? 0);
   const { top, bottom } = chromeOf(el);
@@ -72,6 +101,7 @@ export function stubPrintLayout({ firstHeader, laterHeader }: StubOptions): void
       if (this.matches('[data-measure="footer"]')) return rect(0, FOOTER_H);
       if (this.matches('[data-measure="first-header"]')) return rect(0, firstHeader);
       if (this.matches('[data-measure="later-header"]')) return rect(0, laterHeader);
+      if (this.matches('[data-q-unit]')) return unitRect(this);
       if (this.tagName === 'P') return paragraphRect(this);
       return rect(0, blockHeight(this));
     },
@@ -88,6 +118,11 @@ export function stubPrintLayout({ firstHeader, laterHeader }: StubOptions): void
       return rect(top, wrapped((endContainer.textContent ?? '').slice(0, endOffset)) * PRINT_LINE_H);
     },
   });
+
+  // 재는 쪽이 계산된 윗여백을 읽는다 — jsdom 은 배치는 안 해도 캐스케이드는 한다
+  const style = document.createElement('style');
+  style.textContent = `.pb-q { padding-top: ${PRINT_QUESTION_TOP}px; }`;
+  document.head.appendChild(style);
 
   globalThis.ResizeObserver = class {
     observe() {}

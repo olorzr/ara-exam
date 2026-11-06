@@ -385,3 +385,72 @@ describe('renderPaperBlocks — 자리에 맞춰 쪼갠 문단', () => {
     expect(boxes.map((box) => box.className)).toEqual(['pb-box-part pb-box-part--first', 'pb-box-part pb-box-part--last']);
   });
 });
+
+describe('renderPaperBlocks — 갈린 문항', () => {
+  const drawRange = (range: { from: number; to: number }, item = snapshot(), showAnswers = false, tight = false) => {
+    const block = buildPaperBlocks([item], showAnswers).find((b) => b.kind === 'problem');
+    if (block?.kind !== 'problem') throw new Error('문항 블록이 없다');
+    const nodes = renderPaperBlocks({
+      blocks: [{ ...block, range, ...(tight ? { tight: true as const } : {}) }], settings: SETTINGS, imageUrls: new Map(), showAnswers,
+    });
+    return render(<div>{nodes}</div>).container;
+  };
+  const glyphs = (c: HTMLElement) => [...c.querySelectorAll('.pb-q__choice-glyph')].map((g) => g.textContent);
+
+  it('첫 조각에만 번호·출처가 있고 뒤가 있으면 간격을 뗀다', () => {
+    const c = drawRange({ from: 0, to: 3 });
+    expect(c.querySelector('.q-num--mint')?.textContent).toBe('01');
+    expect(c.querySelector('.pb-q__source')).not.toBeNull();
+    expect(c.querySelector('.pb-q')?.className).toContain('pb-q--split');
+    expect(c.querySelector('.pb-q')?.className).not.toContain('pb-q--cont');
+    expect(glyphs(c)).toEqual(['①', '②']);
+  });
+
+  it('이어지는 조각은 번호·출처 없이 제 선지만 찍고 마지막 조각이 간격을 진다', () => {
+    const c = drawRange({ from: 3, to: 6 });
+    expect(c.querySelector('.q-num')).toBeNull();
+    expect(c.querySelector('.pb-q__source')).toBeNull();
+    expect(c.querySelector('.pb-q')?.className).toContain('pb-q--cont');
+    expect(c.querySelector('.pb-q')?.className).not.toContain('pb-q--split');
+    expect(glyphs(c)).toEqual(['③', '④', '⑤']);
+  });
+
+  it('발문 조각으로 이어지면 번호 칸을 비워 같은 들여쓰기로 시작한다', () => {
+    const item = snapshot({ stem_html: '<p>물음</p><blockquote data-box="보기"><p>가</p><p>나</p></blockquote>' });
+    const c = drawRange({ from: 2, to: 4 }, item);
+    expect(c.querySelector('.q-num--blank')).not.toBeNull();
+    expect(c.querySelector('.q-num--mint')).toBeNull();
+    expect(c.querySelector('blockquote[data-box="보기"]')?.className).toContain('pb-box-part--last');
+  });
+
+  it('교사용 답은 답 단위가 든 조각에만 있고 정답 표시는 범위의 선지에 붙는다', () => {
+    const item = snapshot({ answer: '4' });
+    expect(drawRange({ from: 0, to: 3 }, item, true).querySelector('.pb-q__answer')).toBeNull();
+    const c = drawRange({ from: 3, to: 7 }, item, true);
+    expect(c.querySelector('.pb-q__answer')).not.toBeNull();
+    expect(c.querySelector('.pb-q__choice--answer .pb-q__choice-glyph')?.textContent).toBe('④');
+  });
+
+  it('간격을 뗀 문항은 통째여도 `--split` 이 붙는다', () => {
+    const c = drawRange({ from: 0, to: 6 }, snapshot(), false, true);
+    expect(c.querySelector('.pb-q')?.className).toContain('pb-q--split');
+    expect(c.querySelector('.pb-q')?.className).not.toContain('pb-q--cont');
+  });
+
+  it('쪼개지 않은 문항은 번호가 있고 표시가 붙지 않는다', () => {
+    const c = draw([snapshot()], false);
+    expect(c.querySelector('.q-num--mint')).not.toBeNull();
+    expect(c.querySelector('.pb-q--split, .pb-q--cont')).toBeNull();
+    expect(c.querySelectorAll('[data-q-unit]')).toHaveLength(6);
+  });
+
+  it('OMR 구분 줄은 그 문항의 첫 조각에만 붙는다', () => {
+    const items = Array.from({ length: 91 }, (_, i) => snapshot({ number: i + 1 }));
+    const block = buildPaperBlocks(items, false).at(-1);
+    if (block?.kind !== 'problem') throw new Error('문항 블록이 없다');
+    const nodes = renderPaperBlocks({
+      blocks: [{ ...block, range: { from: 3, to: 6 } }], settings: SETTINGS, imageUrls: new Map(), omrSheetCount: 2,
+    });
+    expect(render(<div>{nodes}</div>).container.querySelectorAll('.mc-sheet-break')).toHaveLength(0);
+  });
+});

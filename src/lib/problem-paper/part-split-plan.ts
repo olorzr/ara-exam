@@ -3,7 +3,7 @@ import type { PassagePartBlock } from './blocks';
 import type { PartMeasure } from './part-measure';
 
 /**
- * 지문 문단을 어디서 자를지 정한다 (순수 함수 — 테스트의 중심).
+ * 지문 문단·문항을 어디서 자를지 정한다 (순수 함수 — 테스트의 중심). 재는 값(`PartMeasure`)만 다르고 계획은 하나다.
  *
  * ⚠️ **한 라운드에 여러 곳을 정한다.** 엔진은 첫 요청의 자리만 정확하다고 말하는데(앞을 쪼개면 뒤가 밀린다),
  *    한 곳 자를 때마다 다시 그려 재면 측정 패스가 쪼갠 곳 수만큼 돈다. 그 패스는 레이아웃 효과 안의 setState 라
@@ -37,8 +37,7 @@ function extentOf(m: PartMeasure, segment: PartSegment) {
   return {
     start: opened ? m.prefixHeights[segment.from] : 0,
     end: closed ? m.prefixHeights[segment.to] : m.totalHeight,
-    // 앞 조각은 정확하다. 문장 끝에서 잘린 뒤 조각은 줄 첫머리로 옮겨 앉아 한 줄 늘 수 있다
-    top: opened ? (m.textCut ? m.lineHeight : 0) : m.topChrome,
+    top: opened ? m.continuationTop[segment.from] : m.topChrome,
     bottom: closed ? 0 : m.bottomChrome,
   };
 }
@@ -50,6 +49,7 @@ function extentOf(m: PartMeasure, segment: PartSegment) {
  * @returns 조각으로 그렸을 때의 높이(px)
  */
 export function segmentHeight(m: PartMeasure, segment: PartSegment): number {
+  if (segment.from === m.emptyTailCut) return 0;
   const { start, end, top, bottom } = extentOf(m, segment);
   return top + end - start + bottom;
 }
@@ -57,7 +57,7 @@ export function segmentHeight(m: PartMeasure, segment: PartSegment): number {
 /**
  * 구간을 어디서 자를지 고른다 — 앞 조각이 지금 자리에 드는 가장 뒤쪽.
  *
- * 앞 자리에 2줄도 안 들어가면 구간을 통째로 다음 단으로 보내면 그만이다. 다음 단에도 안 들어갈 때만
+ * 앞 자리에 최소 높이도 안 들어가면 구간을 통째로 다음 단으로 보내면 그만이다. 다음 단에도 안 들어갈 때만
  * 다음 단 크기로 자른다.
  * @param m - 문단 실측
  * @param segment - 구간
@@ -69,7 +69,6 @@ export function pickCut(
   m: PartMeasure, segment: PartSegment, firstCapacity: number, laterCapacity: number,
 ): number | null {
   const { start, end, top } = extentOf(m, segment);
-  const minPart = MIN_CHUNK_LINES * m.lineHeight - 0.5;
   const last = Math.min(segment.to, m.prefixHeights.length);
 
   const lastFitting = (capacity: number): number | null => {
@@ -77,7 +76,7 @@ export function pickCut(
     for (let k = segment.from + 1; k < last; k += 1) {
       const height = m.prefixHeights[k] - start;
       const rest = end - m.prefixHeights[k];
-      if (height >= minPart && rest >= minPart && top + height <= capacity - SPLIT_SAFETY_PX) best = k;
+      if (height >= m.minChunkPx && rest >= m.minChunkPx && top + height <= capacity - SPLIT_SAFETY_PX) best = k;
     }
     return best;
   };
@@ -130,10 +129,11 @@ export function planSplitRound(
     const { at, origin, segment, measure, cut } = hit;
     const lead: PartSegment = { from: segment.from, to: cut };
     const rest: PartSegment = { from: cut, to: segment.to };
-    // 앞 조각은 자리에 맞춰 잘랐으니 이번 라운드에는 더 안 쪼갠다. 뒤 조각은 엔진이 다시 자리를 알려 준다
+    // 앞 조각은 자리에 맞춰 잘랐으니 이번 라운드에는 더 안 쪼갠다. 뒤 조각은 엔진이 다시 자리를 알려 준다.
+    // 간격만 뗀 자리는 뒤 조각이 없고, 그 뒤 블록은 다음 단에서 시작한다(`usePaperSplit` 의 `breakBefore` 와 같은 규칙)
     heights.splice(at, 1, segmentHeight(measure, lead), segmentHeight(measure, rest));
     splittable.splice(at, 1, false, true);
-    breaks.splice(at, 1, breaks[at], false);
+    breaks.splice(at, 1, breaks[at], cut === measure.emptyTailCut ? 'column' : false);
     slots.splice(at, 1, { origin, segment: lead }, { origin, segment: rest });
     cuts.set(origin, [...(cuts.get(origin) ?? []), cut].sort((a, b) => a - b));
   }

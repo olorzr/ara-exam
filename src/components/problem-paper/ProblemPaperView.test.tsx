@@ -74,3 +74,41 @@ describe('ProblemPaperView — 긴 시가 쪽을 넘을 때', () => {
     expect(text.indexOf('물음 1')).toBeLessThan(text.indexOf('물음 2'));
   });
 });
+
+/**
+ * 같은 날 두 번째 제보 — 「남신의주」 15·16번과 25번. 16번이 통째로 넘어가 왼쪽 단이 반 비고, 25번은 한 단보다 커서
+ * 줄어 찍혔다. "문제를 다음 다단으로 넘기는 걸 만들어야 할 것 같음."
+ */
+describe('ProblemPaperView — 문항이 단을 넘을 때', () => {
+  const stanza = (n: number) => `<p>${Array.from({ length: n }, (_, i) => `행${i + 1}`).join('<br>')}</p>`;
+  const standalone = (number: number, stem: string): PaperItemSnapshot => ({ ...item(number), stem_html: stem, passage: null });
+  const drawItems = (items: PaperItemSnapshot[]) => {
+    const { container } = render(<ProblemPaperView paper={paper} items={items} imageUrls={new Map()} />);
+    return container.querySelector('.a4-stack') as HTMLElement;
+  };
+  const columnsOf = (stack: HTMLElement) => Array.from(stack.querySelectorAll<HTMLElement>('.a4-col'))
+    .filter((col) => col.children.length > 0);
+
+  it('15번 아래에서 16번이 시작해 다음 단으로 이어진다 — 16번의 번호는 한 번이고 선지가 갈린다', () => {
+    const stack = drawItems([
+      { ...standalone(1, '<p>십오번 물음</p>'), choices: ['가', '나'] },
+      standalone(2, `<p>십육번 물음</p><blockquote data-box="보기">${stanza(3)}</blockquote>`),
+    ]);
+    const [left, right] = columnsOf(stack);
+    expect(left.textContent).toContain('십오번 물음');
+    expect(left.textContent).toContain('십육번 물음');
+    expect(right.textContent).not.toContain('십육번 물음');
+    expect(right.querySelector('.pb-q--cont')).not.toBeNull();
+    expect(Array.from(stack.querySelectorAll('.q-num--mint')).map((n) => n.textContent)).toEqual(['01', '02']);
+  });
+
+  it('25번처럼 한 단보다 큰 문항은 줄어들지 않고 단을 넘어 찍힌다', () => {
+    const big = Array.from({ length: 3 }, () => stanza(12)).join('');
+    const stack = drawItems([standalone(1, `<p>물음</p><blockquote data-box="보기 1">${big}</blockquote>`)]);
+    expect(stack.querySelector('.a4-block--scaled')).toBeNull();
+    expect(columnsOf(stack).length).toBeGreaterThan(1);
+    const boxes = Array.from(stack.querySelectorAll('blockquote[data-box="보기 1"]'));
+    expect(boxes.filter((box) => box.classList.contains('pb-box-part--first'))).toHaveLength(1);
+    expect(boxes.filter((box) => box.classList.contains('pb-box-part--last'))).toHaveLength(1);
+  });
+});

@@ -101,3 +101,17 @@ export function passageBlocksOf(input: PassageBlockInput): PaperBlock[] {
   blocks.push(...parts);
   return blocks;
 }
+
+/** 가장 긴 지문의 글자 수 — 1단 권유 판단에 쓴다 */
+export function longestPassageChars(items: readonly PaperItemSnapshot[]): number {
+  let longest = 0;
+  const seen = new Set<string>();
+  for (const item of items) {
+    const passage = item.passage;
+    if (!passage || seen.has(passage.id)) continue;
+    seen.add(passage.id);
+    const chars = passage.html.replace(/<[^>]*>/g, '').replace(/\s+/g, '').length;
+    if (chars > longest) longest = chars;
+  }
+  return longest;
+}

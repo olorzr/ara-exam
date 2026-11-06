@@ -48,4 +48,19 @@ describe('useSignedImageUrls', () => {
     rerender({ paths: [] });
     expect(result.current.urls).toBe(empty);
   });
+
+  it('다시 서명을 기다리는 동안에도 렌더마다 새 지도를 내주지 않는다 — 인쇄 화면이 그 참조로 다시 쪼개 끝없이 돈다', async () => {
+    const { result, rerender } = renderHook(({ paths }) => useSignedImageUrls(paths), {
+      initialProps: { paths: ['a.jpg', 'b.jpg'] },
+    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    sign.mockImplementation(() => new Promise(() => {}));
+    rerender({ paths: ['a.jpg'] });
+    const first = result.current.urls;
+    expect([...first.keys()]).toEqual(['a.jpg']);
+    rerender({ paths: ['a.jpg'] });
+    rerender({ paths: ['a.jpg'] });
+    expect(result.current.urls).toBe(first);
+  });
 });

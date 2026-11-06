@@ -94,6 +94,13 @@ describe('splitPassagePieces', () => {
     expect(pieces[0].box).toEqual({ label: '가', first: true, last: true });
   });
 
+  it('`keepMissingFigures` 면 경로 없는 그림 조각을 남긴다 — 발문은 안내를 찍는다', () => {
+    expect(splitPassagePieces(`<p>글</p>${fig(1)}`, [''], { keepMissingFigures: true }).map((p) => p.html))
+      .toEqual(['<p>글</p>', fig(1)]);
+    expect(splitPassagePieces(`<blockquote data-box="보기">${fig(1)}<p>글</p></blockquote>`, [''], { keepMissingFigures: true })
+      .map((p) => p.html)).toEqual([fig(1), '<p>글</p>']);
+  });
+
   it('상자 밖 그림 조각도 같은 규칙이다', () => {
     expect(splitPassagePieces(`<p>글</p>${fig(1)}`, ['g.jpg'])[1])
       .toEqual({ html: fig(1), figurePath: 'g.jpg' });

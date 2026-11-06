@@ -319,3 +319,22 @@ describe('paginate — 강제 쪽 넘김 · 빈 쪽 · 배수 채움', () => {
     expect(plain.pages.some((page) => 'blank' in page)).toBe(false);
   });
 });
+
+describe('paginate — 다음 단에서 시작(`column`)', () => {
+  const input = { firstPageBodyHeight: 300 + CAPACITY_SAFETY_PX, laterPageBodyHeight: 300 + CAPACITY_SAFETY_PX };
+
+  it('자리가 남아도 다음 단으로 간다', () => {
+    const { pages } = paginate({ ...input, columns: 2, blockHeights: [100, 100], breakBefore: [false, 'column'] });
+    expect(pages).toEqual([{ columns: [[0], [1]] }]);
+  });
+
+  it('마지막 단이면 새 쪽으로 간다', () => {
+    const { pages } = paginate({ ...input, columns: 1, blockHeights: [100, 100], breakBefore: [false, 'column'] });
+    expect(pages).toEqual([{ columns: [[0]] }, { columns: [[1]] }]);
+  });
+
+  it('단 머리에서는 넘기지 않는다 — 빈 단을 만들지 않는다', () => {
+    const { pages } = paginate({ ...input, columns: 2, blockHeights: [100], breakBefore: ['column'] });
+    expect(pages).toEqual([{ columns: [[0], []] }]);
+  });
+});

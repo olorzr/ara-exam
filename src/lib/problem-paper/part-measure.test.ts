@@ -69,10 +69,17 @@ describe('measurePart', () => {
     expect(measurePart(block, p, cutCandidatesOf(p)).lineHeight).toBe(DEFAULT_LINE_HEIGHT_PX);
   });
 
-  it('문장 끝에서 자르는 문단인지 알려 준다', () => {
+  it('문장 끝에서 잘린 뒤 조각에만 한 줄 몫을 더 잡는다 — 줄 첫머리로 옮겨 앉아 한 줄 늘 수 있다', () => {
+    vi.spyOn(window, 'getComputedStyle').mockReturnValue({ lineHeight: '20px' } as CSSStyleDeclaration);
     const verse = setup('<p>가<br>나</p>', 100);
-    expect(measurePart(verse.block, verse.p, cutCandidatesOf(verse.p)).textCut).toBe(false);
+    expect(measurePart(verse.block, verse.p, cutCandidatesOf(verse.p)).continuationTop).toEqual([0]);
     const prose = setup('<p>첫째다. 둘째</p>', 100);
-    expect(measurePart(prose.block, prose.p, cutCandidatesOf(prose.p)).textCut).toBe(true);
+    expect(measurePart(prose.block, prose.p, cutCandidatesOf(prose.p)).continuationTop).toEqual([20]);
+  });
+
+  it('조각의 최소 높이는 두 줄이다', () => {
+    vi.spyOn(window, 'getComputedStyle').mockReturnValue({ lineHeight: '20px' } as CSSStyleDeclaration);
+    const { block, p } = setup('<p>가<br>나</p>', 100);
+    expect(measurePart(block, p, cutCandidatesOf(p)).minChunkPx).toBe(39.5);
   });
 });

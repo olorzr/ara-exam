@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { A4Document, CompactPageHeader } from '@/components/print';
 import ExamPrintHeader from '@/components/exam/ExamPrintHeader';
-import { PAPER_SPLIT_ADAPTER, usePassageSplit } from '@/hooks/usePassageSplit';
+import { PAPER_SPLIT_ADAPTER, usePaperSplit } from '@/hooks/usePaperSplit';
 import { buildPaperBlocks } from '@/lib/problem-paper/blocks';
 import type { PaperCover } from '@/lib/problem-paper/cover';
 import { coverYearOf } from '@/lib/problem-paper/cover-text';
@@ -50,8 +50,8 @@ interface ProblemPaperViewProps {
  * 기출 문제지 인쇄 뷰.
  *
  * 인쇄 엔진(`A4Document`)은 그대로 쓴다 — 블록 배열만 만들어 넘기면 된다.
- * 지문은 문단 단위 블록이라 단·쪽을 넘어 흘러가고, 긴 문단은 남은 자리에 맞춰 더 쪼개진다(`usePassageSplit`).
- * 문항은 하나가 한 블록이다.
+ * 지문은 문단 단위 블록이라 단·쪽을 넘어 흘러가고, 긴 문단과 문항은 남은 자리에 맞춰 쪼개져 다음 단으로
+ * 이어진다(`usePaperSplit`).
  */
 export default function ProblemPaperView({
   paper, items, imageUrls, showAnswers = false, booklet = false, trimWorks = false, cover = null,
@@ -63,12 +63,12 @@ export default function ProblemPaperView({
     () => (paper.settings.omr && !showAnswers ? omrSheetCountOf(buildOmrAnswerKey(items)) : 0),
     [items, paper.settings.omr, showAnswers],
   );
-  // 이미지 URL 이 뒤늦게 와도 쪼갠 것이 풀리지 않게 블록 목록은 그리기와 따로 든다
+  // 쪼개기는 블록 목록에 건다 — 그리기는 그 뒤 일이고 그림이 높이를 바꾸면 처음부터 다시 쪼갠다(`resetKey`)
   const paperBlocks = useMemo(
     () => buildPaperBlocks(items, showAnswers, { trimWorks }),
     [items, showAnswers, trimWorks],
   );
-  const split = usePassageSplit(paperBlocks, PAPER_SPLIT_ADAPTER);
+  const split = usePaperSplit(paperBlocks, PAPER_SPLIT_ADAPTER, { resetKey: imageUrls });
   const blocks = useMemo(
     () => renderPaperBlocks({
       blocks: split.blocks,
@@ -91,6 +91,7 @@ export default function ProblemPaperView({
     <A4Document
       blocks={blocks}
       splittable={split.splittable}
+      breakBefore={split.breakBefore}
       onSplitRequest={split.handleSplitRequest}
       booklet={booklet}
       {...coverSlots}

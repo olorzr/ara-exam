@@ -39,7 +39,8 @@ const EMPTY_URLS: Map<string, string> = new Map();
  *
  * `useMemo` 로 거르지 않는다 — React Compiler 린트가 그 기억을 지킬 수 없다고 거부한다(코덱스 4R).
  * 대신 **참조를 아낀다**: 지도가 이미 바라는 경로만 담고 있으면(평소) 그 지도를 그대로, 아무것도
- * 안 바라면 늘 같은 빈 지도를 내준다. 새 지도는 바라는 경로가 줄어 다시 서명하는 짧은 틈에만 생긴다.
+ * 안 바라면 늘 같은 빈 지도를 내준다. 새 지도는 바라는 경로가 줄어 다시 서명하는 짧은 틈에만 생기고,
+ * 그 지도도 훅이 상태로 들고 있어 렌더마다 바뀌지 않는다.
  * @param urls - 마지막으로 받아 둔 지도
  * @param wanted - 지금 바라는 경로들
  * @returns 바라는 경로만 담은 지도
@@ -70,6 +71,18 @@ export function useSignedImageUrls(paths: string[]): SignedImages {
   const key = pathsKey(paths);
   const wanted = key ? key.split('|') : [];
 
+  // ⚠️ 돌려주는 지도는 **지금 바라는 경로만** 담는다(코덱스 2R). 받아 둔 지도를 그대로 내주면
+  //    바라는 경로가 줄었을 때(문제지에서 구역을 빼 그림이 필요 없어졌다) 옛 URL 이 남아, 그걸로
+  //    로딩을 확인하는 쪽(`useImagesReady`)이 인쇄하지도 않을 그림의 실패로 단추를 잠근다.
+  // ⚠️ 참조는 받은 지도·바라는 경로가 바뀔 때만 바뀐다 — 렌더마다 새 지도면 그것을 다시 쪼개기 열쇠로 쓰는 인쇄 화면이
+  //    다시 재서 부모를 다시 그리고, 또 새 지도를 받아 끝없이 돈다(2026-11-06 코덱스 3R, 쪼개기 `resetKey`)
+  const [shown, setShown] = useState({ from: urls, key, map: onlyWanted(urls, wanted) });
+  let current = shown.map;
+  if (shown.from !== urls || shown.key !== key) {
+    current = onlyWanted(urls, wanted);
+    setShown({ from: urls, key, map: current });
+  }
+
   useEffect(() => {
     // 필요한 이미지가 없으면 아무것도 하지 않는다.
     // (아래 loading 판정이 `key === ''` 를 이미 '다 됐다'로 보므로 state 를 건드릴 필요가 없다)
@@ -90,11 +103,6 @@ export function useSignedImageUrls(paths: string[]): SignedImages {
   }, [key, attempt]);
 
   const reload = useCallback(() => setAttempt((n) => n + 1), []);
-
-  // ⚠️ 돌려주는 지도는 **지금 바라는 경로만** 담는다(코덱스 2R). 받아 둔 지도를 그대로 내주면
-  //    바라는 경로가 줄었을 때(문제지에서 구역을 빼 그림이 필요 없어졌다) 옛 URL 이 남아, 그걸로
-  //    로딩을 확인하는 쪽(`useImagesReady`)이 인쇄하지도 않을 그림의 실패로 단추를 잠근다
-  const current = onlyWanted(urls, wanted);
 
   // 로딩을 state 로 두고 효과에서 켜면 렌더가 한 번 더 돈다.
   // '무엇을 이미 받아 왔는가'만 기억하고 로딩은 파생한다

@@ -132,13 +132,12 @@ describe('내지 목록 — 지문을 쪼갠 뒤에도 자리가 맞는다', () 
     expect(chapterBlocks[1]).toBeGreaterThan(chapterBlocks[0] + 1);
   });
 
-  it('어댑터는 지문 글 조각만 꺼내고 장 번호를 지킨다', () => {
+  it('어댑터는 문제지 블록만 꺼내고 장 번호를 지킨다 — 장 머리·답지는 쪼개지 않는다', () => {
     const entry: BookBlock = { kind: 'paper', chapterIndex: 3, block: part('a') };
-    expect(BOOK_SPLIT_ADAPTER.partOf(entry)).toEqual(part('a'));
+    expect(BOOK_SPLIT_ADAPTER.paperBlockOf(entry)).toEqual(part('a'));
     expect(BOOK_SPLIT_ADAPTER.wrap(entry, part('b'))).toEqual({ kind: 'paper', chapterIndex: 3, block: part('b') });
-    expect(BOOK_SPLIT_ADAPTER.partOf({ kind: 'head', node: null })).toBeNull();
-    expect(BOOK_SPLIT_ADAPTER.partOf({ kind: 'paper', chapterIndex: 0, block: { kind: 'passage-header', key: 'h', text: '' } }))
-      .toBeNull();
+    expect(BOOK_SPLIT_ADAPTER.paperBlockOf({ kind: 'head', node: null })).toBeNull();
+    expect(BOOK_SPLIT_ADAPTER.paperBlockOf({ kind: 'node', node: null })).toBeNull();
   });
 
   it('장마다 그 문제지의 설정으로 그린다 — 출처 표시가 장을 넘어 섞이지 않는다', () => {

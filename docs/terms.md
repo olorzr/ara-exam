@@ -841,4 +841,9 @@
 ## 이어지는 조각 (continues)
 - 정의: 긴 지문 문단이 단·쪽 끝에서 잘려 다음 블록으로 이어지는 앞쪽 조각. 같은 문단이라 조각 사이에 문단 간격을 두지 않는다
 - 코드에서의 사용: `PassagePartBlock.continues`, CSS `.pb-passage-part--continues`
-- 관련 파일: src/hooks/usePassageSplit.ts, src/lib/problem-paper/part-split-plan.ts
+- 관련 파일: src/hooks/usePaperSplit.ts, src/lib/problem-paper/part-split-plan.ts
+
+## 문항 단위 (question unit)
+- 정의: 문항을 단 끝에서 자를 수 있는 가장 작은 덩어리. 머리(번호 + 발문 첫 조각)·발문 조각·그림·선지 하나·표 선지·빈칸·교사용 답이다. 자르는 자리는 단위 사이뿐이다
+- 코드에서의 사용: `QuestionUnit`, `PaperProblemBlock.units`·`range`·`tight`, `questionCuts`
+- 관련 파일: src/lib/problem-paper/question-units.ts, src/lib/problem-paper/split-target.ts, src/components/problem-paper/PaperQuestion.tsx

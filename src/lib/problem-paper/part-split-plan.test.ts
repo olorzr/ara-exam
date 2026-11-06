@@ -16,7 +16,8 @@ function verse(lines: number, over: Partial<PartMeasure> = {}): PartMeasure {
     topChrome: 0,
     bottomChrome: 0,
     lineHeight: LH,
-    textCut: false,
+    continuationTop: Array.from({ length: lines - 1 }, () => 0),
+    minChunkPx: MIN_CHUNK_LINES * LH - 0.5,
     ...over,
   };
 }
@@ -58,9 +59,39 @@ describe('pickCut', () => {
   });
 
   it('문장 끝에서 잘린 뒤 조각은 한 줄 늘 몫을 함께 잰다', () => {
-    const prose = verse(20, { textCut: true });
+    const prose = verse(20, { continuationTop: Array.from({ length: 19 }, () => LH) });
     expect(pickCut(prose, { from: 4, to: Number.POSITIVE_INFINITY }, 62 + SPLIT_SAFETY_PX, 400)).toBe(6);
     expect(pickCut(prose, WHOLE_SEGMENT, 62 + SPLIT_SAFETY_PX, 400)).toBe(2);
+  });
+});
+
+describe('pickCut — 문항(최소 높이 없음)', () => {
+  /** 머리·선지 다섯 — 후보는 경계들과 맨 뒤의 '간격만 떼기' */
+  const question = (over: Partial<PartMeasure> = {}): PartMeasure => ({
+    prefixHeights: [50, 70, 90, 110, 130], totalHeight: 130, topChrome: 0, bottomChrome: 94, lineHeight: 0,
+    continuationTop: [9, 9, 9, 9, 0], minChunkPx: 0, emptyTailCut: 4, ...over,
+  });
+
+  it('선지 하나만 남겨도 자른다 — 두 줄 규칙이 ①②③|④⑤ 를 막으면 안 된다', () => {
+    expect(pickCut(question(), WHOLE_SEGMENT, 95, 700)).toBe(2);
+  });
+
+  it('내용이 다 들면 간격만 뗀다 — 마지막 선지 하나를 다음 단으로 밀지 않는다', () => {
+    expect(pickCut(question(), WHOLE_SEGMENT, 140, 700)).toBe(4);
+  });
+
+  it('앞 자리에 머리와 단위 하나도 안 들면 통째로 다음 단으로 간다', () => {
+    expect(pickCut(question(), WHOLE_SEGMENT, 40, 700)).toBeNull();
+  });
+
+  it('뒤 조각 윗여백을 그 자리 몫으로 잰다', () => {
+    const m = question();
+    expect(pickCut(m, { from: 0, to: Number.POSITIVE_INFINITY }, 9 + 40 + SPLIT_SAFETY_PX, 700)).toBe(2);
+    expect(pickCut(m, { from: 0, to: Number.POSITIVE_INFINITY }, 9 + 39 + SPLIT_SAFETY_PX, 700)).toBe(1);
+  });
+
+  it('간격만 뗀 뒤 조각은 높이가 없다', () => {
+    expect(segmentHeight(question(), { from: 4, to: Number.POSITIVE_INFINITY })).toBe(0);
   });
 });
 
@@ -140,6 +171,20 @@ describe('planSplitRound', () => {
     });
     // 쪽을 넘긴 뒤라 앞 자리가 쪽 하나다 — 첫 블록 뒤 남은 자리로 자르지 않는다
     expect(planSplitRound(input, () => para).get(1)?.[0]).toBe(8);
+  });
+
+  it('간격만 뗀 문항 뒤는 다음 단에서 시작한다 — 뒤 문항을 그 자리에 앉혀 자르지 않는다', () => {
+    const tight: PartMeasure = {
+      prefixHeights: [60, 80, 100], totalHeight: 100, topChrome: 0, bottomChrome: 94, lineHeight: 0,
+      continuationTop: [6, 6, 0], minChunkPx: 0, emptyTailCut: 2,
+    };
+    const next: PartMeasure = { ...tight };
+    const cuts = planSplitRound(
+      page({ columns: 2, blockHeights: [50, 194, 194], splittable: [false, true, true] }),
+      (i) => (i === 1 ? tight : i === 2 ? next : null),
+    );
+    expect(cuts.get(1)).toEqual([2]);
+    expect(cuts.has(2)).toBe(false);
   });
 
   it('쪼갤 블록이 없으면 빈 지도다', () => {

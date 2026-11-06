@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { A4Document, CompactPageHeader } from '@/components/print';
 import type { LayoutHandler } from '@/hooks/useA4Pagination';
-import { usePassageSplit } from '@/hooks/usePassageSplit';
+import { usePaperSplit } from '@/hooks/usePaperSplit';
 import type { BreakBefore } from '@/lib/print/paginate';
 import { EDITION_SUFFIX, type Book, type BookChapter, type BookEdition } from '@/lib/book';
 import type { PaperItemSnapshot } from '@/types/problem-bank';
@@ -45,7 +45,7 @@ function samePages(a: ChapterPages | null, b: ChapterPages): boolean {
  * 만든다 — 번호가 채워질 때 참조가 바뀌면 엔진이 측정 함수를 새로 만들어 관찰자를 다시 건다.
  * 상태는 `BookInnerMode` 가 구성 지문(`key`)으로 다시 마운트할 때 비워진다.
  *
- * **긴 지문 문단**은 문제지 인쇄와 같은 훅(`usePassageSplit`)이 자리에 맞춰 쪼갠다. ⚠️ 목차는 그 훅의 목록 밖에
+ * **긴 지문 문단과 문항**은 문제지 인쇄와 같은 훅(`usePaperSplit`)이 자리에 맞춰 쪼갠다. ⚠️ 목차는 그 훅의 목록 밖에
  * 둔다(`blockOffset`) — 쪽 번호가 채워질 때 목록이 바뀌면 쪼갠 것이 풀리고 다시 재서 수렴이 깨진다.
  */
 export default function BookInnerView({
@@ -53,12 +53,12 @@ export default function BookInnerView({
 }: BookInnerViewProps) {
   const { chapterStart, trimWorks, columns, toc } = book.settings;
   const tocCount = toc ? tocBlockCount(chapters.length) : 0;
-  // 본문 목록은 쪽 번호·이미지와 무관하다 — 번호가 채워지거나 서명이 와도 쪼갠 것이 풀리지 않게 따로 든다
+  // 본문 목록은 쪽 번호와 무관하다 — 번호가 채워져도 쪼갠 것이 풀리지 않게 따로 든다(그림 주소는 `resetKey`)
   const list = useMemo(
     () => buildBookInnerList({ edition, chapters, itemsByPaper, settings: { chapterStart, trimWorks } }),
     [edition, chapters, itemsByPaper, chapterStart, trimWorks],
   );
-  const split = usePassageSplit(list, BOOK_SPLIT_ADAPTER, tocCount);
+  const split = usePaperSplit(list, BOOK_SPLIT_ADAPTER, { blockOffset: tocCount, resetKey: imageUrls });
   const body = useMemo(
     () => renderBookInnerBlocks(split.blocks, { edition, chapters, settings: { chapterStart }, imageUrls }),
     [split.blocks, edition, chapters, chapterStart, imageUrls],
@@ -70,8 +70,12 @@ export default function BookInnerView({
   );
   const blocks = useMemo(() => [...tocBlocks, ...body.blocks], [tocBlocks, body.blocks]);
   const breakBefore = useMemo<BreakBefore[]>(
-    () => [...Array.from({ length: tocCount }, () => false as const), ...body.breakBefore],
-    [tocCount, body.breakBefore],
+    // 장 머리의 쪽 넘김이 먼저다 — 쪼개기의 '다음 단' 은 장 안에서만 뜻이 있다
+    () => [
+      ...Array.from({ length: tocCount }, () => false as const),
+      ...body.breakBefore.map((brk, i) => brk || (split.breakBefore[i] ?? false)),
+    ],
+    [tocCount, body.breakBefore, split.breakBefore],
   );
   const splittable = useMemo<boolean[]>(
     () => [...Array.from({ length: tocCount }, () => false), ...split.splittable],

@@ -1,4 +1,5 @@
 import type { CutCandidate } from './part-cuts';
+import { MIN_CHUNK_LINES } from './part-split-plan';
 
 /**
  * 측정 컨테이너에 그려진 지문 문단을 잰다 (DOM 읽기).
@@ -20,8 +21,15 @@ export interface PartMeasure {
   /** 문단 아래에서 블록 끝까지 — 아랫선·아래 여백. 쪼개면 끝 조각에만 남는다 */
   bottomChrome: number;
   lineHeight: number;
-  /** 문장 끝에서 자르는 문단인가 — 뒤 조각은 줄 첫머리로 옮겨 앉아 한 줄 늘 수 있다 */
-  textCut: boolean;
+  /**
+   * 그 자리에서 자르면 뒤 조각 위에 새로 붙는 높이 — 후보 차례.
+   * 산문은 뒤 조각이 줄 첫머리로 옮겨 앉아 한 줄 늘 수 있고, 문항은 뒤 조각에도 윗여백이 있다.
+   */
+  continuationTop: number[];
+  /** 조각의 최소 높이 — 문단은 두 줄, 문항은 단위 수 규칙이 대신해 0 이다 */
+  minChunkPx: number;
+  /** 뒤 조각이 없는 자리(문항 사이 간격만 떼는 자르기)의 후보 번호 */
+  emptyTailCut?: number;
 }
 
 /** 줄 높이 — 계산값이 없으면 자리 사이의 가장 작은 간격 */
@@ -57,12 +65,15 @@ export function measurePart(blockEl: HTMLElement, p: HTMLElement, candidates: re
     return range.getBoundingClientRect().bottom - para.top + leading;
   });
 
+  const lineHeight = lineHeightOf(p, prefixHeights);
+  const textCut = candidates.some((candidate) => candidate.kind === 'text');
   return {
     prefixHeights,
     totalHeight: para.bottom - para.top,
     topChrome: Math.max(0, para.top - block.top),
     bottomChrome: Math.max(0, block.bottom - para.bottom),
-    lineHeight: lineHeightOf(p, prefixHeights),
-    textCut: candidates.some((candidate) => candidate.kind === 'text'),
+    lineHeight,
+    continuationTop: candidates.map(() => (textCut ? lineHeight : 0)),
+    minChunkPx: MIN_CHUNK_LINES * lineHeight - 0.5,
   };
 }

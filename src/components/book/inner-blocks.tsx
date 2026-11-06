@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { PassageSplitAdapter } from '@/hooks/usePassageSplit';
+import type { PaperSplitAdapter } from '@/hooks/usePaperSplit';
 import { buildAnswerRows, explanationEntries } from '@/lib/problem-paper/answers';
 import { buildPaperBlocks, type PaperBlock } from '@/lib/problem-paper/blocks';
 import { DEFAULT_PAPER_SETTINGS } from '@/lib/problem-paper/settings';
@@ -31,8 +31,8 @@ export interface BookInnerBlocks {
 }
 
 /**
- * 내지 목록의 한 칸 — 긴 지문을 자리에 맞춰 쪼갤 수 있게 그리기 전의 모양으로 든다(`usePassageSplit`).
- * ⚠️ 이미지 URL 에 기대지 않는 값만 담는다 — 서명이 뒤늦게 왔다고 목록이 바뀌면 쪼갠 것이 풀린다.
+ * 내지 목록의 한 칸 — 긴 지문·문항을 자리에 맞춰 쪼갤 수 있게 그리기 전의 모양으로 든다(`usePaperSplit`).
+ * 이미지 URL 은 담지 않는다 — 그리는 쪽이 받는다.
  */
 export type BookBlock =
   | { kind: 'head'; node: ReactNode }
@@ -40,9 +40,9 @@ export type BookBlock =
   /** 정답 및 해설 판의 답지 블록 */
   | { kind: 'node'; node: ReactNode };
 
-/** 책의 지문 쪼개기 어댑터 */
-export const BOOK_SPLIT_ADAPTER: PassageSplitAdapter<BookBlock> = {
-  partOf: (entry) => (entry.kind === 'paper' && entry.block.kind === 'passage-part' ? entry.block : null),
+/** 책의 쪼개기 어댑터 — 장 머리·답지 블록은 쪼개지 않는다 */
+export const BOOK_SPLIT_ADAPTER: PaperSplitAdapter<BookBlock> = {
+  paperBlockOf: (entry) => (entry.kind === 'paper' ? entry.block : null),
   wrap: (entry, chunk) => (entry.kind === 'paper' ? { ...entry, block: chunk } : entry),
 };
 

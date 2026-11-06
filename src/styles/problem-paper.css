@@ -268,11 +268,8 @@
  *    쪽마다 조금씩 넘치거나 남는다. 아래가 위보다 넉넉한 까닭: 다음 문항의 출처 줄이
  *    바로 오므로, 위아래가 같으면 출처가 앞 문항에 붙어 보인다.
  * ⚠️ 아래 여백의 크기는 `--pb-q-gap`(위 `.pb-sheet` 참고) 한 곳에서 정한다 — 문서마다 다르다.
- * ⚠️ **받아들인 한계**(코덱스 P2): 이 여백은 블록 높이에 들어가므로 쪽·단의 **마지막 문항
- *    뒤에도** 잡힌다. 그 자리는 어차피 쪽 바닥의 빈자리라 눈에는 같지만, 딱 맞게 들어갔을
- *    문항 하나가 다음 쪽으로 밀릴 수 있다. 없애려면 인쇄 엔진(`paginate`)이 '쪽 끝의 여백은
- *    빼고 센다' 를 알아야 하는데 그 엔진은 **문서 5종이 함께 쓴다** — 얻는 것에 비해 위험이
- *    커서 두었다. 여백을 위로 옮겨도 같은 자리가 쪽 머리로 옮겨갈 뿐이다.
+ * ⚠️ 이 여백은 블록 높이에 들어가므로 쪽·단의 **마지막 문항 뒤에도** 잡힌다. 내용은 드는데 여백만 안 드는 문항은
+ *    쪼개기가 간격을 떼서 앉힌다(`.pb-q--split`, 2026-11-06). 인쇄 엔진(`paginate`)은 문서 5종이 함께 써서 손대지 않는다.
  */
 .pb-q {
   break-inside: avoid;
@@ -286,6 +283,34 @@
  */
 .pb-q--continues {
   padding-bottom: 4px;
+}
+
+/*
+ * 자리가 모자라 갈린 문항(`usePaperSplit`). 뒤 조각이 더 있으면 간격은 마지막 조각이 지고, 단 끝에 딱 맞춰 앉힌
+ * 문항도 여기서 간격을 뗀다 — 그 뒤는 다음 단이라 보이지 않는 자리다. `--continues` 보다 뒤에 두어 이긴다.
+ */
+.pb-q--split {
+  padding-bottom: 0;
+}
+
+/*
+ * 발문은 조각마다 제 요소(`.pb-q__unit`)라 문단이 저마다 `:last-child` 가 되어 `.pb-sheet p:last-child` 에 걸린다.
+ * 조각 사이 간격 2pt(`.pb-q__stem p`)를 여기서 되살린다 — 쪼개지 않은 문항의 모양은 예전 그대로여야 한다.
+ * ⚠️ `display: flow-root` 를 주지 말 것. 문단 아래 여백과 〈보기〉 위 여백이 겹쳐 접히던 것이 안 접혀 간격이 는다.
+ */
+.pb-sheet .pb-q__unit:not(:last-child) > p:last-child {
+  margin-bottom: 2pt;
+}
+/*
+ * 〈보기〉 조각 — 지문용 3pt(위 `.pb-box-part`)를 끈다. 문단 다음에 문단이 올 때만 발문의 2pt 를 준다.
+ * ⚠️ 그 밖에 주면 안 쪼갠 문항이 커진다: 안쪽 여백은 뒤따르는 표·상자의 위 여백과 겹쳐 접히지 않는다.
+ */
+.pb-sheet .pb-q__stem blockquote.pb-box-part:not(.pb-box-part--last) {
+  padding-bottom: 0;
+}
+.pb-sheet .pb-q__stem .pb-q__unit:has(+ .pb-q__unit > blockquote > p:first-child)
+  > blockquote.pb-box-part:has(> p:last-child):not(.pb-box-part--last) {
+  padding-bottom: 2pt;
 }
 
 /*

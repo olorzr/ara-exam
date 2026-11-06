@@ -37,8 +37,26 @@ export interface PassagePiece {
   box?: BoxPart;
 }
 
+/** 쪼개는 선택 */
+export interface PassagePieceOptions {
+  /**
+   * 경로 없는 그림 조각을 남긴다. 지문은 버리지만 **발문은 남긴다** — 발문의 빠진 그림은 눈에 보이는
+   * 안내로 찍어 왔고(`renderFiguresInHtml`), 조용히 비우면 문항의 자료가 빠진 것을 아무도 모른다.
+   */
+  keepMissingFigures?: boolean;
+}
+
 /** 줄 안에 흐르는 요소 — 정화기가 통과시키는 태그 가운데 블록이 아닌 것 전부 */
 const INLINE_TAGS = new Set(['STRONG', 'EM', 'U', 'S', 'CODE', 'SPAN', 'BR']);
+
+/**
+ * 줄 안에 흐르는 노드인가 — 날글자이거나 줄 안 요소.
+ * @param node - 살펴볼 노드
+ * @returns 블록 요소가 아니면 true
+ */
+export function isInlineNode(node: Node): boolean {
+  return node.nodeType === Node.TEXT_NODE || (node instanceof Element && INLINE_TAGS.has(node.tagName));
+}
 
 /**
  * 터뜨려도 되는 상자인가 — 말머리가 허용 목록에 있고 **다른 속성이 없는** 상자만.
@@ -78,9 +96,7 @@ function childPieces(box: Element): string[] {
   };
 
   for (const node of Array.from(box.childNodes)) {
-    const inline = node.nodeType === Node.TEXT_NODE
-      || (node instanceof Element && INLINE_TAGS.has(node.tagName));
-    if (inline) {
+    if (isInlineNode(node)) {
       run.push(node);
       continue;
     }
@@ -96,13 +112,15 @@ function childPieces(box: Element): string[] {
  * 그대로 두면 인쇄물에 빈 줄만 남는다.
  * @param html - 조각 HTML
  * @param figures - 지문 그림 경로들 (1번이 index 0)
+ * @param options - 쪼개는 선택
  * @returns 0개 또는 1개의 조각
  */
-function withFigure(html: string, figures: readonly string[]): PassagePiece[] {
+function withFigure(html: string, figures: readonly string[], options: PassagePieceOptions): PassagePiece[] {
   const only = soleFigureIndex(html);
   if (only === null) return [{ html }];
   const path = figures[only - 1];
-  return path ? [{ html, figurePath: path }] : [];
+  if (path) return [{ html, figurePath: path }];
+  return options.keepMissingFigures ? [{ html }] : [];
 }
 
 /** 앞뒤의 빈 문단을 걷어낸다 — 가운데 빈 줄은 원문이라 남긴다 */
@@ -122,10 +140,13 @@ function trimEdges(pieces: PassagePiece[]): PassagePiece[] {
  * @param box - 상자 요소
  * @param label - 말머리
  * @param figures - 지문 그림 경로들
+ * @param options - 쪼개는 선택
  * @returns 상자 표시를 단 조각들
  */
-function explodeBox(box: Element, label: string | null, figures: readonly string[]): PassagePiece[] {
-  const inner = trimEdges(childPieces(box).flatMap((html) => withFigure(html, figures)));
+function explodeBox(
+  box: Element, label: string | null, figures: readonly string[], options: PassagePieceOptions,
+): PassagePiece[] {
+  const inner = trimEdges(childPieces(box).flatMap((html) => withFigure(html, figures, options)));
   return inner.map((piece, i) => ({
     ...piece,
     box: { label, first: i === 0, last: i === inner.length - 1 },
@@ -140,18 +161,21 @@ function explodeBox(box: Element, label: string | null, figures: readonly string
  * 〈보기〉 말머리까지 사라진다.
  * @param html - **정화가 끝난** 지문 HTML
  * @param figures - 지문 그림 경로들 (1번이 index 0)
+ * @param options - 쪼개는 선택
  * @returns 순서대로의 조각. 브라우저가 없으면(SSR) 통째로 한 조각 — 클라이언트가 다시 계산한다
  */
-export function splitPassagePieces(html: string, figures: readonly string[]): PassagePiece[] {
+export function splitPassagePieces(
+  html: string, figures: readonly string[], options: PassagePieceOptions = {},
+): PassagePiece[] {
   const host = createHost(html);
   if (!host) return html.trim() ? [{ html }] : [];
 
   const pieces: PassagePiece[] = [];
   for (const el of Array.from(host.children)) {
     const label = explodableLabel(el);
-    const exploded = label !== undefined ? explodeBox(el, label, figures) : [];
+    const exploded = label !== undefined ? explodeBox(el, label, figures, options) : [];
     if (exploded.length > 0) pieces.push(...exploded);
-    else pieces.push(...withFigure(el.outerHTML, figures));
+    else pieces.push(...withFigure(el.outerHTML, figures, options));
   }
   return trimEdges(pieces);
 }

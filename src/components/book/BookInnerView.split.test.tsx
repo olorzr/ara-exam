@@ -54,6 +54,25 @@ const verseLines = (stack: HTMLElement) => Array.from(stack.querySelectorAll('.p
 const sheetOf = (stack: HTMLElement, text: string) => Array.from(stack.querySelectorAll('.a4-sheet'))
   .findIndex((sheet) => Array.from(sheet.querySelectorAll('.bk-chapter')).some((el) => el.textContent?.includes(text)));
 
+describe('BookInnerView — 긴 문항', () => {
+  it('문항도 쪼개지고 목차 쪽 번호가 맞는다', () => {
+    const big = Array.from({ length: 5 }, () => `<p>${LINES.slice(0, 12).join('<br>')}</p>`).join('');
+    const items = new Map([['p1', [snap({ stem_html: `<p>물음</p><blockquote data-box="보기">${big}</blockquote>` })]], ['p2', [snap()]]]);
+    const book: Book = {
+      id: 'b', title: '문학', kind: 'book', finishedAt: null, settings: { ...DEFAULT_BOOK_SETTINGS, columns: 1, toc: true },
+      pageCounts: {}, cover: null, userId: 'u', createdAt: '2026-10-25T00:00:00Z', updatedAt: '2026-10-25T00:00:00Z',
+    };
+    const { container } = render(
+      <BookInnerView book={book} edition="student" chapters={chapters} itemsByPaper={items} imageUrls={new Map()} onLayout={() => {}} />,
+    );
+    const stack = container.querySelector('.a4-stack') as HTMLElement;
+    expect(stack.querySelector('.a4-block--scaled')).toBeNull();
+    expect(stack.querySelector('.pb-q--cont')).not.toBeNull();
+    expect(Array.from(stack.querySelectorAll('.bk-toc__page')).map((el) => el.textContent))
+      .toEqual([String(sheetOf(stack, '1장') + 1), String(sheetOf(stack, '2장') + 1)]);
+  });
+});
+
 describe('BookInnerView — 긴 지문', () => {
   it.each([[true], [false]])('목차 %s 에서 쪼개져 줄어들지 않고 줄이 그대로다', (toc) => {
     const stack = draw(toc);

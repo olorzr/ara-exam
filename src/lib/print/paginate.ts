@@ -3,8 +3,9 @@ import { CAPACITY_SAFETY_PX } from './constants';
 /**
  * 블록 앞에서 쪽을 강제로 넘기는 방식(책의 장 시작).
  * `'page'` 는 새 쪽에서, `'odd'` 는 홀수(오른쪽) 쪽에서 시작한다 — 필요하면 빈 쪽을 한 장 끼운다.
+ * `'column'` 은 다음 단에서 시작한다 — 간격을 떼고 단 끝에 앉힌 문항 뒤를 비워 두는 데 쓴다(usePaperSplit).
  */
-export type BreakBefore = 'page' | 'odd' | false;
+export type BreakBefore = 'page' | 'odd' | 'column' | false;
 
 /** 한 페이지의 컬럼별 블록 인덱스 배치 */
 export interface PagePlan {
@@ -118,7 +119,17 @@ export function paginate({
     const height = blockHeights[i];
 
     const brk = breakBefore?.[i];
-    if (brk) {
+    if (brk === 'column') {
+      // 지금 단이 비어 있으면 이미 단 머리다 — 넘기면 빈 단이 생긴다
+      if (currentPage().columns[colIdx].length > 0) {
+        if (colIdx < columns - 1) {
+          colIdx += 1;
+          remaining = capOfCurrentPage();
+        } else {
+          openPage();
+        }
+      }
+    } else if (brk) {
       // 지금 쪽에 내용이 있을 때만 넘긴다 — 첫 블록이면 1쪽이 비어 있고(홀수다) 앞에 빈 장을 만들지 않는다
       if (pageHasContent()) openPage();
       // 새 쪽이 짝수(왼쪽 면)면 그 쪽을 빈 쪽으로 못박고 한 쪽 더 연다. 1쪽은 늘 홀수라 빈 쪽이 될 일이 없다
