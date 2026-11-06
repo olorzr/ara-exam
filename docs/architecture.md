@@ -345,8 +345,9 @@ src/
 ## lib/yet-hangul (옛한글 — 감지 · 자모 조합 · 프롬프트 규칙)
 - 역할: 옛한글(중세국어) 글자를 **알아보고**(글꼴 클래스), 대체 표기 `⟦ㅎㆍㄴ⟧` 를 **첫가끝 자모로
   합치고**, OCR 프롬프트에 실을 **규칙 문장과 경고 문구**를 한 곳에서 낸다
-- 의존: **없다(잎 모듈)** — problem-ocr·print-scan·pdf 를 import 하지 않는다. 그쪽이 이쪽을 쓴다
+- 의존: lib/print/table-dom 의 `createHost` 하나뿐 — problem-ocr·print-scan·pdf 를 import 하지 않는다. 그쪽이 이쪽을 쓴다
 - 주요 파일: detect.ts(`hasYetHangul`·`markHanyangPua`·`YET_HANGUL_UNICODE_RANGE`),
+  mark.ts(`markYetHangul`·`yetHangulClass` — 옛 글자가 든 문단·선지에만 글꼴을 거는 렌더 시점 표시, 각주 표시와 같은 규약),
   jamo-tables.ts(호환 자모 → 첫가끝 표 셋), compose.ts(`composeSyllable`·`convertYetHangulNotation`),
   prompt-rules.ts(세 프롬프트가 공유), warn.ts(경고 문구), webfont.test.ts(글꼴 파일 고정)
 - 쓰는 곳: 프롬프트 3(problem-ocr·print-scan·continue-passage) · 파서 2 · pdfText · verify-text ·

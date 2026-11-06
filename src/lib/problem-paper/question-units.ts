@@ -3,6 +3,7 @@ import { unplacedFigures } from '@/lib/problem-bank/figure-render';
 import { markFootnotes } from '@/lib/problem-bank/footnotes';
 import { hasTabulatedChoices, matrixChoices, pairedChoices } from '@/lib/problem-bank/paired-choices';
 import { sanitizeProblemHTML } from '@/lib/sanitize-problem';
+import { markYetHangul } from '@/lib/yet-hangul';
 import type { PaperItemSnapshot } from '@/types/problem-bank';
 import { isInlineNode, splitPassagePieces, type BoxPart, type PassagePiece } from './box-parts';
 import { stripTrailingEmptyParagraphs } from './html-trim';
@@ -61,14 +62,24 @@ export function questionChoiceLayout(snapshot: PaperItemSnapshot): QuestionChoic
 }
 
 /**
- * 인쇄할 발문 HTML — 표 선지의 머리를 뗀 뒤 정화하고 끝 빈 문단을 걷고 각주를 표시한다.
+ * 저장된 발문을 그릴 수 있는 HTML 로 — 정화하고 끝 빈 문단을 걷고 각주·옛한글을 표시한다.
+ * 문제지와 문제 은행 화면이 **이 함수 하나**를 쓴다. 갈리면 같은 문항이 두 곳에서 다른 글꼴로 나온다.
+ * ⚠️ 차례를 바꾸지 말 것 — 각주 표시가 새로 만든 문단에도 옛한글 표시가 붙어야 한다.
+ * @param raw - 저장된 발문 HTML
+ * @returns 그릴 수 있는 HTML (다시 정화하지 않는다 — 각주·옛한글 class 가 사라진다)
+ */
+export function displayStemHtml(raw: string): string {
+  return markYetHangul(markFootnotes(stripTrailingEmptyParagraphs(sanitizeProblemHTML(raw))));
+}
+
+/**
+ * 인쇄할 발문 HTML — 표 선지의 머리를 뗀 뒤 `displayStemHtml` 을 거친다.
  * @param snapshot - 문항 스냅샷
  * @param layout - 선지 모양
- * @returns 그릴 수 있는 HTML (다시 정화하지 않는다 — 각주 class 가 사라진다)
+ * @returns 그릴 수 있는 HTML
  */
 export function questionStemHtml(snapshot: PaperItemSnapshot, layout: QuestionChoiceLayout): string {
-  const raw = layout.paired?.stemHtml ?? layout.matrix?.stemHtml ?? snapshot.stem_html;
-  return markFootnotes(stripTrailingEmptyParagraphs(sanitizeProblemHTML(raw)));
+  return displayStemHtml(layout.paired?.stemHtml ?? layout.matrix?.stemHtml ?? snapshot.stem_html);
 }
 
 /**

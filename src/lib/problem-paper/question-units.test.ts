@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PaperItemSnapshot } from '@/types/problem-bank';
-import { questionCuts, questionStemHtml, questionChoiceLayout, questionUnits, type QuestionUnit } from './question-units';
+import { displayStemHtml, questionCuts, questionStemHtml, questionChoiceLayout, questionUnits, type QuestionUnit } from './question-units';
 
 const snap = (over: Partial<PaperItemSnapshot> = {}): PaperItemSnapshot => ({
   number: 1, question_type: '객관식', stem_html: '<p>물음</p>', choices: ['가', '나', '다', '라', '마'], answer: '1',
@@ -10,6 +10,33 @@ const snap = (over: Partial<PaperItemSnapshot> = {}): PaperItemSnapshot => ({
   ...over,
 });
 const kinds = (units: readonly QuestionUnit[]) => units.map((unit) => unit.kind);
+
+/** ᄒᆞᆫ — 첫가끝 자모로 적은 옛한글 한 음절 */
+const YET = '\u1112\u119E\u11AB';
+
+describe('displayStemHtml', () => {
+  it('옛 글자가 든 문단에 글꼴 표시를 붙인다', () => {
+    expect(displayStemHtml(`<p>물음</p><p>${YET}</p>`)).toBe(`<p>물음</p><p class="yet-hangul">${YET}</p>`);
+  });
+
+  it('현대 글은 정화 결과 그대로다', () => {
+    expect(displayStemHtml('<p>물음</p>')).toBe('<p>물음</p>');
+  });
+
+  it('각주와 옛한글이 한 문단에 함께 붙는다', () => {
+    expect(displayStemHtml(`<p>* ${YET} : 풀이</p>`)).toBe(`<p class="pb-note yet-hangul">* ${YET} : 풀이</p>`);
+  });
+
+  it('저장값에 섞인 class 는 정화기가 지운다 — 표시는 그릴 때만 붙는다', () => {
+    expect(displayStemHtml('<p class="yet-hangul">현대</p>')).toBe('<p>현대</p>');
+  });
+
+  it('조각으로 나뉜 단위에도 표시가 남는다', () => {
+    const units = questionUnits(snap({ stem_html: `<p>물음</p><blockquote data-box="보기"><p>${YET}</p></blockquote>` }), false);
+    expect(units[1]).toMatchObject({ kind: 'stem', box: { label: '보기' } });
+    expect(units[1]).toMatchObject({ html: expect.stringContaining('class="yet-hangul"') });
+  });
+});
 
 describe('questionUnits', () => {
   it('머리 · 선지 다섯', () => {

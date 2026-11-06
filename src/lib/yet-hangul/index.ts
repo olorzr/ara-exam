@@ -2,6 +2,7 @@ export {
   hanyangPuaCount, hasYetHangul, markHanyangPua,
   YET_HANGUL_MARKER, YET_HANGUL_UNICODE_RANGE,
 } from './detect';
+export { markYetHangul, YET_HANGUL_CLASS, yetHangulClass } from './mark';
 export {
   composeSyllable, convertYetHangulNotation, decodeYetHangulEntities, finalizeYetHangul,
   hasUnconvertedNotation, normalizeYetHangul,

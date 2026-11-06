@@ -247,6 +247,12 @@ describe('splitsExplanation', () => {
 });
 
 describe('explanationHtml', () => {
+  it('옛 글자가 든 문단에 글꼴 표시를 붙이고 길이 판정은 글자만 본다', () => {
+    const html = '<p>\u1112\u119E\u11AB</p>';
+    expect(explanationHtml(html)).toBe('<p class="yet-hangul">\u1112\u119E\u11AB</p>');
+    expect(explanationTextLength(explanationHtml(html))).toBe(explanationTextLength(html));
+  });
+
   /**
    * ⚠️ 스냅샷은 jsonb 라 DB 를 직접 건드린 값이 섞일 수 있다. 정화가 통째로 지우는
    *    태그만 든 해설을 **날글자로** 재면 '길다' 고 판정해 갈라낸 뒤 그릴 것이 없어진다

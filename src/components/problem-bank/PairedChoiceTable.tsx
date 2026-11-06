@@ -1,5 +1,6 @@
 import { choiceGlyph } from '@/lib/problem-bank/choices';
 import { sanitizeInlineHTML } from '@/lib/sanitize-problem';
+import { yetHangulClass } from '@/lib/yet-hangul';
 
 export default function PairedChoiceTable({
   rows, answerIndices,
@@ -16,9 +17,9 @@ export default function PairedChoiceTable({
           return (
             <tr key={index} className={isAnswer ? 'pb-q__choice--answer' : ''}>
               <td className="pb-q__choice-glyph">{choiceGlyph(index)}</td>
-              <td dangerouslySetInnerHTML={{ __html: sanitizeInlineHTML(left) }} />
+              <td className={yetHangulClass(left)} dangerouslySetInnerHTML={{ __html: sanitizeInlineHTML(left) }} />
               <td>
-                <span dangerouslySetInnerHTML={{ __html: sanitizeInlineHTML(right) }} />
+                <span className={yetHangulClass(right)} dangerouslySetInnerHTML={{ __html: sanitizeInlineHTML(right) }} />
                 {isAnswer && <span className="pb-q__choice-answer-mark">정답</span>}
               </td>
             </tr>

@@ -8,7 +8,7 @@ import type { PaperProblemBlock } from '@/lib/problem-paper/blocks';
 import { boxPartClassName } from '@/lib/problem-paper/box-parts';
 import { questionChoiceLayout, type QuestionUnit } from '@/lib/problem-paper/question-units';
 import { sanitizeInlineHTML } from '@/lib/sanitize-problem';
-import { hasYetHangul } from '@/lib/yet-hangul';
+import { yetHangulClass } from '@/lib/yet-hangul';
 import type { PaperItemSnapshot, PaperSettings } from '@/types/problem-bank';
 import MatrixChoiceTable from '@/components/problem-bank/MatrixChoiceTable';
 import PairedChoiceTable from '@/components/problem-bank/PairedChoiceTable';
@@ -23,14 +23,10 @@ import { PrintImage, SourceLine, TeacherAnswer } from './PaperPrintParts';
  *    아예 사라진다(문항이 여백을 줄였는데 해설 조각이 안 나온다).
  * @param snapshot - 문항 스냅샷
  * @param showAnswers - 교사용인가 (학생 문제지에는 해설이 아예 안 나간다)
- * @param yetHangul - 옛한글 문항인가 (발문·선지는 고딕)
  * @returns 공백으로 이은 클래스 문자열
  */
-export function problemClassName(
-  snapshot: PaperItemSnapshot, showAnswers: boolean, yetHangul = false,
-): string {
+export function problemClassName(snapshot: PaperItemSnapshot, showAnswers: boolean): string {
   const classes = ['pb-q'];
-  if (yetHangul) classes.push('yet-hangul');
   if (showAnswers && splitsExplanation(snapshot.explanation_html)) classes.push('pb-q--continues');
   return classes.join(' ');
 }
@@ -95,8 +91,6 @@ export default function PaperQuestion({ block, settings, imageUrls, showAnswers,
   const has = (kind: QuestionUnit['kind']) => shown.some((unit) => unit.kind === kind);
 
   const { paired, matrix } = questionChoiceLayout(snapshot);
-  // 발문·선지의 옛한글은 **고딕**이다(지문만 명조 — CLAUDE.md 2026-09-15)
-  const yetHangul = hasYetHangul([snapshot.stem_html, ...snapshot.choices].join(''));
   // 교사용에서 표시할 정답 선지. 객관식이 아니면 빈 배열이라 아무 선지도 안 걸린다.
   // **복수 정답이면 둘 다** 걸린다 — 답지에 `③, ⑤` 라고 적고 여기서 한 칸도 안 칠하면
   // 같은 문항이 두 인쇄물에서 다르게 읽힌다
@@ -108,7 +102,7 @@ export default function PaperQuestion({ block, settings, imageUrls, showAnswers,
   const last = to === units.length;
   const className = [
     // 해설이 따로 흘러가는 표시는 해설 조각이 바로 뒤에 오는 마지막 조각에만
-    last ? problemClassName(snapshot, showAnswers, yetHangul) : problemClassName(snapshot, false, yetHangul),
+    problemClassName(snapshot, last && showAnswers),
     first ? '' : 'pb-q--cont',
     last && !block.tight ? '' : 'pb-q--split',
   ].filter(Boolean).join(' ');
@@ -143,10 +137,12 @@ export default function PaperQuestion({ block, settings, imageUrls, showAnswers,
         <div className="pb-q__choices">
           {choices.map((i) => {
             const isAnswer = answerIndices.includes(i);
+            const text = sanitizeInlineHTML(snapshot.choices[i]);
             return (
               <span key={i} className={`pb-q__choice${isAnswer ? ' pb-q__choice--answer' : ''}`} data-q-unit="">
                 <span className="pb-q__choice-glyph">{choiceGlyph(i)}</span>
-                <span dangerouslySetInnerHTML={{ __html: sanitizeInlineHTML(snapshot.choices[i]) }} />
+                {/* 옛한글 글꼴은 이 글자에만 — 선지 기호·다른 선지까지 바뀌면 문항 전체가 굵어 보인다 */}
+                <span className={yetHangulClass(text)} dangerouslySetInnerHTML={{ __html: text }} />
                 {/* 색만으로 알리지 않는다 — 흑백으로 뽑으면 바탕색이 거의 사라진다 */}
                 {isAnswer && <span className="pb-q__choice-answer-mark">정답</span>}
               </span>

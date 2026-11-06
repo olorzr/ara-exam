@@ -1,5 +1,6 @@
 import { choiceGlyph } from '@/lib/problem-bank/choices';
 import { sanitizeProblemHTML } from '@/lib/sanitize-problem';
+import { markYetHangul } from '@/lib/yet-hangul';
 import type { PaperItemSnapshot, QuestionType } from '@/types/problem-bank';
 
 /**
@@ -187,11 +188,12 @@ export const EXPLANATION_INLINE_MAX_CHARS = 400;
  *    DB 를 직접 건드린 값이 섞일 수 있는데, 정화가 통째로 지우는 태그(`<script>`)로만
  *    이뤄진 해설을 날글자로 재면 **길다고 판정해 놓고 그릴 것은 없는** 상태가 된다
  *    (코덱스 정지 리뷰 2R).
+ * 옛한글 표시도 여기서 붙인다 — 교사용 짧은 해설·따로 흘러가는 해설·답지 해설이 전부 이 값을 쓴다.
  * @param html - 저장된 해설 HTML
- * @returns 정화한 HTML (실을 것이 없으면 빈 문자열)
+ * @returns 정화한 HTML (실을 것이 없으면 빈 문자열, 다시 정화하지 않는다)
  */
 export function explanationHtml(html: string | undefined): string {
-  const clean = sanitizeProblemHTML(html ?? '').trim();
+  const clean = markYetHangul(sanitizeProblemHTML(html ?? '').trim());
   return explanationTextLength(clean) > 0 || /<(img|figure|table|hr)\b/i.test(clean) ? clean : '';
 }
 

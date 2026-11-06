@@ -143,19 +143,35 @@ describe('옛한글 글꼴 클래스', () => {
     expect(sheetOf(container)).not.toContain('yet-hangul');
   });
 
-  it('문항의 옛한글은 **고딕**이다 — 발문·선지는 앱 본문과 같은 계열이라야 읽기가 자연스럽다', () => {
+  it('문항의 옛한글은 **고딕**이고 옛 글자가 든 문단에만 걸린다 — 뿌리에 달면 번호·선지까지 굵어 보인다', () => {
     const { container } = render(
-      <ProblemBodyView problem={problem({ stem_html: `<p>${YET}</p>` })} imageUrls={new Map()} />,
+      <ProblemBodyView problem={problem({ stem_html: `<p>물음</p><p>${YET}</p>` })} imageUrls={new Map()} />,
     );
-    expect(sheetOf(container)).toContain('yet-hangul');
-    expect(sheetOf(container)).not.toContain('yet-hangul-serif');
+    expect(sheetOf(container)).not.toContain('yet-hangul');
+    expect([...container.querySelectorAll('.pb-q__stem .yet-hangul')].map((el) => el.textContent)).toEqual([YET]);
+    expect(container.querySelector('.yet-hangul-serif')).toBeNull();
   });
 
-  it('선지에만 옛한글이 있어도 알아본다 — 문법 문항이 그런 모양이다', () => {
+  it('선지에만 옛한글이 있으면 그 선지 글자에만 걸린다 — 문법 문항이 그런 모양이다', () => {
     const { container } = render(
       <ProblemBodyView problem={problem({ choices: ['현대', YET] })} imageUrls={new Map()} />,
     );
-    expect(sheetOf(container)).toContain('yet-hangul');
+    expect(sheetOf(container)).not.toContain('yet-hangul');
+    expect([...container.querySelectorAll('.pb-q__choice .yet-hangul')].map((el) => el.textContent)).toEqual([YET]);
+    expect(container.querySelector('.pb-q__choice-glyph.yet-hangul')).toBeNull();
+  });
+
+  it('해설과 주관식 정답의 옛한글도 그 자리에만 걸린다', () => {
+    const { container } = render(
+      <ProblemBodyView
+        problem={problem({
+          question_type: '주관식', choices: [], answer: YET, explanation_html: `<p>${YET}</p><p>풀이</p>`,
+        })}
+        imageUrls={new Map()}
+      />,
+    );
+    expect([...container.querySelectorAll('details p')].map((p) => p.className)).toEqual(['yet-hangul', '']);
+    expect(container.querySelector('p.mt-2 .yet-hangul')?.textContent).toBe(YET);
   });
 
   it('낱자 ㆍ 를 설명하는 문항은 글꼴을 바꾸지 않는다 — 한 글자 때문에 문항 전체가 달라지면 안 된다', () => {
@@ -165,7 +181,7 @@ describe('옛한글 글꼴 클래스', () => {
         imageUrls={new Map()}
       />,
     );
-    expect(sheetOf(container)).not.toContain('yet-hangul');
+    expect(container.querySelector('.yet-hangul')).toBeNull();
   });
 });
 

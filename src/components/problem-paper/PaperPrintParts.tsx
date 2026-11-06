@@ -2,6 +2,7 @@
 
 import { sourceLabel } from '@/lib/problem-bank/source-label';
 import { explanationHtml, formatAnswer, splitsExplanation } from '@/lib/problem-paper/answers';
+import { yetHangulClass } from '@/lib/yet-hangul';
 import type { PaperItemSnapshot } from '@/types/problem-bank';
 
 /**
@@ -76,7 +77,7 @@ export function TeacherAnswer({ snapshot }: { snapshot: PaperItemSnapshot }) {
     <>
       <p className="pb-q__answer">
         <span className="pb-q__answer-label">정답</span>
-        {answer}
+        <span className={yetHangulClass(answer)}>{answer}</span>
       </p>
       {explanation && (
         <div

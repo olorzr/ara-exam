@@ -3,11 +3,10 @@
 import { choiceGlyph } from '@/lib/problem-bank/choices';
 import { correctChoiceIndices, formatAnswer } from '@/lib/problem-paper/answers';
 import { renderFiguresInHtml, unplacedFigures } from '@/lib/problem-bank/figure-render';
-import { markFootnotes } from '@/lib/problem-bank/footnotes';
 import { hasTabulatedChoices, matrixChoices, pairedChoices } from '@/lib/problem-bank/paired-choices';
-import { stripTrailingEmptyParagraphs } from '@/lib/problem-paper/html-trim';
+import { displayStemHtml } from '@/lib/problem-paper/question-units';
 import { sanitizeInlineHTML, sanitizeProblemHTML } from '@/lib/sanitize-problem';
-import { hasYetHangul } from '@/lib/yet-hangul';
+import { markYetHangul, yetHangulClass } from '@/lib/yet-hangul';
 import type { Problem } from '@/types/problem-bank';
 import PairedChoiceTable from './PairedChoiceTable';
 import MatrixChoiceTable from './MatrixChoiceTable';
@@ -57,18 +56,10 @@ export default function ProblemBodyView({ problem, imageUrls }: ProblemBodyViewP
    */
   const answerIndices =
     correctChoiceIndices(problem.question_type, problem.answer, problem.choices.length);
-  /**
-   * 옛한글(중세국어)이 섞였는가 — 섞였으면 블록째 옛한글 글꼴로 그린다.
-   *
-   * 지문과 달리 **고딕**이다: 발문·선지는 앱 본문과 같은 계열이라야 읽기가 자연스럽다
-   * (지문만 명조로 간다 — CLAUDE.md 2026-09-15).
-   */
-  const yetHangul = hasYetHangul(
-    [problem.stem_html, problem.explanation_html, ...problem.choices].join(''),
-  );
 
+  // 옛한글 글꼴(고딕)은 옛 글자가 든 문단·선지에만 건다 — 지문과 달리 뿌리에 달지 않는다(mark.ts)
   return (
-    <div className={`pb-sheet pb-sheet--screen${yetHangul ? ' yet-hangul' : ''}`}>
+    <div className="pb-sheet pb-sheet--screen">
       <div className="pb-q">
         <div className="pb-q__head">
           {problem.number !== null && (
@@ -77,7 +68,7 @@ export default function ProblemBodyView({ problem, imageUrls }: ProblemBodyViewP
           {!asImage && (
             <div className="pb-q__stem">
               <BodyWithFigures
-                html={markFootnotes(stripTrailingEmptyParagraphs(sanitizeProblemHTML(paired?.stemHtml ?? matrix?.stemHtml ?? problem.stem_html)))}
+                html={displayStemHtml(paired?.stemHtml ?? matrix?.stemHtml ?? problem.stem_html)}
                 paths={problem.figure_paths}
                 urls={imageUrls}
               />
@@ -101,13 +92,14 @@ export default function ProblemBodyView({ problem, imageUrls }: ProblemBodyViewP
           <div className="pb-q__choices">
             {problem.choices.map((choice, i) => {
               const isAnswer = answerIndices.includes(i);
+              const text = sanitizeInlineHTML(choice);
               return (
                 <span
                   key={i}
                   className={`pb-q__choice${isAnswer ? ' pb-q__choice--answer' : ''}`}
                 >
                   <span className="pb-q__choice-glyph">{choiceGlyph(i)}</span>
-                  <span dangerouslySetInnerHTML={{ __html: sanitizeInlineHTML(choice) }} />
+                  <span className={yetHangulClass(text)} dangerouslySetInnerHTML={{ __html: text }} />
                   {/* 색만으로 알리지 않는다 — 글자로도 정답임을 말한다 */}
                   {isAnswer && <span className="pb-q__choice-answer-mark">정답</span>}
                 </span>
@@ -121,7 +113,8 @@ export default function ProblemBodyView({ problem, imageUrls }: ProblemBodyViewP
       {(!objective || tabulated || answerIndices.length === 0) && (
         <p className="mt-2 text-sm">
           <span className="font-semibold text-gray-500">정답 </span>
-          {answer ? formatAnswer(problem.question_type, answer, problem.choices.length)
+          {answer
+            ? <span className={yetHangulClass(answer)}>{formatAnswer(problem.question_type, answer, problem.choices.length)}</span>
             : <span className="text-amber-600">미입력</span>}
         </p>
       )}
@@ -131,7 +124,7 @@ export default function ProblemBodyView({ problem, imageUrls }: ProblemBodyViewP
           <summary className="cursor-pointer text-sm font-medium text-gray-700">해설</summary>
           <div
             className="mt-1"
-            dangerouslySetInnerHTML={{ __html: sanitizeProblemHTML(problem.explanation_html) }}
+            dangerouslySetInnerHTML={{ __html: markYetHangul(sanitizeProblemHTML(problem.explanation_html)) }}
           />
         </details>
       )}

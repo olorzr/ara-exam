@@ -706,7 +706,7 @@
 - 정의: 지금은 안 쓰는 글자가 섞인 한글. 아래아 `ㆍ`, 반치음 `ㅿ`, 옛이응 `ㆁ`, 여린히읗 `ㆆ`,
   순경음 `ㅸ`, 어두 자음군 `ㅄ·ㅳ·ㅺ` 등. 국어 시험지에서는 훈민정음 언해·용비어천가·두시언해 같은
   중세국어 자료로 나온다
-- 코드에서의 사용: `hasYetHangul`(감지 → 글꼴 클래스), `yetHangulPageWarning`(쪽 경고)
+- 코드에서의 사용: `hasYetHangul`(감지), `markYetHangul`·`yetHangulClass`(문항은 옛 글자가 든 문단·선지에만 글꼴 클래스), `yetHangulPageWarning`(쪽 경고)
 - 관련 파일: src/lib/yet-hangul/, src/app/globals.css(`.yet-hangul`·`.yet-hangul-serif`)
 - ⚠️ **낱자 하나만 있는 글은 옛한글로 세지 않는다** — 'ㆍ의 소실' 을 묻는 문법 문항까지
   블록 글꼴이 바뀌면 안 된다
