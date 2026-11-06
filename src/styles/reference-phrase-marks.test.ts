@@ -31,6 +31,12 @@ describe('reference-phrase-marks.css', () => {
     expect(css).toContain(":has(br)::before");
   });
 
+  it('⚠️ 풀이 폭에 고정 상한이 있다 — 없으면 짧은 낱말의 상자가 풀이만큼 넓어져 본문에 구멍이 난다', () => {
+    const rule = css.match(/content: attr\(data-note\);[\s\S]*?\n}/)?.[0] ?? '';
+    expect(rule).toMatch(/max-width:\s*\d+(\.\d+)?em;/);
+    expect(rule).toContain('margin-inline: auto;');
+  });
+
   it('위 풀이는 구절 앞, 아래 풀이는 구절 뒤에 그린다', () => {
     expect(css).toContain("span[data-note]:not([data-note-pos='over'])::after");
     expect(css).toContain("span[data-note][data-note-pos='over']::before");
