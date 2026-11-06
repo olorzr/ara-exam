@@ -719,7 +719,7 @@
 ## 붙은 문항 (glued question)
 - 정의: 지문과 상관없이 혼자 서는 문항이 업체 정리본 순서 때문에 앞 지문에 붙어 들어온 것. 지문의 작품을 물려받아 그 작품 문항으로 나온다
 - 코드에서의 사용: 적재 도구의 `should_detach`·`apply_detach`, 스펙의 `keep_on_passage`(지문을 쓰는 문항이라는 표시)
-- 관련 파일: ~/.claude/tools/exam-specs/detach.py, detach-gate.py, sql/86_problem_bank_detach_glued_questions.sql
+- 관련 파일: ~/.claude/tools/exam-specs/detach.py, detach_apply.py, detach-gate.py, sql/86_problem_bank_detach_glued_questions.sql
 
 ## 첫가끝 코드 (조합형 자모, conjoining jamo)
 - 정의: 옛한글 음절을 **초성·중성·종성 자모를 순서대로 늘어놓아** 적는 유니코드 방식
