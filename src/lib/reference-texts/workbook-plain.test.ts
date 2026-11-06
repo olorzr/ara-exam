@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { sanitizeReferenceHTML } from '@/lib/sanitize-reference';
 import { referenceBodyPlainText, stripWorkbookNotes } from './workbook-plain';
 
 /** 「저녁 항구」(함기석) — 노미숙 평가문제집 10쪽: 연마다 여백 해설 + 핵심 포인트 + 쌤의 비밀 노트 */
@@ -50,6 +51,22 @@ describe('stripWorkbookNotes', () => {
       + '<blockquote data-callout="쌤의 비밀 노트"><p>노트</p></blockquote><p>바깥 원문</p>'
       + '</td><td><p>바깥 해설</p></td></tr></tbody></table>';
     expect(referenceBodyPlainText(html, 'html')).toBe('안쪽 원문\n\n바깥 원문');
+  });
+
+  it('⚠️ 구절 풀이·표식은 속성만 벗긴다 — 구절은 원문이고 풀이 글자는 해설이다', () => {
+    const html = '<p><span data-note="시각적 심상" data-note-pos="over"><span data-shape="box"><u>푸른 파도가</u></span></span> 밀려오고</p>';
+    expect(stripWorkbookNotes(html)).toBe('<p><span><span><u>푸른 파도가</u></span></span> 밀려오고</p>');
+    expect(referenceBodyPlainText(html, 'html')).toBe('푸른 파도가 밀려오고');
+  });
+
+  it('⚠️ 꺾쇠가 든 풀이는 정화기가 걷는다 — 남으면 태그가 끊겨 풀이 뒷글자가 원문으로 샌다', () => {
+    const clean = sanitizeReferenceHTML('<p><span data-note="현실 > 이상">바다</span>에서</p>');
+    expect(referenceBodyPlainText(clean, 'html')).toBe('바다에서');
+  });
+
+  it('여백 해설 원문 칸 안의 풀이도 벗긴다', () => {
+    const html = '<table data-layout="gloss"><tbody><tr><td><p><span data-note="항구">우리 집 현관</span>에서</p></td><td><p>해설</p></td></tr></tbody></table>';
+    expect(stripWorkbookNotes(html)).toBe('<p><span>우리 집 현관</span>에서</p>');
   });
 
   it('나란히 표(verse)는 원문이라 남긴다', () => {

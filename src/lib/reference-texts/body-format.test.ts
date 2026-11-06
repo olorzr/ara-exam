@@ -26,6 +26,19 @@ describe('htmlToText · bodyPlainText', () => {
   });
 });
 
+describe('구절 풀이가 든 본문', () => {
+  const html = '<p>푸른 <span data-note="시각적 심상">파<span data-shape="box">도</span>가</span> 온다</p>';
+
+  it('풀이 글자는 세지 않고 구절 가운데에 공백을 만들지 않는다', () => {
+    expect(bodyPlainText(html, 'html')).toBe('푸른 파도가 온다');
+    expect(bodyLength(html, 'html')).toBe('푸른 파도가 온다'.length);
+  });
+
+  it('평문으로 바꿔도 풀이 글자가 본문이 되지 않는다', () => {
+    expect(htmlToText(html)).toBe('푸른 파도가 온다');
+  });
+});
+
 describe('parseSeq · normalizeTags', () => {
   it('차례 — 빈칸은 null, 0~9999 정수만', () => {
     expect(parseSeq('')).toBeNull();

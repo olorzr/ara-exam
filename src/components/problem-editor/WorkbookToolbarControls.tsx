@@ -8,6 +8,8 @@ import {
   CALLOUT_LABEL_MAX, CALLOUT_PRESETS, CALLOUT_TONES, CALLOUT_TONE_LABELS, GLOSS_LAYOUT, VOCAB_LAYOUT,
   isCalloutLabel, isCalloutTone, type CalloutTone,
 } from '@/lib/workbook-markup';
+import PhraseNoteControls from './PhraseNoteControls';
+import { TOOLBAR_SELECT_CLASS as selectClass, toolbarButtonClass as buttonClass } from './toolbar-styles';
 
 /** '없음' 센티널 — 빈 문자열 option 은 브라우저마다 다루기가 다르다 */
 const NONE = '__none__';
@@ -35,7 +37,7 @@ interface WorkbookToolbarControlsProps {
 }
 
 /**
- * 작품 전문 · 개념 편집기에만 붙는 단추들 — 형광펜 · 작은 글씨 · 말머리 상자 · 표 모양 · 도식 · 표 틀 넣기.
+ * 작품 전문 · 개념 편집기에만 붙는 단추들 — 형광펜 · 작은 글씨 · 구절 풀이 · 표식 · 말머리 상자 · 표 모양 · 도식 · 표 틀 넣기.
  *
  * ⚠️ 활성 상태는 `useEditorState` 로만 읽는다(문항 툴바와 같은 까닭 — `editor.isActive` 를 직접 읽으면 커서를 옮겨도
  *    다시 그려지지 않는다). 말머리 상자와 〈보기〉 상자(`data-box`)는 한 blockquote 에 함께 두지 않는다 — 하나를 고르면
@@ -61,10 +63,6 @@ export default function WorkbookToolbarControls({ editor }: WorkbookToolbarContr
       };
     },
   });
-
-  const buttonClass = (active: boolean) =>
-    `rounded px-2 py-1 text-xs ${active ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700'}`;
-  const selectClass = 'rounded border border-gray-200 bg-white px-1.5 py-1 text-xs text-gray-700';
 
   /** 말머리 상자로 감싸거나(없으면 만들고) 말머리를 바꾼다. '없음' 이면 상자를 푼다 */
   const setCallout = (value: string) => {
@@ -98,6 +96,7 @@ export default function WorkbookToolbarControls({ editor }: WorkbookToolbarContr
       >
         작게
       </button>
+      <PhraseNoteControls editor={editor} />
 
       <select
         className={selectClass} aria-label="말머리 상자"
@@ -116,7 +115,6 @@ export default function WorkbookToolbarControls({ editor }: WorkbookToolbarContr
           editor={editor}
           label={state.calloutLabel}
           tone={state.calloutTone}
-          selectClass={selectClass}
         />
       )}
 
@@ -169,7 +167,6 @@ interface CalloutEditFieldsProps {
   editor: Editor;
   label: string;
   tone: string | null;
-  selectClass: string;
 }
 
 /**
@@ -179,7 +176,7 @@ interface CalloutEditFieldsProps {
  * @param props - 편집기 · 지금 말머리 · 갈래
  * @returns 입력칸과 갈래 고르기
  */
-function CalloutEditFields({ editor, label, tone, selectClass }: CalloutEditFieldsProps) {
+function CalloutEditFields({ editor, label, tone }: CalloutEditFieldsProps) {
   const [draft, setDraft] = useState(label);
   const valid = isCalloutLabel(draft);
 

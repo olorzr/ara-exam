@@ -34,6 +34,20 @@ describe('ReferenceBodyView', () => {
     expect(container.firstElementChild!.className).toContain('ref-sheet--plain');
   });
 
+  it('구절 풀이·표식을 속성째 그린다', () => {
+    const { container } = render(
+      <ReferenceBodyView
+        kind="작품" format="html"
+        body={'<p><span data-note="항구" data-note-pos="over"><u>우리 집 현관</u></span> <span data-shape="triangle">소금</span></p>'}
+      />,
+    );
+    const note = container.querySelector('span[data-note]');
+    expect(note?.getAttribute('data-note')).toBe('항구');
+    expect(note?.getAttribute('data-note-pos')).toBe('over');
+    expect(note?.querySelector('u')?.textContent).toBe('우리 집 현관');
+    expect(container.querySelector('span[data-shape="triangle"]')?.textContent).toBe('소금');
+  });
+
   it('각주는 작은 글씨 표시가 붙는다', () => {
     const { container } = render(<ReferenceBodyView kind="작품" format="html" body="<p>본문</p><p>*열무: 어린 무.</p>" />);
     expect(container.querySelector('p.pb-note')?.textContent).toBe('*열무: 어린 무.');

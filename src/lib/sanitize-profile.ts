@@ -12,6 +12,9 @@ import { filterStyleAttribute } from './sanitize-css';
  * 프로필 전환이 안전한 이유: `DOMPurify.sanitize` 는 동기 함수라 호출이 겹치지 않는다.
  */
 
+/** data-* 값 검증기 — 값 · 붙은 태그 이름(소문자) · 요소 */
+export type DataAttrCheck = (value: string, tagName: string, element: Element) => boolean;
+
 /** 문서 종류별로 달라지는 부분 */
 export interface SanitizeProfile {
   /** inline style 로 허용할 CSS 속성 */
@@ -19,9 +22,9 @@ export interface SanitizeProfile {
   /**
    * 허용할 data-* 속성과 그 값 검증기.
    * 검증기는 붙은 태그 이름(소문자)도 받는다 — 표에만 뜻이 있는 속성(`data-layout`)을
-   * 다른 태그에서 걷어 내려고(2026-10-26).
+   * 다른 태그에서 걷어 내려고(2026-10-26). 요소도 받는다 — 함께 못 쓰는 속성을 가르려고(2026-11-06).
    */
-  allowedDataAttrs: ReadonlyMap<string, (value: string, tagName: string) => boolean>;
+  allowedDataAttrs: ReadonlyMap<string, DataAttrCheck>;
 }
 
 /** 어떤 프로필도 지정되지 않았을 때(있어서는 안 되는 경로) 쓰는 가장 좁은 규칙 */
@@ -44,7 +47,7 @@ DOMPurify.addHook('uponSanitizeAttribute', (node, data) => {
   // **값**은 DOMPurify 가 안 본다. 프로필별 검증기로 한 번 더 좁힌다.
   if (data.attrName.startsWith('data-')) {
     const check = activeProfile.allowedDataAttrs.get(data.attrName);
-    if (!check || !check(data.attrValue ?? '', node.nodeName.toLowerCase())) data.keepAttr = false;
+    if (!check || !check(data.attrValue ?? '', node.nodeName.toLowerCase(), node)) data.keepAttr = false;
   }
 });
 

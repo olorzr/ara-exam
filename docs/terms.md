@@ -819,7 +819,7 @@
 - 관련 파일: src/lib/sanitize-problem.ts, src/components/problem-editor/VerseTableAttribute.ts, src/styles/problem-paper.css
 
 ## 문제집 서식 (workbook markup)
-- 정의: 작품 전문 · 개념 본문이 평가문제집 쪽처럼 보이게 하는 표시 다섯 가지 — 말머리 상자 · 어휘 풀이 표 · 여백 해설 표 · 흐름 목록(화살표 도식) · 형광펜. 문항 정화기는 하나도 받지 않는다
+- 정의: 작품 전문 · 개념 본문이 평가문제집 쪽처럼 보이게 하는 표시 일곱 가지 — 말머리 상자 · 어휘 풀이 표 · 여백 해설 표 · 흐름 목록(화살표 도식) · 형광펜 · 구절 풀이 · 표식. 문항 정화기는 하나도 받지 않는다
 - 코드에서의 사용: `CALLOUT_TONES`·`CALLOUT_PRESETS`·`GLOSS_LAYOUT`·`VOCAB_LAYOUT`·`REFERENCE_TABLE_LAYOUTS`(workbook-markup.ts), `sanitizeReferenceHTML`, `WORKBOOK_EXTENSIONS`
 - 관련 파일: src/lib/workbook-markup.ts, src/lib/sanitize-reference.ts, src/styles/reference-sheet.css, src/components/problem-editor/WorkbookExtensions.ts
 
@@ -837,6 +837,16 @@
 - 정의: 낱말 칸 · 풀이 칸 두 칸 표(한자는 `<small>`). 화면은 밑줄 친 낱말 바로 밑에 풀이를 놓는다
 - 코드에서의 사용: `<table data-layout="vocab">`, `VOCAB_LAYOUT`
 - 관련 파일: src/lib/workbook-markup.ts, src/styles/reference-sheet.css
+
+## 구절 풀이 (phrase note)
+- 정의: 구절 바로 밑(또는 위)에 붙는 작은 글씨 풀이. 자습서의 행간 풀이('푸른 파도가' 밑 '시각적 심상', '우리 집 현관' 위 '항구')다. 연·문단 옆에 붙는 여백 해설과 달리 구절 하나에 붙는다. 밑줄은 따로 `<u>` 라 줄 전체에 밑줄을 긋고 그 안의 구절에만 달 수 있다. 참고자료로 보낼 때는 풀이 글자를 뺀다
+- 코드에서의 사용: `<span data-note="…">`, 위면 `data-note-pos="over"`, `PhraseNoteMark`(편집기), `isPhraseNote`, `PHRASE_NOTE_MAX`
+- 관련 파일: src/lib/workbook-markup.ts, src/components/problem-editor/WorkbookMarks.ts, src/components/problem-editor/PhraseNoteControls.tsx, src/styles/reference-phrase-marks.css
+
+## 표식 (shape mark)
+- 정의: 낱말에 그리는 □ ○ △ ◇ ☆ 다섯 가지. □ ○ 는 낱말을 두르고 △ ◇ ☆ 는 낱말 앞 작은 기호와 점선 밑줄이다. 범례('□: 수고로운 현실')는 새 표시 없이 여백 해설 칸에 글로 적는다. 문항의 네모 표시(`<code>`)와 □ 는 모양이 같지만 표식은 참고자료에만 있다
+- 코드에서의 사용: `<span data-shape="box|circle|triangle|diamond|star">`, `ShapeMark`(편집기), `SHAPE_KINDS`, `SHAPE_LABELS`, `SHAPE_GLYPHS`
+- 관련 파일: src/lib/workbook-markup.ts, src/components/problem-editor/WorkbookMarks.ts, src/styles/reference-phrase-marks.css
 
 ## 흐름 목록 (flow list)
 - 정의: 화살표 도식(전 ↓ 중 ↓ 후, 화자 → 청자)을 담는 점 목록. 항목마다 상자, 사이에 화살표를 화면이 그린다

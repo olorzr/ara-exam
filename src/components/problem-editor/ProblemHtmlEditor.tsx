@@ -13,7 +13,7 @@ import { hasYetHangul } from '@/lib/yet-hangul';
 import { FigurePlaceholderNode } from './FigurePlaceholderNode';
 import ProblemEditorToolbar from './ProblemEditorToolbar';
 import { VerseTableAttribute, VerseTableView } from './VerseTableAttribute';
-import { ReferenceTableLayoutAttribute, WORKBOOK_EXTENSIONS } from './WorkbookExtensions';
+import { REFERENCE_STARTER_KIT, ReferenceTableLayoutAttribute, WORKBOOK_EXTENSIONS } from './WorkbookExtensions';
 
 /**
  * 〈보기〉 상자를 살려 두는 blockquote.
@@ -94,7 +94,7 @@ export default function ProblemHtmlEditor({
     extensions: [
       // 밑줄·줄바꿈(<br>)·구분선(<hr>)은 StarterKit 3.x 에 이미 들어 있다.
       // @tiptap/extension-underline 을 따로 등록하면 확장이 두 벌이 된다
-      StarterKit.configure({ heading: { levels: [3, 4] } }),
+      StarterKit.configure({ heading: { levels: [3, 4] }, ...(reference ? REFERENCE_STARTER_KIT : {}) }),
       BoxAttribute,
       // 없으면 편집기가 그림 자리표시자를 모르는 태그로 보고 버린다
       FigurePlaceholderNode,

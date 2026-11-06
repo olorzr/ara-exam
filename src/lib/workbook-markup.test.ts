@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CALLOUT_LABEL_MAX, CALLOUT_PRESETS, CALLOUT_TONE_LABELS, CALLOUT_TONES, REFERENCE_TABLE_LAYOUTS,
-  isCalloutLabel, isCalloutTone, isFlowDirection,
+  CALLOUT_LABEL_MAX, CALLOUT_PRESETS, CALLOUT_TONE_LABELS, CALLOUT_TONES, NOTE_POS_OVER, PHRASE_NOTE_MAX,
+  REFERENCE_TABLE_LAYOUTS, SHAPE_GLYPHS, SHAPE_KINDS, SHAPE_LABELS,
+  isCalloutLabel, isCalloutTone, isFlowDirection, isNotePos, isPhraseNote, isShapeKind,
 } from './workbook-markup';
 
 describe('isCalloutLabel', () => {
@@ -39,5 +40,40 @@ describe('갈래·방향·표 모양', () => {
 
   it('표 모양은 나란히·여백 해설·어휘 풀이 셋', () => {
     expect([...REFERENCE_TABLE_LAYOUTS].sort()).toEqual(['gloss', 'verse', 'vocab']);
+  });
+});
+
+describe('구절 풀이', () => {
+  it('자습서에 적힌 풀이를 받는다', () => {
+    for (const note of ['시각적 심상', '부모님의 구두', "'닻' = 휴식", '(비유)', '가'.repeat(PHRASE_NOTE_MAX)]) {
+      expect(isPhraseNote(note)).toBe(true);
+    }
+  });
+
+  it('빈 글자·앞뒤 공백·상한 초과·보이지 않는 글자를 막는다', () => {
+    for (const bad of ['', ' 심상', '심상 ', '가'.repeat(PHRASE_NOTE_MAX + 1), '심\u0007상', '심\u200b상', '심\ue000상', '심\n상', '현실 > 이상', 'a<b']) {
+      expect(isPhraseNote(bad)).toBe(false);
+    }
+  });
+
+  it('자리 값은 over 하나뿐이다 — 아래는 속성을 비운다', () => {
+    expect(isNotePos(NOTE_POS_OVER)).toBe(true);
+    expect(isNotePos('under')).toBe(false);
+    expect(isNotePos('')).toBe(false);
+  });
+});
+
+describe('표식', () => {
+  it('다섯 가지이고 이름이 있다', () => {
+    expect([...SHAPE_KINDS]).toEqual(['box', 'circle', 'triangle', 'diamond', 'star']);
+    for (const kind of SHAPE_KINDS) {
+      expect(isShapeKind(kind)).toBe(true);
+      expect(SHAPE_LABELS[kind]).toBeTruthy();
+    }
+    expect(isShapeKind('square')).toBe(false);
+  });
+
+  it('두르는 표식(□ ○)에는 앞붙임 기호가 없다', () => {
+    expect(Object.keys(SHAPE_GLYPHS).sort()).toEqual(['diamond', 'star', 'triangle']);
   });
 });

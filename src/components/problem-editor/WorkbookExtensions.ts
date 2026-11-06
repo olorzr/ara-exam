@@ -1,10 +1,16 @@
-import { Extension, Mark } from '@tiptap/core';
+import { Extension } from '@tiptap/core';
 import { DOMParser as ProseMirrorDOMParser } from '@tiptap/pm/model';
 import { Plugin } from '@tiptap/pm/state';
 import type { EditorView } from '@tiptap/pm/view';
 import { textToHtml } from '@/lib/reference-texts/body-format';
 import { REFERENCE_TABLE_LAYOUTS } from '@/lib/workbook-markup';
+import { keepPhraseRuns } from './phrase-run-keeper';
 import { createTableLayoutAttribute } from './VerseTableAttribute';
+import {
+  HighlightMark, PhraseNoteMark, ReferenceCodeMark, ShapeMark, SmallMark, passThrough,
+} from './WorkbookMarks';
+
+export { HighlightMark, PhraseNoteMark, ReferenceCodeMark, ShapeMark, SmallMark } from './WorkbookMarks';
 
 /**
  * 작품 전문 · 개념 편집기(참고자료 프로필)에만 얹는 확장 — 문제집 서식(workbook-markup.ts)이 저장할 때 사라지지 않게.
@@ -14,22 +20,6 @@ import { createTableLayoutAttribute } from './VerseTableAttribute';
  *    같은 함정). 값 검증은 정화기(`sanitizeReferenceHTML`)가 하므로 여기서는 통과만 시킨다.
  * ⚠️ 문항 편집기에는 넣지 않는다 — 문항 정화기가 어차피 지우고, 지운 표시를 편집기가 다시 만들면 안 된다.
  */
-
-/**
- * 한 속성을 그대로 읽고 쓰는 전역 속성 정의.
- * @param attr - HTML 속성 이름
- * @returns TipTap 속성 정의
- */
-function passThrough(attr: string) {
-  return {
-    default: null,
-    parseHTML: (element: HTMLElement) => element.getAttribute(attr),
-    renderHTML: (attributes: Record<string, unknown>) => {
-      const value = attributes[attr];
-      return typeof value === 'string' && value ? { [attr]: value } : {};
-    },
-  };
-}
 
 /** 말머리 상자 — blockquote 의 `data-callout`(말머리) · `data-tone`(색 갈래). 〈보기〉 상자(`data-box`)와 같은 꼴 */
 export const CalloutAttribute = Extension.create({
@@ -47,34 +37,6 @@ export const FlowAttribute = Extension.create({
   name: 'flowAttribute',
   addGlobalAttributes() {
     return [{ types: ['bulletList'], attributes: { 'data-flow': passThrough('data-flow') } }];
-  },
-});
-
-/**
- * 핵심어 형광펜 `<mark>` — 개념지의 `ConceptMark`(`mark[data-concept]`, 빈칸 마킹)와 다른 것이다(속성 없음).
- * 새 패키지(`@tiptap/extension-highlight`)를 깔지 않는다.
- */
-export const HighlightMark = Mark.create({
-  name: 'highlight',
-  parseHTML() {
-    return [{ tag: 'mark' }];
-  },
-  renderHTML() {
-    return ['mark', 0];
-  },
-  addKeyboardShortcuts() {
-    return { 'Mod-Shift-h': () => this.editor.commands.toggleMark(this.name) };
-  },
-});
-
-/** 작은 글씨 `<small>` — 어휘의 한자 풀이(話 말할 화, 者 사람 자) */
-export const SmallMark = Mark.create({
-  name: 'small',
-  parseHTML() {
-    return [{ tag: 'small' }];
-  },
-  renderHTML() {
-    return ['small', 0];
   },
 });
 
@@ -116,5 +78,25 @@ export const PlainTextPaste = Extension.create({
   },
 });
 
+/** 내용이 바뀌어도 풀이·표식 한 덩이가 갈라지지 않게 지킨다(`keepPhraseRuns`) — 키보드 · 툴바 · 붙여넣기 어느 길이든 */
+export const PhraseRunKeeper = Extension.create({
+  name: 'phraseRunKeeper',
+  addProseMirrorPlugins() {
+    return [new Plugin({
+      appendTransaction: (transactions, _oldState, state) => keepPhraseRuns(transactions, state),
+    })];
+  },
+});
+
+/**
+ * 참고자료 편집기의 StarterKit 설정 — `code` 는 `ReferenceCodeMark` 로 바꾸고 `link` 는 끈다.
+ * ⚠️ 링크는 우선순위가 1000 이라 구절 풀이보다 바깥에 놓여 풀이를 링크 경계마다 쪼갠다. 그런데 정화기는 `<a>` 를 지우므로
+ *    저장하면 링크는 사라지고 같은 풀이만 여러 번 찍힌다. 어차피 저장 못 할 표시라 편집기에 들이지 않는다.
+ */
+export const REFERENCE_STARTER_KIT = { code: false, link: false } as const;
+
 /** 참고자료 편집기에 얹는 확장 묶음(표 모양 속성은 따로 — 문항 편집기의 verse 속성과 자리를 바꾼다) */
-export const WORKBOOK_EXTENSIONS = [CalloutAttribute, FlowAttribute, HighlightMark, SmallMark, PlainTextPaste];
+export const WORKBOOK_EXTENSIONS = [
+  CalloutAttribute, FlowAttribute, HighlightMark, SmallMark, PhraseNoteMark, ShapeMark, ReferenceCodeMark,
+  PhraseRunKeeper, PlainTextPaste,
+];

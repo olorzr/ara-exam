@@ -5,6 +5,7 @@ import { useEditorState, type Editor } from '@tiptap/react';
 import { Bold, Italic, Minus, Table as TableIcon, Underline as UnderlineIcon, WrapText } from 'lucide-react';
 import { BOX_LABEL_OPTIONS } from '@/lib/box-labels';
 import { VERSE_LAYOUT } from '@/lib/sanitize-problem';
+import { toolbarButtonClass as buttonClass } from './toolbar-styles';
 import WorkbookToolbarControls from './WorkbookToolbarControls';
 import YetHangulDialog from './YetHangulDialog';
 
@@ -40,9 +41,6 @@ export default function ProblemEditorToolbar({ editor, profile = 'problem' }: Pr
       boxLabel: (e.getAttributes('blockquote')['data-box'] as string | null) ?? null,
     }),
   });
-
-  const buttonClass = (active: boolean) =>
-    `rounded px-2 py-1 text-xs ${active ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700'}`;
 
   /** 고른 말머리로 감싸거나(없으면 만들고) 상자를 푼다 */
   const setBox = (value: string) => {

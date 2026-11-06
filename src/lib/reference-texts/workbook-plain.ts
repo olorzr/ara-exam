@@ -11,8 +11,12 @@ import { htmlToText } from './body-format';
  *
  * 걷는 것: 말머리 상자(`blockquote[data-callout|data-tone]`) 통째, 어휘 풀이 표(`table[data-layout="vocab"]`) 통째,
  * 화살표 도식(`ul[data-flow]`) 통째. 여백 해설 표(`table[data-layout="gloss"]`)는 줄마다 **첫째 칸(원문)만** 꺼낸다.
- * `mark`·`small` 은 표시만 벗긴다(글자는 원문이다).
+ * `mark`·`small` 은 표시만 벗긴다(글자는 원문이다). 구절 풀이·표식은 `span` 의 속성이라 속성만 벗긴다 — 풀이 글자는 해설이고
+ * 구절 글자는 원문이다.
  */
+
+/** 구절 풀이·표식 속성 — 정화기를 지난 값이라 큰따옴표로만 온다 */
+const PHRASE_ATTR = /\s+data-(?:note-pos|note|shape)="[^"]*"/gi;
 
 /** 원문 블록으로 이미 감싸인 칸 속 — 아니면 `<p>` 로 감싼다 */
 const BLOCK_START = /^\s*<(p|h3|h4|ul|ol|blockquote|table|figure)\b/i;
@@ -130,7 +134,9 @@ export function stripWorkbookNotes(html: string): string {
   out = replaceElements(out, 'table', /\bdata-layout=["']vocab["']/i, () => '');
   out = replaceElements(out, 'ul', /\bdata-flow=/i, () => '');
   out = replaceElements(out, 'table', /\bdata-layout=["']gloss["']/i, glossToBlocks);
-  return out.replace(/<\/?(mark|small)\b[^>]*>/gi, '');
+  return out
+    .replace(/<\/?(mark|small)\b[^>]*>/gi, '')
+    .replace(/<span\b[^>]*>/gi, (tag) => tag.replace(PHRASE_ATTR, ''));
 }
 
 /**

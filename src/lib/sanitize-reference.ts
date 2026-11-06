@@ -3,9 +3,9 @@ import { FORBID_ATTR, FORBID_TAGS, SAFE_URI_REGEXP } from './sanitize-html';
 import {
   PROBLEM_ALLOWED_ATTR, PROBLEM_ALLOWED_CSS_PROPS, PROBLEM_ALLOWED_TAGS, PROBLEM_DATA_ATTRS,
 } from './sanitize-problem';
-import { withProfile, type SanitizeProfile } from './sanitize-profile';
+import { withProfile, type DataAttrCheck, type SanitizeProfile } from './sanitize-profile';
 import {
-  REFERENCE_TABLE_LAYOUTS, isCalloutLabel, isCalloutTone, isFlowDirection,
+  REFERENCE_TABLE_LAYOUTS, isCalloutLabel, isCalloutTone, isFlowDirection, isNotePos, isPhraseNote, isShapeKind,
 } from './workbook-markup';
 
 /**
@@ -17,6 +17,7 @@ import {
  *   - `blockquote` 의 `data-callout`(말머리, 24자) · `data-tone`(색 갈래)
  *   - `ul` 의 `data-flow`(화살표 도식 down·right)
  *   - `table` 의 `data-layout` 에 `gloss`(원문·여백 해설) · `vocab`(낱말·풀이)
+ *   - `span` 의 `data-note`(구절 풀이, 60자) · `data-note-pos`(`over` 면 구절 위) · `data-shape`(표식 □ ○ △ ◇ ☆)
  *
  * ⚠️ 문항 프로필을 넓히지 않고 따로 두는 이유: 기출 지문·발문이 그 규칙으로 돌고, 적재 도구가 그 정화기와의
  *    왕복으로 화면에서 사라질 서식을 막는다. 문항에 말머리 상자가 들어오면 인쇄가 원본과 달라진다.
@@ -25,13 +26,23 @@ import {
 
 const REFERENCE_ALLOWED_TAGS = [...PROBLEM_ALLOWED_TAGS, 'mark', 'small'];
 
-const REFERENCE_ALLOWED_ATTR = [...PROBLEM_ALLOWED_ATTR, 'data-callout', 'data-tone', 'data-flow'];
+const REFERENCE_ALLOWED_ATTR = [
+  ...PROBLEM_ALLOWED_ATTR, 'data-callout', 'data-tone', 'data-flow', 'data-note', 'data-note-pos', 'data-shape',
+];
 
-const REFERENCE_DATA_ATTRS = new Map(PROBLEM_DATA_ATTRS);
+const REFERENCE_DATA_ATTRS = new Map<string, DataAttrCheck>(PROBLEM_DATA_ATTRS);
 REFERENCE_DATA_ATTRS.set('data-layout', (value, tagName) => tagName === 'table' && REFERENCE_TABLE_LAYOUTS.has(value));
 REFERENCE_DATA_ATTRS.set('data-callout', (value, tagName) => tagName === 'blockquote' && isCalloutLabel(value));
 REFERENCE_DATA_ATTRS.set('data-tone', (value, tagName) => tagName === 'blockquote' && isCalloutTone(value));
 REFERENCE_DATA_ATTRS.set('data-flow', (value, tagName) => tagName === 'ul' && isFlowDirection(value));
+// 구절 풀이·표식은 글자 사이의 span 에만 — 블록·밑줄·형광펜에 붙은 것은 걷는다(CSS 도 span 만 그린다)
+REFERENCE_DATA_ATTRS.set('data-note', (value, tagName) => tagName === 'span' && isPhraseNote(value));
+REFERENCE_DATA_ATTRS.set('data-note-pos', (value, tagName) => tagName === 'span' && isNotePos(value));
+// ⚠️ 한 span 에 풀이와 표식을 함께 두지 않는다 — 위 풀이와 △ ◇ ☆ 가 같은 `::before` 를 두고 부딪혀 기호가 사라지고, □ ○ 는 풀이까지
+//    두른다. 편집기는 언제나 `<span data-note><span data-shape>` 로 내보내므로 이 모양은 적재로만 들어온다 — 왕복 검사가 막는다
+REFERENCE_DATA_ATTRS.set('data-shape', (value, tagName, element) => (
+  tagName === 'span' && isShapeKind(value) && !element.hasAttribute('data-note')
+));
 
 const REFERENCE_PROFILE: SanitizeProfile = {
   allowedCss: PROBLEM_ALLOWED_CSS_PROPS,
@@ -43,6 +54,9 @@ const REFERENCE_SANITIZE_CONFIG = {
   ALLOWED_ATTR: REFERENCE_ALLOWED_ATTR,
   ALLOW_DATA_ATTR: false,
   ALLOWED_URI_REGEXP: SAFE_URI_REGEXP,
+  // 풀이는 주소로 쓰이지 않고(`isPhraseNote` 가 따로 본다) `content: attr()` 로 글자만 찍힌다.
+  // ⚠️ 빼면 'A: 화자' 를 주소로 오해해 속성째 지운다 — 영문자 뒤 쌍점이 낯선 scheme 으로 읽힌다
+  ADD_URI_SAFE_ATTR: ['data-note'],
   FORBID_TAGS,
   FORBID_ATTR,
   KEEP_CONTENT: true,

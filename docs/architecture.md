@@ -319,7 +319,8 @@ src/
 ## lib/reference-texts (작품 전문 · 개념)
 - 역할: 작품 원문 · 개념 정리 CRUD 와 파일 가져오기(`.txt`·PDF 글자 레이어), 분류(교과서 단원 여럿·문법·판본 메모, sql/60)와
   왼쪽 패널 트리(교과서 · 단원 / 작품 / 문법). 본문은 문제집 서식 HTML(2026-10-28 — `lib/workbook-markup` ·
-  `lib/sanitize-reference`)이고 화면은 `components/reference-texts/ReferenceBodyView` + `styles/reference-sheet.css`
+  `lib/sanitize-reference`)이고 화면은 `components/reference-texts/ReferenceBodyView` + `styles/reference-sheet.css` ·
+  `styles/reference-phrase-marks.css`(구절 풀이 · 표식, 편집기 쪽은 `problem-editor/WorkbookMarks` · `PhraseNoteControls` · `phrase-mark-rules` · `phrase-run-keeper`)
 - 의존: lib/supabase, lib/pg-array-literal, lib/problem-bank(queries.escapeIlike·unit-tree·grammar-tree·
   grammar-browse-tree·grammar-counts·work-tree·school-exam-tree 의 FacetTreeNode), lib/category-name,
   lib/category-tree(naturalCompare), lib/pdf(openPdfSource·readPageText)
@@ -329,7 +330,7 @@ src/
   import-text.ts(순수: 잇기·판정), import.ts(브라우저: 파일 읽기)
 - 훅: useReferenceTexts(목록 — 검색어·축 거울), useReferenceTextFacets(트리 재료, 실패 시 이전 트리 유지),
   useReferenceTextEditor(편집 — 배열 칸도 `settle` 이 칸마다 가린다), useLazyLoad(고르기 창 목록을 처음 열 때 한 번)
-- workbook-plain.ts: `stripWorkbookNotes`·`referenceBodyPlainText` — 해설·상자·어휘를 걷은 **원문**(참고자료·적재 도구의 같은 글 판정)
+- workbook-plain.ts: `stripWorkbookNotes`·`referenceBodyPlainText` — 해설·상자·어휘를 걷고 구절 풀이·표식 속성을 벗긴 **원문**(참고자료·적재 도구의 같은 글 판정)
 - ⚠️ 본문 형식은 둘이다 — 옛 평문(`text`, 텍스트 노드로만 그린다)과 문제집 서식(`html`, `sanitizeReferenceHTML`).
   저장 · 읽기 · 견주기(form.ts)와 편집기(`ProblemHtmlEditor profile="reference"`) · 보기 화면이 같은 정화기다
 - ⚠️ 쓰기는 원장만(sql/84 RLS, 화면은 `useOwnerAccess` 로 단추를 숨긴다), 읽기는 도메인 전원
