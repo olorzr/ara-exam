@@ -711,6 +711,16 @@
 - ⚠️ **낱자 하나만 있는 글은 옛한글로 세지 않는다** — 'ㆍ의 소실' 을 묻는 문법 문항까지
   블록 글꼴이 바뀌면 안 된다
 
+## 빈칸 (blank)
+- 정의: 시험지에서 답을 넣는 자리로, 전각 공백을 밑줄이나 네모로 감싼 글(`<u>　　　</u>`, `<u>　㉠　</u>`, `<code>　ⓐ　</code>`). 주관식 답 쓰는 빈칸(`.pb-q__blank`)과는 다르다
+- 코드에서의 사용: `markBlanks`(렌더 시점 표시), `isBlankText`, `.pb-blank`
+- 관련 파일: src/lib/problem-bank/blanks.ts, src/styles/problem-paper.css
+
+## 붙은 문항 (glued question)
+- 정의: 지문과 상관없이 혼자 서는 문항이 업체 정리본 순서 때문에 앞 지문에 붙어 들어온 것. 지문의 작품을 물려받아 그 작품 문항으로 나온다
+- 코드에서의 사용: 적재 도구의 `should_detach`·`apply_detach`, 스펙의 `keep_on_passage`(지문을 쓰는 문항이라는 표시)
+- 관련 파일: ~/.claude/tools/exam-specs/detach.py, detach-gate.py, sql/86_problem_bank_detach_glued_questions.sql
+
 ## 첫가끝 코드 (조합형 자모, conjoining jamo)
 - 정의: 옛한글 음절을 **초성·중성·종성 자모를 순서대로 늘어놓아** 적는 유니코드 방식
   (초성 U+1100~115F·U+A960~, 중성 U+1160~11A7·U+D7B0~, 종성 U+11A8~11FF·U+D7CB~).

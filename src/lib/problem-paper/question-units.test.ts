@@ -27,6 +27,10 @@ describe('displayStemHtml', () => {
     expect(displayStemHtml(`<p>* ${YET} : 풀이</p>`)).toBe(`<p class="pb-note yet-hangul">* ${YET} : 풀이</p>`);
   });
 
+  it('빈칸에도 표시가 붙는다', () => {
+    expect(displayStemHtml('<p><u>\u3000\u3000</u></p>')).toBe('<p><u class="pb-blank">\u3000\u3000</u></p>');
+  });
+
   it('저장값에 섞인 class 는 정화기가 지운다 — 표시는 그릴 때만 붙는다', () => {
     expect(displayStemHtml('<p class="yet-hangul">현대</p>')).toBe('<p>현대</p>');
   });

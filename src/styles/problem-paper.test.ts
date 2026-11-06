@@ -21,6 +21,9 @@ describe('문제지 — 글이 단 밖으로 나가지 않게', () => {
           <p class="pb-q__source">출처</p>
           <div class="pb-q__head"><span class="q-num">1</span><div class="pb-q__stem"><p>물음</p></div></div>
           <table><tbody><tr><td>칸</td></tr></tbody></table>
+          <table class="pb-q__paired-choices"><tbody><tr><td class="paired">칸</td></tr></tbody></table>
+          <table><tbody><tr class="wide">${'<td>ㅴ</td>'.repeat(16)}</tr></tbody></table>
+          <p><u class="pb-blank">　　</u></p>
         </div>
       </div>`;
     document.body.appendChild(host);
@@ -44,6 +47,20 @@ describe('문제지 — 글이 단 밖으로 나가지 않게', () => {
 
   it('끊을 자리가 없는 글자열도 꺾는다 — 최소 폭을 안 바꾸는 break-word 다', () => {
     expect(computed('.pb-sheet').getPropertyValue('overflow-wrap')).toBe('break-word');
+  });
+
+  it('표 선지는 자리가 모자라면 꺾인다 — nowrap 이면 표가 단 밖으로 나간다', () => {
+    expect(computed('td.paired').getPropertyValue('white-space')).not.toBe('nowrap');
+    expect(computed('td.paired').getPropertyValue('overflow-wrap')).toBe('anywhere');
+  });
+
+  it('칸이 아주 많은 표만 칸 여백을 줄인다', () => {
+    expect(computed('.wide td').getPropertyValue('padding-left')).toBe('1px');
+    expect(computed('table:first-of-type td').getPropertyValue('padding-left')).toBe('5px');
+  });
+
+  it('빈칸은 통째로 다음 줄로 넘어간다 — 줄 끝에 걸치면 밑줄이 옆 단으로 뻗는다', () => {
+    expect(computed('.pb-blank').getPropertyValue('white-space')).toBe('nowrap');
   });
 
   it('표 칸과 출처 줄은 제 규칙을 그대로 쓴다', () => {

@@ -384,13 +384,18 @@
   width: auto;
   margin: 4px 0 0 20px;
 }
+/*
+ * ⚠️ `nowrap` 으로 되돌리지 말 것 — 긴 칸이 표를 단 밖으로 밀었다(운영 +65px, 2026-11-06). 표가 자리에 맞으면 칸이
+ *    안 꺾이므로 넘치지 않던 표의 모양은 그대로다. 꺾일 때는 낱말 단위로.
+ */
 .pb-sheet .pb-q__paired-choices th,
 .pb-sheet .pb-q__paired-choices td {
   border: 0;
   background: transparent;
   padding: 1px 16px;
   text-align: center;
-  white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 .pb-sheet .pb-q__paired-choices th:not(:first-child) {
   text-decoration: underline;
@@ -474,6 +479,18 @@
   overflow-wrap: anywhere;
 }
 .pb-sheet th { background: #f3f4f6; font-weight: 700; }
+
+/*
+ * 칸이 아주 많은 표(낱자 문자표처럼 한 줄에 13칸 넘게) — 칸의 최소 폭은 글자 + 안쪽 여백이라 그대로 두면 표가 단보다
+ * 넓어진다. 표는 꺾을 자리가 없으니 여백을 줄인다. 보통 표는 이 규칙에 안 걸린다.
+ */
+.pb-sheet tr:has(> :nth-child(13)) > :is(td, th) { padding-left: 1px; padding-right: 1px; }
+
+/*
+ * 빈칸 — 전각 공백으로 적은 밑줄·네모(`markBlanks`, blanks.ts). 줄 끝의 전각 공백은 다음 줄로 안 넘어가고 단 밖에
+ * 걸치는데 밑줄·테두리는 그대로 그려져 옆 단으로 뻗는다. 통째로 다음 줄로 보낸다.
+ */
+.pb-sheet .pb-blank { white-space: nowrap; }
 
 /*
  * 칸선 없는 나란히 표 — 향찰과 해독, 한시와 번역처럼 원문과 풀이를 줄 맞춰 나란히 적은 글

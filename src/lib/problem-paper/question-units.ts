@@ -1,4 +1,5 @@
 import { createHost } from '@/lib/print/table-dom';
+import { markBlanks } from '@/lib/problem-bank/blanks';
 import { unplacedFigures } from '@/lib/problem-bank/figure-render';
 import { markFootnotes } from '@/lib/problem-bank/footnotes';
 import { hasTabulatedChoices, matrixChoices, pairedChoices } from '@/lib/problem-bank/paired-choices';
@@ -62,14 +63,14 @@ export function questionChoiceLayout(snapshot: PaperItemSnapshot): QuestionChoic
 }
 
 /**
- * 저장된 발문을 그릴 수 있는 HTML 로 — 정화하고 끝 빈 문단을 걷고 각주·옛한글을 표시한다.
+ * 저장된 발문을 그릴 수 있는 HTML 로 — 정화하고 끝 빈 문단을 걷고 각주·옛한글·빈칸을 표시한다.
  * 문제지와 문제 은행 화면이 **이 함수 하나**를 쓴다. 갈리면 같은 문항이 두 곳에서 다른 글꼴로 나온다.
  * ⚠️ 차례를 바꾸지 말 것 — 각주 표시가 새로 만든 문단에도 옛한글 표시가 붙어야 한다.
  * @param raw - 저장된 발문 HTML
- * @returns 그릴 수 있는 HTML (다시 정화하지 않는다 — 각주·옛한글 class 가 사라진다)
+ * @returns 그릴 수 있는 HTML (다시 정화하지 않는다 — 표시 class 가 사라진다)
  */
 export function displayStemHtml(raw: string): string {
-  return markYetHangul(markFootnotes(stripTrailingEmptyParagraphs(sanitizeProblemHTML(raw))));
+  return markBlanks(markYetHangul(markFootnotes(stripTrailingEmptyParagraphs(sanitizeProblemHTML(raw)))));
 }
 
 /**
