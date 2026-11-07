@@ -21,7 +21,7 @@ const CONCEPT_HTML = [
 
 const row = (over: Partial<ReferenceTextListItem> = {}): ReferenceTextListItem => ({
   id: 't1', title: '저녁 항구', author: '함기석', kind: '작품', format: 'html', seq: 30, tags: [],
-  source_key: null, char_count: 100,
+  source_key: null, part_of: null, char_count: 100,
   units: [
     { grade: '중2', textbook: '천재(노미숙)', semester: '1학기', unit_path: ['1. 문학의 즐거움', '(1) 시의 표현'] },
     { grade: '중2', textbook: '동아', semester: '1학기', unit_path: ['2. 다른 단원'] },

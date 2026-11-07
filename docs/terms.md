@@ -854,6 +854,11 @@
 - 코드에서의 사용: `<span data-shape="box|circle|triangle|diamond|star">`, `ShapeMark`(편집기), `SHAPE_KINDS`, `SHAPE_LABELS`, `SHAPE_GLYPHS`
 - 관련 파일: src/lib/workbook-markup.ts, src/components/problem-editor/WorkbookMarks.ts, src/styles/reference-phrase-marks.css
 
+## 묶음 · 부분 (bundle · part)
+- 정의: 평가문제집 개념의 **묶음**은 단원 총괄(단원 전체를 아우르는 글 하나)과 제재 정리(지문마다 하나)다. **부분**은 묶음에 든 낱개 개념이다. 부분은 지우지 않고 목록·트리·고르기에서 숨기며 주소로만 열린다. 묶음을 지우면 부분도 함께 지워진다
+- 코드에서의 사용: `reference_texts.part_of`, `bundle_digest`(도구 전용), `isReferenceBundle`, `referenceDeletePrompt`, 열쇠 `평가문제집|<교과서>|<학년-학기>|묶음|…`
+- 관련 파일: src/lib/reference-texts/bundle.ts, src/lib/reference-texts/queries.ts, sql/98_reference_texts_part_of.sql, ~/.claude/tools/regroup-concepts.js
+
 ## 흐름 목록 (flow list)
 - 정의: 화살표 도식(전 ↓ 중 ↓ 후, 화자 → 청자)을 담는 점 목록. 항목마다 상자, 사이에 화살표를 화면이 그린다
 - 코드에서의 사용: `<ul data-flow="down|right">`, `FlowAttribute`

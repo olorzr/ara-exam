@@ -6,13 +6,13 @@ import { ALL_REFERENCE_TEXTS } from '@/lib/reference-texts/filters';
 const ROWS: ReferenceTextListItem[] = [
   {
     id: 'w1', title: '저녁 항구', author: '함기석', kind: '작품', format: 'html', seq: 30, tags: [],
-    source_key: null, char_count: 120,
+    source_key: null, part_of: null, char_count: 120,
     units: [{ grade: '중2', textbook: '천재(노미숙)', semester: '1학기', unit_path: ['1. 문학을 펼치면', '(1) 시의 목소리'] }],
     grammar_paths: [], note: '평가문제집 수록 부분', user_id: 'u', updated_by: null, created_at: '', updated_at: '',
   },
   {
     id: 'c1', title: '비유의 효과', author: '', kind: '개념', format: 'html', seq: 10, tags: [],
-    source_key: null, char_count: 80, units: [],
+    source_key: null, part_of: null, char_count: 80, units: [],
     grammar_paths: [], note: '', user_id: 'u', updated_by: null, created_at: '', updated_at: '',
   },
 ];

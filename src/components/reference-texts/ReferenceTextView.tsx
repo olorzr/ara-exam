@@ -67,6 +67,12 @@ export default function ReferenceTextView({ row, backHref, onEdit }: ReferenceTe
           {row.author && <span className="ml-2 text-base font-normal text-gray-500">{row.author}</span>}
         </h1>
         {row.note && <p className="text-sm text-amber-700">{row.note}</p>}
+        {row.part_of && (
+          <p className="text-sm text-gray-500" data-no-print>
+            이 글은 묶음의 일부예요.{' '}
+            <Link href={`${backHref}/${row.part_of}`} className="text-primary underline">묶음 보기</Link>
+          </p>
+        )}
         {(row.units.length > 0 || row.grammar_paths.length > 0) && (
           <ul className="flex flex-wrap gap-1" aria-label="실린 교과서 단원과 문법">
             {row.units.map((unit) => (

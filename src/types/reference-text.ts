@@ -32,6 +32,11 @@ export interface ReferenceText {
    */
   source_key: string | null;
   /**
+   * 이 행이 든 묶음(단원 총괄·제재 정리, sql/98). 있으면 목록·트리·고르기에서 숨기고 주소로만 열린다.
+   * 묶기 도구(`regroup-concepts.js`)가 쓴다. **앱은 보내지 않는다** — 읽기만 한다.
+   */
+  part_of: string | null;
+  /**
    * 본문 글자 수.
    *
    * ⚠️ **DB 트리거가 채운다**(`ab_reference_texts_char_count`) — 앱이 보내는 값은 무시된다.

@@ -15,11 +15,12 @@ import type { ReferenceTextQuery } from './filters';
 
 // ⚠️ 한 줄로 둘 것 — `+` 로 이으면 리터럴 타입이 string 으로 넓어져 PostgREST 의 행 타입
 //    추론이 통째로 풀린다. `ReferenceTextListItem` 과 **1:1** 로 맞춰 둘 것
-export const REFERENCE_TEXT_LIST_COLUMNS = 'id,title,author,kind,format,seq,tags,source_key,char_count,units,grammar_paths,note,user_id,updated_by,created_at,updated_at';
+export const REFERENCE_TEXT_LIST_COLUMNS = 'id,title,author,kind,format,seq,tags,source_key,part_of,char_count,units,grammar_paths,note,user_id,updated_by,created_at,updated_at';
 
 /** 조건을 걸 수 있는 요청 — PostgREST 필터 빌더의 필요한 부분만(`applySourceAxes` 와 같은 규약) */
 interface ReferenceQueryFilterable<T> {
   eq(column: string, value: string): T;
+  is(column: string, value: null): T;
   contains(column: string, value: string): T;
   overlaps(column: string, value: string): T;
 }
@@ -32,6 +33,8 @@ interface ReferenceQueryFilterable<T> {
  *    이름(`1. 나를 깨우는, 문학`)이 쪼개져 0건이 된다(2026-09-27 의 그 문제).
  * ⚠️ 문법 배열은 `pgArrayLiteral` 로 넘긴다(같은 이유). 상위 검색이라 `&&` 다(sql/21).
  * ⚠️ '분류 없음' 은 빈 값과의 같음이다(`units=eq.[]`, `grammar_paths=eq.{}`).
+ * ⚠️ 묶음의 부분(`part_of`)은 어느 조회에서나 뺀다 — 안 빼면 묶음과 그 낱개가 함께 떠 같은 글이 두 번 나온다(sql/98).
+ *    트리 재료(`fetchReferenceTextFacets`)도 같은 조건을 건다. 건수가 어긋나면 트리와 목록이 다른 수를 낸다.
  * @param request - 필터 빌더
  * @param query - 조건 (`toReferenceTextQuery` 가 만든 값)
  * @returns 조건을 건 빌더
@@ -39,7 +42,7 @@ interface ReferenceQueryFilterable<T> {
 export function applyReferenceQuery<T extends ReferenceQueryFilterable<T>>(
   request: T, query: ReferenceTextQuery,
 ): T {
-  let next = request;
+  let next = request.is('part_of', null);
   if (query.unit) next = next.contains('units', JSON.stringify([query.unit]));
   if (query.unitsEmpty) next = next.eq('units', '[]');
   if (query.title !== undefined) next = next.eq('title', query.title);

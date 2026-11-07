@@ -2,6 +2,7 @@
 //    (`lib/quiz-references`)은 조회만 필요하므로 `./queries` 를 **파일 경로로** 가져간다 —
 //    배럴로 가져가면 쓰지도 않는 pdf.js 가 그 화면 번들에 실린다.
 export * from './browse-trees';
+export * from './bundle';
 export * from './constants';
 export * from './facets';
 export * from './filters';

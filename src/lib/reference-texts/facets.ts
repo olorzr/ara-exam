@@ -58,6 +58,7 @@ export async function fetchReferenceTextFacets(): Promise<ReferenceFacetRow[]> {
     const { data, error } = await supabase
       .from('reference_texts')
       .select('id,title,author,kind,units,grammar_paths')
+      .is('part_of', null)
       .order('id')
       .range(from, from + REFERENCE_FACET_CHUNK - 1);
     if (error) {

@@ -5,7 +5,7 @@ import ReferenceTextList from './ReferenceTextList';
 
 const row: ReferenceTextListItem = {
   id: 'r1', title: '저녁 항구', author: '함기석', kind: '작품', format: 'html', seq: 30, tags: ['제재'],
-  source_key: null, char_count: 120, units: [], grammar_paths: [], note: '', user_id: 'u',
+  source_key: null, part_of: null, char_count: 120, units: [], grammar_paths: [], note: '', user_id: 'u',
   updated_by: null, created_at: '2026-10-28T00:00:00Z', updated_at: '2026-10-28T00:00:00Z',
 };
 

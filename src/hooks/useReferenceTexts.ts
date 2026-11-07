@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { referenceDeletePrompt } from '@/lib/reference-texts/bundle';
 import {
   REFERENCE_SEARCH_DEBOUNCE_MS, REFERENCE_TEXT_LIST_LIMIT,
 } from '@/lib/reference-texts/constants';
@@ -147,11 +148,7 @@ export function useReferenceTexts() {
    */
   const remove = useCallback(async (row: ReferenceTextListItem): Promise<boolean> => {
     if (busyRef.current) return false;
-    if (!window.confirm(
-      row.kind === '개념'
-        ? `"${row.title}" 개념 정리를 지울까요?\n되돌릴 수 없습니다.`
-        : `"${row.title}" 전문을 지울까요?\n되돌릴 수 없고, 문제 만들기에서 참고자료로 쓸 수 없게 됩니다.`,
-    )) return false;
+    if (!window.confirm(referenceDeletePrompt(row))) return false;
 
     busyRef.current = true;
     setBusyId(row.id);

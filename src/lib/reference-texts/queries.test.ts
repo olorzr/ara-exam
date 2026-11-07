@@ -46,6 +46,28 @@ beforeEach(() => {
   captured.length = 0;
 });
 
+describe('묶음의 부분 숨기기 (sql/98)', () => {
+  it('목록은 조건이 없어도 부분을 뺀다', async () => {
+    await fetchReferenceTextList(30);
+    expect(lastParam('part_of')).toBe('is.null');
+  });
+
+  it('단원 축과 함께 걸린다 — 단원을 열면 총괄과 제재 정리만 보인다', async () => {
+    await fetchReferenceTextList(30, toReferenceTextQuery({ kind: 'unit', unit }));
+    expect(lastParam('part_of')).toBe('is.null');
+    expect(lastParam('units')).toContain('cs.[');
+  });
+
+  it('검색에도 걸린다 — 낱개 제목으로 찾아도 부분이 따로 뜨지 않는다', async () => {
+    await searchReferenceTexts('핵심 개념', 'title', 30);
+    expect(lastParam('part_of')).toBe('is.null');
+  });
+
+  it('고른 칸 목록에 part_of 가 있다 — 타입과 1:1', () => {
+    expect(REFERENCE_TEXT_LIST_COLUMNS.split(',')).toContain('part_of');
+  });
+});
+
 describe('fetchReferenceTextList — 축 조건의 URL 표기', () => {
   it('축이 없으면 조건 없이 목록 컬럼만 읽는다', async () => {
     await fetchReferenceTextList();
