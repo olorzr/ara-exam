@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, type RefObject } from 'react';
-import { layoutPhraseNotes, layoutPhraseNotesForPrint } from '@/lib/reference-texts/phrase-note-dom';
+import { EXPLANATION_NOTE_SELECTOR, layoutPhraseNotes, layoutPhraseNotesForPrint } from '@/lib/reference-texts/phrase-note-dom';
 import { useIsoLayoutEffect } from './useIsoLayoutEffect';
 
 /**
@@ -21,7 +21,7 @@ export function usePhraseNoteLayout(rootRef: RefObject<HTMLElement | null>, html
 
   useEffect(() => {
     const root = rootRef.current;
-    if (!root || !root.querySelector('span[data-note]')) return;
+    if (!root || !root.querySelector(EXPLANATION_NOTE_SELECTOR)) return;
 
     let printing = false;
     let frame = 0;

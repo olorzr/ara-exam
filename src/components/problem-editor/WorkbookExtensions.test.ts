@@ -79,6 +79,12 @@ describe('구절 풀이 · 표식 — 편집기를 지나도 남는다', () => {
     expect(referenceRoundTrip(html)).toBe(html);
   });
 
+  it('낱말 뜻풀이 갈래가 남고 모르는 값은 해설로 읽는다', () => {
+    const html = '<p><span data-note="닭의 수컷" data-note-kind="vocab">수탉</span></p>';
+    expect(referenceRoundTrip(html)).toBe(html);
+    expect(referenceRoundTrip('<p><span data-note="뜻" data-note-kind="term">수탉</span></p>')).toBe('<p><span data-note="뜻">수탉</span></p>');
+  });
+
   it('한 span 의 풀이와 표식은 두 마크로 읽히고 글자는 한 번만 들어간다', () => {
     expect(referenceRoundTrip('<p><span data-note="가" data-shape="circle">나</span></p>'))
       .toBe('<p><span data-note="가"><span data-shape="circle">나</span></span></p>');
@@ -172,6 +178,13 @@ describe('구절 풀이 명령 — 툴바가 쓰는 체인', () => {
   it('⚠️ 옛 위 풀이에 걸친 범위에 새 풀이를 달면 자리가 하나로 돌아온다 — setMark 는 글자마다 옛 속성에 합친다', () => {
     const editor = referenceEditor('<p>푸른 <span data-note="옛" data-note-pos="over">파도</span>가</p>');
     editor.chain().setTextSelection({ from: 4, to: 7 }).setMark(PHRASE_NOTE_MARK, { 'data-note': '새', 'data-note-pos': null }).run();
+    expect(editor.getHTML()).toBe('<p>푸른 <span data-note="새">파도가</span></p>');
+    editor.destroy();
+  });
+
+  it('⚠️ 옛 낱말 뜻풀이에 걸친 범위에 새 풀이를 달면 갈래가 하나로 돌아온다 — 글자마다 어휘·해설로 갈리면 안 된다', () => {
+    const editor = referenceEditor('<p>푸른 <span data-note="옛" data-note-kind="vocab">파도</span>가</p>');
+    editor.chain().setTextSelection({ from: 4, to: 7 }).setMark(PHRASE_NOTE_MARK, { 'data-note': '새', 'data-note-pos': null, 'data-note-kind': null }).run();
     expect(editor.getHTML()).toBe('<p>푸른 <span data-note="새">파도가</span></p>');
     editor.destroy();
   });

@@ -47,6 +47,13 @@ describe('풀이·표식 안에 끼는 내용 — 같은 풀이가 두 번 찍�
     editor.destroy();
   });
 
+  it('같은 뜻의 해설과 낱말 뜻풀이는 사이에 넣은 글자가 어느 쪽도 안 입는다', () => {
+    const editor = referenceEditor('<p><span data-note="뜻">가</span><span data-note="뜻" data-note-kind="vocab">나</span></p>');
+    editor.chain().setTextSelection(2).insertContent('<br>').run();
+    expect(editor.getHTML()).toBe('<p><span data-note="뜻">가</span><br><span data-note="뜻" data-note-kind="vocab">나</span></p>');
+    editor.destroy();
+  });
+
   it('⚠️ 따로 단 두 풀이는 굵게 · 다시 불러오기 · 붙여넣기 · 되돌리기를 지나도 합쳐지지 않는다', () => {
     const separate = '<p><span data-note="심상">가</span><br><span data-note="심상">나</span></p>';
     const notes = (html: string) => html.match(/data-note=/g)?.length ?? 0;

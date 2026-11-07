@@ -272,7 +272,22 @@ node /Users/ara/Projects/Ara-system/scripts/post-update.js "<HTML>"
 - [2026-11-07] **배포 뒤 '안 고쳐졌다' 는 제보는 먼저 그 탭의 코드를 의심할 것.** 문제 은행·문제지 조합은 머무는 동안 Next 서버를 안 불러 옛 코드가 그대로 돈다. 0.9.73 전에 연 탭은 감시 코드도 없으니 한 번은 손으로 새로 고쳐야 한다
 
 ## Architecture Decisions
-- [2026-11-07 · 0.9.76] **중철에서 빈 면이 생기면 첫 하나는 앞표지 바로 뒤다**([booklet.ts](src/lib/print/booklet.ts) 의 `frontCover`, [BookletStack.tsx](src/components/print/BookletStack.tsx), [A4Document.tsx](src/components/print/A4Document.tsx)). 원장님: "중철 제본 했을 때 빈 장수가 나올 경우 꼭 표지 다음 페이지 하나 비워줘". 앞표지 + 본문 3 + 뒷표지면 읽는 순서가 `표지, 빈, 1, 2, 3, 빈, 빈, 뒷표지` 다. 되돌리지 말아야 할 판단들:
+- [2026-11-07 · 0.9.77] **구절 풀이를 어휘와 설명으로 가른다 — 어휘는 ★ + 글 끝 어휘 목록, 설명만 구절 밑에 남고 밑줄·풀이는 청록**([vocab-list.ts](src/lib/reference-texts/vocab-list.ts), [reference-phrase-marks.css](src/styles/reference-phrase-marks.css), [phrase-note-dom.ts](src/lib/reference-texts/phrase-note-dom.ts), [PhraseNoteControls.tsx](src/components/problem-editor/PhraseNoteControls.tsx), [sql/99](sql/99_reference_texts_vocab_notes.sql), 저장소 밖 `~/.claude/tools/exam-specs/phrase-notes-2026-11-07/vocab/`). 원장님: "개념에서 설명을 밑줄치고 써주는데 대부분이 지금 어휘네?! 어휘는 단어 오른쪽 상단에 작은 별 표시 해 놓고 페이지마다 단어 모음으로 해 주고 설명만 남겨 주라. 밑줄 설명은 잘 보이는 하늘색이나 민트색으로". 풀이 516개를 어휘 405 · 설명 111 로 갈랐다(36행 변경, 설명뿐인 5행은 그대로). 되돌리지 말아야 할 판단들:
+  - **'페이지마다' 는 글 하나에 하나로 풀었다.** 참고자료 인쇄는 `window.print()` 라 쪽 경계를 아는 코드가 없고 A4 엔진은 참고자료를 안 그린다. 쪽마다 모으려면 참고자료를 A4 엔진으로 옮겨야 한다(별건, 원장 결정 대기)
+  - **갈래는 속성 하나다**(`data-note-kind="vocab"`). 뜻은 `data-note` 한 곳에 있고 어휘 목록은 **저장하지 않고 그릴 때 만든다**(`appendVocabList`, 각주와 같은 규약). 저장하면 뜻이 두 벌이 된다
+  - ⚠️ **쓰는 쪽은 전부 `span[data-note][data-note-kind]` 두 속성으로 건다.** 정화기는 둘의 동반을 강제하지 못한다 — DOMPurify 는 속성을 뒤에서 앞으로 돌아, 비어 지워질 `data-note` 가 아직 있을 때 갈래 검사가 온다. 홀로 남은 값은 아무 일도 안 하고 편집기는 첫 편집에서 버린다
+  - ⚠️⚠️ **`PHRASE_ATTR` 에서 `note-kind` 는 `note` 앞이다**(`workbook-plain.ts`). 뒤에 두면 `note` 가 먼저 맞고 `="` 에서 어긋나 이 속성이 평문 경로에 안 걷힌다
+  - ⚠️ **배치는 설명만 잰다**(`EXPLANATION_NOTE_SELECTOR`, 재기 · 훅 문지기 · 하네스). 어휘의 `::after` 는 흐름 안의 ★ 라 `left` 가 `auto` 다. 행간 예약 `:has()` 셋도 어휘를 뺀다 — 안 빼면 어휘만 든 작품이 2.6em 으로 벌어진다
+  - ⚠️ **★ 는 `position: static` · `line-height: 0` 이고 절대 배치 규칙 뒤에 쓴다.** `relative` 면 같은 특이성의 `top: 100%` 가 살아나 ★ 가 문단 높이만큼 밀려난다. `line-height` 를 빼면 올린 ★ 가 그 줄만 벌린다. `content` 의 `\2060` 은 한글과 ★ 사이 줄바꿈을 막는다(없으면 ★ 만 다음 줄 맨 앞으로 떨어진다)
+  - ⚠️ **밑줄 색은 시트의 `u` 전체에 건다.** 구절만 칠하면 풀이가 달린 긴 밑줄 한 줄이 두 색이 된다. `<u>` 를 품은 span 에 밑줄을 또 걸지 말 것 — 안쪽 `<u>` 가 같은 자리에 덧그려 색이 안 보인다(span 밑줄은 `:not(:has(u))` 뿐이다)
+  - **어휘 낱말의 `<u>` 는 데이터를 지우지 않고 화면에서만 지운다.** 책 전사 그대로라 되돌리기 쉽고 검사기의 '밑줄이 줄어듦' 에도 안 걸린다. 긴 밑줄 줄 안의 낱말은 `ref-vocab-in-line` 으로 밑줄을 남기고, 낱말 사이 빈 `<u> </u>` 는 줄이 아니면 글자로 푼다(`settleLines`). 편집기는 `<strong><u>앞</u></strong>` 처럼 서식이 바깥에 오므로 형제의 태그 이름이 아니라 맞닿은 끝 글자를 따라 내려간다(코덱스 1R). ⚠️ CSS `u + span` 으로 가리지 말 것 — 형제 결합자는 글자 노드를 건너뛰어 사이에 맨 글자가 있어도 맞는다
+  - **어휘 목록 CSS 접두를 줄이지 말 것**(`.pb-sheet.ref-sheet .ref-vocab ol.ref-vocab__list`). `:is()` 목록 규칙이 (0,4,1) 이라 지면 번호와 들여쓰기가 샌다. 옛한글 작품은 글꼴을 덮지 않는다
+  - **색은 변수 두 개다**(`--ref-note-color: #0e7490` 글자·★, `--ref-note-line: #22b8cf` 밑줄). 글자 쪽을 옅게 하지 말 것 — 풀이는 11px 안팎이다. 인쇄는 같은 변수를 `#444` 로 덮어 회색 한 벌을 지킨다
+  - **판정 기록이 유일한 원본이다**(`vocab/kinds.json`, 재계산 불가). 옮기기 전 자리(어휘 표 · 날개의 `낱말: 뜻` · 날개의 형광펜)로 가른 뒤 516개 전수를 눈으로 봤다. 자리만으로는 틀린다 — 형광펜인데 사전 뜻풀이 8개(나비잠 · 부적 등), `낱말: 뜻` 인데 인물 해설 2개(양반전 '부자'), 손 판정 45개. 뒤집은 55개는 코덱스 읽기 전용 교차 판정과 전부 일치했다. 「시 창작 시간」 '짐짓' 은 머리말을 뗐다(목록에 낱말이 두 번 찍힌다)
+  - ⚠️ **새 전사는 BRIEF-refs-v3 대로 어휘에 갈래를 단다.** 적재기가 옛 모양을 쓰면 갈래가 사라진다 — 적재 뒤 `apply-notes.cjs --reconcile`. `vocab/mark-vocab.cjs --local` 이 `refs-v3` · `apply-log` · `apply-plan` · A/B refs 를 같은 본문으로 맞춰 둔 덕에 그 도구가 그대로 돈다. appfns 는 이 판으로 다시 묶었다 — 옛 묶음은 이 속성을 말없이 걷는다
+  - **편집기는 어휘도 상자 그대로다.** ★ 와 옅은 민트 바탕으로 구별만 한다. 어휘로 바꾸면 '구절 위/아래' 단추가 숨는다(저장된 자리 값은 화면이 안 쓰고 지우지도 않는다). 새 풀이는 갈래를 비워 넣는다 — `setMark` 는 글자마다 옛 속성에 합쳐 어휘·해설로 갈린다(`NEW_NOTE`)
+  - ⚠️ **개념 행은 풀이가 0개라 데이터가 안 바뀐다**(937행). 밑줄 색만 함께 바뀐다. 개념의 어휘 풀이 표(195행)는 그대로다
+ 첫 하나는 앞표지 바로 뒤다**([booklet.ts](src/lib/print/booklet.ts) 의 `frontCover`, [BookletStack.tsx](src/components/print/BookletStack.tsx), [A4Document.tsx](src/components/print/A4Document.tsx)). 원장님: "중철 제본 했을 때 빈 장수가 나올 경우 꼭 표지 다음 페이지 하나 비워줘". 앞표지 + 본문 3 + 뒷표지면 읽는 순서가 `표지, 빈, 1, 2, 3, 빈, 빈, 뒷표지` 다. 되돌리지 말아야 할 판단들:
   - **자리 공식은 그대로이고 자리에 앉는 쪽만 바꿨다**(뒷표지와 같은 수법). 짝 합 불변식·짧은 면 뒤집기 전제가 그대로다. 표지를 넘긴 면의 왼쪽(자리 1, 1장 뒷면 왼쪽)이 빈 면이고 본문 1쪽은 오른쪽 면에서 시작한다
   - **빈 면이 없으면 끼우지 않는다.** 4의 배수에 빈 면을 억지로 넣으면 A3 한 장이 늘어난다. 장 수는 언제나 `ceil(쪽 수 / 4)` 그대로다. 앞표지가 없으면 옛 배치 그대로다
   - **빈 면은 렌더 자리일 뿐이다.** `layout.pages.length`·`n / N`·`paginate` 는 그대로다. 쪽 번호의 바깥쪽 자리는 `data-slot` 을 따라가 본문이 밀려도 맞는다

@@ -55,6 +55,28 @@ describe('PhraseNoteControls', () => {
     expect(editor.getHTML()).toBe('<p>파도가</p>');
   });
 
+  it('어휘 단추가 풀이 전체의 갈래를 켜고 끄고, 구절 자리 단추는 해설에만 나온다', () => {
+    const editor = buildEditor('<p><span data-note="심상">파도가</span></p>');
+    editor.commands.setTextSelection(2);
+    render(<PhraseNoteControls editor={editor} />);
+    fireEvent.click(screen.getByRole('button', { name: '어휘' }));
+    expect(editor.getHTML()).toBe('<p><span data-note="심상" data-note-kind="vocab">파도가</span></p>');
+    expect(screen.getByRole('button', { name: '어휘' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.queryByRole('button', { name: '구절 아래' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '어휘' }));
+    expect(editor.getHTML()).toBe('<p><span data-note="심상">파도가</span></p>');
+    expect(screen.getByRole('button', { name: '구절 아래' })).toBeTruthy();
+  });
+
+  it('⚠️ 옛 낱말 뜻풀이에 걸친 범위에 Enter 로 단 풀이는 해설 하나다', () => {
+    const editor = renderWith('<p>푸른 <span data-note="옛" data-note-kind="vocab">파도</span>가</p>', 4, 7);
+    fireEvent.click(screen.getByRole('button', { name: '풀이 달기' }));
+    const input = screen.getByLabelText('구절 풀이');
+    fireEvent.change(input, { target: { value: '새' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(editor.getHTML()).toBe('<p>푸른 <span data-note="새">파도가</span></p>');
+  });
+
   /** 풀이 달기를 눌러 글을 친 칸 */
   const openNote = (text: string) => {
     fireEvent.click(screen.getByRole('button', { name: '풀이 달기' }));

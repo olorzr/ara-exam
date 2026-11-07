@@ -4,7 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { layoutPhraseNotes, layoutPhraseNotesForPrint } from '@/lib/reference-texts/phrase-note-dom';
 import { usePhraseNoteLayout } from './usePhraseNoteLayout';
 
-vi.mock('@/lib/reference-texts/phrase-note-dom', () => ({ layoutPhraseNotes: vi.fn(), layoutPhraseNotesForPrint: vi.fn() }));
+vi.mock('@/lib/reference-texts/phrase-note-dom', async (original) => ({
+  ...await original<typeof import('@/lib/reference-texts/phrase-note-dom')>(),
+  layoutPhraseNotes: vi.fn(),
+  layoutPhraseNotesForPrint: vi.fn(),
+}));
 
 const NOTE = '<p><span data-note="가">갑</span></p>';
 
@@ -77,6 +81,12 @@ describe('usePhraseNoteLayout', () => {
 
   it('풀이가 없는 본문은 인쇄에 끼어들지 않는다', () => {
     render(<Sheet html="<p>가</p>" />);
+    act(() => { window.dispatchEvent(new Event('beforeprint')); });
+    expect(layoutPhraseNotesForPrint).not.toHaveBeenCalled();
+  });
+
+  it('낱말 뜻풀이뿐인 본문도 인쇄에 끼어들지 않는다 — 잴 풀이가 없다', () => {
+    render(<Sheet html={'<p><span data-note="뜻" data-note-kind="vocab">갑</span></p>'} />);
     act(() => { window.dispatchEvent(new Event('beforeprint')); });
     expect(layoutPhraseNotesForPrint).not.toHaveBeenCalled();
   });

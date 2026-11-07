@@ -48,6 +48,31 @@ describe('ReferenceBodyView', () => {
     expect(container.querySelector('span[data-shape="triangle"]')?.textContent).toBe('소금');
   });
 
+  it('낱말 뜻풀이는 갈래째 그리고 글 끝 어휘 목록에 모은다', () => {
+    const { container } = render(
+      <ReferenceBodyView
+        kind="작품" format="html"
+        body={'<p><span data-note="닭의 수컷" data-note-kind="vocab"><u>수탉</u></span>이 <span data-note="화가 남"><u>운다</u></span></p>'}
+      />,
+    );
+    expect(container.querySelector('span[data-note-kind="vocab"]')?.textContent).toBe('수탉');
+    const list = container.querySelector('.ref-vocab');
+    expect(list).toBe(container.firstElementChild!.lastElementChild);
+    expect(Array.from(list!.querySelectorAll('li')).map((li) => li.textContent)).toEqual(['수탉닭의 수컷']);
+  });
+
+  it('낱말 뜻풀이가 없으면 어휘 목록도 없다', () => {
+    const { container } = render(<ReferenceBodyView kind="작품" format="html" body={'<p><span data-note="화가 남">운다</span></p>'} />);
+    expect(container.querySelector('.ref-vocab')).toBeNull();
+  });
+
+  it('⚠️ 다시 그려도 어휘 목록이 두 번 붙지 않는다', () => {
+    const props = { kind: '작품', format: 'html', body: '<p><span data-note="뜻" data-note-kind="vocab">갑</span></p>' } as const;
+    const { container, rerender } = render(<ReferenceBodyView {...props} />);
+    rerender(<ReferenceBodyView {...props} />);
+    expect(container.querySelectorAll('.ref-vocab')).toHaveLength(1);
+  });
+
   it('잴 수 없는 환경에서는 풀이 자리를 쓰지 않고 본문은 그대로다', () => {
     const { container } = render(
       <ReferenceBodyView kind="작품" format="html" body={'<p><span data-note="가">갑</span> <span data-note="나">을</span></p>'} />,

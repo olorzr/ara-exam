@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import { TextSelection } from '@tiptap/pm/state';
 import { useEditorState, type Editor } from '@tiptap/react';
 import {
-  NOTE_POS_OVER, PHRASE_NOTE_MAX, SHAPE_KINDS, SHAPE_LABELS, isPhraseNote,
+  NOTE_KIND_VOCAB, NOTE_POS_OVER, PHRASE_NOTE_MAX, SHAPE_KINDS, SHAPE_LABELS, isPhraseNote,
 } from '@/lib/workbook-markup';
 import {
   MARKS_INSIDE_SHAPE, boxRunAt, followRange, noteAnchor, restoreCursor, selectionInOneNote, selectionSplitsBox, shapeEditRange,
@@ -15,6 +15,9 @@ import { PHRASE_NOTE_MARK, SHAPE_MARK } from './WorkbookMarks';
 
 /** '표식 없음' 센티널 — 빈 문자열 option 은 브라우저마다 다루기가 다르다 */
 const NONE = '__none__';
+
+/** 새 풀이 — 자리·갈래를 비워 넣는다. `setMark` 는 글자마다 옛 속성에 합쳐서, 옛 풀이에 걸친 범위가 위·아래나 어휘·해설로 갈린다 */
+const NEW_NOTE = (text: string) => ({ 'data-note': text, 'data-note-pos': null, 'data-note-kind': null });
 
 /** 범위에 표식이 섞였을 때 칸에 보이는 값 — 없으면 '표식 없음' 이 이미 골라져 있어 지우는 길이 막힌다 */
 const MIXED = '__mixed__';
@@ -55,6 +58,7 @@ export default function PhraseNoteControls({ editor }: PhraseNoteControlsProps) 
         noteActive,
         note: noteActive ? note : null,
         over: noteActive && pos === NOTE_POS_OVER,
+        vocab: noteActive && noteAttrs['data-note-kind'] === NOTE_KIND_VOCAB,
         shapeActive,
         shape: shapeActive ? (shape as string) : null,
         mixedShape: typeof shape === 'string' && !shapeActive,
@@ -76,11 +80,11 @@ export default function PhraseNoteControls({ editor }: PhraseNoteControlsProps) 
     editor.chain().focus().extendMarkRange(PHRASE_NOTE_MARK).unsetMark(PHRASE_NOTE_MARK).command(restore).run();
   };
 
-  /** 풀이 넣기(Enter) — 새 풀이는 자리를 비워 넣는다. `setMark` 는 글자마다 옛 속성에 합쳐서, 옛 위 풀이에 걸친 범위가 위·아래로 갈린다 */
+  /** 풀이 넣기(Enter) */
   const commitNote = (text: string) => {
     setAdding(false);
     if (state.noteActive) editNote({ 'data-note': text });
-    else editor.chain().focus().setMark(PHRASE_NOTE_MARK, { 'data-note': text, 'data-note-pos': null }).run();
+    else editor.chain().focus().setMark(PHRASE_NOTE_MARK, NEW_NOTE(text)).run();
   };
 
   /** 입력칸을 닫는다(Esc) — 편집기로 돌아간다. 안 그러면 포커스가 문서 몸통에 떨어져 치는 글이 사라진다 */
@@ -106,7 +110,7 @@ export default function PhraseNoteControls({ editor }: PhraseNoteControlsProps) 
       if (!target || editor.isDestroyed) return;
       const restore = restoreCursor(editor.state);
       if (!noteActive) {
-        editor.chain().setTextSelection(target).setMark(PHRASE_NOTE_MARK, { 'data-note': text, 'data-note-pos': null }).command(restore).run();
+        editor.chain().setTextSelection(target).setMark(PHRASE_NOTE_MARK, NEW_NOTE(text)).command(restore).run();
         return;
       }
       // 살아남은 앞쪽 끝의 풀이만 고친다 — 블록이 갈랐으면 앞 조각에만 남아 있고, 표시가 지워졌으면 할 일이 없다.
@@ -152,12 +156,21 @@ export default function PhraseNoteControls({ editor }: PhraseNoteControlsProps) 
       {state.noteActive && (
         <>
           <button
-            type="button" className={toolbarButtonClass(state.over)} aria-pressed={state.over}
-            onClick={() => editNote({ 'data-note-pos': state.over ? null : NOTE_POS_OVER })}
-            title="풀이를 구절 위로 올리거나 아래로 내려요"
+            type="button" className={toolbarButtonClass(state.vocab)} aria-pressed={state.vocab}
+            onClick={() => editNote({ 'data-note-kind': state.vocab ? null : NOTE_KIND_VOCAB })}
+            title="뜻풀이는 낱말 오른쪽 위 별표와 글 끝 어휘 목록으로, 해설은 구절 밑 글로 보여요"
           >
-            {state.over ? '구절 위' : '구절 아래'}
+            어휘
           </button>
+          {!state.vocab && (
+            <button
+              type="button" className={toolbarButtonClass(state.over)} aria-pressed={state.over}
+              onClick={() => editNote({ 'data-note-pos': state.over ? null : NOTE_POS_OVER })}
+              title="풀이를 구절 위로 올리거나 아래로 내려요"
+            >
+              {state.over ? '구절 위' : '구절 아래'}
+            </button>
+          )}
           <button
             type="button" className={toolbarButtonClass(false)}
             onClick={removeNote}

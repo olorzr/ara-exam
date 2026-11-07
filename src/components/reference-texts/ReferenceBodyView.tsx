@@ -3,6 +3,7 @@
 import { useMemo, useRef } from 'react';
 import { usePhraseNoteLayout } from '@/hooks/usePhraseNoteLayout';
 import { markFootnotes } from '@/lib/problem-bank/footnotes';
+import { appendVocabList } from '@/lib/reference-texts/vocab-list';
 import { sanitizeReferenceHTML } from '@/lib/sanitize-reference';
 import { hasYetHangul } from '@/lib/yet-hangul';
 import type { ReferenceTextFormat, ReferenceTextKind } from '@/types/reference-text';
@@ -23,13 +24,14 @@ interface ReferenceBodyViewProps {
  *    다층 방어). 각주 표시(`markFootnotes`)는 정화한 **뒤에** 붙이고 다시 정화하지 않는다(class 를 받지 않는다).
  * 옛 평문 작품은 빈 줄로 문단을 갈라 텍스트 노드로만 그린다(줄바꿈은 CSS 가 지킨다).
  * 구절 풀이 자리는 그린 뒤에 재서 잡는다(`usePhraseNoteLayout`). 쓰는 값은 안쪽 DOM 에만 있고 저장되지 않는다.
+ * 낱말 뜻풀이는 글 끝 어휘 목록으로 모은다(`appendVocabList`). 목록은 **글 하나에 하나**다 — 인쇄는 브라우저가 쪽을 나눠 쪽마다 모을 길이 없다.
  * @param props - 본문 · 형식 · 종류
  * @returns 본문
  */
 export default function ReferenceBodyView({ body, format, kind }: ReferenceBodyViewProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   // ⚠️ 객체째 메모한다. React 19 는 글이 같아도 객체가 새것이면 안쪽을 갈아 끼워, 잡아 둔 풀이 자리가 말없이 사라진다
-  const inner = useMemo(() => ({ __html: format === 'html' ? markFootnotes(sanitizeReferenceHTML(body)) : '' }), [body, format]);
+  const inner = useMemo(() => ({ __html: format === 'html' ? appendVocabList(markFootnotes(sanitizeReferenceHTML(body))) : '' }), [body, format]);
   usePhraseNoteLayout(rootRef, inner.__html);
 
   const work = kind === '작품';

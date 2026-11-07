@@ -59,6 +59,12 @@ describe('stripWorkbookNotes', () => {
     expect(referenceBodyPlainText(html, 'html')).toBe('푸른 파도가 밀려오고');
   });
 
+  it('⚠️ 낱말 뜻풀이 갈래도 벗긴다 — 정규식에서 note-kind 가 note 뒤에 오면 안 걷힌다', () => {
+    const html = '<p><span data-note="닭의 수컷" data-note-kind="vocab"><u>수탉</u></span>이 운다</p>';
+    expect(stripWorkbookNotes(html)).toBe('<p><span><u>수탉</u></span>이 운다</p>');
+    expect(referenceBodyPlainText(html, 'html')).toBe(referenceBodyPlainText('<p><span data-note="닭의 수컷"><u>수탉</u></span>이 운다</p>', 'html'));
+  });
+
   it('⚠️ 꺾쇠가 든 풀이는 정화기가 걷는다 — 남으면 태그가 끊겨 풀이 뒷글자가 원문으로 샌다', () => {
     const clean = sanitizeReferenceHTML('<p><span data-note="현실 > 이상">바다</span>에서</p>');
     expect(referenceBodyPlainText(clean, 'html')).toBe('바다에서');

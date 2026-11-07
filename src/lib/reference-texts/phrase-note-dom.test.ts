@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { layoutPhraseNotes, layoutPhraseNotesForPrint, type NoteMeasure } from './phrase-note-dom';
+import { EXPLANATION_NOTE_SELECTOR, layoutPhraseNotes, layoutPhraseNotesForPrint, type NoteMeasure } from './phrase-note-dom';
 
 const LINE = 40;
 const GLYPH = 20;
@@ -59,6 +59,27 @@ const vars = (span: Element) => ({
 describe('layoutPhraseNotes', () => {
   it('풀이가 없으면 아무 일도 없다', () => {
     expect(layoutPhraseNotes(sheet('<p>가</p>'))).toEqual({ notes: 0, wrapped: 0, maxRows: 0 });
+  });
+
+  it('⚠️ 낱말 뜻풀이는 재지 않는다 — ★ 는 흐름 안이고 자리 변수가 쓰일 곳이 없다', () => {
+    const root = sheet('<p><span data-note="뜻" data-note-kind="vocab">갑</span> <span data-note="나">을</span></p>');
+    const [vocab, note] = Array.from(root.querySelectorAll('span'));
+    vocab.style.setProperty('--note-dx', '-5px');
+    const summary = layoutPhraseNotes(root, fake([{ left: 450 }]));
+    expect(summary?.notes).toBe(1);
+    expect(vars(note).dx).toBe('-52px');
+    expect(vars(vocab).dx).toBe('-5px');
+  });
+
+  it('낱말 뜻풀이뿐이면 풀이가 없는 글과 같다', () => {
+    const root = sheet('<p><span data-note="뜻" data-note-kind="vocab">갑</span></p>');
+    expect(layoutPhraseNotes(root, fake([]))).toEqual({ notes: 0, wrapped: 0, maxRows: 0 });
+    expect(root.querySelector('span')!.getAttribute('style')).toBeNull();
+  });
+
+  it('갈래 값이 없는 풀이는 해설이다', () => {
+    const root = sheet('<p><span data-note="가">갑</span><span data-note-kind="vocab">을</span></p>');
+    expect(Array.from(root.querySelectorAll(EXPLANATION_NOTE_SELECTOR)).map((n) => n.textContent)).toEqual(['갑']);
   });
 
   it('잴 수 없으면 null 이고 아무것도 안 쓴다(jsdom)', () => {

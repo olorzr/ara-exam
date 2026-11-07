@@ -15,8 +15,11 @@ import { htmlToText } from './body-format';
  * 구절 글자는 원문이다.
  */
 
-/** 구절 풀이·표식 속성 — 정화기를 지난 값이라 큰따옴표로만 온다 */
-const PHRASE_ATTR = /\s+data-(?:note-pos|note|shape)="[^"]*"/gi;
+/**
+ * 구절 풀이·표식 속성 — 정화기를 지난 값이라 큰따옴표로만 온다.
+ * ⚠️ `note-kind` 는 `note` 앞에 둔다. 뒤에 두면 `note` 가 먼저 맞고 `="` 에서 어긋나 이 속성이 안 걷힌다
+ */
+const PHRASE_ATTR = /\s+data-(?:note-pos|note-kind|note|shape)="[^"]*"/gi;
 
 /** 원문 블록으로 이미 감싸인 칸 속 — 아니면 `<p>` 로 감싼다 */
 const BLOCK_START = /^\s*<(p|h3|h4|ul|ol|blockquote|table|figure)\b/i;

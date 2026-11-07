@@ -5,7 +5,7 @@ import {
   MARKS_INSIDE_SHAPE, boxRunAt, selectionInOneNote, selectionSplitsBox, shapeEditRange, shapeWouldCrossNote,
 } from './phrase-mark-rules';
 import { REFERENCE_STARTER_KIT, WORKBOOK_EXTENSIONS } from './WorkbookExtensions';
-import { SHAPE_MARK } from './WorkbookMarks';
+import { PHRASE_NOTE_MARK, SHAPE_MARK } from './WorkbookMarks';
 
 /** 참고자료 편집기와 같은 마크를 든 편집기 */
 function buildEditor(html: string): Editor {
@@ -92,6 +92,13 @@ describe('표식 한 덩이는 풀이 경계에서 끊긴다', () => {
   it('⚠️ 글자 하나짜리 표식은 자기 덩이로 잰다 — 다음 글자의 다른 표식으로 재면 판정이 틀린다', () => {
     const html = '<p><span data-shape="box"><strong>푸른</strong>파</span><span data-shape="circle">도</span></p>';
     expect(judge(html, 3, 5).splits).toBe(true);
+  });
+
+  it('같은 뜻이어도 갈래가 다르면 다른 풀이다', () => {
+    const editor = buildEditor('<p><span data-note="뜻">가나</span><span data-note="뜻" data-note-kind="vocab">다라</span></p>');
+    expect(boxRunAt(editor.state, 1, PHRASE_NOTE_MARK)).toEqual({ from: 1, to: 3 });
+    expect(boxRunAt(editor.state, 3, PHRASE_NOTE_MARK)).toEqual({ from: 3, to: 5 });
+    editor.destroy();
   });
 
   it('덩이는 풀이가 달라지는 자리에서 끝난다', () => {

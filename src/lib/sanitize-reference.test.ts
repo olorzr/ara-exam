@@ -67,6 +67,26 @@ describe('sanitizeReferenceHTML', () => {
     expect(sanitizeReferenceHTML('<p data-note-pos="over">나</p>')).toBe('<p>나</p>');
   });
 
+  it('낱말 뜻풀이 갈래는 속성 차례와 상관없이 글자 하나 안 바뀌고 남는다', () => {
+    for (const html of [
+      '<p><span data-note="닭의 수컷" data-note-kind="vocab"><u>수탉</u></span></p>',
+      '<p><span data-note-kind="vocab" data-note="닭의 수컷"><u>수탉</u></span></p>',
+      '<p><span data-note="닭의 수컷" data-note-pos="over" data-note-kind="vocab">수탉</span></p>',
+    ]) expect(sanitizeReferenceHTML(html)).toBe(html);
+  });
+
+  it('갈래는 span 의 아는 값만 — 문항 프로필은 받지 않는다', () => {
+    expect(sanitizeReferenceHTML('<p><u data-note-kind="vocab">나</u></p>')).toBe('<p><u>나</u></p>');
+    expect(sanitizeReferenceHTML('<p data-note-kind="vocab">나</p>')).toBe('<p>나</p>');
+    expect(sanitizeReferenceHTML('<p><span data-note="가" data-note-kind="term">나</span></p>')).toBe('<p><span data-note="가">나</span></p>');
+    expect(sanitizeProblemHTML('<p><span data-note-kind="vocab">나</span></p>')).not.toContain('data-note-kind');
+  });
+
+  it('⚠️ 풀이 없이 홀로 남은 갈래 값은 정화기가 못 걷는다 — 쓰는 쪽이 전부 두 속성으로 거는 까닭이다', () => {
+    expect(sanitizeReferenceHTML('<p><span data-note="" data-note-kind="vocab">나</span></p>')).toContain('data-note-kind="vocab"');
+    expect(sanitizeReferenceHTML('<p><span data-note="" data-note-kind="vocab">나</span></p>')).not.toContain('data-note=');
+  });
+
   it('⚠️ 한 span 에 풀이와 표식을 함께 두면 표식을 걷는다 — 같은 ::before 를 두고 부딪힌다', () => {
     for (const html of [
       '<p><span data-note="뜻" data-note-pos="over" data-shape="star">말</span></p>',

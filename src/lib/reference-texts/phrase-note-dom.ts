@@ -7,6 +7,12 @@ import { groupBands, groupLines, placeBand, type BandNote, type NoteBand } from 
  * 잴 수 없는 풀이(jsdom · 숨은 화면)는 건드리지 않는다. 그래도 구절 밑에 그려지고 겹침만 안 풀린다.
  */
 
+/**
+ * 자리를 재는 풀이 — 구절 밑에 글이 찍히는 해설뿐이다. 낱말 뜻풀이는 ★ 만 찍고 뜻은 글 끝 어휘 목록으로 간다.
+ * ⚠️ 어휘의 `::after` 는 흐름 안의 ★ 라 재면 안 된다. 자리 변수를 써 봐야 쓰이지 않고 `left` 는 `auto` 라 겹침 계산이 깨진다
+ */
+export const EXPLANATION_NOTE_SELECTOR = 'span[data-note]:not([data-note-kind="vocab"])';
+
 /** 재는 동안 인쇄 치수를 흉내 내는 클래스(reference-sheet.css) */
 const PRINT_METRICS_CLASS = 'ref-sheet--print-metrics';
 const NOTE_VARS = ['--note-dx', '--note-dy', '--note-shift', '--note-w', '--note-strut'] as const;
@@ -194,7 +200,7 @@ function writeBand(band: NoteBand<MeasuredNote>, box: BlockBox): number {
  * @returns 요약 — 잴 수 없었으면 null
  */
 export function layoutPhraseNotes(root: HTMLElement, measure: NoteMeasure = BROWSER_MEASURE): PhraseNoteSummary | null {
-  const spans = Array.from(root.querySelectorAll<HTMLElement>('span[data-note]'));
+  const spans = Array.from(root.querySelectorAll<HTMLElement>(EXPLANATION_NOTE_SELECTOR));
   if (spans.length === 0) return { notes: 0, wrapped: 0, maxRows: 0 };
   clearNotes(spans);
   const notes = measureNotes(spans, root, measure);

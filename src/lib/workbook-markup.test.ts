@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CALLOUT_LABEL_MAX, CALLOUT_PRESETS, CALLOUT_TONE_LABELS, CALLOUT_TONES, NOTE_POS_OVER, PHRASE_NOTE_MAX,
+  CALLOUT_LABEL_MAX, CALLOUT_PRESETS, CALLOUT_TONE_LABELS, CALLOUT_TONES, NOTE_KIND_VOCAB, NOTE_POS_OVER, PHRASE_NOTE_MAX,
   REFERENCE_TABLE_LAYOUTS, SHAPE_GLYPHS, SHAPE_KINDS, SHAPE_LABELS,
-  isCalloutLabel, isCalloutTone, isFlowDirection, isNotePos, isPhraseNote, isShapeKind,
+  isCalloutLabel, isCalloutTone, isFlowDirection, isNoteKind, isNotePos, isPhraseNote, isShapeKind,
 } from './workbook-markup';
 
 describe('isCalloutLabel', () => {
@@ -54,6 +54,11 @@ describe('구절 풀이', () => {
     for (const bad of ['', ' 심상', '심상 ', '가'.repeat(PHRASE_NOTE_MAX + 1), '심\u0007상', '심\u200b상', '심\ue000상', '심\n상', '현실 > 이상', 'a<b']) {
       expect(isPhraseNote(bad)).toBe(false);
     }
+  });
+
+  it('갈래 값은 vocab 하나뿐이다 — 해설은 속성을 비운다', () => {
+    expect(isNoteKind(NOTE_KIND_VOCAB)).toBe(true);
+    for (const bad of ['', 'term', 'VOCAB', ' vocab']) expect(isNoteKind(bad)).toBe(false);
   });
 
   it('자리 값은 over 하나뿐이다 — 아래는 속성을 비운다', () => {

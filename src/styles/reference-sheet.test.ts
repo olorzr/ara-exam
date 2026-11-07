@@ -6,6 +6,9 @@ import { chromaticHexColors, printBlock } from './css-test-helpers';
 
 const css = readFileSync(path.resolve(__dirname, 'reference-sheet.css'), 'utf8');
 
+/** 구절 밑에 글이 찍히는 풀이 — 낱말 뜻풀이는 뺀다 */
+const EXPLANATION = "span[data-note]:not([data-note-kind='vocab'])";
+
 describe('reference-sheet.css', () => {
   it('말머리 상자의 색 갈래마다 규칙이 하나씩 있다(workbook-markup.ts 와 짝)', () => {
     for (const tone of CALLOUT_TONES) expect(css).toContain(`blockquote[data-tone='${tone}']`);
@@ -26,9 +29,13 @@ describe('reference-sheet.css', () => {
 
   it('구절 풀이가 든 글은 행간을 미리 벌린다 — 풀이가 흐름 밖이라 안 벌리면 다음 줄 글자를 덮는다', () => {
     expect(css).toMatch(/--ref-note-leading: [\d.]+em;/);
-    const rule = css.slice(css.indexOf('.pb-sheet.ref-sheet--work:has(span[data-note]) > p'));
+    const rule = css.slice(css.indexOf(`.pb-sheet.ref-sheet--work:has(${EXPLANATION}) > p`));
     expect(rule.slice(0, rule.indexOf('}'))).toContain('line-height: var(--ref-note-leading)');
-    expect(rule.slice(0, rule.indexOf('}'))).toContain(".pb-sheet.ref-sheet :is(p, li, td, th):has(span[data-note])");
+    expect(rule.slice(0, rule.indexOf('}'))).toContain(`.pb-sheet.ref-sheet :is(p, li, td, th):has(${EXPLANATION})`);
+  });
+
+  it('⚠️ 낱말 뜻풀이는 행간을 벌리지 않는다 — ★ 만 찍혀 자리가 필요 없다', () => {
+    expect(css).not.toContain(':has(span[data-note])');
   });
 
   it('인쇄 규칙과 재는 동안의 흉내가 같은 치수를 읽는다', () => {

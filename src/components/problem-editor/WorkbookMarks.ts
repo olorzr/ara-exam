@@ -1,5 +1,5 @@
 import { Mark } from '@tiptap/core';
-import { isNotePos, isPhraseNote, isShapeKind } from '@/lib/workbook-markup';
+import { isNoteKind, isNotePos, isPhraseNote, isShapeKind } from '@/lib/workbook-markup';
 
 /**
  * 작품 전문 · 개념 편집기의 글자 표시 — 형광펜 · 작은 글씨 · 구절 풀이 · 표식 · 네모.
@@ -80,6 +80,7 @@ export const SmallMark = Mark.create({
 
 /**
  * 구절 풀이 `<span data-note>` — 구절 바로 밑(`data-note-pos="over"` 면 위)에 작은 글씨 해설. 밑줄은 따로 `<u>` 다.
+ * `data-note-kind="vocab"` 이면 낱말 뜻풀이다 — 보기 화면이 ★ 와 글 끝 어휘 목록으로 그린다.
  *
  * `inclusive: false` — 구절 끝에서 이어 쳐도 풀이가 늘어나지 않는다.
  * `consuming: false` — 붙여 넣은 span 에 `data-note`·`data-shape` 가 함께 있어도 두 마크로 읽힌다(글자는 한 번만 들어간다).
@@ -89,7 +90,11 @@ export const PhraseNoteMark = Mark.create({
   priority: OUTER_MARK_PRIORITY,
   inclusive: false,
   addAttributes() {
-    return { 'data-note': passThrough('data-note'), 'data-note-pos': passThrough('data-note-pos', isNotePos) };
+    return {
+      'data-note': passThrough('data-note'),
+      'data-note-pos': passThrough('data-note-pos', isNotePos),
+      'data-note-kind': passThrough('data-note-kind', isNoteKind),
+    };
   },
   parseHTML() {
     return [{

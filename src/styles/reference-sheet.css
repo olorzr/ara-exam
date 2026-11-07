@@ -262,10 +262,11 @@
  * ── 구절 풀이 자리 — 책처럼 행간을 미리 벌려 둔다 ───
  * 풀이는 흐름 밖에 있으니(reference-phrase-marks.css) 이 간격이 없으면 다음 줄 글자를 덮는다. 작품 원문은 풀이가 없는 연까지 같은
  * 행간으로 맞춰 고르게 보이게 하고, 그 밖의 글(말머리 상자 안 등)은 풀이가 든 문단만 벌린다. 풀이가 없는 작품은 그대로다.
+ * 낱말 뜻풀이는 ★ 만 찍혀 자리가 필요 없다 — 어휘만 든 작품까지 벌리지 않게 뺀다. 풀이 색 변수는 reference-phrase-marks.css 에 있다.
  */
-.pb-sheet.ref-sheet--work:has(span[data-note]) > p,
-.pb-sheet.ref-sheet--work:has(span[data-note]) > table[data-layout='gloss'] :is(td, th):first-child > p,
-.pb-sheet.ref-sheet :is(p, li, td, th):has(span[data-note]) { line-height: var(--ref-note-leading); }
+.pb-sheet.ref-sheet--work:has(span[data-note]:not([data-note-kind='vocab'])) > p,
+.pb-sheet.ref-sheet--work:has(span[data-note]:not([data-note-kind='vocab'])) > table[data-layout='gloss'] :is(td, th):first-child > p,
+.pb-sheet.ref-sheet :is(p, li, td, th):has(span[data-note]:not([data-note-kind='vocab'])) { line-height: var(--ref-note-leading); }
 
 /*
  * ── 인쇄 치수 흉내 — 구절 풀이 자리를 재는 동안만 붙는다 ───

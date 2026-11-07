@@ -5,7 +5,7 @@ import {
 } from './sanitize-problem';
 import { withProfile, type DataAttrCheck, type SanitizeProfile } from './sanitize-profile';
 import {
-  REFERENCE_TABLE_LAYOUTS, isCalloutLabel, isCalloutTone, isFlowDirection, isNotePos, isPhraseNote, isShapeKind,
+  REFERENCE_TABLE_LAYOUTS, isCalloutLabel, isCalloutTone, isFlowDirection, isNoteKind, isNotePos, isPhraseNote, isShapeKind,
 } from './workbook-markup';
 
 /**
@@ -17,7 +17,7 @@ import {
  *   - `blockquote` 의 `data-callout`(말머리, 24자) · `data-tone`(색 갈래)
  *   - `ul` 의 `data-flow`(화살표 도식 down·right)
  *   - `table` 의 `data-layout` 에 `gloss`(원문·여백 해설) · `vocab`(낱말·풀이)
- *   - `span` 의 `data-note`(구절 풀이, 60자) · `data-note-pos`(`over` 면 구절 위) · `data-shape`(표식 □ ○ △ ◇ ☆)
+ *   - `span` 의 `data-note`(구절 풀이, 60자) · `data-note-pos`(`over` 면 구절 위) · `data-note-kind`(`vocab` 면 낱말 뜻풀이) · `data-shape`(표식 □ ○ △ ◇ ☆)
  *
  * ⚠️ 문항 프로필을 넓히지 않고 따로 두는 이유: 기출 지문·발문이 그 규칙으로 돌고, 적재 도구가 그 정화기와의
  *    왕복으로 화면에서 사라질 서식을 막는다. 문항에 말머리 상자가 들어오면 인쇄가 원본과 달라진다.
@@ -27,7 +27,7 @@ import {
 const REFERENCE_ALLOWED_TAGS = [...PROBLEM_ALLOWED_TAGS, 'mark', 'small'];
 
 const REFERENCE_ALLOWED_ATTR = [
-  ...PROBLEM_ALLOWED_ATTR, 'data-callout', 'data-tone', 'data-flow', 'data-note', 'data-note-pos', 'data-shape',
+  ...PROBLEM_ALLOWED_ATTR, 'data-callout', 'data-tone', 'data-flow', 'data-note', 'data-note-pos', 'data-note-kind', 'data-shape',
 ];
 
 const REFERENCE_DATA_ATTRS = new Map<string, DataAttrCheck>(PROBLEM_DATA_ATTRS);
@@ -38,6 +38,9 @@ REFERENCE_DATA_ATTRS.set('data-flow', (value, tagName) => tagName === 'ul' && is
 // 구절 풀이·표식은 글자 사이의 span 에만 — 블록·밑줄·형광펜에 붙은 것은 걷는다(CSS 도 span 만 그린다)
 REFERENCE_DATA_ATTRS.set('data-note', (value, tagName) => tagName === 'span' && isPhraseNote(value));
 REFERENCE_DATA_ATTRS.set('data-note-pos', (value, tagName) => tagName === 'span' && isNotePos(value));
+// ⚠️ `data-note` 와 함께 있는지는 여기서 못 본다 — DOMPurify 는 속성을 뒤에서 앞으로 돌아, 비어 지워질 `data-note` 가 아직 있을 때 이 검사가 온다.
+//    그래서 쓰는 쪽(CSS · 배치 · 어휘 목록)이 전부 `span[data-note][data-note-kind]` 두 속성으로 건다. 홀로 남은 값은 아무 일도 안 한다
+REFERENCE_DATA_ATTRS.set('data-note-kind', (value, tagName) => tagName === 'span' && isNoteKind(value));
 // ⚠️ 한 span 에 풀이와 표식을 함께 두지 않는다 — 위 풀이와 △ ◇ ☆ 가 같은 `::before` 를 두고 부딪혀 기호가 사라지고, □ ○ 는 풀이까지
 //    두른다. 편집기는 언제나 `<span data-note><span data-shape>` 로 내보내므로 이 모양은 적재로만 들어온다 — 왕복 검사가 막는다
 REFERENCE_DATA_ATTRS.set('data-shape', (value, tagName, element) => (

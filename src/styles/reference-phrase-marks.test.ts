@@ -7,6 +7,7 @@ import { chromaticHexColors, printBlock } from './css-test-helpers';
 const css = readFileSync(path.resolve(__dirname, 'reference-phrase-marks.css'), 'utf8');
 const VIEW = '.pb-sheet.ref-sheet';
 const EDITOR = '.pb-editor.pb-editor--reference .ProseMirror';
+const VOCAB = "span[data-note][data-note-kind='vocab']";
 
 /** 주석을 뺀 선언 — 주석 속 낱말로 규칙이 있는 체하지 않게 한다 */
 const rules = css.replace(/\/\*[\s\S]*?\*\//g, '');
@@ -70,6 +71,43 @@ describe('reference-phrase-marks.css', () => {
     expect(shared).not.toMatch(/position|display|max-width|margin/);
   });
 
+  it('풀이 글자는 청록이고 밑줄은 시트 전체가 한 색이다', () => {
+    expect(rules.slice(0, rules.indexOf('}'))).toContain('color: var(--ref-note-color, #0e7490)');
+    expect(ruleOf(VIEW)).toContain('--ref-note-color:');
+    expect(ruleOf(VIEW)).toContain('--ref-note-line:');
+    expect(ruleOf(`:is(.ref-sheet, ${EDITOR}) u`)).toContain('text-decoration-color: var(--ref-note-line');
+  });
+
+  it('⚠️ span 밑줄은 `<u>` 없는 풀이만이다 — 안쪽 `<u>` 가 덧그려 색이 안 보이고, 낱말 뜻풀이는 밑줄이 없다', () => {
+    const line = ruleOf(`${VIEW} span[data-note]:not([data-note-kind='vocab']):not(:has(u))`);
+    expect(line).toContain('text-decoration: underline');
+    expect(line).toContain('text-decoration-color: var(--ref-note-line)');
+    expect(ruleOf(`${VIEW} ${VOCAB}:not(.ref-vocab-in-line) u`)).toContain('text-decoration: none');
+  });
+
+  it('⚠️ 낱말 뜻풀이의 ★ 는 흐름 안이고 줄 높이를 안 키운다 — 위쪽 절대 배치 규칙 뒤에 온다', () => {
+    const star = ruleOf(`${VIEW} ${VOCAB}::after`);
+    expect(star).toContain("content: '\\2060★'");
+    expect(star).toContain('position: static');
+    expect(star).toContain('line-height: 0');
+    expect(star).toContain('vertical-align:');
+    expect(rules.indexOf(`${VIEW} ${VOCAB}::after`)).toBeGreaterThan(rules.indexOf(`${VIEW} span[data-note]:not([data-note-pos='over'])::after`));
+  });
+
+  it('⚠️ 어휘 목록은 `:is()` 목록 규칙을 이기는 접두를 쓴다 — 줄이면 번호와 들여쓰기가 샌다', () => {
+    const list = ruleOf(`${VIEW} .ref-vocab ol.ref-vocab__list`);
+    expect(list).toContain('list-style: none');
+    expect(list).toContain('padding: 0');
+    expect(list).toContain('columns: 2');
+    expect(rules).toContain(`${VIEW}:not(.yet-hangul, .yet-hangul-serif) .ref-vocab { font-family: var(--font-sans); }`);
+  });
+
+  it('편집기는 낱말 뜻풀이를 해설과 구별해 보여 준다', () => {
+    expect(rules).toContain(`${EDITOR} ${VOCAB}:not([data-note-pos='over'])::after`);
+    expect(rules).toContain(`${EDITOR} ${VOCAB}[data-note-pos='over']::before`);
+    expect(rules).toContain("content: '★ ' attr(data-note)");
+  });
+
   it('⚠️ 루비로 되돌리지 않는다 — 크롬의 루비 풀이는 꺾이지 않아 옆 칸을 덮고 <br> 을 무시한다', () => {
     expect(rules).not.toMatch(/display:\s*ruby/);
   });
@@ -85,6 +123,10 @@ describe('reference-phrase-marks.css', () => {
     const block = printBlock(css);
     expect(block).toContain('.ref-sheet span[data-note]::after');
     expect(block).toContain(`${EDITOR} span[data-note][data-note-pos='over']::before`);
+    expect(block).toContain(`:is(${VIEW}, ${EDITOR}) {`);
+    expect(block).toContain('--ref-note-color: #444');
+    expect(block).toContain('--ref-note-line: #444');
+    expect(block).toContain('background: none');
     expect(chromaticHexColors(block)).toEqual([]);
   });
 });
