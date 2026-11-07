@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { A4Document, CompactPageHeader } from '@/components/print';
 import ExamPrintHeader from '@/components/exam/ExamPrintHeader';
+import type { LayoutHandler } from '@/hooks/useA4Pagination';
 import { PAPER_SPLIT_ADAPTER, usePaperSplit } from '@/hooks/usePaperSplit';
 import { buildPaperBlocks } from '@/lib/problem-paper/blocks';
 import type { PaperCover } from '@/lib/problem-paper/cover';
@@ -45,6 +46,8 @@ interface ProblemPaperViewProps {
   coverTeacher?: string;
   /** 표지를 읽지 못했을 때 표지 자리에 찍을 안내 (있으면 표지 대신 이것) */
   coverNotice?: string;
+  /** 배치가 끝나면 본문 쪽 수(표지 제외)를 알린다 — 중철 뒷표지 안내가 쓴다. 참조가 안정적이어야 한다 */
+  onLayout?: LayoutHandler;
 }
 
 /**
@@ -56,7 +59,7 @@ interface ProblemPaperViewProps {
  */
 export default function ProblemPaperView({
   paper, items, imageUrls, showAnswers = false, booklet = false, trimWorks = false, cover = null,
-  coverImages, coverTeacher, coverNotice,
+  coverImages, coverTeacher, coverNotice, onLayout,
 }: ProblemPaperViewProps) {
   // OMR 문제지만 90A 답안지 안내를 붙인다 — 학생 종이에만(교사용은 채점하는 종이라 칸 안내가 필요 없다).
   // 장 수는 성적 시스템과 같은 규칙(버블로 채점하는 마지막 번호)으로 잰다
@@ -94,6 +97,7 @@ export default function ProblemPaperView({
       splittable={split.splittable}
       breakBefore={split.breakBefore}
       onSplitRequest={split.handleSplitRequest}
+      onLayout={onLayout}
       booklet={booklet}
       {...coverSlots}
       columns={paper.settings.columns}

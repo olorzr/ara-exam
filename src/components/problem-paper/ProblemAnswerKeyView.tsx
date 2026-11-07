@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { A4Document, CompactPageHeader } from '@/components/print';
 import ExamPrintHeader from '@/components/exam/ExamPrintHeader';
+import type { LayoutHandler } from '@/hooks/useA4Pagination';
 import { buildAnswerRows, explanationEntries } from '@/lib/problem-paper/answers';
 import type { PaperCover } from '@/lib/problem-paper/cover';
 import { coverYearOf } from '@/lib/problem-paper/cover-text';
@@ -23,6 +24,8 @@ interface ProblemAnswerKeyViewProps {
   coverTeacher?: string;
   /** 표지를 읽지 못했을 때 표지 자리에 찍을 안내 (있으면 표지 대신 이것) */
   coverNotice?: string;
+  /** 배치가 끝나면 본문 쪽 수(표지 제외)를 알린다 — 중철 뒷표지 안내가 쓴다. 참조가 안정적이어야 한다 */
+  onLayout?: LayoutHandler;
 }
 
 /**
@@ -40,7 +43,7 @@ interface ProblemAnswerKeyViewProps {
  * 작아 격자에서 크게 찍는다(`.pb-answer-value--choice`).
  */
 export default function ProblemAnswerKeyView({
-  paper, items, booklet = false, cover = null, coverImages, coverTeacher, coverNotice,
+  paper, items, booklet = false, cover = null, coverImages, coverTeacher, coverNotice, onLayout,
 }: ProblemAnswerKeyViewProps) {
   const title = `${paper.title} - 답지`;
   const rows = useMemo(() => buildAnswerRows(items), [items]);
@@ -56,6 +59,7 @@ export default function ProblemAnswerKeyView({
   return (
     <A4Document
       blocks={blocks}
+      onLayout={onLayout}
       booklet={booklet}
       {...coverSlots}
       columns={1}

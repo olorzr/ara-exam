@@ -119,7 +119,7 @@ src/
   - `src/lib/print/fonts-ready.ts` — 웹폰트 로딩이 끝났는가(개념지·지문 쪼개기가 같이 쓴다)
   - `src/components/print/{A4Document,A4Sheet,CompactPageHeader}.tsx` — 측정 컨테이너 + 낱장 렌더
   - `src/components/print/A4CoverSheet.tsx` — 표지 한 장(여백·머리글·푸터 없음, 쪽 번호에 안 센다). `A4Document` 의 `coverPage` 가 그린다
-  - `src/lib/print/booklet.ts` — 순수 계산: 중철 제본 면 배정(`bookletSheets` — 장마다 앞·뒷면의 [왼쪽, 오른쪽] 쪽)
+  - `src/lib/print/booklet.ts` — 순수 계산: 중철 제본 면 배정(`bookletSheets` — 장마다 앞·뒷면의 [왼쪽, 오른쪽] 쪽), 빈 면 수(`bookletBlankCount`)
   - `src/components/print/BookletStack.tsx` — 중철 제본 렌더: A3 가로 한 면에 A4 두 쪽, `<style>` 로 `@page` 를 A3 가로로 덮는다. `A4Document booklet` 이 그린다(`breakAfterLast` 와 타입으로 배타)
   - `src/styles/print-a4.css` — 낱장·푸터·페이지 브레이크 CSS (globals.css 에서 @import)
   - `src/styles/print-booklet.css` — 중철 면·빈 면·화면 축소(zoom 0.5, 측정 무관)·면 안 쪽 넘김 억제·왼쪽 면 쪽 번호를 바깥쪽(왼쪽 아래)으로. 면 높이는 쪽보다 40px 낮다(`BOOKLET_SIDE_HEIGHT_PX`, 프린터 여백에도 면마다 빈 쪽이 안 붙게)
@@ -457,7 +457,7 @@ src/
 - 주요 파일: compose.ts, dnd.ts, blocks.ts, passage-blocks.ts(지문 묶음 블록), box-parts.ts,
   part-cuts.ts·part-measure.ts·part-split-plan.ts·question-units.ts·split-target.ts(긴 문단·문항을 자리에 맞춰 쪼개기), answers.ts, bulk-add.ts,
   html-trim.ts, settings.ts, shuffle-groups.ts, cover.ts, cover-image.ts, cover-queries.ts, print-layout-pref.ts,
-  trim-works.ts(복합 지문에서 묻지 않는 작품 구역 빼기), print-label.ts(인쇄 단추 글자),
+  trim-works.ts(복합 지문에서 묻지 않는 작품 구역 빼기), print-label.ts(인쇄 단추 글자), booklet-advice.ts(중철 뒷표지 안내 판단),
   cover-text.ts·cover-scale.ts·cover-copy.ts·cover-fonts.ts(디자인 표지의 글 나누기·크기 계산 도구·고정 문구·글꼴),
   cover-fit.ts·cover-fit-spines.ts·cover-fit-soft.ts·cover-fit-zine.ts(디자인마다 글이 들어갈 자리와 크기 결정)
 - **표지**(2026-10-04): 곁표 `exam.problem_paper_covers`(sql/61, 문제지 1:1, 행이 없으면 표지 없음).
@@ -481,6 +481,9 @@ src/
 - **인쇄 방식**(2026-10-04): 낱장 / 중철 제본(A3 가로 양면). 화면 선택이고 localStorage 에
   기억한다(`print-layout-pref.ts`, 저장 설정 아님). 번호 어긋남 안내를 확인하기 전에는 중철로
   그리지 않는다 — 그 안내가 인쇄물에 찍혀 면이 한 면씩 밀리기 때문이다
+- **중철 뒷표지 안내**(2026-11-07): 두 문서(`ProblemPaperView`·`ProblemAnswerKeyView`)가 `onLayout` 으로 본문 쪽 수를 알리고,
+  `usePaperBodyPages` 가 그 수를 판(학생용·교사용·답지)과 함께 든다. `adviseDropBackCover` 가 참이면 `PaperBackCoverAdvice` 띠가
+  '뒷표지 없애기'(`coverWithoutBack` 로 저장)를 먼저 권한다. 학생용·교사용 문서는 판마다 `key` 로 새로 마운트해 알림이 반드시 온다
 - 배점은 인쇄하지 않는다(2026-09-08). `PaperSettings.showScore` 키는 RPC 화이트리스트
   호환용으로만 남아 있고 렌더러는 보지 않는다
 - 출처는 **기본으로 찍는다**(2026-09-19). `DEFAULT_PAPER_SETTINGS.showSource` 가 true 이고

@@ -50,6 +50,16 @@ export function bookletSheetCount(pageCount: number): number {
   return Math.ceil(Math.floor(pageCount) / BOOKLET_PAGES_PER_SHEET);
 }
 
+/**
+ * 쪽 수를 4의 배수로 올리느라 생기는 빈 면 수.
+ * @param pageCount - A4 쪽 수 (앞표지·뒷표지가 있으면 그것까지)
+ * @returns 빈 면 수 (0쪽·이상한 값이면 0)
+ */
+export function bookletBlankCount(pageCount: number): number {
+  const sheets = bookletSheetCount(pageCount);
+  return sheets === 0 ? 0 : sheets * BOOKLET_PAGES_PER_SHEET - Math.floor(pageCount);
+}
+
 /** 면 배치 선택 */
 export interface BookletOptions {
   /** 첫 쪽이 앞표지다 — 빈 면이 생기면 그 하나를 표지 바로 뒤(표지 안쪽)에 둔다 */

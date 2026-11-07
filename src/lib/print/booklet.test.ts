@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bookletSheetCount, bookletSheets, type BookletSheet } from './booklet';
+import { bookletBlankCount, bookletSheetCount, bookletSheets, type BookletSheet } from './booklet';
 
 /** 1-based 로 적은 배치를 0-based 로 (빈 면은 0 → null) */
 function sheet(front: [number, number], back: [number, number]): BookletSheet {
@@ -198,6 +198,25 @@ describe('bookletSheets — 앞표지 안쪽 빈 면', () => {
           if (v === null && position !== 1) expect(position, label).toBeGreaterThan(lastBodyAt);
         });
       }
+    }
+  });
+});
+
+describe('bookletBlankCount', () => {
+  it('4의 배수로 올리느라 생기는 빈 면 수', () => {
+    expect([1, 2, 3, 4, 5, 6, 7, 8].map(bookletBlankCount)).toEqual([3, 2, 1, 0, 3, 2, 1, 0]);
+  });
+
+  it('0쪽이나 이상한 값은 0', () => {
+    expect(bookletBlankCount(0)).toBe(0);
+    expect(bookletBlankCount(-2)).toBe(0);
+    expect(bookletBlankCount(Number.NaN)).toBe(0);
+  });
+
+  it('bookletSheets 가 그리는 빈 자리 수와 같다', () => {
+    for (let n = 1; n <= 24; n++) {
+      const blanks = bookletSheets(n).flatMap((s) => [...s.front, ...s.back]).filter((v) => v === null);
+      expect(blanks, `${n}쪽`).toHaveLength(bookletBlankCount(n));
     }
   });
 });

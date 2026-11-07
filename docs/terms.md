@@ -672,8 +672,9 @@
 - 프린터는 **양면 · 짧은 면 뒤집기**(A3 가로에서는 짧은 변이 좌우다). 거꾸로 나오면 '긴 면' 이 맞는 드라이버다
 - 인쇄 창은 **여백 없음 · 배율 기본값**. 면은 쪽보다 40px 낮게 그린다(`BOOKLET_SIDE_HEIGHT_PX`) — 같으면 프린터 여백 때문에 면마다 빈 쪽이 붙는다(2026-10-13)
 - 쪽 번호는 **책 바깥쪽 아래**: 왼쪽 면은 왼쪽 끝, 오른쪽 면은 오른쪽 끝(`print-booklet.css` 의 `[data-slot='left']` 규칙)
-- 코드에서의 사용: `bookletSheets`, `BookletStack`, `A4Document` 의 `booklet`, `PaperPrintLayout`(`'single' | 'booklet'`), `BOOKLET_SIDE_SLACK_PX`
-- 관련 파일: src/lib/print/booklet.ts, src/components/print/BookletStack.tsx, src/styles/print-booklet.css, src/lib/problem-paper/print-layout-pref.ts
+- **뒷표지 안내**(2026-11-07): 본문이 3·7·11…쪽이라 뒷표지만 빼면 빈 면이 없을 때, 문제지 보기 화면이 '뒷표지 없애기' 를 먼저 권한다(인쇄되지 않는 띠). '그대로 두기' 는 그 화면에서만 접는다
+- 코드에서의 사용: `bookletSheets`, `bookletBlankCount`, `BookletStack`, `A4Document` 의 `booklet`, `PaperPrintLayout`(`'single' | 'booklet'`), `BOOKLET_SIDE_SLACK_PX`, `adviseDropBackCover`, `usePaperBodyPages`, `PaperBackCoverAdvice`
+- 관련 파일: src/lib/print/booklet.ts, src/components/print/BookletStack.tsx, src/styles/print-booklet.css, src/lib/problem-paper/print-layout-pref.ts, src/lib/problem-paper/booklet-advice.ts, src/hooks/usePaperBodyPages.ts, src/components/problem-paper/PaperBackCoverAdvice.tsx
 
 ## 문제지 표지 (PaperCover)
 - 정의: 문제지 인쇄물의 첫 장. **간단 표지**(`simple` — 학원 이름·제목·부제·이름 칸을 앱이 그린다)와

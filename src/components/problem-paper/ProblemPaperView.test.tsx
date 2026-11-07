@@ -1,5 +1,5 @@
 import { render } from '@testing-library/react';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { stubPrintLayout } from '@/test-utils/print-layout-stub';
 import type { PaperItemSnapshot, PaperPassageSnapshot, ProblemPaper } from '@/types/problem-bank';
 import ProblemPaperView from './ProblemPaperView';
@@ -110,5 +110,15 @@ describe('ProblemPaperView — 문항이 단을 넘을 때', () => {
     const boxes = Array.from(stack.querySelectorAll('blockquote[data-box="보기 1"]'));
     expect(boxes.filter((box) => box.classList.contains('pb-box-part--first'))).toHaveLength(1);
     expect(boxes.filter((box) => box.classList.contains('pb-box-part--last'))).toHaveLength(1);
+  });
+});
+
+describe('ProblemPaperView — 쪽 수 알림', () => {
+  it('배치가 끝나면 onLayout 으로 본문 쪽 수(표지 제외)를 알린다 — 중철 뒷표지 안내가 쓴다', () => {
+    const onLayout = vi.fn();
+    render(<ProblemPaperView paper={paper} items={[item(1), item(2)]} imageUrls={new Map()} onLayout={onLayout} />);
+    expect(onLayout).toHaveBeenCalled();
+    const { pageCount } = onLayout.mock.calls.at(-1)![0] as { pageCount: number };
+    expect(pageCount).toBeGreaterThanOrEqual(1);
   });
 });

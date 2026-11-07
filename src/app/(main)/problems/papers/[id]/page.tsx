@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import ProblemPaperView from '@/components/problem-paper/ProblemPaperView';
 import ProblemAnswerKeyView from '@/components/problem-paper/ProblemAnswerKeyView';
+import PaperBackCoverAdvice from '@/components/problem-paper/PaperBackCoverAdvice';
 import PaperCoverAlerts from '@/components/problem-paper/PaperCoverAlerts';
 import PaperCoverDialog from '@/components/problem-paper/PaperCoverDialog';
 import { PaperPrintLayoutNotice } from '@/components/problem-paper/PaperPrintLayoutToggle';
@@ -16,11 +17,13 @@ import { useImagesReady } from '@/hooks/useImagesReady';
 import { useCoverFontsReady } from '@/hooks/useCoverFontsReady';
 import { useCoverImages } from '@/hooks/useCoverImages';
 import { usePaperCover } from '@/hooks/usePaperCover';
+import { usePaperBodyPages } from '@/hooks/usePaperBodyPages';
 import { usePaperLoad } from '@/hooks/usePaperLoad';
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls';
 import {
   imagePathsOf, renumberedImageItems, renumberedPrintConfirmMessage,
 } from '@/lib/problem-paper/blocks';
+import { adviseDropBackCover, coverWithoutBack } from '@/lib/problem-paper/booklet-advice';
 import { coverTeacherName, coverYearOf } from '@/lib/problem-paper/cover-text';
 import { paperPrintLabel } from '@/lib/problem-paper/print-label';
 import { trimmableGroupCount } from '@/lib/problem-paper/trim-works';
@@ -53,6 +56,11 @@ export default function ProblemPaperViewPage() {
   /** 표지를 못 읽었지만 표지 없이 가기로 했는가 */
   const [skipCover, setSkipCover] = useState(false);
   const coverUnknown = coverState.failed && !skipCover;
+  /** 지금 판의 본문 쪽 수 — 중철에서 뒷표지만 빼면 딱 맞는지 가른다 */
+  const { bodyPages, handleLayout } = usePaperBodyPages(mode);
+  /** '그대로 두기' — 이 화면에서만 뒷표지 안내를 접는다(저장하지 않는다) */
+  const [keepBackCover, setKeepBackCover] = useState(false);
+  const adviseDrop = !keepBackCover && adviseDropBackCover({ printLayout, cover, coverUnknown, bodyPages });
   /**
    * 문항 본문을 인쇄하는 모드인가.
    *
@@ -179,6 +187,15 @@ export default function ProblemPaperViewPage() {
         <PaperPrintLayoutNotice blockedReason={bookletBlocked ? BOOKLET_BLOCKED_REASON : undefined} />
       )}
 
+      {adviseDrop && cover && (
+        <PaperBackCoverAdvice
+          backIsImage={cover.backKind === 'image'}
+          busy={coverState.saving}
+          onDrop={() => { void coverState.save(coverWithoutBack(cover)); }}
+          onKeep={() => setKeepBackCover(true)}
+        />
+      )}
+
       <PaperCoverAlerts
         fetchFailed={coverUnknown}
         imageBroken={coverImages.broken}
@@ -227,13 +244,16 @@ export default function ProblemPaperViewPage() {
         </div>
       )}
 
-      {/* 문제지와 교사용은 같은 컴포넌트다 — 모드마다 따로 마운트되므로 A4Document 가 새로 잰다 */}
+      {/* 문제지와 교사용은 같은 컴포넌트다 — `key` 로 모드마다 따로 마운트해 A4Document 가 새로 재고 쪽 수를
+          반드시 알리게 한다(같은 인스턴스면 쪽 배정이 우연히 같을 때 알림이 안 와 뒷표지 안내가 빠진다) */}
       {printsProblems && (
         <ProblemPaperView
+          key={mode}
           paper={paper} items={items} imageUrls={images.urls}
           showAnswers={mode === 'teacher'} trimWorks={trimWorks}
-            booklet={booklet} cover={cover} coverImages={coverImages} coverTeacher={teacher}
+          booklet={booklet} cover={cover} coverImages={coverImages} coverTeacher={teacher}
           coverNotice={coverUnknown ? COVER_FETCH_FAILED_NOTICE : undefined}
+          onLayout={handleLayout}
         />
       )}
       {mode === 'key' && (
@@ -241,6 +261,7 @@ export default function ProblemPaperViewPage() {
           paper={paper} items={items}
           booklet={booklet} cover={cover} coverImages={coverImages} coverTeacher={teacher}
           coverNotice={coverUnknown ? COVER_FETCH_FAILED_NOTICE : undefined}
+          onLayout={handleLayout}
         />
       )}
 
