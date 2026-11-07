@@ -26,8 +26,9 @@ beforeEach(() => {
 });
 
 describe('fetchReferenceTextFacets', () => {
-  it('묶음의 부분을 세지 않는다', async () => {
+  it('묶음의 부분과 붙어 보이는 글을 세지 않는다', async () => {
     await fetchReferenceTextFacets();
     expect(captured[0].searchParams.get('part_of')).toBe('is.null');
+    expect(captured[0].searchParams.get('attached_to')).toBe('is.null');
   });
 });

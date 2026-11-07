@@ -108,7 +108,7 @@ describe('referenceDraftEquals', () => {
 describe('draftFromReferenceText', () => {
   const row = {
     id: 'r1', title: '봄봄', author: '김유정', body: '본문', char_count: 2,
-    kind: '작품' as const, format: 'text' as const, seq: 3, tags: ['제재'], source_key: null, part_of: null,
+    kind: '작품' as const, format: 'text' as const, seq: 3, tags: ['제재'], source_key: null, part_of: null, attached_to: null,
     units: [unit()], grammar_paths: ['담화'], note: '메모',
     user_id: 'u', updated_by: null, created_at: 'c', updated_at: 't',
   };

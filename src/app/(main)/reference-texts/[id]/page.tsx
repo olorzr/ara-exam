@@ -57,7 +57,17 @@ function ReferenceTextViewer({ id, onEdit }: { id: string; onEdit?: () => void }
       </div>
     );
   }
-  return <ReferenceTextView row={view.row} backHref={LIST_HREF} onEdit={onEdit} />;
+  return (
+    <ReferenceTextView
+      row={view.row}
+      attachments={view.attachments}
+      attachFailed={view.attachFailed}
+      attachLoading={view.attachLoading}
+      onRetry={view.reload}
+      backHref={LIST_HREF}
+      onEdit={onEdit}
+    />
+  );
 }
 
 /**

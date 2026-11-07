@@ -17,7 +17,7 @@ vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 const { useReferenceTexts } = await import('./useReferenceTexts');
 
 const row = (id: string, title: string, author = '') => ({
-  id, title, author, kind: '작품' as const, format: 'text' as const, seq: null, tags: [], source_key: null, part_of: null, char_count: 100, units: [], grammar_paths: [], note: '', user_id: 'u',
+  id, title, author, kind: '작품' as const, format: 'text' as const, seq: null, tags: [], source_key: null, part_of: null, attached_to: null, char_count: 100, units: [], grammar_paths: [], note: '', user_id: 'u',
   updated_by: null, created_at: '2026-09-01', updated_at: '2026-09-01',
 });
 

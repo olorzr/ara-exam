@@ -37,6 +37,11 @@ export interface ReferenceText {
    */
   part_of: string | null;
   /**
+   * 이 글이 붙어 보이는 글(sql/102) — 제재 정리는 작품 전문 맨 위, 단원 총괄의 여백 글은 총괄 오른쪽 칸에 그려진다.
+   * 있으면 목록·트리·고르기에서 숨긴다. 붙은 곳을 지우면 비워진다(SET NULL). 묶기 도구가 쓴다 — **앱은 보내지 않는다**.
+   */
+  attached_to: string | null;
+  /**
    * 본문 글자 수.
    *
    * ⚠️ **DB 트리거가 채운다**(`ab_reference_texts_char_count`) — 앱이 보내는 값은 무시된다.

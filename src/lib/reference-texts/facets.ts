@@ -59,6 +59,7 @@ export async function fetchReferenceTextFacets(): Promise<ReferenceFacetRow[]> {
       .from('reference_texts')
       .select('id,title,author,kind,units,grammar_paths')
       .is('part_of', null)
+      .is('attached_to', null)
       .order('id')
       .range(from, from + REFERENCE_FACET_CHUNK - 1);
     if (error) {

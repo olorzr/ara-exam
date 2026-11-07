@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isReferenceBundle, referenceDeletePrompt } from './bundle';
+import { isReferenceBundle, referenceAttachSlot, referenceDeletePrompt } from './bundle';
 
 const BUNDLE_KEY = '평가문제집|동아|중2-1학기|묶음|단원|1. 생각을 키우는 소통 > (1) 효과적으로 듣고 말하기';
 
@@ -26,5 +26,17 @@ describe('referenceDeletePrompt', () => {
       .toBe('"가" 개념 정리를 지울까요?\n되돌릴 수 없습니다.');
     expect(referenceDeletePrompt({ title: '나', kind: '작품', source_key: null }))
       .toBe('"나" 전문을 지울까요?\n되돌릴 수 없고, 문제 만들기에서 참고자료로 쓸 수 없게 됩니다.');
+  });
+});
+
+describe('referenceAttachSlot', () => {
+  it('여백 글만 오른쪽 칸이고 제재 정리는 맨 위다', () => {
+    expect(referenceAttachSlot({ source_key: '평가문제집|동아|중2-1학기|묶음|여백|1. 가 > (1) 나' })).toBe('wing');
+    expect(referenceAttachSlot({ source_key: '평가문제집|동아|중2-1학기|묶음|작품|1. 가 > (1) 나|동백꽃|김유정' })).toBe('top');
+  });
+
+  it('모르는 열쇠는 맨 위다 — 오른쪽 칸은 도구가 지은 여백 글만', () => {
+    expect(referenceAttachSlot({ source_key: null })).toBe('top');
+    expect(referenceAttachSlot({ source_key: '평가문제집|동아|동아-1-1|개념|10' })).toBe('top');
   });
 });

@@ -862,6 +862,7 @@
 ## 묶음 · 부분 (bundle · part)
 - 정의: 평가문제집 개념의 **묶음**은 단원 총괄(단원 전체를 아우르는 글 하나)과 제재 정리(지문마다 하나)다. **부분**은 묶음에 든 낱개 개념이다. 부분은 지우지 않고 목록·트리·고르기에서 숨기며 주소로만 열린다. 묶음을 지우면 부분도 함께 지워진다
 - 코드에서의 사용: `reference_texts.part_of`, `bundle_digest`(도구 전용), `isReferenceBundle`, `referenceDeletePrompt`, 열쇠 `평가문제집|<교과서>|<학년-학기>|묶음|…`
+- 붙은 글(0.9.79, sql/102): 제재 정리는 작품 전문 맨 위, 단원 총괄의 **여백 글**은 총괄 오른쪽 칸에 그려진다(`attached_to`, 붙은 곳을 지우면 비워진다). 목록에는 안 보이고 `fetchReferenceAttachments` · `referenceAttachSlot` · `ReferenceAttachedBody` 가 그린다
 - 관련 파일: src/lib/reference-texts/bundle.ts, src/lib/reference-texts/queries.ts, sql/98_reference_texts_part_of.sql, ~/.claude/tools/regroup-concepts.js
 
 ## 흐름 목록 (flow list)

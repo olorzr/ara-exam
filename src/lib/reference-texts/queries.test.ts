@@ -30,7 +30,7 @@ vi.mock('@/lib/supabase', () => {
   };
 });
 
-const { REFERENCE_TEXT_LIST_COLUMNS, fetchReferenceTextList, searchReferenceTexts } =
+const { REFERENCE_TEXT_LIST_COLUMNS, fetchReferenceAttachments, fetchReferenceTextList, searchReferenceTexts } =
   await import('./queries');
 
 /** 마지막 요청의 파라미터 값 */
@@ -52,6 +52,20 @@ describe('묶음의 부분 숨기기 (sql/98)', () => {
     expect(lastParam('part_of')).toBe('is.null');
   });
 
+  it('다른 글에 붙어 보이는 글도 뺀다 — 제재 정리 · 여백 글은 붙은 글의 화면에서만 보인다(sql/102)', async () => {
+    await fetchReferenceTextList(30);
+    expect(lastParam('attached_to')).toBe('is.null');
+    await searchReferenceTexts('제재 정리', 'title', 30);
+    expect(lastParam('attached_to')).toBe('is.null');
+  });
+
+  it('붙은 글은 그 글 id 로 본문까지 읽는다', async () => {
+    await fetchReferenceAttachments('w1');
+    expect(lastParam('attached_to')).toBe('eq.w1');
+    expect(lastParam('select')).toBe('*');
+    expect(lastParam('part_of')).toBeNull();
+  });
+
   it('단원 축과 함께 걸린다 — 단원을 열면 총괄과 제재 정리만 보인다', async () => {
     await fetchReferenceTextList(30, toReferenceTextQuery({ kind: 'unit', unit }));
     expect(lastParam('part_of')).toBe('is.null');
@@ -65,6 +79,7 @@ describe('묶음의 부분 숨기기 (sql/98)', () => {
 
   it('고른 칸 목록에 part_of 가 있다 — 타입과 1:1', () => {
     expect(REFERENCE_TEXT_LIST_COLUMNS.split(',')).toContain('part_of');
+    expect(REFERENCE_TEXT_LIST_COLUMNS.split(',')).toContain('attached_to');
   });
 });
 

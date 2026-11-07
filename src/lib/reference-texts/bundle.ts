@@ -6,6 +6,21 @@ import type { ReferenceTextListItem } from '@/types/reference-text';
  */
 const BUNDLE_KEY_MARK = '|묶음|';
 
+/** 붙은 글의 자리 — 작품 맨 위(제재 정리) / 단원 총괄 오른쪽 칸(여백 글) */
+export type ReferenceAttachSlot = 'top' | 'wing';
+
+const WING_KEY_MARK = `${BUNDLE_KEY_MARK}여백|`;
+
+/**
+ * 붙은 글을 어디에 그릴까 — 여백 글만 오른쪽 칸이고 나머지(제재 정리 · 모르는 것)는 맨 위다.
+ * ⚠️ 열쇠 모양은 묶기 도구(`regroup-concepts.next.js` → 0.9.79 뒤 `regroup-concepts.js`)가 짓는 것과 같아야 한다.
+ * @param row - 붙은 글
+ * @returns 자리
+ */
+export function referenceAttachSlot(row: Pick<ReferenceTextListItem, 'source_key'>): ReferenceAttachSlot {
+  return row.source_key?.includes(WING_KEY_MARK) ? 'wing' : 'top';
+}
+
 /**
  * 이 행이 묶음(단원 총괄·제재 정리)인가.
  * @param row - 목록 한 줄
