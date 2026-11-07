@@ -15,7 +15,7 @@ import { VERSE_LAYOUT } from './sanitize-problem';
  * | 여백 해설 | `<table data-layout="gloss">` (원문 · 해설 두 칸) |
  * | 화살표 도식 | `<ul data-flow="down">` / `"right"` |
  * | 구절 풀이 | `<span data-note="시각적 심상">푸른 파도가</span>` — 구절 바로 밑(`data-note-pos="over"` 면 위)에 작은 글씨, 밑줄은 따로 `<u>` |
- * | 어휘 풀이(낱말) | `<span data-note="닭의 수컷" data-note-kind="vocab">수탉</span>` — 낱말 오른쪽 위 ★, 뜻은 글 끝 어휘 목록(`vocab-list.ts`) |
+ * | 어휘 풀이(낱말) | `<span data-note="닭의 수컷" data-note-kind="vocab">수탉</span>` — 낱말 오른쪽 위 ✦, 뜻은 글 끝 어휘 목록(`vocab-list.ts`) |
  * | 표식 | `<span data-shape="box">바다</span>` — □ ○ 는 낱말을 두르고, △ ◇ ☆ 는 낱말 앞 작은 기호(범례는 여백 해설 칸에 글로) |
  *
  * ⚠️ 문항 정화기(`sanitizeProblemHTML`)는 이 표시를 **하나도** 받지 않는다 — 기출 지문·발문의 규칙은 그대로다.
@@ -138,7 +138,7 @@ export function isNotePos(value: string): boolean {
   return value === NOTE_POS_OVER;
 }
 
-/** 풀이 갈래 — 속성이 없으면 구절 해설(구절 밑 글), 이 값이면 낱말 뜻풀이(★ + 글 끝 어휘 목록) */
+/** 풀이 갈래 — 속성이 없으면 구절 해설(구절 밑 글), 이 값이면 낱말 뜻풀이(✦ + 글 끝 어휘 목록) */
 export const NOTE_KIND_VOCAB = 'vocab';
 
 /**

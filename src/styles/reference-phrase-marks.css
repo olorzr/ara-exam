@@ -1,6 +1,6 @@
 /*
  * 구절 풀이 · 표식 — 자습서의 행간 풀이(밑줄 친 구절 밑 '시각적 심상')와 낱말 표식(□ ○ △ ◇ ☆).
- * 풀이는 두 갈래다: 구절 해설은 구절 밑 글, 낱말 뜻풀이(`data-note-kind="vocab"`)는 낱말 오른쪽 위 ★ 와 글 끝 어휘 목록.
+ * 풀이는 두 갈래다: 구절 해설은 구절 밑 글, 낱말 뜻풀이(`data-note-kind="vocab"`)는 낱말 오른쪽 위 ✦ 와 글 끝 어휘 목록.
  *
  * 어휘는 lib/workbook-markup.ts 가 단일 출처이고, 표식은 reference-sheet.css 와 같은
  * `:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror)` 하나로 보기 · 편집기를 함께 적는다.
@@ -24,18 +24,21 @@
 }
 
 /*
- * 풀이 색 두 벌 — 글자·★ 는 흰 바탕에서 작은 글씨가 읽히는 청록, 밑줄은 눈에 띄는 밝은 하늘·민트.
+ * 풀이 색 세 벌 — 글자는 흰 바탕에서 작은 글씨가 읽히는 청록, 밑줄은 눈에 띄는 밝은 하늘·민트, 어휘 별은 설명과 아예 다르게 보이는 분홍.
  * ⚠️ 글자 쪽을 더 옅게 하지 말 것 — 풀이는 11px 안팎이다. 인쇄는 맨 아래에서 회색으로 덮는다.
  */
 .pb-sheet.ref-sheet {
   --ref-note-color: #0e7490;
   --ref-note-line: #22b8cf;
+  --ref-star-color: #ec4899;
 }
 /*
  * 밑줄 — 풀이가 달린 구절은 긴 밑줄 줄의 일부일 때가 있어 시트의 밑줄 전체를 한 색으로 둔다(구절만 칠하면 한 줄이 두 색이다).
  * ⚠️ `<u>` 를 품은 span 에 밑줄을 또 걸지 말 것 — 안쪽 `<u>` 가 같은 자리에 덧그려 span 의 색이 안 보인다. span 밑줄은 `<u>` 없는 풀이만이다.
  */
 :is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) u { text-decoration-color: var(--ref-note-line, #22b8cf); }
+/* ⚠️ 공백을 지킨다 — 크롬은 공백만 든 `<u> </u>` 에 줄을 안 그려, 낱말 사이에 전사된 공백 자리에서 긴 밑줄이 끊긴다. 줄바꿈 자리는 그대로다 */
+.pb-sheet.ref-sheet u { white-space: pre-wrap; }
 .pb-sheet.ref-sheet span[data-note]:not([data-note-kind='vocab']):not(:has(u)) {
   text-decoration: underline;
   text-decoration-color: var(--ref-note-line);
@@ -45,14 +48,14 @@
 
 /*
  * ── 보기 화면 — 책처럼 본문은 줄글이고 풀이는 그 위에 씌운다 ───
- * 구절은 그냥 인라인이라 줄 가운데서 꺾이고 본문 폭을 건드리지 않는다. 풀이는 구절 첫 조각 왼쪽 끝에서 오른쪽으로 **한 줄**로 흐른다.
+ * 구절은 그냥 인라인이라 줄 가운데서 꺾이고 본문 폭을 건드리지 않는다. 풀이는 **한 줄**로, 구절이 든 밑줄의 긴 줄 밑 한가운데에 놓인다.
  * 흐름 밖이어도 앞뒤 줄과 겹치지 않는 것은 행간을 미리 벌려 두기 때문이다(reference-sheet.css 의 `--ref-note-leading`).
  * ⚠️ 그 행간 없이 `position: absolute` 만 쓰면 풀이가 다음 줄 글자를 덮는다.
  *
  * 자리는 lib/reference-texts/phrase-note-dom.ts 가 재서 쓴다. 스크립트가 안 돌아도 같은 모양이고 겹침만 안 풀린다.
- *   --note-dx     칸 끝을 넘거나 앞 풀이와 부딪힐 때 옮기는 거리
+ *   --note-dx     구절 첫 조각 왼쪽에서 풀이 왼쪽까지 — 가운데로 옮기고, 칸 끝을 넘거나 앞 풀이와 부딪히면 더 옮긴다
  *   --note-shift  구절에서 얼마나 떨어질까 — 같은 줄 사이의 둘째 행부터. px 인 까닭은 풀이마다 글자 크기가 달라도 행이 맞아야 해서다
- *   --note-dy     구절이 꺾였을 때 첫 조각 높이 — 인라인의 `100%` 는 **마지막** 조각 밑이다
+ *   --note-dy     첫 조각 위에서 기준 줄 밑까지 — 인라인의 `100%` 는 **마지막** 조각 밑이라 기준 줄이 거기면 안 쓴다
  *   --note-strut  이 줄을 얼마나 늘릴까 — 풀이 행이 행간보다 많을 때만
  *   --note-w · data-note-fit='wrap'  칸보다 긴 풀이만 그 자리에서 꺾는다
  */
@@ -84,25 +87,39 @@
   vertical-align: calc(var(--note-strut, 0px) / -2);
 }
 .pb-sheet.ref-sheet span[data-note][data-note-pos='over']::before { vertical-align: calc(var(--note-strut, 0px) / 2); }
+/* 구절 첫 조각이 아닌 줄의 받침 — `::before` 는 첫 조각에만 붙으니 배치 스크립트가 빈 요소를 넣는다. 저장되지 않는다 */
+.pb-sheet.ref-sheet .ref-note-strut {
+  line-height: var(--note-strut, 0px);
+  vertical-align: calc(var(--note-strut, 0px) / -2);
+}
+.pb-sheet.ref-sheet .ref-note-strut[data-over] { vertical-align: calc(var(--note-strut, 0px) / 2); }
 
 /*
- * ── 낱말 뜻풀이 — 글자 오른쪽 위 ★, 뜻은 글 끝 어휘 목록(lib/reference-texts/vocab-list.ts) ───
+ * ── 낱말 뜻풀이 — 글자 오른쪽 위 ✦, 뜻은 글 끝 어휘 목록(lib/reference-texts/vocab-list.ts) ───
  * 배치 스크립트가 재지 않으니(`EXPLANATION_NOTE_SELECTOR`) 자리 변수도 받침도 안 쓰인다.
- * ⚠️ `position: static` 이어야 한다 — `relative` 면 위 규칙의 `top: 100%` 가 살아나 ★ 가 문단 높이만큼 밀려난다. 그래서 이 규칙은 위 규칙들 뒤에 둔다.
- * ⚠️ `line-height: 0` 을 빼지 말 것 — 올린 ★ 가 줄 상자를 키워 어휘가 있는 줄만 벌어진다.
- * ⚠️ `\2060` 은 낱말과 ★ 사이 줄바꿈을 막는다. 한글 뒤는 끊을 수 있는 자리라 없으면 ★ 만 다음 줄 맨 앞으로 떨어진다.
+ * ⚠️ `position: static` 이어야 한다 — `relative` 면 위 규칙의 `top: 100%` 가 살아나 ✦ 가 문단 높이만큼 밀려난다. 그래서 이 규칙은 위 규칙들 뒤에 둔다.
+ * ⚠️ `line-height: 0` 을 빼지 말 것 — 올린 ✦ 가 줄 상자를 키워 어휘가 있는 줄만 벌어진다.
+ * ⚠️ `\2060` 은 낱말과 ✦ 사이 줄바꿈을 막는다. 한글 뒤는 끊을 수 있는 자리라 없으면 ✦ 만 다음 줄 맨 앞으로 떨어진다.
  * 책의 밑줄(`<u>`)은 저장된 그대로 두고 화면에서만 지운다 — 되돌리기 쉽고 원문 전사가 그대로다.
  * 긴 밑줄 줄 안의 낱말(`.ref-vocab-in-line`, vocab-list.ts 가 붙인다)은 지우면 줄이 끊겨 그대로 둔다.
  */
 .pb-sheet.ref-sheet span[data-note][data-note-kind='vocab']::after {
-  content: '\2060★';
+  content: '\2060✦';
   position: static;
-  margin-left: 1px;
-  font-size: 0.55em;
+  margin-left: -1px;
+  font-size: 0.44em;
   line-height: 0;
-  vertical-align: 0.7em;
+  vertical-align: 1.35em;
+  color: var(--ref-star-color);
 }
 .pb-sheet.ref-sheet span[data-note][data-note-kind='vocab']:not(.ref-vocab-in-line) u { text-decoration: none; }
+/* 긴 밑줄 안의 낱말은 ✦ 밑까지 줄이 이어진다 — `<u>` 는 낱말까지이고 별은 그 뒤라, 없으면 별 폭만큼 줄이 끊긴다. 별 자체가 아니라 span 에 걸어야 줄 높이가 낱말과 같다 */
+.pb-sheet.ref-sheet span[data-note][data-note-kind='vocab'].ref-vocab-in-line {
+  text-decoration: underline;
+  text-decoration-color: var(--ref-note-line);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
 
 /* 글 끝 어휘 목록 — 접두를 줄이지 말 것. `:is()` 목록 규칙(reference-sheet.css)을 이겨야 번호와 들여쓰기가 안 샌다 */
 .pb-sheet.ref-sheet .ref-vocab {
@@ -128,12 +145,12 @@
   break-inside: avoid;
 }
 .pb-sheet.ref-sheet .ref-vocab ol.ref-vocab__list li::before {
-  content: '★';
+  content: '✦';
   position: absolute;
   top: 0.35em;
   left: 0;
   font-size: 0.7em;
-  color: var(--ref-note-color);
+  color: var(--ref-star-color);
 }
 .pb-sheet.ref-sheet .ref-vocab .ref-vocab__word {
   margin-right: 0.4em;
@@ -181,11 +198,12 @@
   margin: 0 0.5em;
 }
 
-/* 낱말 뜻풀이는 쓰는 동안 해설과 구별되게 — 보기 화면에서는 ★ 와 어휘 목록이 된다 */
+/* 낱말 뜻풀이는 쓰는 동안 해설과 구별되게 — 보기 화면에서는 ✦ 와 어휘 목록이 된다 */
 .pb-editor.pb-editor--reference .ProseMirror span[data-note][data-note-kind='vocab']:not([data-note-pos='over'])::after,
 .pb-editor.pb-editor--reference .ProseMirror span[data-note][data-note-kind='vocab'][data-note-pos='over']::before {
-  content: '★ ' attr(data-note);
-  background: #e0f7f5;
+  content: '✦ ' attr(data-note);
+  background: #fce7f3;
+  color: #be185d;
 }
 
 /* ── 표식 — 글자가 줄을 넘어가도 테두리가 양쪽에 닫힌다 ─── */
@@ -219,15 +237,27 @@
 :is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) span[data-shape='diamond']::before { content: '◇'; }
 :is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) span[data-shape='star']::before { content: '☆'; }
 
-/* ── 인쇄 — 회색 한 벌. 표식은 currentColor 라 규칙이 없고, 밑줄 · ★ · 어휘 목록은 위 변수를 덮어 함께 회색이 된다 ─── */
+/*
+ * 네모 · 표식의 선도 밑줄과 같은 색 — 원장 "네모도 밑줄이랑 같은 색으루, 통일되게". 기호(△ ◇ ☆)는 글자색 그대로다.
+ * 네모(`code`)는 기출과 한 규칙(problem-paper.css)이라 보기 화면에서만 덮는다. 위 표식 규칙과 특이성이 같아 뒤에 둔다
+ */
+.pb-sheet.ref-sheet code { border-color: var(--ref-note-line); }
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) span:is([data-shape='box'], [data-shape='circle']) { border-color: var(--ref-note-line, #22b8cf); }
+:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) span:is([data-shape='triangle'], [data-shape='diamond'], [data-shape='star']) { text-decoration-color: var(--ref-note-line, #22b8cf); }
+
+/* ── 인쇄 — 회색 한 벌. 표식은 currentColor 라 규칙이 없고, 밑줄 · ✦ · 어휘 목록은 위 변수를 덮어 함께 회색이 된다 ─── */
 @media print {
   /* 편집기도 덮는다 — 변수가 없으면 밑줄이 `var()` 의 청록 기본값으로 찍힌다 */
   :is(.pb-sheet.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) {
     --ref-note-color: #444;
     --ref-note-line: #444;
+    --ref-star-color: #444;
   }
   .pb-editor.pb-editor--reference .ProseMirror span[data-note][data-note-kind='vocab']:not([data-note-pos='over'])::after,
-  .pb-editor.pb-editor--reference .ProseMirror span[data-note][data-note-kind='vocab'][data-note-pos='over']::before { background: none; }
+  .pb-editor.pb-editor--reference .ProseMirror span[data-note][data-note-kind='vocab'][data-note-pos='over']::before {
+    background: none;
+    color: #444;
+  }
   .ref-sheet span[data-note]::after,
   .pb-editor.pb-editor--reference .ProseMirror span[data-note]:not([data-note-pos='over'])::after,
   .pb-editor.pb-editor--reference .ProseMirror span[data-note][data-note-pos='over']::before { color: #444; }

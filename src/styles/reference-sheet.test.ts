@@ -34,7 +34,17 @@ describe('reference-sheet.css', () => {
     expect(rule.slice(0, rule.indexOf('}'))).toContain(`.pb-sheet.ref-sheet :is(p, li, td, th):has(${EXPLANATION})`);
   });
 
-  it('⚠️ 낱말 뜻풀이는 행간을 벌리지 않는다 — ★ 만 찍혀 자리가 필요 없다', () => {
+  it('⚠️ 작품 본문은 오른쪽 여백 칸을 늘 비운다 — 폭은 여백 해설 격자와 짝이다', () => {
+    const body = ":is(p, blockquote:not([data-callout], [data-tone]), table[data-layout='verse'])";
+    expect(css).toContain('grid-template-columns: minmax(0, 1fr) minmax(7em, 28%);');
+    expect(css).toContain('gap: 0.9em 1.4em;');
+    const rule = css.slice(css.indexOf(`.pb-sheet.ref-sheet--work > ${body} {`));
+    expect(rule.slice(0, rule.indexOf('}'))).toContain('max-width: calc(100% - max(7em, 28%) - 1.4em)');
+    expect(css).toContain(`.pb-sheet.ref-sheet--work > ${body} { max-width: none; }`);
+    expect(css).toContain(`.pb-sheet.ref-sheet--work.ref-sheet--print-metrics > ${body} {`);
+  });
+
+  it('⚠️ 낱말 뜻풀이는 행간을 벌리지 않는다 — ✦ 만 찍혀 자리가 필요 없다', () => {
     expect(css).not.toContain(':has(span[data-note])');
   });
 
@@ -53,7 +63,7 @@ describe('reference-sheet.css', () => {
   });
 
   it('⚠️ 흉내는 좁은 화면에서도 여백 해설을 두 칸으로 되살린다 — 인쇄는 그 미디어 쿼리에 안 걸린다', () => {
-    const template = css.match(/grid-template-columns: (minmax\(0, 1fr\) minmax\(8em, 38%\));/)?.[1];
+    const template = css.match(/grid-template-columns: (minmax\(0, 1fr\) minmax\(7em, 28%\));/)?.[1];
     expect(template).toBeTruthy();
     expect(css).toContain(`.ref-sheet--print-metrics table[data-layout='gloss'] { grid-template-columns: ${template} !important; }`);
     expect(css.indexOf('.ref-sheet--print-metrics table')).toBeGreaterThan(css.indexOf('@media (max-width: 640px)'));

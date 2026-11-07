@@ -331,6 +331,7 @@ src/
 - 훅: useReferenceTexts(목록 — 검색어·축 거울), useReferenceTextFacets(트리 재료, 실패 시 이전 트리 유지),
   useReferenceTextEditor(편집 — 배열 칸도 `settle` 이 칸마다 가린다), useLazyLoad(고르기 창 목록을 처음 열 때 한 번)
 - workbook-plain.ts: `stripWorkbookNotes`·`referenceBodyPlainText` — 해설·상자·어휘를 걷고 구절 풀이·표식 속성을 벗긴 **원문**(참고자료·적재 도구의 같은 글 판정)
+- underline-run.ts: 이어진 밑줄 줄 찾기(`underlineRun`) — 풀이 자리와 어휘 목록이 같은 눈으로 본다
 - vocab-list.ts: `appendVocabList` — 낱말 뜻풀이를 글 끝 어휘 목록으로 모은다. 저장하지 않고 그릴 때 만든다(`ReferenceBodyView`, 각주 `markFootnotes` 다음). 배럴에 넣지 않고 경로로 가져온다
 - ⚠️ 본문 형식은 둘이다 — 옛 평문(`text`, 텍스트 노드로만 그린다)과 문제집 서식(`html`, `sanitizeReferenceHTML`).
   저장 · 읽기 · 견주기(form.ts)와 편집기(`ProblemHtmlEditor profile="reference"`) · 보기 화면이 같은 정화기다

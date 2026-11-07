@@ -850,7 +850,7 @@
 - 관련 파일: src/lib/workbook-markup.ts, src/components/problem-editor/WorkbookMarks.ts, src/components/problem-editor/PhraseNoteControls.tsx, src/styles/reference-phrase-marks.css
 
 ## 낱말 뜻풀이 (vocab note)
-- 정의: 구절 풀이 가운데 낱말의 사전식 뜻인 것. 구절의 역할을 풀어 주는 **설명**(구절 해설)과 갈래가 다르다. 보기 화면은 낱말 오른쪽 위 ★ 만 찍고 뜻은 글 끝 **어휘 목록**에 모은다. 어휘 풀이 표(`table[data-layout="vocab"]`)와는 다른 것이다 — 표는 본문에 저장된 표이고 목록은 그릴 때 만든다
+- 정의: 구절 풀이 가운데 낱말의 사전식 뜻인 것. 구절의 역할을 풀어 주는 **설명**(구절 해설)과 갈래가 다르다. 보기 화면은 낱말 오른쪽 위 ✦ 만 찍고 뜻은 글 끝 **어휘 목록**에 모은다. 어휘 풀이 표(`table[data-layout="vocab"]`)와는 다른 것이다 — 표는 본문에 저장된 표이고 목록은 그릴 때 만든다
 - 코드에서의 사용: `<span data-note="…" data-note-kind="vocab">`, `NOTE_KIND_VOCAB`, `isNoteKind`, `appendVocabList`, `EXPLANATION_NOTE_SELECTOR`(자리를 재는 쪽은 설명뿐이다)
 - 관련 파일: src/lib/reference-texts/vocab-list.ts, src/lib/workbook-markup.ts, src/styles/reference-phrase-marks.css
 

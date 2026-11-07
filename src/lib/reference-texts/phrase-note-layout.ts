@@ -2,9 +2,18 @@
  * 구절 풀이 자리 잡기 — 순수 계산. 화면을 재는 쪽은 `phrase-note-dom.ts` 다.
  *
  * 띠는 **두 줄 사이 공간 하나**다. 위 줄의 아래 풀이와 아래 줄의 위 풀이가 같은 공간을 나눠 쓰므로 한 묶음으로 푼다.
+ * 풀이는 제 구절 밑 가운데에 놓고, 부딪히면 먼저 한쪽을 구절 위로 올린다(`notesToRaise`). 위에도 자리가 없으면 그때 민다.
  * 풀이는 제 구절 밑을 떠나면 어느 구절 것인지 모른다. 그래서 오른쪽으로는 구절 폭 안에서만 밀고, 그래도 부딪히면 다음 행으로 내린다.
  * 행 수에 상한을 두지 않는다 — 풀이마다 제 행을 가지면 언제나 풀리므로 겹침이 남지 않는다.
  */
+
+/** 화면 상자 */
+export interface LineBox {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
 
 /** 띠 안의 풀이 하나 */
 export interface BandNote {
@@ -12,9 +21,9 @@ export interface BandNote {
   id: number;
   /** 구절 위 풀이인가 */
   over: boolean;
-  /** 구절 첫 조각의 왼쪽 끝 */
+  /** 풀이를 두고 싶은 왼쪽 끝 — 기준 줄의 가운데다 */
   x0: number;
-  /** 구절 첫 조각의 오른쪽 끝 */
+  /** 기준 줄의 오른쪽 끝 */
   phraseRight: number;
   /** 풀이 폭 */
   width: number;
@@ -35,7 +44,7 @@ export interface BandLimits {
 /** 풀이 하나의 자리 */
 export interface NotePlacement {
   id: number;
-  /** 구절 왼쪽 끝에서 옮긴 거리(px, 정수) */
+  /** 두고 싶은 자리에서 옮긴 거리(px, 정수) */
   dx: number;
   /** 구절에서 몇 번째 행인가 — 아래 풀이는 위에서, 위 풀이는 아래에서 센다 */
   row: number;
@@ -152,6 +161,36 @@ export function placeBand(notes: readonly BandNote[], limits: BandLimits): BandP
   return stackRows(ordered, limits);
 }
 
+/**
+ * 상자들을 줄로 합친다 — 밑줄 줄의 글자 상자는 낱말마다 여럿이고 폭 없는 받침도 섞인다.
+ * @param boxes - 화면 상자들
+ * @returns 위에서 아래로 줄 상자들
+ */
+export function mergeLineBoxes(boxes: readonly LineBox[]): LineBox[] {
+  const lines: LineBox[] = [];
+  for (const box of [...boxes].filter((item) => item.right > item.left).sort((a, b) => a.top - b.top)) {
+    const middle = (box.top + box.bottom) / 2;
+    const line = lines.find((item) => middle > item.top && middle < item.bottom);
+    if (!line) { lines.push({ left: box.left, right: box.right, top: box.top, bottom: box.bottom }); continue; }
+    line.left = Math.min(line.left, box.left);
+    line.right = Math.max(line.right, box.right);
+    line.top = Math.min(line.top, box.top);
+    line.bottom = Math.max(line.bottom, box.bottom);
+  }
+  return lines;
+}
+
+/** 올릴지 따져 볼 풀이 */
+export interface RaiseNote {
+  id: number;
+  /** 가운데에 뒀을 때 왼쪽 끝 */
+  start: number;
+  end: number;
+  over: boolean;
+  /** 올려도 되는가 — 칸보다 길어 꺾인 풀이는 안 올린다 */
+  movable: boolean;
+}
+
 /** 줄 하나 — 같은 높이에 있는 풀이의 묶음 */
 export interface NoteLine<T> {
   top: number;
@@ -173,6 +212,34 @@ export function groupLines<T>(items: readonly T[], topOf: (item: T) => number, t
     else lines.push({ top: topOf(item), items: [item] });
   }
   return lines;
+}
+
+/**
+ * 가운데에 둔 아래 풀이끼리 겹치면 한쪽을 구절 위로 올린다 — 밀면 가운데를 떠나고 행을 늘리면 줄이 벌어진다.
+ * 뒤쪽 풀이를 먼저 올린다. 위쪽 띠에 윗줄의 아래 풀이나 위 풀이가 있어 못 올리면 앞쪽을 올리고, 둘 다 안 되면 그대로 둔다(`placeBand` 가 푼다).
+ * @param lines - 위에서 아래로 줄들
+ * @param gap - 같은 행에서 풀이 사이에 둘 틈
+ * @param adjacent - 두 줄 사이 거리가 이보다 작으면 바로 이어진 줄이다
+ * @returns 올릴 풀이의 id
+ */
+export function notesToRaise(lines: readonly NoteLine<RaiseNote>[], gap: number, adjacent: number): Set<number> {
+  const raised = new Set<number>();
+  const clash = (a: RaiseNote, b: RaiseNote) => a.start < b.end + gap && b.start < a.end + gap;
+  lines.forEach((line, index) => {
+    const prev = lines[index - 1];
+    const aboveLine = prev && line.top - prev.top < adjacent ? prev.items.filter((note) => !note.over && !raised.has(note.id)) : [];
+    const roomAbove = (note: RaiseNote) => (
+      note.movable && ![...aboveLine, ...line.items.filter((item) => item.over || raised.has(item.id))].some((other) => clash(other, note))
+    );
+    let kept: RaiseNote | null = null;
+    for (const note of line.items.filter((item) => !item.over).sort((a, b) => a.start - b.start)) {
+      if (!kept || !clash(kept, note)) { kept = note; continue; }
+      if (roomAbove(note)) { raised.add(note.id); continue; }
+      if (roomAbove(kept)) { raised.add(kept.id); kept = note; continue; }
+      if (note.end > kept.end) kept = note;
+    }
+  });
+  return raised;
 }
 
 /** 띠 — 그 안의 풀이와 맞닿은 줄 */

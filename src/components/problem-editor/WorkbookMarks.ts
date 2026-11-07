@@ -80,7 +80,7 @@ export const SmallMark = Mark.create({
 
 /**
  * 구절 풀이 `<span data-note>` — 구절 바로 밑(`data-note-pos="over"` 면 위)에 작은 글씨 해설. 밑줄은 따로 `<u>` 다.
- * `data-note-kind="vocab"` 이면 낱말 뜻풀이다 — 보기 화면이 ★ 와 글 끝 어휘 목록으로 그린다.
+ * `data-note-kind="vocab"` 이면 낱말 뜻풀이다 — 보기 화면이 ✦ 와 글 끝 어휘 목록으로 그린다.
  *
  * `inclusive: false` — 구절 끝에서 이어 쳐도 풀이가 늘어나지 않는다.
  * `consuming: false` — 붙여 넣은 span 에 `data-note`·`data-shape` 가 함께 있어도 두 마크로 읽힌다(글자는 한 번만 들어간다).

@@ -76,7 +76,9 @@ describe('appendVocabList', () => {
     expect(inLine(`<p><span data-note="해설"><u>앞 줄</u></span>${word}</p>`)).toBe(true);
     expect(inLine(`<p><u>앞 줄</u> 맨 글자 ${word}</p>`)).toBe(false);
     expect(inLine(`<p>${word}<span data-note="다른 뜻" data-note-kind="vocab"><u>옆 낱말</u></span></p>`)).toBe(false);
-    expect(inLine(`<p><span data-note="해설">밑줄 없는 구절</span>${word}</p>`)).toBe(false);
+    // `<u>` 없는 구절 해설은 화면이 span 에 밑줄을 긋는다 — 맞닿으면 한 줄이다
+    expect(inLine(`<p><span data-note="해설">밑줄 없는 구절</span>${word}</p>`)).toBe(true);
+    expect(inLine(`<p><span data-note="해설">밑줄 없는 구절</span> ${word}</p>`)).toBe(false);
     expect(inLine(`<p><u>앞 줄</u><u> </u>${word}</p>`)).toBe(true);
   });
 
@@ -91,6 +93,12 @@ describe('appendVocabList', () => {
     expect(inLine(`<p>${word}<strong><u>뒤</u> 맨 글자</strong></p>`)).toBe(true);
     expect(inLine(`<p><strong><u>앞</u> 맨 글자</strong>${word}</p>`)).toBe(false);
     expect(inLine(`<p>${word}<strong>맨 글자 <u>뒤</u></strong></p>`)).toBe(false);
+  });
+
+  it('⚠️ 서식에 싸인 옆 낱말의 밑줄은 화면이 지운 것이라 줄이 아니다', () => {
+    const host = document.createElement('div');
+    host.innerHTML = appendVocabList('<p><strong><span data-note="가" data-note-kind="vocab"><u>A</u></span></strong><span data-note="나" data-note-kind="vocab">B</span></p>');
+    expect(host.querySelector('.ref-vocab-in-line')).toBeNull();
   });
 
   it('서식에 싸인 빈 밑줄도 낱말 사이에서는 글자로 푼다', () => {

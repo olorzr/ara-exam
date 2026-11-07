@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { groupBands, groupLines, placeBand, type BandNote, type NotePlacement } from './phrase-note-layout';
+import {
+  groupBands, groupLines, mergeLineBoxes, notesToRaise, placeBand, type BandNote, type NotePlacement, type RaiseNote,
+} from './phrase-note-layout';
 
 const LIMITS = { left: 0, right: 500, gap: 10 };
 
@@ -132,5 +134,72 @@ describe('groupBands', () => {
     expect(bands).toHaveLength(2);
     expect(bands[0].above).toBeNull();
     expect(bands[1].below).toBeNull();
+  });
+});
+
+describe('mergeLineBoxes', () => {
+  const box = (left: number, right: number, top: number, bottom = top + 20) => ({ left, right, top, bottom });
+
+  it('같은 줄의 글자 상자를 한 줄로 합친다', () => {
+    expect(mergeLineBoxes([box(50, 90, 10), box(0, 50, 12)])).toEqual([box(0, 90, 10, 32)]);
+  });
+
+  it('다른 줄은 위에서 아래로 따로다', () => {
+    expect(mergeLineBoxes([box(0, 40, 50), box(300, 500, 10)])).toEqual([box(300, 500, 10), box(0, 40, 50)]);
+  });
+
+  it('폭 없는 상자는 뺀다 — 받침이 줄을 늘린다', () => {
+    expect(mergeLineBoxes([box(10, 10, 0, 100), box(0, 40, 50)])).toEqual([box(0, 40, 50)]);
+  });
+});
+
+describe('notesToRaise', () => {
+  const raise = (id: number, start: number, end: number, extra: Partial<RaiseNote> = {}): RaiseNote => ({ id, start, end, over: false, movable: true, ...extra });
+  const line = (top: number, ...items: RaiseNote[]) => ({ top, items });
+
+  it('안 겹치면 아무것도 안 올린다', () => {
+    expect(notesToRaise([line(0, raise(1, 0, 100), raise(2, 200, 300))], 10, 60).size).toBe(0);
+  });
+
+  it('틈보다 가까우면 겹친 것이고 뒤 풀이를 올린다', () => {
+    expect([...notesToRaise([line(0, raise(1, 0, 100), raise(2, 105, 200))], 10, 60)]).toEqual([2]);
+  });
+
+  it('입력 차례가 달라도 오른쪽 풀이를 올린다', () => {
+    expect([...notesToRaise([line(0, raise(2, 105, 200), raise(1, 0, 100))], 10, 60)]).toEqual([2]);
+  });
+
+  it('⚠️ 윗줄의 아래 풀이가 그 자리에 있으면 앞 풀이를 올린다', () => {
+    const lines = [line(0, raise(9, 100, 200)), line(40, raise(1, 0, 90), raise(2, 95, 200))];
+    expect([...notesToRaise(lines, 10, 60)]).toEqual([1]);
+  });
+
+  it('둘 다 자리가 없으면 그대로 둔다 — placeBand 가 푼다', () => {
+    const lines = [line(0, raise(9, 0, 300)), line(40, raise(1, 0, 90), raise(2, 95, 200))];
+    expect(notesToRaise(lines, 10, 60).size).toBe(0);
+  });
+
+  it('멀리 떨어진 윗줄은 자리를 안 막는다', () => {
+    const lines = [line(0, raise(9, 0, 300)), line(100, raise(1, 0, 90), raise(2, 95, 200))];
+    expect([...notesToRaise(lines, 10, 60)]).toEqual([2]);
+  });
+
+  it('윗줄에서 올린 풀이는 이 띠를 안 막는다', () => {
+    const lines = [line(0, raise(8, 0, 50), raise(9, 45, 200)), line(40, raise(1, 60, 110), raise(2, 115, 200))];
+    expect([...notesToRaise(lines, 10, 60)]).toEqual([9, 2]);
+  });
+
+  it('같은 줄의 위 풀이가 있으면 그 자리로는 못 올린다', () => {
+    const lines = [line(0, raise(1, 0, 100), raise(2, 95, 200), raise(3, 150, 180, { over: true }))];
+    expect([...notesToRaise(lines, 10, 60)]).toEqual([1]);
+  });
+
+  it('꺾인 풀이는 안 올리고 옆 풀이를 올린다', () => {
+    expect([...notesToRaise([line(0, raise(1, 0, 100), raise(2, 95, 200, { movable: false }))], 10, 60)]).toEqual([1]);
+  });
+
+  it('셋이 겹치면 올린 뒤에도 남은 풀이끼리 견준다', () => {
+    const raised = notesToRaise([line(0, raise(1, 0, 100), raise(2, 95, 200), raise(3, 105, 300))], 10, 60);
+    expect([...raised]).toEqual([2]);
   });
 });

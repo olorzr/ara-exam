@@ -1,4 +1,5 @@
 import { createHost } from '@/lib/print/table-dom';
+import { VOCAB_IN_LINE_CLASS, VOCAB_NOTE_SELECTOR, edgeIsLine, touchesLongLine } from './underline-run';
 
 /**
  * 글 끝 어휘 목록 — 낱말 뜻풀이(`span[data-note][data-note-kind="vocab"]`)를 글 차례대로 모은다.
@@ -11,31 +12,12 @@ import { createHost } from '@/lib/print/table-dom';
  * ⚠️ 목록은 **글 하나에 하나**다. 참고자료 인쇄는 브라우저가 쪽을 나눠 쪽 경계를 아는 코드가 없다.
  */
 
-/** 낱말 뜻풀이 — 두 속성을 함께 본다. 정화기는 `data-note` 없이 홀로 남은 갈래 값을 못 걷는다 */
-export const VOCAB_NOTE_SELECTOR = 'span[data-note][data-note-kind="vocab"]';
-
 /** 목록 뿌리의 클래스 — reference-phrase-marks.css 와 짝이다 */
 export const VOCAB_LIST_CLASS = 'ref-vocab';
-
-/** 긴 밑줄 줄 안의 낱말 — 이 낱말만 밑줄을 지우면 줄이 끊겨서 그대로 둔다 */
-export const VOCAB_IN_LINE_CLASS = 'ref-vocab-in-line';
 
 interface VocabEntry {
   word: string;
   meaning: string;
-}
-
-/** 낱말 뜻풀이인가 — 이 밑줄은 화면이 지운다 */
-function isVocab(node: Node | null): boolean {
-  return node?.nodeType === 1 && (node as Element).matches(VOCAB_NOTE_SELECTOR);
-}
-
-/** 이쪽 끝 글자가 밑줄 안인가 — `<strong><u>앞</u></strong>` 처럼 서식에 싸여 있어도 맞닿은 끝을 따라 내려간다 */
-function edgeIsLine(node: Node | null, edge: 'firstChild' | 'lastChild'): boolean {
-  for (let current = node; current; current = current[edge]) {
-    if (current.nodeType === 1 && (current as Element).tagName === 'U') return true;
-  }
-  return false;
 }
 
 /**
@@ -47,27 +29,17 @@ function isBlankLine(node: Node | null): boolean {
   return (node as Element).querySelector('br') === null;
 }
 
-/** 낱말과 빈 밑줄을 건너 밑줄에 닿는가 — 맨 글자를 만나면 줄이 끝난 것이다 */
-function reachesLine(start: Node | null, step: 'previousSibling' | 'nextSibling'): boolean {
-  let node = start;
-  while (isVocab(node) || isBlankLine(node)) node = node![step];
-  return edgeIsLine(node, step === 'previousSibling' ? 'lastChild' : 'firstChild');
-}
-
-function inLongLine(node: Node): boolean {
-  return reachesLine(node.previousSibling, 'previousSibling') || reachesLine(node.nextSibling, 'nextSibling');
-}
-
 /**
  * 밑줄을 낱말마다 가른다 — 긴 밑줄 줄 안의 낱말은 표시해 밑줄을 남기고, 낱말 옆 빈 밑줄은 줄이 아니면 글자로 푼다.
  * ⚠️ CSS `u + span` 으로는 못 가린다 — 형제 결합자는 글자 노드를 건너뛰어 사이에 맨 글자가 있어도 맞는다.
+ *    판정은 풀이 자리와 같은 글자 단위다(`touchesLongLine`).
  * @param host - 본문
  */
 function settleLines(host: HTMLElement): void {
   const words = Array.from(host.querySelectorAll(VOCAB_NOTE_SELECTOR));
-  const inLine = words.filter(inLongLine);
+  const inLine = words.filter(touchesLongLine);
   const blanks = new Set(words.flatMap((word) => [word.previousSibling, word.nextSibling])
-    .filter((node): node is ChildNode => node !== null && isBlankLine(node) && !inLongLine(node)));
+    .filter((node): node is ChildNode => node !== null && isBlankLine(node) && !touchesLongLine(node as Element)));
   inLine.forEach((word) => word.classList.add(VOCAB_IN_LINE_CLASS));
   blanks.forEach((node) => node.replaceWith(node.textContent ?? ''));
 }
