@@ -13,7 +13,7 @@ const WING_KEY_MARK = `${BUNDLE_KEY_MARK}여백|`;
 
 /**
  * 붙은 글을 어디에 그릴까 — 여백 글만 오른쪽 칸이고 나머지(제재 정리 · 모르는 것)는 맨 위다.
- * ⚠️ 열쇠 모양은 묶기 도구(`regroup-concepts.js)가 짓는 것과 같아야 한다.
+ * ⚠️ 열쇠 모양은 묶기 도구(`regroup-concepts.js`)가 짓는 것과 같아야 한다.
  * @param row - 붙은 글
  * @returns 자리
  */
