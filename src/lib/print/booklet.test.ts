@@ -121,3 +121,83 @@ describe('bookletSheets — 뒷표지', () => {
     for (let n = 1; n <= 12; n++) expect(bookletSheets(n, { backCover: false })).toEqual(bookletSheets(n));
   });
 });
+
+describe('bookletSheets — 앞표지 안쪽 빈 면', () => {
+  const front = { frontCover: true };
+  const both = { frontCover: true, backCover: true };
+
+  it('5쪽(앞표지 · 본문 3 · 뒷표지) — 표지 바로 뒤가 비고 본문은 한 자리 뒤로, 남은 빈 면은 뒷표지 앞', () => {
+    // 읽는 순서: 표지, 빈, 1, 2, 3, 빈, 빈, 뒷표지
+    expect(bookletSheets(5, both)).toEqual([
+      sheet([5, 1], [0, 0]),
+      sheet([0, 2], [3, 4]),
+    ]);
+  });
+
+  it('5쪽(앞표지 · 본문 4) — 뒷표지가 없으면 남은 빈 면은 끝에', () => {
+    // 읽는 순서: 표지, 빈, 1, 2, 3, 4, 빈, 빈
+    expect(bookletSheets(5, front)).toEqual([
+      sheet([0, 1], [0, 0]),
+      sheet([5, 2], [3, 4]),
+    ]);
+  });
+
+  it('빈 면이 하나뿐이면 그 하나가 표지 바로 뒤다', () => {
+    expect(bookletSheets(3, front)).toEqual([sheet([3, 1], [0, 2])]);
+    expect(bookletSheets(3, both)).toEqual([sheet([3, 1], [0, 2])]);
+  });
+
+  it('4의 배수면 빈 면이 없어 배치가 그대로다', () => {
+    for (const n of [4, 8, 12]) {
+      expect(bookletSheets(n, front)).toEqual(bookletSheets(n));
+      expect(bookletSheets(n, both)).toEqual(bookletSheets(n, { backCover: true }));
+    }
+  });
+
+  it('1쪽(표지뿐)·2쪽(앞뒤 표지뿐) — 표지만 제자리에 앉는다', () => {
+    expect(bookletSheets(1, front)).toEqual([sheet([0, 1], [0, 0])]);
+    expect(bookletSheets(2, both)).toEqual([sheet([2, 1], [0, 0])]);
+  });
+
+  it('1쪽에 앞·뒷표지를 함께 켜도 같은 쪽을 두 번 찍지 않는다', () => {
+    const slots = bookletSheets(1, both).flatMap((s) => [...s.front, ...s.back]);
+    expect(slots.filter((v) => v !== null)).toEqual([0]);
+  });
+
+  it('앞표지가 없으면 예전 배치 그대로', () => {
+    for (let n = 1; n <= 12; n++) {
+      expect(bookletSheets(n, { frontCover: false })).toEqual(bookletSheets(n));
+      expect(bookletSheets(n, { frontCover: false, backCover: true })).toEqual(bookletSheets(n, { backCover: true }));
+    }
+  });
+
+  it('2~40쪽 — 모든 쪽이 한 번, 읽는 순서 유지, 빈 면이 있으면 자리 1 이 비고 나머지 빈 면은 뒤에만', () => {
+    for (const backCover of [false, true]) {
+      for (let n = 2; n <= 40; n++) {
+        const sheets = bookletSheets(n, { frontCover: true, backCover });
+        expect(sheets).toHaveLength(bookletSheetCount(n));
+        const total = sheets.length * 4;
+        // 자리 공식(앞면 [total-1-2k, 2k], 뒷면 [2k+1, total-2-2k])으로 읽는 순서를 되짚는다
+        const reading = new Array<number | null>(total).fill(null);
+        sheets.forEach((s, k) => {
+          reading[total - 1 - 2 * k] = s.front[0];
+          reading[2 * k] = s.front[1];
+          reading[2 * k + 1] = s.back[0];
+          reading[total - 2 - 2 * k] = s.back[1];
+        });
+        const label = `${n}쪽 뒷표지 ${backCover}`;
+        expect(reading[0], label).toBe(0);
+        if (backCover) expect(reading[total - 1], label).toBe(n - 1);
+        expect(reading.filter((v) => v !== null), label).toEqual(Array.from({ length: n }, (_, i) => i));
+        if (total === n) continue;
+        expect(reading[1], label).toBeNull();
+        // 표지 안쪽 말고 빈 면은 본문이 끝난 뒤에만 있다
+        const lastBody = backCover ? n - 2 : n - 1;
+        const lastBodyAt = reading.indexOf(lastBody);
+        reading.forEach((v, position) => {
+          if (v === null && position !== 1) expect(position, label).toBeGreaterThan(lastBodyAt);
+        });
+      }
+    }
+  });
+});

@@ -268,7 +268,7 @@ describe('A4Document', () => {
       expect(body.some((s) => s.classList.contains('a4-sheet--last'))).toBe(false);
     });
 
-    it('중철 + 앞·뒷표지 — 뒷표지는 1장 앞면 왼쪽(책의 맨 뒤), 빈 면은 본문 끝과 뒷표지 사이', () => {
+    it('중철 + 앞·뒷표지 — 뒷표지는 1장 앞면 왼쪽(책의 맨 뒤), 첫 빈 면은 표지 바로 뒤, 나머지는 본문 끝과 뒷표지 사이', () => {
       const total = blocksPerPage(FIRST_HEADER_H) + blocksPerPage(LATER_HEADER_H) + 1;
       const { container } = render(
         <A4Document
@@ -280,13 +280,37 @@ describe('A4Document', () => {
           laterPageHeader={<div data-h={LATER_HEADER_H}>컴팩트 헤더</div>}
         />,
       );
-      // 앞표지 + 본문 3 + 뒷표지 = 5쪽 → 2장, 빈 면 셋
+      // 앞표지 + 본문 3 + 뒷표지 = 5쪽 → 2장, 빈 면 셋(읽는 순서: 표지, 빈, 1, 2, 3, 빈, 빈, 뒷표지)
       const sides = Array.from(container.querySelectorAll('.a4-stack .booklet-side'));
       expect(sides).toHaveLength(4);
       expect(sides[0].querySelector('[data-slot="right"] .a4-sheet--cover:not(.a4-sheet--cover-back)')).not.toBeNull();
       expect(sides[0].querySelector('[data-slot="left"] .a4-sheet--cover-back')).not.toBeNull();
       expect(container.querySelectorAll('.a4-stack .booklet-blank')).toHaveLength(3);
-      expect(sides[3].querySelector('[data-slot="left"] .a4-footer__page')?.textContent).toBe('3 / 3');
+      // 표지를 넘긴 면(1장 뒷면)의 왼쪽이 빈 면이고 본문 1쪽은 그다음 오른쪽 자리다
+      expect(sides[1].querySelector('[data-slot="left"] .booklet-blank')).not.toBeNull();
+      expect(sides[2].querySelector('[data-slot="right"] .a4-footer__page')?.textContent).toBe('1 / 3');
+      expect(sides[3].querySelector('[data-slot="left"] .a4-footer__page')?.textContent).toBe('2 / 3');
+      expect(sides[3].querySelector('[data-slot="right"] .a4-footer__page')?.textContent).toBe('3 / 3');
+    });
+
+    it('중철 + 표지 — 빈 면이 생기면 표지 바로 뒤를 비운다', () => {
+      const total = blocksPerPage(FIRST_HEADER_H) + 1;
+      const { container } = render(
+        <A4Document
+          booklet
+          coverPage={<div>표지 내용</div>}
+          blocks={Array.from({ length: total }, (_, i) => <div key={i} data-h={BLOCK_H}>문항 {i + 1}</div>)}
+          firstPageHeader={<div data-h={FIRST_HEADER_H}>전체 헤더</div>}
+          laterPageHeader={<div data-h={LATER_HEADER_H}>컴팩트 헤더</div>}
+        />,
+      );
+      // 앞표지 + 본문 2 = 3쪽 → 1장, 빈 면 하나(읽는 순서: 표지, 빈, 1, 2)
+      const sides = Array.from(container.querySelectorAll('.a4-stack .booklet-side'));
+      expect(sides).toHaveLength(2);
+      expect(container.querySelectorAll('.a4-stack .booklet-blank')).toHaveLength(1);
+      expect(sides[1].querySelector('[data-slot="left"] .booklet-blank')).not.toBeNull();
+      expect(sides[1].querySelector('[data-slot="right"] .a4-footer__page')?.textContent).toBe('1 / 2');
+      expect(sides[0].querySelector('[data-slot="left"] .a4-footer__page')?.textContent).toBe('2 / 2');
     });
 
     it('중철 + 표지 — 표지가 1쪽이 되어 1장 앞면 오른쪽에 온다', () => {

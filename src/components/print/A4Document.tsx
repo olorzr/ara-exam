@@ -26,7 +26,7 @@ interface A4DocumentBaseProps {
   showPageNumber?: boolean;
   /**
    * 표지 한 장(본문 앞). 실측 배정 밖의 고정 한 장이라 **쪽 번호를 세지 않는다**.
-   * 측정이 끝나기 전 폴백에는 그리지 않는다.
+   * 측정이 끝나기 전 폴백에는 그리지 않는다. 중철에서 빈 면이 생기면 표지 바로 뒤 자리가 빈다.
    */
   coverPage?: ReactNode;
   /**
@@ -199,7 +199,11 @@ export default function A4Document({
       <div className="a4-stack">
         {layout.ready ? (
           booklet ? (
-            <BookletStack pages={[...cover, ...pages.map(renderPage), ...back]} backCover={back.length > 0} />
+            <BookletStack
+              pages={[...cover, ...pages.map(renderPage), ...back]}
+              frontCover={cover.length > 0}
+              backCover={back.length > 0}
+            />
           ) : (
             [...cover, ...pages.map(renderPage), ...back]
           )

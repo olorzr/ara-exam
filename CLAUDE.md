@@ -272,6 +272,13 @@ node /Users/ara/Projects/Ara-system/scripts/post-update.js "<HTML>"
 - [2026-11-07] **배포 뒤 '안 고쳐졌다' 는 제보는 먼저 그 탭의 코드를 의심할 것.** 문제 은행·문제지 조합은 머무는 동안 Next 서버를 안 불러 옛 코드가 그대로 돈다. 0.9.73 전에 연 탭은 감시 코드도 없으니 한 번은 손으로 새로 고쳐야 한다
 
 ## Architecture Decisions
+- [2026-11-07 · 0.9.76] **중철에서 빈 면이 생기면 첫 하나는 앞표지 바로 뒤다**([booklet.ts](src/lib/print/booklet.ts) 의 `frontCover`, [BookletStack.tsx](src/components/print/BookletStack.tsx), [A4Document.tsx](src/components/print/A4Document.tsx)). 원장님: "중철 제본 했을 때 빈 장수가 나올 경우 꼭 표지 다음 페이지 하나 비워줘". 앞표지 + 본문 3 + 뒷표지면 읽는 순서가 `표지, 빈, 1, 2, 3, 빈, 빈, 뒷표지` 다. 되돌리지 말아야 할 판단들:
+  - **자리 공식은 그대로이고 자리에 앉는 쪽만 바꿨다**(뒷표지와 같은 수법). 짝 합 불변식·짧은 면 뒤집기 전제가 그대로다. 표지를 넘긴 면의 왼쪽(자리 1, 1장 뒷면 왼쪽)이 빈 면이고 본문 1쪽은 오른쪽 면에서 시작한다
+  - **빈 면이 없으면 끼우지 않는다.** 4의 배수에 빈 면을 억지로 넣으면 A3 한 장이 늘어난다. 장 수는 언제나 `ceil(쪽 수 / 4)` 그대로다. 앞표지가 없으면 옛 배치 그대로다
+  - **빈 면은 렌더 자리일 뿐이다.** `layout.pages.length`·`n / N`·`paginate` 는 그대로다. 쪽 번호의 바깥쪽 자리는 `data-slot` 을 따라가 본문이 밀려도 맞는다
+  - 뒷표지가 없고 빈 면이 하나뿐이면 본문 마지막 쪽이 책의 바깥 뒷면에 온다(앞표지 + 본문 2 = `표지, 빈, 1, 2`). 요청이 '꼭' 이라 그대로 뒀다
+  - **책 만들기 내지(`padPagesTo`)는 해당 없다** — 무선제본이고 표지를 따로 뽑는다
+  - **확인**: 표지 있는 중철의 면 배치를 단위 테스트로 고정했고 `frontCover` 연결을 끊으면 깨지는 것을 봤다. 앱 화면과 실물 A3 양면 인쇄는 못 봤다
 - [2026-11-07 · 0.9.75] **평가문제집 개념을 단원 총괄 + 제재 정리로 묶는다 — 낱개는 지우지 않고 `part_of` 로 숨긴다**([sql/98](sql/98_reference_texts_part_of.sql), [bundle.ts](src/lib/reference-texts/bundle.ts), [queries.ts](src/lib/reference-texts/queries.ts) 의 `applyReferenceQuery`, 저장소 밖 `~/.claude/tools/regroup-concepts.js`·`regroup-rules.cjs`). 원장님: "작품 개념들이 너무 중구난방이야. 단원별로 단원 전체를 아우르는 개념 1개, 지문당 개념 1묶음". 낱개 686행 → 단원 총괄 107 · 제재 정리 144. 되돌리지 말아야 할 판단들:
   - **낱개를 지우지 않는 까닭은 재료다.** 구역을 새로 적재하면 도구가 DB 전체를 보고 묶음을 다시 짓는다. 적재기는 낱개를 `source_key` 로 갈아 끼우고 `part_of` 를 안 건드려 숨김이 유지된다. `load.sh` 가 적재 뒤에 도구를 부른다. ⚠️ `--replace-workbook` 은 묶음까지 지운다(`평가문제집|%`)
   - **`part_of` 는 숨김이지 권한이 아니다.** 거르는 곳은 둘이다 — `applyReferenceQuery`(목록·검색·고르기·참고자료 후보)와 `fetchReferenceTextFacets`(트리 건수). 하나만 걸면 트리 `(n)` 과 목록이 다른 수를 낸다. id 로 읽는 `fetchReferenceText`·`fetchReferenceBodies` 는 일부러 안 거른다
@@ -497,7 +504,7 @@ node /Users/ara/Projects/Ara-system/scripts/post-update.js "<HTML>"
   - ⚠️ **sql/75 를 앱보다 먼저**(`COVER_COLUMNS` 가 새 칸 셋을 select — 없으면 모든 문제지 인쇄가 잠긴다). 2026-10-25 운영 적용·자가 검증(기본값·zine·막혀야 할 넷·그림 뒷표지 upsert, authenticated 역할·되돌림) 완료. **디자인 CHECK 의 정본은 이제 sql/75** 다(cover.test.ts 거울도 sql/75 를 본다)
   - **선생님 이름: `teacher` 칸이 비면 문제지를 만든 선생님**(`coverTeacherName`, `public.profiles` — `fetchCreatorNames`, 실패해도 빈 이름). 줄은 **이름이 있을 때만** 찍는다(빈 '선생님' 줄을 두지 않는다). ⚠️ `usePaperLoad` 는 이름까지 받은 **뒤에** `loaded` 를 켠다 — 이름이 나중에 오면 글꼴 글자 묶음(`coverFontSample`)이 바뀌어 인쇄 단추가 한 번 더 잠긴다
   - '이름 칸 넣기' 는 디자인에서 **학생 빈칸 하나**다(시안에서 날짜 칸이 빠졌다). 간단(basic) 표지는 예전 학교·학년 반·이름 칸 그대로이고 선생님 줄이 없다
-  - ⚠️ **중철 뒷표지 자리**: `bookletSheets(n, { backCover })` 는 자리 공식(앞면 `[total-1-2k, 2k]`·뒷면 `[2k+1, total-2-2k]`)을 **바꾸지 않고** `total-1` 자리(1장 앞면 왼쪽 = 책의 맨 뒤)에 마지막 쪽을 앉히며 빈 면은 본문 끝과 뒷표지 사이로 간다. 옛 "빈 면은 끝에(뒤표지 쪽)" 는 뒷표지가 없을 때만이다
+  - ⚠️ **중철 뒷표지 자리**: `bookletSheets(n, { backCover })` 는 자리 공식(앞면 `[total-1-2k, 2k]`·뒷면 `[2k+1, total-2-2k]`)을 **바꾸지 않고** `total-1` 자리(1장 앞면 왼쪽 = 책의 맨 뒤)에 마지막 쪽을 앉히며 빈 면은 본문 끝과 뒷표지 사이로 간다. 옛 "빈 면은 끝에(뒤표지 쪽)" 는 뒷표지가 없을 때만이다. **【2026-11-07】** 앞표지가 있으면 첫 빈 면은 표지 바로 뒤다(맨 위 0.9.76 항목)
   - ⚠️ **낱장에서는 문서의 마지막 낱장 표시(`a4-sheet--last`)가 뒷표지로 옮겨 간다**(`A4Document` 의 본문 마지막 장 `isLast` 에 `!backCoverPage`). 안 옮기면 본문 마지막 장이 쪽 넘김을 끄고 뒷표지 뒤에 빈 장이 붙는다. 헤드리스 PDF 로 낱장 = 앞표지·본문 3·뒷표지 정확히 5쪽, 중철 = A3 4면(1장 앞면 [뒷표지 | 앞표지])을 확인했다
   - **앞·뒤 표지 그림은 `useCoverImages` 한 곳이** 서명·확인하고 하나라도 안 왔거나 깨졌으면 인쇄를 막는다(뒷표지 자리에도 인쇄되는 안내 `BACK_COVER_IMAGE_FAILED_NOTICE`). 저장(`usePaperCover.save(next, { front, back })`)은 **두 그림이 다 있는지 먼저** 보고 올린다 — 앞을 올린 뒤에 뒤가 없다고 멈추면 앞 파일이 고아가 된다. 옛 그림 파일은 지우지 않는다(다른 탭이 인쇄 중일 수 있다)
   - 글꼴 잠금은 **간단 앞표지 + 디자인 뒷표지**에도 건다(`BackCover` 뿌리가 `pb-cover--layout` 이라 디자인 글꼴을 쓴다)

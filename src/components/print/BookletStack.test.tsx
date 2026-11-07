@@ -42,6 +42,25 @@ describe('BookletStack', () => {
     expect(container.querySelector('.booklet-leaf__caption')!.textContent).toContain('왼쪽 뒷표지');
   });
 
+  it('앞표지 — 빈 면이 있으면 표지 바로 뒤를 비우고, 캡션은 앞표지라고 적는다', () => {
+    const { container } = render(<BookletStack pages={pages(5)} frontCover backCover />);
+    expect(faces(container)).toEqual([
+      ['5', '1'],
+      ['blank', 'blank'],
+      ['blank', '2'],
+      ['3', '4'],
+    ]);
+    const first = container.querySelector('.booklet-leaf__caption')!.textContent;
+    expect(first).toContain('왼쪽 뒷표지');
+    expect(first).toContain('오른쪽 앞표지');
+  });
+
+  it('앞표지 — 쪽 수가 4의 배수면 빈 면 없이 그대로다', () => {
+    const { container } = render(<BookletStack pages={pages(4)} frontCover backCover />);
+    expect(faces(container)).toEqual([['4', '1'], ['2', '3']]);
+    expect(container.querySelectorAll('.booklet-blank')).toHaveLength(0);
+  });
+
   it('면 안의 자리에 그 쪽 내용을 그린다', () => {
     const { container } = render(<BookletStack pages={pages(4)} />);
     const first = container.querySelector('.booklet-side')!;

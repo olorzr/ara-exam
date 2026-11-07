@@ -472,8 +472,8 @@ src/
 - **뒷표지**(2026-10-25): 같은 표지 행의 `back_kind`(none · design · image)·`back_image_path`(sql/75). 디자인 뒷표지는
   간단 표지 디자인의 짝(`BackCover`, back.css)이다. 표지 자리 조립은 `renderCoverSlots`(앞·뒤 둘)이고 `A4Document` 의
   `backCoverPage` 가 본문 뒤 한 장을 그린다(쪽 번호에 세지 않는다, 문서의 마지막 낱장 표시 `a4-sheet--last` 가 뒷표지로
-  옮겨 간다). 중철은 `bookletSheets(n, { backCover })` 가 뒷표지를 책의 맨 뒤 자리(1장 앞면 왼쪽)에 두고 빈 면을 그 앞에
-  둔다. 앞·뒤 표지 그림은 `useCoverImages` 가 함께 서명·확인해 하나라도 안 왔거나 깨졌으면 인쇄를 막는다
+  옮겨 간다). 중철은 `bookletSheets(n, { frontCover, backCover })` 가 뒷표지를 책의 맨 뒤 자리(1장 앞면 왼쪽)에 두고 빈 면을 그 앞에
+  두되, 빈 면이 생기면 첫 하나는 앞표지 바로 뒤에 둔다(2026-11-07). 앞·뒤 표지 그림은 `useCoverImages` 가 함께 서명·확인해 하나라도 안 왔거나 깨졌으면 인쇄를 막는다
 - **묻는 작품만 인쇄**(2026-10-12): 문제지 보기 화면의 선택(localStorage, 기본 켜짐). 스냅샷의 지문 `works`·문항
   `work_titles`(sql/68)로 묻지 않는 (가)(나) 최상위 상자를 뺀다. 확실하지 않으면(옛 스냅샷·범위 표시·상자 없음) 지문 전체
 - **인쇄 방식**(2026-10-04): 낱장 / 중철 제본(A3 가로 양면). 화면 선택이고 localStorage 에
