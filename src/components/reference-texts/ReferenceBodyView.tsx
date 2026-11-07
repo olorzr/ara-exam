@@ -1,5 +1,7 @@
 'use client';
 
+import { useMemo, useRef } from 'react';
+import { usePhraseNoteLayout } from '@/hooks/usePhraseNoteLayout';
 import { markFootnotes } from '@/lib/problem-bank/footnotes';
 import { sanitizeReferenceHTML } from '@/lib/sanitize-reference';
 import { hasYetHangul } from '@/lib/yet-hangul';
@@ -20,10 +22,16 @@ interface ReferenceBodyViewProps {
  * ⚠️ 저장할 때 정화했더라도 여기서 **한 번 더** 정화한다(진입이 `dangerouslySetInnerHTML` — `PassageBodyView` 와 같은
  *    다층 방어). 각주 표시(`markFootnotes`)는 정화한 **뒤에** 붙이고 다시 정화하지 않는다(class 를 받지 않는다).
  * 옛 평문 작품은 빈 줄로 문단을 갈라 텍스트 노드로만 그린다(줄바꿈은 CSS 가 지킨다).
+ * 구절 풀이 자리는 그린 뒤에 재서 잡는다(`usePhraseNoteLayout`). 쓰는 값은 안쪽 DOM 에만 있고 저장되지 않는다.
  * @param props - 본문 · 형식 · 종류
  * @returns 본문
  */
 export default function ReferenceBodyView({ body, format, kind }: ReferenceBodyViewProps) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  // ⚠️ 객체째 메모한다. React 19 는 글이 같아도 객체가 새것이면 안쪽을 갈아 끼워, 잡아 둔 풀이 자리가 말없이 사라진다
+  const inner = useMemo(() => ({ __html: format === 'html' ? markFootnotes(sanitizeReferenceHTML(body)) : '' }), [body, format]);
+  usePhraseNoteLayout(rootRef, inner.__html);
+
   const work = kind === '작품';
   // 옛한글은 블록째 옛한글 글꼴로 — 작품 원문은 명조, 개념은 고딕(지문·발문과 같은 규약)
   const yet = hasYetHangul(body) ? (work ? ' yet-hangul-serif' : ' yet-hangul') : '';
@@ -37,5 +45,5 @@ export default function ReferenceBodyView({ body, format, kind }: ReferenceBodyV
       </div>
     );
   }
-  return <div className={base} dangerouslySetInnerHTML={{ __html: markFootnotes(sanitizeReferenceHTML(body)) }} />;
+  return <div ref={rootRef} className={base} dangerouslySetInnerHTML={inner} />;
 }

@@ -1,59 +1,105 @@
 /*
  * 구절 풀이 · 표식 — 자습서의 행간 풀이(밑줄 친 구절 밑 '시각적 심상')와 낱말 표식(□ ○ △ ◇ ☆).
  *
- * 어휘는 lib/workbook-markup.ts 가 단일 출처이고, 선택자는 reference-sheet.css 와 같은
+ * 어휘는 lib/workbook-markup.ts 가 단일 출처이고, 표식은 reference-sheet.css 와 같은
  * `:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror)` 하나로 보기 · 편집기를 함께 적는다.
+ * 풀이는 글자 모양만 함께 쓰고 **자리**는 둘이 다르다 — 자리 선언은 맨 앞 공통 규칙에 넣지 말고 아래 두 절에 따로 적는다.
  *
- * 풀이는 구절과 위아래로 쌓인 인라인 블록이다. 흐름 안에 있어 줄 상자가 풀이만큼 늘어나 앞뒤 줄과 겹치지 않고,
- * 풀이가 칸보다 길면 칸 폭에서 꺾인다.
  * ⚠️ CSS 루비로 되돌리지 말 것 — 크롬의 루비 풀이는 어떤 설정으로도 꺾이지 않아 좁은 칸을 넘어 옆 칸 위로 올라가고,
  *    루비는 안에 든 `<br>` 을 무시해 시의 두 행이 한 줄로 붙는다.
  */
 
-:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) span[data-note] {
-  display: inline-block;
-  /* 인라인 블록의 기준선은 원래 마지막 줄이다 — 그대로면 구절이 풀이 높이만큼 떠오른다 */
-  baseline-source: first;
-  max-width: 100%;
-}
-:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) span[data-note][data-note-pos='over'] { baseline-source: last; }
-:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) span[data-note]:not([data-note-pos='over'])::after,
-:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) span[data-note][data-note-pos='over']::before {
+.ref-sheet span[data-note]::after,
+.pb-editor.pb-editor--reference .ProseMirror span[data-note]:not([data-note-pos='over'])::after,
+.pb-editor.pb-editor--reference .ProseMirror span[data-note][data-note-pos='over']::before {
   content: attr(data-note);
-  display: block;
   font-family: var(--font-sans);
   font-size: 0.72em;
   font-weight: 400;
   font-style: normal;
   line-height: 1.3;
   letter-spacing: -0.01em;
+  color: var(--ref-muted, #6b7280);
+}
+
+/*
+ * ── 보기 화면 — 책처럼 본문은 줄글이고 풀이는 그 위에 씌운다 ───
+ * 구절은 그냥 인라인이라 줄 가운데서 꺾이고 본문 폭을 건드리지 않는다. 풀이는 구절 첫 조각 왼쪽 끝에서 오른쪽으로 **한 줄**로 흐른다.
+ * 흐름 밖이어도 앞뒤 줄과 겹치지 않는 것은 행간을 미리 벌려 두기 때문이다(reference-sheet.css 의 `--ref-note-leading`).
+ * ⚠️ 그 행간 없이 `position: absolute` 만 쓰면 풀이가 다음 줄 글자를 덮는다.
+ *
+ * 자리는 lib/reference-texts/phrase-note-dom.ts 가 재서 쓴다. 스크립트가 안 돌아도 같은 모양이고 겹침만 안 풀린다.
+ *   --note-dx     칸 끝을 넘거나 앞 풀이와 부딪힐 때 옮기는 거리
+ *   --note-shift  구절에서 얼마나 떨어질까 — 같은 줄 사이의 둘째 행부터. px 인 까닭은 풀이마다 글자 크기가 달라도 행이 맞아야 해서다
+ *   --note-dy     구절이 꺾였을 때 첫 조각 높이 — 인라인의 `100%` 는 **마지막** 조각 밑이다
+ *   --note-strut  이 줄을 얼마나 늘릴까 — 풀이 행이 행간보다 많을 때만
+ *   --note-w · data-note-fit='wrap'  칸보다 긴 풀이만 그 자리에서 꺾는다
+ */
+.pb-sheet.ref-sheet span[data-note] { position: relative; }
+.pb-sheet.ref-sheet span[data-note]::after {
+  position: absolute;
+  left: var(--note-dx, 0px);
+  white-space: nowrap;
+  text-align: left;
+}
+.pb-sheet.ref-sheet span[data-note]:not([data-note-pos='over'])::after { top: calc(var(--note-dy, 100%) + var(--note-shift, 0px)); }
+.pb-sheet.ref-sheet span[data-note][data-note-pos='over']::after { bottom: calc(100% + var(--note-shift, 0px)); }
+.pb-sheet.ref-sheet span[data-note][data-note-fit='wrap']::after {
+  width: var(--note-w);
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+/*
+ * 받침 — 풀이 행이 많은 줄만 늘린다. 문단 행간을 통째로 올리면 붐비는 줄 하나 때문에 문단 전체가 벌어진다.
+ * 빈 인라인 상자도 줄 높이에 든다. 자기 높이의 절반만큼 내리면 윗변이 글자 가운데에 걸려 **아래로만** 늘어난다(위 풀이는 위로만).
+ * ⚠️ `inline-block` 으로 쓰지 말 것 — 구절 앞뒤에 줄바꿈 기회가 생겨 잰 자리가 틀어진다.
+ * ⚠️ 받침은 위 · 아래 풀이 모두 `::before` 다. 꺾인 구절에서 첫 조각에 붙는 것은 이쪽뿐이고(`::after` 는 마지막 줄에 붙는다),
+ *    그래서 풀이는 위 풀이도 `::after` 에 그린다 — 흐름 밖이라 그리는 차례는 자리와 상관없다.
+ */
+.pb-sheet.ref-sheet span[data-note]::before {
+  content: '';
+  line-height: var(--note-strut, 0px);
+  vertical-align: calc(var(--note-strut, 0px) / -2);
+}
+.pb-sheet.ref-sheet span[data-note][data-note-pos='over']::before { vertical-align: calc(var(--note-strut, 0px) / 2); }
+
+/*
+ * ── 편집기 — 구절과 풀이를 위아래로 쌓은 상자 ───
+ * ProseMirror 가 DOM 을 쥐고 있어 자리 재는 스크립트를 얹지 않는다. 쓰는 동안은 풀이가 구절 바로 밑에 보이는 것이 먼저다.
+ */
+.pb-editor.pb-editor--reference .ProseMirror span[data-note] {
+  display: inline-block;
+  /* 인라인 블록의 기준선은 원래 마지막 줄이다 — 그대로면 구절이 풀이 높이만큼 떠오른다 */
+  baseline-source: first;
+  max-width: 100%;
+}
+.pb-editor.pb-editor--reference .ProseMirror span[data-note][data-note-pos='over'] { baseline-source: last; }
+.pb-editor.pb-editor--reference .ProseMirror span[data-note]:not([data-note-pos='over'])::after,
+.pb-editor.pb-editor--reference .ProseMirror span[data-note][data-note-pos='over']::before {
+  display: block;
   text-align: center;
   word-break: keep-all;
   overflow-wrap: anywhere;
-  color: var(--ref-muted, #6b7280);
   /*
    * ⚠️ 상자 폭은 구절과 풀이 중 넓은 쪽이다. 상한이 없으면 낱말 하나에 24자 풀이(평가문제집 중앙값)만 달아도 상자가 풀이만큼 넓어져
-   * 본문 가운데 큰 구멍이 나고, 좁은 칸에서는 구절이 한 줄을 통째로 차지한다. 그래서 풀이를 이 폭에서 꺾어 구멍을 줄인다.
-   * `100%` 로 쓰지 말 것 — 상자 폭을 재는 동안 퍼센트 상한은 없는 셈이라 구멍이 그대로다.
+   * 본문 가운데 큰 구멍이 난다. `100%` 로 쓰지 말 것 — 상자 폭을 재는 동안 퍼센트 상한은 없는 셈이라 구멍이 그대로다.
    */
   max-width: 12em;
   margin-inline: auto;
+  /* 풀이가 본문 글자가 아닌 것이 보여야 한다 — 옅은 바탕 */
+  border-radius: 3px;
+  background: #f1f5f9;
 }
 /*
  * ⚠️ 줄바꿈이 든 풀이는 상자를 푼다. 상자로 두면 줄 가운데서 시작한 구절의 둘째 행이 들여 써지고, 구절 뒤 글자가 둘째 행보다
- * 앞에 찍혀 읽는 차례가 뒤집힌다. 편집기 · 붙여넣기 · 적재 어느 길로 들어와도 CSS 가 받는다.
+ * 앞에 찍혀 읽는 차례가 뒤집힌다. 보기 화면은 처음부터 인라인이라 이 규칙이 필요 없다.
  */
-:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) span[data-note]:has(br) { display: inline; }
-:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) span[data-note]:not([data-note-pos='over']):has(br)::after,
-:is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) span[data-note][data-note-pos='over']:has(br)::before {
+.pb-editor.pb-editor--reference .ProseMirror span[data-note]:has(br) { display: inline; }
+.pb-editor.pb-editor--reference .ProseMirror span[data-note]:not([data-note-pos='over']):has(br)::after,
+.pb-editor.pb-editor--reference .ProseMirror span[data-note][data-note-pos='over']:has(br)::before {
   display: inline;
   margin: 0 0.5em;
-}
-/* 편집기에서는 풀이가 본문 글자가 아닌 것이 보여야 한다 — 옅은 바탕 */
-.pb-editor.pb-editor--reference .ProseMirror span[data-note]:not([data-note-pos='over'])::after,
-.pb-editor.pb-editor--reference .ProseMirror span[data-note][data-note-pos='over']::before {
-  border-radius: 3px;
-  background: #f1f5f9;
 }
 
 /* ── 표식 — 글자가 줄을 넘어가도 테두리가 양쪽에 닫힌다 ─── */
@@ -89,6 +135,7 @@
 
 /* ── 인쇄 — 회색 한 벌. 표식은 currentColor 라 규칙이 없다 ─── */
 @media print {
-  :is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) span[data-note]:not([data-note-pos='over'])::after,
-  :is(.ref-sheet, .pb-editor.pb-editor--reference .ProseMirror) span[data-note][data-note-pos='over']::before { color: #444; }
+  .ref-sheet span[data-note]::after,
+  .pb-editor.pb-editor--reference .ProseMirror span[data-note]:not([data-note-pos='over'])::after,
+  .pb-editor.pb-editor--reference .ProseMirror span[data-note][data-note-pos='over']::before { color: #444; }
 }

@@ -1,16 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { A4_HEIGHT_PX, getColumnWidth, PAGE_PAD_BOTTOM, PAGE_PAD_TOP } from '@/lib/print/constants';
 import {
   blockPagesOf, findBlockPage, paginate, type BreakBefore, type PagePlan, type PaginateInput, type SplitRequest,
 } from '@/lib/print/paginate';
+import { useIsoLayoutEffect } from './useIsoLayoutEffect';
 
 /** 측정값이 이보다 작으면 아직 레이아웃이 안 잡힌 것으로 본다 */
 const MIN_SANE_BODY_PX = 80;
-
-/** SSR 에서는 useLayoutEffect 경고가 나므로 useEffect 로 대체 */
-const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 export interface A4Layout {
   pages: PagePlan[];

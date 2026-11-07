@@ -48,6 +48,28 @@ describe('ReferenceBodyView', () => {
     expect(container.querySelector('span[data-shape="triangle"]')?.textContent).toBe('소금');
   });
 
+  it('잴 수 없는 환경에서는 풀이 자리를 쓰지 않고 본문은 그대로다', () => {
+    const { container } = render(
+      <ReferenceBodyView kind="작품" format="html" body={'<p><span data-note="가">갑</span> <span data-note="나">을</span></p>'} />,
+    );
+    const notes = container.querySelectorAll('span[data-note]');
+    expect(notes).toHaveLength(2);
+    notes.forEach((note) => {
+      expect(note.getAttribute('style')).toBeNull();
+      expect(note.getAttribute('data-note-fit')).toBeNull();
+    });
+  });
+
+  it('⚠️ 같은 본문으로 다시 그려도 잡아 둔 풀이 자리가 남는다 — 안쪽을 갈아 끼우면 다시 재는 때가 없어 겹친 채 남는다', () => {
+    const props = { kind: '작품', format: 'html', body: '<p><span data-note="가">갑</span></p>' } as const;
+    const { container, rerender } = render(<ReferenceBodyView {...props} />);
+    const note = container.querySelector<HTMLElement>('span[data-note]')!;
+    note.style.setProperty('--note-dx', '-5px');
+    rerender(<ReferenceBodyView {...props} />);
+    expect(container.querySelector('span[data-note]')).toBe(note);
+    expect(note.style.getPropertyValue('--note-dx')).toBe('-5px');
+  });
+
   it('각주는 작은 글씨 표시가 붙는다', () => {
     const { container } = render(<ReferenceBodyView kind="작품" format="html" body="<p>본문</p><p>*열무: 어린 무.</p>" />);
     expect(container.querySelector('p.pb-note')?.textContent).toBe('*열무: 어린 무.');
