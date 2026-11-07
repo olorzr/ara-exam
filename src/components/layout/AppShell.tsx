@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { useState } from 'react';
 import { Menu } from 'lucide-react';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import { useBuildWatch } from '@/hooks/useBuildWatch';
 import Sidebar from './Sidebar';
 
 /**
@@ -12,6 +13,7 @@ import Sidebar from './Sidebar';
  */
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  useBuildWatch();
 
   return (
     <div className="min-h-screen bg-white lg:flex">

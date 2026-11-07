@@ -3,6 +3,11 @@
 이 프로젝트는 별도의 API 라우트 없이 Supabase 클라이언트를 직접 사용합니다.
 모든 데이터 접근은 RLS(Row Level Security) 정책으로 보호됩니다.
 
+## GET /api/version
+- 설명: 지금 배포본의 빌드 값. 열어 둔 탭이 자기가 옛 코드인지 묻는다(`useBuildWatch`)
+- 인증: 없음(비밀이 아니다)
+- Response: `{ build: string }`, `Cache-Control: no-store`. 배포본이 아니면 `'dev'`
+
 ## Supabase 테이블 CRUD
 
 ### categories

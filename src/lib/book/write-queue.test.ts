@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { hasWorkInProgress } from '@/lib/work-in-progress';
 import { allBookWritesSettled, bookWritesSettled, enqueueBookWrite } from './write-queue';
 
 function deferred<T = void>() {
@@ -69,5 +70,21 @@ describe('allBookWritesSettled', () => {
     hold.resolve();
     await flush();
     expect(settled).toBe(true);
+  });
+
+  it('성공이든 실패든 일이 끝나야 작업 표시가 꺼진다', async () => {
+    const ok = deferred();
+    const bad = deferred();
+    const first = enqueueBookWrite('w', 'fields', () => ok.promise);
+    const second = enqueueBookWrite('w', 'fields', () => bad.promise);
+    expect(hasWorkInProgress()).toBe(true);
+    ok.resolve();
+    await first;
+    await flush();
+    expect(hasWorkInProgress()).toBe(true);
+    bad.reject(new Error('실패'));
+    await expect(second).rejects.toThrow('실패');
+    await flush();
+    expect(hasWorkInProgress()).toBe(false);
   });
 });

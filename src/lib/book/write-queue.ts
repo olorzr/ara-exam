@@ -9,6 +9,8 @@
  * 줄은 둘이다 — 책 칸(제목·설정·표지·쪽 수·다 만든 표시)과 장 바꾸기. 따로 돌아 서로를 기다리지 않는다(예전과 같다).
  */
 
+import { holdWorkInProgress } from '@/lib/work-in-progress';
+
 /** 줄 종류 */
 export type BookWriteLane = 'fields' | 'chapters';
 
@@ -26,9 +28,12 @@ const laneKey = (bookId: string, lane: BookWriteLane) => `${lane}:${bookId}`;
  */
 export function enqueueBookWrite<T>(bookId: string, lane: BookWriteLane, work: () => Promise<T>): Promise<T> {
   const key = laneKey(bookId, lane);
+  // 줄은 화면을 떠나도 돈다 — 그 사이 다른 화면에서 새로 고치면 아직 안 보낸 저장이 사라진다
+  const release = holdWorkInProgress();
   const run = (tails.get(key) ?? Promise.resolve()).then(work);
   const tail = run.then(() => undefined, () => undefined);
   tails.set(key, tail);
+  void tail.then(release);
   void tail.then(() => { if (tails.get(key) === tail) tails.delete(key); });
   return run;
 }

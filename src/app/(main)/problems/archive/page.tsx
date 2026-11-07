@@ -14,6 +14,7 @@ import ProblemFilterBar from '@/components/problem-bank/ProblemFilterBar';
 import GrammarBulkTagDialog from '@/components/problem-bank/GrammarBulkTagDialog';
 import { useArchiveBulkActions } from '@/hooks/useArchiveBulkActions';
 import { useProblemArchive } from '@/hooks/useProblemArchive';
+import { useWorkInProgress } from '@/hooks/useWorkInProgress';
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls';
 import { filtersFromParams, filtersToQueryString } from '@/lib/problem-bank/filters';
 
@@ -36,6 +37,8 @@ function ArchiveContent() {
   const [tagOpen, setTagOpen] = useState(false);
   /** 상세 창에 띄운 문항 — 목록의 조건·스크롤·선택을 잃지 않으려고 창으로 연다 */
   const [openId, setOpenId] = useState<string | null>(null);
+  // 고른 문항과 열린 창은 주소에 없다 — 새 배포가 나와도 말없이 새로 고치지 않는다
+  useWorkInProgress(selection.count > 0 || tagOpen || openId !== null);
 
   // 필터가 바뀌면 주소도 따라간다(뒤로 가기로 히스토리를 채우지 않도록 replace).
   // ⚠️ router.replace 가 아니라 네이티브 replaceState 다 — 라우터는 같은 쪽이어도 클릭마다 서버 왕복(RSC)을

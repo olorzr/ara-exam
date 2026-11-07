@@ -8,6 +8,7 @@ import { deleteSource } from '@/lib/problem-bank/mutations-source';
 import { countPapersUsing } from '@/lib/problem-bank/mutations';
 import { countSourceProblems, fetchSourceProblemIds } from '@/lib/problem-bank/source-list';
 import { sourceDeleteConfirmMessage } from '@/lib/problem-bank/source-delete';
+import { holdWorkInProgress } from '@/lib/work-in-progress';
 import type { ProblemSource } from '@/types/problem-bank';
 
 /**
@@ -68,6 +69,8 @@ export function useSourceDelete(onDeleted: OnSourceDeleted) {
     if (busyRef.current) return;
     busyRef.current = true;
     setDeletingId(source.id);
+    // 화면을 떠나도 삭제는 돈다 — 표시를 화면이 아니라 이 일에 묶는다
+    const release = holdWorkInProgress();
     try {
       // 확인창에 적을 두 숫자를 먼저 센다 — 문제지에 담긴 출처인지 모르고 지우면
       // "인쇄물이 망가졌나" 를 나중에 혼자 걱정하게 된다.
@@ -102,6 +105,7 @@ export function useSourceDelete(onDeleted: OnSourceDeleted) {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '지우지 못했어요.');
     } finally {
+      release();
       busyRef.current = false;
       setDeletingId(null);
     }

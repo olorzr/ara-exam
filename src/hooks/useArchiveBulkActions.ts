@@ -9,6 +9,7 @@ import { addGrammarPaths } from '@/lib/problem-bank/mutations-source';
 import { PROBLEM_PAGE_SIZE } from '@/lib/problem-bank/queries';
 import { bulkDeleteConfirmMessage, pageAfterDelete } from '@/lib/problem-bank/selection';
 import { useArchiveSelection } from './useArchiveSelection';
+import { holdWorkInProgress } from '@/lib/work-in-progress';
 import type { ArchiveRow } from './useProblemArchive';
 
 /**
@@ -109,6 +110,8 @@ export function useArchiveBulkActions(archive: ArchiveLike) {
     const view = viewSeq.current;
     const target = targetSeq.current;
     setDeleting(true);
+    // 화면을 떠나도 지우기는 돈다 — 표시를 화면이 아니라 이 일에 묶는다
+    const release = holdWorkInProgress();
     try {
       const papers = await countPapersUsing(ids);
       // 묻는 사이에 화면을 떠났으면 조용히 그만둔다
@@ -148,6 +151,7 @@ export function useArchiveBulkActions(archive: ArchiveLike) {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '지우지 못했어요.');
     } finally {
+      release();
       setDeleting(false);
     }
   }, [archive, selection]);
@@ -167,6 +171,7 @@ export function useArchiveBulkActions(archive: ArchiveLike) {
 
     const target = targetSeq.current;
     setTagging(true);
+    const release = holdWorkInProgress();
     try {
       if (target !== targetSeq.current) {
         toast.info('선택이 바뀌어 멈췄어요. 다시 눌러 주세요.');
@@ -188,6 +193,7 @@ export function useArchiveBulkActions(archive: ArchiveLike) {
       toast.error(e instanceof Error ? e.message : '붙이지 못했어요.');
       return false;
     } finally {
+      release();
       setTagging(false);
     }
   }, [archive, selection]);

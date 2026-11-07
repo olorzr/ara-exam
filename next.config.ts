@@ -44,6 +44,15 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // 열어 둔 탭이 옛 코드인지 가르는 값 — 브라우저·서버 번들에 같은 글자로 박힌다(src/lib/build-id.ts).
+  // 값이 없으면 'dev' 가 되어 감시가 조용히 꺼지므로 배포 뒤 /api/version 이 실제 값을 답하는지 볼 것.
+  // ⚠️ `??` 로 잇지 말 것 — 빈 글자에서 멈춘다. 그렇게 쓴 판은 커밋 값을 줘도 'dev' 를 답했다
+  env: {
+    NEXT_PUBLIC_BUILD_ID: process.env.VERCEL_DEPLOYMENT_ID
+      || process.env.NEXT_DEPLOYMENT_ID
+      || process.env.VERCEL_GIT_COMMIT_SHA
+      || '',
+  },
   async headers() {
     return [
       {

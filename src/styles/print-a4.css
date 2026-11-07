@@ -177,6 +177,11 @@
     margin: 0;
   }
 
+  /* '새 버전' 안내는 닫을 때까지 떠 있다 — 문서 위에 찍히면 안 된다 */
+  [data-sonner-toaster] {
+    display: none !important;
+  }
+
   html,
   body {
     background: #fff !important;

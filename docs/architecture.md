@@ -524,3 +524,8 @@ src/
 문단 하나가 남은 자리에 안 들어가면 `usePaperSplit` 이 그 문단을 더 쪼갠다(2026-11-06) — 시는 행 경계,
 산문은 문장 끝에서만, 양쪽에 두 줄 이상 남긴다. 문항은 〈보기〉 조각·선지 사이에서 갈려 다음 단으로 이어지고
 번호·출처는 첫 조각에만 찍는다. 표·목록·상자 안 상자·그림 문항은 쪼개지 않는다.
+
+## 배포 감시 (lib/build-watch, hooks/useBuildWatch)
+- 역할: 열어 둔 탭이 옛 배포본의 코드로 계속 도는 것을 끊는다. 들어올 때 · 탭으로 돌아올 때 · 보고 있는 동안 10분마다 `/api/version` 과 자기 빌드(`lib/build-id`)를 견준다
+- 의존: `lib/work-in-progress`(새로 고치면 사라질 것이 있는가, `useWorkInProgress` 로 화면이 켠다), `sonner`
+- 주요 파일: `src/lib/build-watch.ts`(판단 `decideBuildAction`·허용 목록 `AUTO_RELOAD_PATHS`), `src/hooks/useBuildWatch.ts`(`AppShell` 이 부른다), `src/app/api/version/route.ts`
