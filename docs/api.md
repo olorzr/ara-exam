@@ -156,10 +156,11 @@
   PostgREST 가 함수 결과에 건다
 - 인자(**POST 본문**): `p_work_title text`, `p_only_work boolean`(그 작품만 — 배열 같음), `p_grammar_paths text[]`(겹침),
   `p_source jsonb`(출처 칸 — `source_type`·`school_name`·`year`·`grade`·`semester`·`exam_type`·`textbook`·`title`·`grades`·
-  `exclude_source_type`, 키가 있으면 같음/`grades` 는 in/`exclude_source_type` 은 다름, `''` 은 미지정만)
+  `exclude_source_type`, 키가 있으면 같음/`grades` 는 in/`exclude_source_type` 은 다름, `''` 은 미지정만),
+  `p_exclude_papers uuid[]`(이 문제지들에 담긴 문항은 뺀다, 없거나 비면 조건 아님)
 - 에러: 작품·문법이 둘 다 비면·모르는 출처 키면 `invalid_parameter_value`, 바깥 도메인이면 `insufficient_privilege`
-- 비고: SECURITY DEFINER(sql/72, **정식 정의 sql/85**) — RLS 아래에선 배열 연산자가 leakproof 가 아니라 GIN 을 못 탄다. 운영 PostgREST 14.5 는
-  함수 결과의 **임베드에 필터를 못 걸고**(그래서 출처 칸이 인자다) **select 에 없는 칸으로 정렬하지 못한다**(앱이 정렬 칸을 보탠다).
+- 비고: SECURITY DEFINER(sql/72, **정식 정의 sql/97**) — RLS 아래에선 배열 연산자가 leakproof 가 아니라 GIN 을 못 탄다. 운영 PostgREST 14.5 는
+  함수 결과의 **임베드에 필터를 못 걸고**(그래서 출처 칸과 문제지 빼기가 인자다) **select 에 없는 칸으로 정렬하지 못한다**(앱이 정렬 칸을 보탠다).
   GET 은 배열 인자를 따옴표 없이 실어 쉼표 든 작품명이 갈리므로 POST 만 쓴다
 
 ## RPC exam.set_source_textbook

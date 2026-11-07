@@ -151,28 +151,28 @@ describe('OMR 답안지 안내', () => {
   }
   const many = (n: number) => Array.from({ length: n }, (_, i) => snapshot({ number: i + 1 }));
 
-  it('답안지가 한 장이면 보조 번호도 구분 줄도 없다', () => {
+  it('답안지가 한 장이면 구분 줄이 없다', () => {
     const container = drawOmr(many(3), 1);
-    expect(container.querySelectorAll('.mc-q-slot')).toHaveLength(0);
     expect(container.querySelectorAll('.mc-sheet-break')).toHaveLength(0);
   });
 
-  it('두 장이면 95번은 2-5 이고, 91번 문항과 구분 줄이 한 블록이다', () => {
+  it('⚠️ 두 장이어도 번호 옆에 (장-칸) 표기를 달지 않는다 — 1~90번마다 1-4 가 찍혀 있었다(2026-11-07 원장 결정)', () => {
     const container = drawOmr(many(95), 2);
-    const slots = [...container.querySelectorAll('.mc-q-slot')].map((el) => el.textContent);
-    expect(slots).toHaveLength(95);
-    expect(slots[94]).toBe('2-5');
+    expect(container.querySelectorAll('.mc-q-slot')).toHaveLength(0);
+    expect(container.textContent).not.toMatch(/\b[12]-\d+\b/);
+  });
+
+  it('그림 문항에도 달지 않는다', () => {
+    const items = Array.from({ length: 95 }, (_, i) => snapshot({ number: i + 1, render_mode: 'image', image_path: `q/${i}.png` }));
+    expect(drawOmr(items, 2).querySelectorAll('.mc-q-slot')).toHaveLength(0);
+  });
+
+  it('두 장이면 91번 문항과 구분 줄이 한 블록이다', () => {
+    const container = drawOmr(many(95), 2);
     const breaks = container.querySelectorAll('.mc-sheet-break');
     expect(breaks).toHaveLength(1);
     const block = breaks[0].closest('section');
     expect(block?.querySelector('.q-num')?.textContent).toBe('91');
-  });
-
-  it('주관식에는 칸 표기를 달지 않는다 — 답안지에 칠하지 않는다', () => {
-    const items = [...many(90), snapshot({ question_type: '주관식', choices: [], answer: '봄' }), snapshot()];
-    const container = drawOmr(items, 2);
-    const q91 = [...container.querySelectorAll('.pb-q')].find((el) => el.querySelector('.q-num')?.textContent === '91');
-    expect(q91?.querySelector('.mc-q-slot')).toBeNull();
   });
 });
 
@@ -193,7 +193,14 @@ describe('ProblemPaperView', () => {
     const omrPaper = { ...paper, settings: { ...SETTINGS, omr: true } };
     const student = render(<ProblemPaperView paper={omrPaper} items={[snapshot()]} imageUrls={new Map()} />);
     expect(student.container.textContent).toContain('OMR 답안지(90A)에 표시하세요');
+    expect(student.container.textContent).not.toContain('새 답안지의 1번 칸');
     student.unmount();
+
+    const many = Array.from({ length: 91 }, (_, i) => snapshot({ number: i + 1 }));
+    const twoSheets = render(<ProblemPaperView paper={omrPaper} items={many} imageUrls={new Map()} />);
+    expect(twoSheets.container.textContent).toContain('90문항마다 새 답안지의 1번 칸부터 표시하세요');
+    expect(twoSheets.container.textContent).not.toContain('작은 숫자');
+    twoSheets.unmount();
 
     const teacher = render(<ProblemPaperView paper={omrPaper} items={[snapshot()]} imageUrls={new Map()} showAnswers />);
     expect(teacher.container.textContent).not.toContain('OMR 답안지(90A)');

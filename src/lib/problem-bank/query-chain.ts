@@ -1,4 +1,5 @@
 import { pgArrayLiteral } from '@/lib/pg-array-literal';
+import { applyPaperExclusions } from './paper-exclusions';
 import { applySourceAxes } from './source-axes';
 import type { ProblemQuery } from './queries';
 
@@ -111,6 +112,7 @@ export interface ProblemChain<T> {
   eq(column: string, value: string): T;
   neq(column: string, value: string): T;
   in(column: string, values: readonly string[]): T;
+  is(column: string, value: null): T;
   contains(column: string, value: string): T;
   overlaps(column: string, value: string): T;
   like(column: string, pattern: string): T;
@@ -190,5 +192,6 @@ export function applyProblemFilters<T extends ProblemChain<T>>(request: T, query
     //    트리거의 lower() 를 걷으면 이것도 ilike 로 되돌릴 것
     next = next.like('search_text', `%${escapeIlike(query.search.trim().toLowerCase())}%`);
   }
-  return next;
+  // 함수 경로에서는 `exclude_paper_ids` 가 인자로 옮겨 가 여기 안 온다 — `answered_only` 만 남아 함수 결과의 제 칸에 걸린다
+  return applyPaperExclusions(next, query);
 }

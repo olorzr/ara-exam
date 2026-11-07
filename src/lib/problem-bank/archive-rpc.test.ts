@@ -35,7 +35,7 @@ describe('splitArchiveRpc — 작품·문법 축이 있을 때만 함수에서 �
       question_types: ['객관식'], search: '화자', page: 3,
     });
     expect(split?.args).toEqual({
-      p_work_title: '소녀, 두드리다', p_only_work: true, p_grammar_paths: null, p_source: {},
+      p_work_title: '소녀, 두드리다', p_only_work: true, p_grammar_paths: null, p_source: {}, p_exclude_papers: null,
     });
     expect(split?.rest).toEqual({
       area_path: ['문학'], passage_areas: ['문학'], question_types: ['객관식'], search: '화자', page: 3,
@@ -75,9 +75,27 @@ describe('sourceAxisArgs — applySourceAxes 와 같은 규칙', () => {
   });
 });
 
-describe('sql/85 거울 (problems_for_archive 의 정식 정의 — sql/72·82 를 대신한다)', () => {
+describe('splitArchiveRpc — 문제지 빼기 (sql/97)', () => {
+  it('뺄 문제지는 인자로 옮기고 나머지에서 뺀다 — 남으면 함수 결과의 임베드 필터가 되어 운영 PostgREST 가 거절한다', () => {
+    const split = splitArchiveRpc({ grammar_paths: ['음운'], exclude_paper_ids: ['p1', 'p2'], page: 1 });
+    expect(split?.args.p_exclude_papers).toEqual(['p1', 'p2']);
+    expect(split?.rest).toEqual({ page: 1 });
+  });
+
+  it('정답 빼기는 나머지에 남는다 — 제 칸이라 함수 결과에 그대로 걸린다', () => {
+    const split = splitArchiveRpc({ work_title: '동백꽃', answered_only: true });
+    expect(split?.rest).toEqual({ answered_only: true });
+    expect(split?.args.p_exclude_papers).toBeNull();
+  });
+
+  it('빈 목록은 null 이다', () => {
+    expect(splitArchiveRpc({ work_title: '동백꽃', exclude_paper_ids: [] })?.args.p_exclude_papers).toBeNull();
+  });
+});
+
+describe('sql/97 거울 (problems_for_archive 의 정식 정의 — sql/72·82·85 를 대신한다)', () => {
   it('함수가 받는 출처 키 목록이 SOURCE_EQ_AXES + grades + exclude_source_type 과 같다 — 어긋나면 조건이 빠지거나 목록이 오류를 낸다', () => {
-    const sql = readFileSync(path.resolve(__dirname, '../../../sql/85_problem_bank_hide_workbook.sql'), 'utf8');
+    const sql = readFileSync(path.resolve(__dirname, '../../../sql/97_problem_bank_archive_exclude_papers.sql'), 'utf8');
     const match = sql.match(/WHERE k NOT IN \(([^)]*)\)/);
     expect(match).not.toBeNull();
     const keys = [...(match?.[1] ?? '').matchAll(/'([a-z_]+)'/g)].map((m) => m[1]).sort();
@@ -85,7 +103,7 @@ describe('sql/85 거울 (problems_for_archive 의 정식 정의 — sql/72·82 �
   });
 
   it('함수 매개변수 이름이 인자 객체의 키와 같다 — PostgREST 는 이름으로 짝짓는다', () => {
-    const sql = readFileSync(path.resolve(__dirname, '../../../sql/85_problem_bank_hide_workbook.sql'), 'utf8');
+    const sql = readFileSync(path.resolve(__dirname, '../../../sql/97_problem_bank_archive_exclude_papers.sql'), 'utf8');
     const head = sql.slice(sql.indexOf('CREATE OR REPLACE FUNCTION exam.problems_for_archive('));
     const params = [...head.slice(0, head.indexOf(')')).matchAll(/\b(p_[a-z_]+)\b/g)].map((m) => m[1]);
     const args = splitArchiveRpc({ work_title: '동백꽃' })?.args ?? {};

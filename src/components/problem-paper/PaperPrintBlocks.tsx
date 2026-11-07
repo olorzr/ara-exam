@@ -4,9 +4,9 @@ import type { ReactNode } from 'react';
 import { renderFiguresInHtml } from '@/lib/problem-bank/figure-render';
 import type { PaperBlock } from '@/lib/problem-paper/blocks';
 import { boxPartClassName } from '@/lib/problem-paper/box-parts';
-import type { PaperItemSnapshot, PaperSettings } from '@/types/problem-bank';
+import type { PaperSettings } from '@/types/problem-bank';
 import { PrintImage, SourceLine, TeacherAnswer } from './PaperPrintParts';
-import { OmrSlotLabel, withOmrSheetBreak } from './PaperOmrMarks';
+import { withOmrSheetBreak } from './PaperOmrMarks';
 import PaperQuestion, { problemClassName } from './PaperQuestion';
 
 /**
@@ -30,15 +30,10 @@ interface RenderArgs {
    */
   showAnswers?: boolean;
   /**
-   * OMR 문제지의 90A 답안지 장 수. **2 이상일 때만** 객관식 번호 옆에 보조 표기(`2-1`)를 달고
-   * 새 답안지가 시작되는 문항 앞에 구분 줄을 끼운다. 0·1 이면 아무것도 더하지 않는다.
+   * OMR 문제지의 90A 답안지 장 수. **2 이상일 때만** 새 답안지가 시작되는 문항 앞에 구분 줄을 끼운다.
+   * 0·1 이면 아무것도 더하지 않는다.
    */
   omrSheetCount?: number;
-}
-
-/** 객관식이면 답안지 칸 표기를 단다 — 주관식은 답안지에 칠하지 않으니 칸이 없다 */
-function slotFor(snapshot: PaperItemSnapshot, number: number, multiSheet: boolean): ReactNode {
-  return multiSheet && snapshot.question_type === '객관식' ? <OmrSlotLabel number={number} /> : null;
 }
 
 /**
@@ -106,7 +101,6 @@ export function renderPaperBlocks({
             {settings.showSource && <SourceLine source={block.snapshot.source} />}
             <div className="pb-q__head">
               <span className="q-num q-num--mint">{String(block.number).padStart(2, '0')}</span>
-              {slotFor(block.snapshot, block.number, multiSheet)}
             </div>
             <PrintImage path={block.path} urls={imageUrls} alt={`${block.number}번 문항`} />
             {/* 이미지 문항의 정답·해설도 교사용에는 있어야 한다 — 글로 옮기지 못했을 뿐
@@ -143,7 +137,6 @@ export function renderPaperBlocks({
             settings={settings}
             imageUrls={imageUrls}
             showAnswers={showAnswers}
-            slot={slotFor(block.snapshot, block.number, multiSheet)}
           />
         );
         // 구분 줄은 그 문항의 첫 조각에만 붙는다 — 이어지는 조각마다 찍히면 안내가 되풀이된다

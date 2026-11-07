@@ -25,10 +25,11 @@ for (const path of [
 ]) vi.doMock(path, () => ({ default: () => null }));
 
 const { default: PaperComposeScreen } = await import('./PaperComposeScreen');
+const { EMPTY_FILTERS } = await import('@/lib/problem-bank/filters');
 
 beforeEach(() => {
   useProblemArchive.mockReset();
-  useProblemArchive.mockReturnValue({ filters: {}, facets: {}, rows: [], total: 0, failed: null, loading: false });
+  useProblemArchive.mockReturnValue({ filters: EMPTY_FILTERS, facets: {}, rows: [], total: 0, failed: null, loading: false });
 });
 
 describe('PaperComposeScreen', () => {
@@ -44,5 +45,13 @@ describe('PaperComposeScreen', () => {
     expect(useProblemArchive.mock.calls[0][0]).toMatchObject({ with_workbook: true });
     expect(screen.getByRole('heading', { name: /문제지 만들기/ })).toBeTruthy();
     expect(screen.getByText(/평가문제집 문항은 여기서만/)).toBeTruthy();
+  });
+
+  it('두 화면 모두 정답 없는 문항을 처음부터 뺀다(원장 결정) — 그 칸이 빼기 줄에 보인다', () => {
+    render(<PaperComposeScreen />);
+    render(<PaperComposeScreen withWorkbook />);
+    expect(useProblemArchive.mock.calls[0][0]).toMatchObject({ answered_only: true });
+    expect(useProblemArchive.mock.calls.at(-1)?.[0]).toMatchObject({ answered_only: true, with_workbook: true });
+    expect(screen.getAllByRole('checkbox', { name: '정답 없는 문항 빼기' })).toHaveLength(2);
   });
 });

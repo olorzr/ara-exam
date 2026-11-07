@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { Passage, Problem, ProblemSource } from '@/types/problem-bank';
+import { applyPaperExclusions, withExclusionEmbed, type PaperExclusionQuery } from './paper-exclusions';
 
 /**
  * 문항 **한 개를 지문과 함께** 읽는 조회들 (상세 창·작품별 묶음).
@@ -24,9 +25,12 @@ export interface ProblemDetail {
  * 형제를 본문째 받아 오는 이유: 상세 창에서 '이 지문의 문항' 을 눌러 옮겨 다니는데,
  * 그때마다 다시 조회하면 지문이 깜빡이고 왕복이 는다. 한 지문의 문항은 많아야 대여섯이다.
  * @param id - 문항 id
+ * @param exclusions - 빼기 조건 — 문제지 만들기 화면이 넘긴다. 형제에만 걸린다(연 문항은 이미 목록에 걸린 것이다)
  * @returns 문항·출처·지문·형제. 문항이 없으면 null
  */
-export async function fetchProblemDetail(id: string): Promise<ProblemDetail | null> {
+export async function fetchProblemDetail(
+  id: string, exclusions: PaperExclusionQuery = {},
+): Promise<ProblemDetail | null> {
   const { data, error } = await supabase
     .from('problems')
     .select('*, source:problem_sources!inner(*), passage:passages(*)')
@@ -39,7 +43,7 @@ export async function fetchProblemDetail(id: string): Promise<ProblemDetail | nu
   const { source, passage, ...problem } = row;
 
   const siblings = passage
-    ? await fetchProblemsOfPassage(passage.id)
+    ? await fetchProblemsOfPassage(passage.id, exclusions)
     : [problem as Problem];
 
   return { problem: problem as Problem, source, passage, siblings };
@@ -48,17 +52,21 @@ export async function fetchProblemDetail(id: string): Promise<ProblemDetail | nu
 /**
  * 한 지문에 딸린 문항 전부 (번호순).
  * @param passageId - 지문 id
+ * @param exclusions - 빼기 조건
  * @returns 문항 목록
  */
-export async function fetchProblemsOfPassage(passageId: string): Promise<Problem[]> {
-  const { data, error } = await supabase
+export async function fetchProblemsOfPassage(
+  passageId: string, exclusions: PaperExclusionQuery = {},
+): Promise<Problem[]> {
+  const request = supabase
     .from('problems')
-    .select('*')
+    .select(withExclusionEmbed('*', exclusions))
     .eq('passage_id', passageId)
     .order('number', { nullsFirst: false })
     .order('id');
+  const { data, error } = await applyPaperExclusions(request, exclusions);
   if (error) throw error;
-  return (data ?? []) as Problem[];
+  return (data ?? []) as unknown as Problem[];
 }
 
 /**

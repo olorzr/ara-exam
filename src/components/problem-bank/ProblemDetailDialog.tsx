@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls';
 import { areaPathLabel } from '@/lib/problem-bank/area-tree';
 import { fetchProblemDetail, type ProblemDetail } from '@/lib/problem-bank/detail-queries';
+import type { PaperExclusionQuery } from '@/lib/problem-bank/paper-exclusions';
 import { sourceLabel } from '@/lib/problem-bank/source-label';
 import { unitPathLabel } from '@/lib/problem-bank/unit-tree';
 import type { ArchiveRow } from '@/hooks/useProblemArchive';
@@ -27,6 +28,8 @@ interface ProblemDetailDialogProps {
   onAdd?: (rows: ArchiveRow[]) => boolean;
   /** 이미 담긴 문항 id — 단추와 형제 칩에 표시한다 */
   addedIds?: ReadonlySet<string>;
+  /** 문제지 만들기의 빼기 조건 — 걸린 형제 문항은 보이지도 담기지도 않는다 */
+  exclusions?: PaperExclusionQuery;
 }
 
 /**
@@ -39,7 +42,7 @@ interface ProblemDetailDialogProps {
  * 문제지 조합 화면에서도 담기 전에 같은 방법으로 확인할 수 있어야 한다.
  */
 export default function ProblemDetailDialog({
-  problemId, onClose, onAdd, addedIds,
+  problemId, onClose, onAdd, addedIds, exclusions,
 }: ProblemDetailDialogProps) {
   return (
     <Dialog open={problemId !== null} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -52,6 +55,7 @@ export default function ProblemDetailDialog({
             onClose={onClose}
             onAdd={onAdd}
             addedIds={addedIds}
+            exclusions={exclusions}
           />
         )}
       </DialogContent>
@@ -60,11 +64,12 @@ export default function ProblemDetailDialog({
 }
 
 /** 실제 내용 — `key={problemId}` 로 마운트되므로 문항이 바뀌면 상태가 저절로 초기화된다 */
-function DetailBody({ problemId, onClose, onAdd, addedIds }: {
+function DetailBody({ problemId, onClose, onAdd, addedIds, exclusions }: {
   problemId: string;
   onClose: () => void;
   onAdd?: (rows: ArchiveRow[]) => boolean;
   addedIds?: ReadonlySet<string>;
+  exclusions?: PaperExclusionQuery;
 }) {
   const [detail, setDetail] = useState<ProblemDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -72,11 +77,14 @@ function DetailBody({ problemId, onClose, onAdd, addedIds }: {
   const [shownId, setShownId] = useState(problemId);
   const [showOriginal, setShowOriginal] = useState(false);
 
+  // 부모가 렌더마다 새 객체를 넘겨도 다시 읽지 않게 값으로 견준다
+  const exclusionKey = JSON.stringify(exclusions ?? {});
+
   // 마운트할 때 한 번만 읽는다. setState 는 `.then` 안에서만 한다
   // (효과 본문의 동기 setState 는 lint 가 막는다 — CLAUDE.md 규약 ④)
   useEffect(() => {
     let alive = true;
-    fetchProblemDetail(problemId)
+    fetchProblemDetail(problemId, JSON.parse(exclusionKey))
       .then((res) => {
         if (!alive) return;
         if (res) setDetail(res);
@@ -86,7 +94,7 @@ function DetailBody({ problemId, onClose, onAdd, addedIds }: {
         if (alive) setError(e instanceof Error ? e.message : '불러오지 못했어요.');
       });
     return () => { alive = false; };
-  }, [problemId]);
+  }, [problemId, exclusionKey]);
 
   const shown = detail?.siblings.find((p) => p.id === shownId) ?? detail?.problem ?? null;
   const paths = [

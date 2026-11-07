@@ -152,8 +152,14 @@ export function useProblemArchive(initial: ProblemFilters = EMPTY_FILTERS) {
     setFilters((f) => ({ ...f, ...next }));
   }, []);
 
-  // ⚠️ 화면 모드는 조건이 아니다 — 통째로 비우면 책 화면의 '조건 지우기' 가 평가문제집을 숨긴다
-  const reset = useCallback(() => setFilters((f) => ({ ...EMPTY_FILTERS, with_workbook: f.with_workbook })), []);
+  // ⚠️ 화면 모드와 빼기 조건은 폴더 조건이 아니다 — 통째로 비우면 책 화면의 '조건 지우기' 가 평가문제집을 숨기고,
+  //    폴더를 바꾸려다 1주차 빼기가 조용히 풀린다
+  const reset = useCallback(() => setFilters((f) => ({
+    ...EMPTY_FILTERS,
+    with_workbook: f.with_workbook,
+    exclude_papers: f.exclude_papers,
+    answered_only: f.answered_only,
+  })), []);
 
   /** 조건은 그대로 두고 목록만 다시 읽는다 (선택 삭제 뒤) */
   const reload = useCallback(() => setReloadSeq((n) => n + 1), []);

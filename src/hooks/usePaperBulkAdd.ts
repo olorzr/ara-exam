@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { hasActiveFilters, toProblemQuery, type ProblemFilters } from '@/lib/problem-bank/filters';
+import { hasActiveFilters, paperExclusionsOf, toProblemQuery, type ProblemFilters } from '@/lib/problem-bank/filters';
+import { hasPaperExclusions } from '@/lib/problem-bank/paper-exclusions';
 import { fetchProblemsForBulkAdd, fetchProblemsOfPassageForAdd } from '@/lib/problem-bank/queries';
 import { bulkAddToast, folderTooBigMessage, PAPER_MAX_ITEMS } from '@/lib/problem-paper/bulk-add';
 import { useArchiveSelection } from './useArchiveSelection';
@@ -71,6 +72,13 @@ export function usePaperBulkAdd(archive: ArchiveLike, paper: ComposerLike) {
    *    (코덱스 리뷰 2R). 아카이브 화면의 `viewSeq` 와 같은 규약.
    */
   const filterSeq = useRef(0);
+  /**
+   * 빼기 조건이 바뀐 세대 — 지문 담기가 돌아와서 견준다(코덱스 1R).
+   *
+   * ⚠️ `filterSeq` 로 견주지 말 것. 지문 담기는 폴더 조건을 안 보므로 폴더를 옮겼다고 버리면 멀쩡한 담기가 사라진다.
+   *    반대로 빼기가 바뀐 뒤의 응답은 옛 조건으로 받은 것이라 뺀 문항이 캔버스에 들어온다. `reset` 은 빼기를 지켜 안 올린다.
+   */
+  const exclusionSeq = useRef(0);
   /** 화면이 아직 붙어 있는가 (StrictMode 는 마운트를 두 번 한다 — 반드시 true 로 되돌린다) */
   const aliveRef = useRef(true);
   useEffect(() => {
@@ -106,6 +114,7 @@ export function usePaperBulkAdd(archive: ArchiveLike, paper: ComposerLike) {
    */
   const patch = useCallback((next: Partial<ProblemFilters>) => {
     filterSeq.current += 1;
+    if ('exclude_papers' in next || 'answered_only' in next) exclusionSeq.current += 1;
     selection.clear();
     archive.patch(next);
   }, [selection, archive]);
@@ -155,6 +164,7 @@ export function usePaperBulkAdd(archive: ArchiveLike, paper: ComposerLike) {
    * ⚠️ 화면에 보이는 행만 담지 않고 **다시 조회한다.** 그 지문의 문항이 조건에 안 걸렸거나
    *    다음 쪽에 있을 수 있어서, 보이는 것만 담으면 '이 지문 담기' 라고 해 놓고 일부만
    *    담는다(코덱스 정지 리뷰). 상세 창의 '이 지문의 문항 N개 담기' 와 같은 규약이다.
+   * ⚠️ 폴더 조건은 안 보지만 **빼기 조건은 본다** — 안 보면 뺀 문제지의 문항이 이 단추로 도로 들어온다.
    * @param passageId - 담을 지문 id
    */
   const addPassage = useCallback(async (passageId: string) => {
@@ -162,19 +172,27 @@ export function usePaperBulkAdd(archive: ArchiveLike, paper: ComposerLike) {
     if (!lock.acquire()) return;
     setPassageBusy(passageId);
     const askedClear = paper.clearSeq();
+    const exclusions = paperExclusionsOf(archive.filters);
+    const askedExclusion = exclusionSeq.current;
     try {
-      const rows = await fetchProblemsOfPassageForAdd(passageId);
+      const rows = await fetchProblemsOfPassageForAdd(passageId, exclusions);
       if (!aliveRef.current) return;
+      // 조회하는 사이 빼기 조건을 바꿨다 — 옛 조건으로 받은 문항을 담으면 방금 뺀 문항이 들어온다
+      if (exclusionSeq.current !== askedExclusion) {
+        toast.error('빼기 조건이 바뀌어 담지 않았어요. 다시 눌러 주세요.');
+        return;
+      }
       // 조회하는 사이 '비우기' 를 눌렀다 — 방금 비운 캔버스를 도로 채우면 안 된다
       if (paper.clearSeq() !== askedClear) {
         toast.error('담는 사이에 캔버스를 비워서 담지 않았어요.');
         return;
       }
       if (rows.length === 0) {
-        toast.error('그 지문의 문항을 찾지 못했어요.');
+        toast.error(hasPaperExclusions(exclusions)
+          ? '그 지문의 문항이 전부 빼기 조건에 걸렸어요.' : '그 지문의 문항을 찾지 못했어요.');
         return;
       }
-      // ⚠️ 조건은 보지 않는다 — 지문에 딸린 문항은 함께 담아야 문제지가 성립한다
+      // ⚠️ 폴더 조건은 보지 않는다 — 지문에 딸린 문항은 함께 담아야 문제지가 성립한다
       addRows(rows);
     } catch (e) {
       if (aliveRef.current) toast.error(e instanceof Error ? e.message : '담지 못했어요.');
@@ -182,7 +200,7 @@ export function usePaperBulkAdd(archive: ArchiveLike, paper: ComposerLike) {
       lock.release();
       if (aliveRef.current) setPassageBusy(null);
     }
-  }, [addRows, lock, paper]);
+  }, [addRows, archive.filters, lock, paper]);
 
   /** 지금 조건에 걸린 문항을 통째로 담는다 */
   const addFolder = useCallback(async () => {

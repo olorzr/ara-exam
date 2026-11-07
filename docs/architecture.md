@@ -504,6 +504,9 @@ src/
 - **비율로 담기**: `type-mix.ts`(계산·뽑기, 순수) + `type-mix-queries.ts`(가벼운 풀 ≤1,000행 →
   뽑힌 id 로 되읽기) + `usePaperTypeMix` + `TypeMixDialog`/`TypeMixForm`. 잠금과 조건 세대는
   `usePaperBulkAdd` 의 것을 **나눠 쓴다**(셋이 같은 캔버스를 채운다)
+- **빼기 조건**: `paper-exclusions.ts`(임베드 반조인·`answer` 조건) + `PaperExcludeBar` +
+  `PaperExcludePickerDialog`. 조합 화면에만 있고 `exclude_papers`·`answered_only`(기본 켬)를 `bulk.patch` 로 바꾼다.
+  폴더 조건과 달리 '이 지문 전체 담기' 와 상세 창 형제까지 따라간다. 함수 경로는 `p_exclude_papers`(sql/97)
 - **문항 갈래 필터**(`question_kind`)는 아카이브와 조합 화면이 함께 쓰는 필터 줄에 있다 —
   그것만으로 폴더 담기·골라 담기가 유형을 따른다
 - **학교급 필터**(`school_level`, `school-level.ts`)도 같은

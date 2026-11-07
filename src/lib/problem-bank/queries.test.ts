@@ -44,7 +44,9 @@ vi.mock('@/lib/supabase', () => {
   };
 });
 
-const { fetchProblemPage, runProblemQuery, PROBLEM_LIST_SELECT } = await import('./queries');
+const { fetchProblemPage, fetchProblemsOfPassageForAdd, runProblemQuery, PROBLEM_LIST_SELECT } = await import('./queries');
+const { fetchProblemsOfPassage } = await import('./detail-queries');
+const { PAPER_EXCLUDE_MAX } = await import('./paper-exclusions');
 
 /** 마지막 요청 */
 function last(): Captured {
@@ -70,7 +72,7 @@ describe('fetchProblemPage — 작품·문법 축은 함수에서 출발한다(s
     expect(last().url.pathname).toBe(RPC_PATH);
     expect(last().method).toBe('POST');
     expect(last().body).toEqual({
-      p_work_title: '소녀, 두드리다', p_only_work: false, p_grammar_paths: null, p_source: {},
+      p_work_title: '소녀, 두드리다', p_only_work: false, p_grammar_paths: null, p_source: {}, p_exclude_papers: null,
     });
     expect(lastParam('work_titles')).toBeNull();
   });
@@ -125,6 +127,79 @@ describe('fetchProblemPage — 작품·문법 축은 함수에서 출발한다(s
     expect(lastParam('select')).toBe('id,passage_id,source:problem_sources!inner(id),source_id,page_no,number');
     await runProblemQuery({ grammar_paths: ['음운'] }, 'reading', 0, 9, PROBLEM_LIST_SELECT);
     expect(lastParam('select')).toBe(PROBLEM_LIST_SELECT.replace(/\s/g, ''));
+  });
+});
+
+describe('빼기 조건 (문제지 만들기, sql/97)', () => {
+  const EMBED = 'problem_paper_items!left(paper_id)';
+
+  it('표 경로는 임베드 반조인으로 뺀다 — 운영 PostgREST 14.5 에서 실측한 모양 그대로', async () => {
+    await fetchProblemPage({ area_path: ['문학'], exclude_paper_ids: ['p1', 'p2'] });
+    expect(last().url.pathname).toBe(TABLE_PATH);
+    expect(lastParam('select')).toContain(EMBED);
+    expect(lastParam('problem_paper_items.paper_id')).toBe('in.(p1,p2)');
+    expect(lastParam('problem_paper_items')).toBe('is.null');
+  });
+
+  it('⚠️ 함수 경로는 본문 인자다 — URL 에 임베드가 남으면 pgrst_call 오류로 목록이 죽는다', async () => {
+    await fetchProblemPage({ grammar_paths: ['음운'], exclude_paper_ids: ['p1'] });
+    expect(last().url.pathname).toBe(RPC_PATH);
+    expect(last().body).toMatchObject({ p_exclude_papers: ['p1'] });
+    expect(last().url.search).not.toContain('problem_paper_items');
+  });
+
+  it('정답 빼기는 두 경로 모두 URL 의 제 칸 조건이다', async () => {
+    await fetchProblemPage({ answered_only: true });
+    expect(last().url.pathname).toBe(TABLE_PATH);
+    expect(lastParam('answer')).toBe('neq.');
+    await fetchProblemPage({ work_title: '동백꽃', answered_only: true });
+    expect(last().url.pathname).toBe(RPC_PATH);
+    expect(lastParam('answer')).toBe('neq.');
+  });
+
+  it('가벼운 select 도 빠지지 않는다 — 비율 담기 풀이 뺀 문항을 뽑으면 안 된다', async () => {
+    await runProblemQuery({ exclude_paper_ids: ['p1'] }, 'reading', 0, 9, 'id, source:problem_sources!inner(id)');
+    expect(lastParam('select')).toBe(`id,source:problem_sources!inner(id),${EMBED}`);
+    expect(lastParam('problem_paper_items')).toBe('is.null');
+  });
+
+  it('⚠️ 상한까지 고르고 다른 조건이 다 걸려도 주소가 프록시 상한(100개 id 의 4KB, type-mix-queries.ts) 아래다', async () => {
+    const ids = Array.from({ length: PAPER_EXCLUDE_MAX }, (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`);
+    await fetchProblemPage({
+      exclude_paper_ids: ids, answered_only: true, exclude_source_type: '평가문제집', school_name: '서울사대부설중학교',
+      year: '2025', grades: ['중1', '중2', '중3'], semester: '1학기', exam_type: '기말', textbook: '천재(박영목)(2015개정)',
+      area_path: ['화법과 언어', '언어'], unit_path: ['1. 나를 깨우는, 문학', '(1) 시와 화자'],
+      question_types: ['주관식', '서술형'], search: '음운의 변동을 설명한 것으로 적절한 것은',
+    });
+    expect(last().url.pathname).toBe(TABLE_PATH);
+    expect(last().url.href.length).toBeLessThan(4096);
+  });
+
+  it('조건이 없으면 요청이 예전과 글자 그대로 같다', async () => {
+    await fetchProblemPage({ area_path: ['문학'] });
+    expect(lastParam('select')).toBe(PROBLEM_LIST_SELECT.replace(/\s/g, ''));
+    expect(lastParam('problem_paper_items')).toBeNull();
+    expect(lastParam('answer')).toBeNull();
+  });
+
+  it("'이 지문 전체 담기' 도 빼기 조건을 건다 — 뺀 문항이 이 단추로 도로 들어오면 안 된다", async () => {
+    await fetchProblemsOfPassageForAdd('passage-1', { exclude_paper_ids: ['p1'], answered_only: true });
+    expect(lastParam('passage_id')).toBe('eq.passage-1');
+    expect(lastParam('select')).toContain(EMBED);
+    expect(lastParam('problem_paper_items.paper_id')).toBe('in.(p1)');
+    expect(lastParam('problem_paper_items')).toBe('is.null');
+    expect(lastParam('answer')).toBe('neq.');
+  });
+
+  it('상세 창의 형제 문항도 같다 — 조건이 없으면 예전 요청 그대로', async () => {
+    await fetchProblemsOfPassage('passage-1', { exclude_paper_ids: ['p1'], answered_only: true });
+    expect(lastParam('select')).toBe(`*,${EMBED}`);
+    expect(lastParam('problem_paper_items')).toBe('is.null');
+    expect(lastParam('answer')).toBe('neq.');
+
+    await fetchProblemsOfPassage('passage-1');
+    expect(lastParam('select')).toBe('*');
+    expect(lastParam('answer')).toBeNull();
   });
 });
 

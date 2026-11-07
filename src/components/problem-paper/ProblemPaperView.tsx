@@ -6,6 +6,7 @@ import ExamPrintHeader from '@/components/exam/ExamPrintHeader';
 import { PAPER_SPLIT_ADAPTER, usePaperSplit } from '@/hooks/usePaperSplit';
 import { buildPaperBlocks } from '@/lib/problem-paper/blocks';
 import type { PaperCover } from '@/lib/problem-paper/cover';
+import { OMR_SHEET_QUESTIONS } from '@/lib/omr-sheet';
 import { coverYearOf } from '@/lib/problem-paper/cover-text';
 import { buildOmrAnswerKey, omrSheetCountOf } from '@/lib/problem-paper/omr-payload';
 import type { PaperItemSnapshot, ProblemPaper } from '@/types/problem-bank';
@@ -113,7 +114,7 @@ export default function ProblemPaperView({
             <div className="section-bar section-bar--mint mb-2">
               <span>
                 객관식은 OMR 답안지(90A)에 표시하세요. 답이 여러 개인 문항은 해당 번호를 모두 표시해요.
-                {omrSheets > 1 && ' 문항 번호 옆의 작은 숫자는 (답안지 장 - 칸 번호) 입니다.'}
+                {omrSheets > 1 && ` ${OMR_SHEET_QUESTIONS}문항마다 새 답안지의 1번 칸부터 표시하세요.`}
               </span>
             </div>
           )}

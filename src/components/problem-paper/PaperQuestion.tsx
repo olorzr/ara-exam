@@ -1,6 +1,5 @@
 'use client';
 
-import type { ReactNode } from 'react';
 import { choiceGlyph } from '@/lib/problem-bank/choices';
 import { renderFiguresInHtml } from '@/lib/problem-bank/figure-render';
 import { correctChoiceIndices, splitsExplanation } from '@/lib/problem-paper/answers';
@@ -36,8 +35,6 @@ interface PaperQuestionProps {
   settings: PaperSettings;
   imageUrls: Map<string, string>;
   showAnswers: boolean;
-  /** 답안지 칸 보조 표기(OMR 문제지가 여러 장일 때만) */
-  slot?: ReactNode;
 }
 
 /** 발문 칸에 드는 단위 */
@@ -79,10 +76,10 @@ function StemPiece({
 /**
  * 문항 하나, 또는 그 조각 하나 — 자리가 모자라면 단위 사이에서 갈려 다음 단으로 이어진다(2026-11-06 원장 결정).
  *
- * 번호·출처·OMR 칸은 첫 조각에만 찍는다. 이어지는 조각은 번호 칸을 비워 같은 들여쓰기로 시작하고, 문항 사이 간격은
+ * 번호·출처는 첫 조각에만 찍는다. 이어지는 조각은 번호 칸을 비워 같은 들여쓰기로 시작하고, 문항 사이 간격은
  * 마지막 조각만 진다. 교사용 답은 마지막 선지에 붙어 간다.
  */
-export default function PaperQuestion({ block, settings, imageUrls, showAnswers, slot = null }: PaperQuestionProps) {
+export default function PaperQuestion({ block, settings, imageUrls, showAnswers }: PaperQuestionProps) {
   const { number, snapshot, units } = block;
   const { from, to } = block.range ?? { from: 0, to: units.length };
   const shown = units.slice(from, to);
@@ -116,7 +113,6 @@ export default function PaperQuestion({ block, settings, imageUrls, showAnswers,
           {first
             ? <span className="q-num q-num--mint">{String(number).padStart(2, '0')}</span>
             : <span className="q-num q-num--blank">{' '}</span>}
-          {first && slot}
           <div className="pb-q__stem">
             {stem.map((unit, i) => (
               <StemPiece key={i} unit={unit} paths={snapshot.figure_paths} imageUrls={imageUrls} number={number} />

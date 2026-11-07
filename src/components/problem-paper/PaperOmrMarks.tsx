@@ -1,20 +1,13 @@
 import type { ReactNode } from 'react';
-import { OMR_SHEET_QUESTIONS, omrSlotLabel, startsNewOmrSheet } from '@/lib/omr-sheet';
+import { OMR_SHEET_QUESTIONS, startsNewOmrSheet } from '@/lib/omr-sheet';
 
 /**
  * OMR 채점 문제지의 답안지 안내 조각 — 90문항을 넘어 답안지가 두 장 이상일 때만 쓴다.
  *
- * 단어 객관식 시험지(`MultipleChoiceView`)와 **같은 규약**이다: 통번호는 그대로 두고 보조 표기
- * (`2-1` = 2장째 1번 칸)만 덧붙이며, 새 답안지가 시작되는 문항 앞에 구분 줄을 끼운다.
+ * 통번호는 그대로 두고 새 답안지가 시작되는 문항 앞에 구분 줄을 끼운다.
+ * ⚠️ 번호 옆 보조 표기(`1-4` = 1장째 4번 칸)는 **문제지에서 뺐다**(2026-11-07 원장 결정) — 1~90번은 통번호와 같은 숫자라
+ *    문항마다 뜻 없는 글자가 붙어 보였다. 단어 객관식 시험지(`MultipleChoiceView`)에는 그대로 있어 두 화면이 여기서 갈린다.
  */
-
-/**
- * 문항 번호 옆 작은 보조 표기.
- * @param number - 문제지 안의 번호(1부터)
- */
-export function OmrSlotLabel({ number }: { number: number }) {
-  return <span className="mc-q-slot">{omrSlotLabel(number - 1)}</span>;
-}
 
 /**
  * 새 답안지가 시작되는 문항이면 구분 줄과 **한 노드로** 묶는다.

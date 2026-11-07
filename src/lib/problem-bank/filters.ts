@@ -2,6 +2,7 @@ import { grammarPathsUnder } from './grammar-tree';
 import { QUESTION_KIND_TYPES, parseQuestionKind, type QuestionKindFilter } from './question-kind';
 import { gradesForSchoolLevel, parseSchoolLevel, type SchoolLevelFilter } from './school-level';
 import { WORKBOOK_SOURCE_TYPE } from './source-form';
+import type { PaperExclusionQuery } from './paper-exclusions';
 import type { ProblemQuery } from './queries';
 import { GRAMMAR_SOLO_PASSAGE_AREAS, soloApplies, soloAxisOf } from './solo-filter';
 
@@ -11,6 +12,13 @@ import { GRAMMAR_SOLO_PASSAGE_AREAS, soloApplies, soloAxisOf } from './solo-filt
  * 필터를 주소에 실어 두면 검수하다가 목록으로 돌아와도 조건이 남고,
  * 선생님끼리 링크를 그대로 주고받을 수 있다.
  */
+
+/** 빼기로 고른 문제지 — 화면이 칩에 이름을 찍어야 해서 id 만 들지 않는다 */
+export interface ExcludedPaper {
+  id: string;
+  title: string;
+  total_questions: number;
+}
 
 /** 화면이 들고 있는 필터 */
 export interface ProblemFilters {
@@ -69,6 +77,14 @@ export interface ProblemFilters {
    * ⚠️ '조건 지우기' 도 지우지 않는다(`useProblemArchive.reset`).
    */
   with_workbook: boolean;
+  /**
+   * 이 문제지들에 담긴 문항은 뺀다 — 문제지 만들기 화면만 쓴다(2026-11-07 "2주차는 1주차에 안 넣은 문제만").
+   * ⚠️ 주소에 싣지 않고(`with_workbook` 과 같은 결), `hasActiveFilters` 에 세지 않고, '조건 지우기' 가 풀지 않는다 —
+   *    폴더를 바꾸려고 조건을 지웠는데 1주차 빼기가 조용히 풀리면 안 된다(`useProblemArchive.reset`).
+   */
+  exclude_papers: ExcludedPaper[];
+  /** 정답을 적은 문항만 본다 — 문제지 만들기 화면의 기본값은 켜짐이다. 규칙은 `exclude_papers` 와 같다 */
+  answered_only: boolean;
   search: string;
   page: number;
 }
@@ -76,7 +92,7 @@ export interface ProblemFilters {
 export const EMPTY_FILTERS: ProblemFilters = {
   source_type: '', school_name: '', year: '', school_level: '', grade: '', semester: '', exam_type: '', textbook: '',
   source_title: '', area_path: [], unit_path: [], grammar_path: [], question_kind: '', work_title: '', solo: false,
-  with_workbook: false, search: '', page: 0,
+  with_workbook: false, exclude_papers: [], answered_only: false, search: '', page: 0,
 };
 
 /** 영역 경로를 주소에 실을 때 쓰는 구분자 — 이름에 들어갈 일이 없는 글자 */
@@ -175,6 +191,8 @@ export function filtersFromParams(params: URLSearchParams): ProblemFilters {
     work_title: params.get('work') ?? '',
     solo: params.get('solo') === '1',
     with_workbook: false,
+    exclude_papers: [],
+    answered_only: false,
     search: params.get('q') ?? '',
     // 주소는 사람이 읽는 1-based, 내부는 0-based
     page: Number.isFinite(rawPage) && rawPage > 1 ? rawPage - 1 : 0,
@@ -212,6 +230,20 @@ function soloEntry(filters: ProblemFilters): Pick<ProblemQuery, 'only_work' | 'p
 }
 
 /**
+ * 빼기 조건만 조회 조건으로 바꾼다 — 폴더 조건을 안 보는 조회(지문 담기·상세 창)가 이것만 받는다.
+ * @param filters - 화면 필터
+ * @returns 걸린 조건만 담은 객체
+ */
+export function paperExclusionsOf(
+  filters: Pick<ProblemFilters, 'exclude_papers' | 'answered_only'>,
+): PaperExclusionQuery {
+  return {
+    ...(filters.exclude_papers.length > 0 ? { exclude_paper_ids: filters.exclude_papers.map((p) => p.id) } : {}),
+    ...(filters.answered_only ? { answered_only: true } : {}),
+  };
+}
+
+/**
  * 필터를 조회 조건으로 바꾼다.
  * @param filters - 화면 필터
  * @returns 조회 조건 (빈 값은 빼서 불필요한 eq 를 만들지 않는다)
@@ -243,6 +275,7 @@ export function toProblemQuery(filters: ProblemFilters): ProblemQuery {
     // 작품명은 자유 텍스트다 — '미지정만' 을 허용하면 그런 이름의 작품과 겹친다
     ...axisEntry('work_title', filters.work_title),
     ...soloEntry(filters),
+    ...paperExclusionsOf(filters),
     ...(filters.search.trim() ? { search: filters.search.trim() } : {}),
     page: filters.page,
   };
@@ -260,6 +293,8 @@ export function hasActiveFilters(filters: ProblemFilters): boolean {
     || filters.unit_path.length > 0 || filters.grammar_path.length > 0
     || filters.question_kind || filters.work_title || filters.search
     // 축 없이 켜져만 있는 칸은 조건이 아니다 — 그것 때문에 '조건 지우기' 가 뜨면 눌러도 목록이 그대로다
+    // ⚠️ 빼기 조건(`exclude_papers`·`answered_only`)도 세지 않는다 — 폴더를 고른 것이 아니라서 이 값으로 폴더 담기가 열리면
+    //    문제 은행 전체를 담게 되고, 기본 켬이라 '조건 지우기' 가 늘 떠 있게 된다
     || soloApplies(filters),
   );
 }

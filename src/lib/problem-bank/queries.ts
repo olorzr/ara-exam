@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import type { SourceAxisQuery } from './source-axes';
 import { ARCHIVE_LIST_RPC, splitArchiveRpc } from './archive-rpc';
+import { applyPaperExclusions, withExclusionEmbed, type PaperExclusionQuery } from './paper-exclusions';
 import {
   applyProblemFilters, applyProblemOrder, withOrderColumns, type ProblemChain, type ProblemOrder,
 } from './query-chain';
@@ -98,6 +99,13 @@ export interface ProblemQuery extends SourceAxisQuery {
   question_types?: QuestionType[];
   /** 발문·선지·작품명 평문 검색 */
   search?: string;
+  /**
+   * 이 문제지들에 담긴 문항은 **뺀다**(paper-exclusions.ts). 비면 조건이 아니다.
+   * ⚠️ 표 경로는 임베드 반조인, 작품·문법 함수 경로는 인자 `p_exclude_papers` 다(archive-rpc.ts).
+   */
+  exclude_paper_ids?: string[];
+  /** 정답을 적은 문항만 — `answer <> ''` */
+  answered_only?: boolean;
   page?: number;
 }
 
@@ -138,7 +146,7 @@ export async function runProblemQuery<Row = ProblemRow>(
   }
   const fromTable = supabase
     .from('problems')
-    .select(select, { count: 'exact' });
+    .select(withExclusionEmbed(select, query), { count: 'exact' });
   return finishProblemQuery<Row, typeof fromTable>(fromTable, query, order, from, to);
 }
 
@@ -186,19 +194,23 @@ export async function fetchProblemPage(query: ProblemQuery): Promise<ProblemPage
  *
  * 차례는 **시험지에 실린 그대로**다(쪽 → 번호). 캔버스는 같은 지문의 문항이 붙어 있어야
  * 저장되므로(`isContiguous`) 받는 순서가 곧 담기는 순서다.
+ *
+ * ⚠️ 폴더 조건은 보지 않지만 **빼기 조건은 본다**(paper-exclusions.ts) — 안 보면 1주차에 낸 문항이 이 단추로 도로 들어온다.
  * @param passageId - 지문 id
+ * @param exclusions - 빼기 조건
  * @returns 그 지문의 문항 (출처 포함)
  */
 export async function fetchProblemsOfPassageForAdd(
-  passageId: string,
+  passageId: string, exclusions: PaperExclusionQuery = {},
 ): Promise<ProblemRow[]> {
-  const { data, error } = await supabase
+  const request = supabase
     .from('problems')
-    .select(PROBLEM_LIST_SELECT)
+    .select(withExclusionEmbed(PROBLEM_LIST_SELECT, exclusions))
     .eq('passage_id', passageId)
     .order('page_no')
     .order('number', { nullsFirst: false })
     .order('id');
+  const { data, error } = await applyPaperExclusions(request, exclusions);
   if (error) throw error;
   return (data ?? []) as unknown as ProblemRow[];
 }

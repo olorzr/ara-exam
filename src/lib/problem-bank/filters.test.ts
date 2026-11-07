@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  EMPTY_FILTERS, filtersFromParams, filtersToQueryString, hasActiveFilters, hideWorkbookAxes, toProblemQuery,
-  UNSPECIFIED_AXIS,
+  EMPTY_FILTERS, filtersFromParams, filtersToQueryString, hasActiveFilters, hideWorkbookAxes, paperExclusionsOf,
+  toProblemQuery, UNSPECIFIED_AXIS,
 } from './filters';
 
 describe('filters ↔ 주소', () => {
@@ -293,5 +293,39 @@ describe('출처 제목 축 (평가문제집 책 잎, sql/82)', () => {
     expect(filtersFromParams(new URLSearchParams(qs.slice(1))).source_title).toBe(filters.source_title);
     expect(toProblemQuery(filters).source_title).toBe(filters.source_title);
     expect(hasActiveFilters({ ...EMPTY_FILTERS, source_title: 'x' })).toBe(true);
+  });
+});
+
+describe('빼기 조건 (문제지 만들기, 2026-11-07)', () => {
+  const week1 = { id: 'p1', title: '음운 1주차', total_questions: 112 };
+  const week2 = { id: 'p2', title: '음운 2주차', total_questions: 80 };
+
+  it('고른 문제지는 id 목록으로, 정답 빼기는 참일 때만 조회 조건이 된다', () => {
+    const query = toProblemQuery({ ...EMPTY_FILTERS, exclude_papers: [week1, week2], answered_only: true });
+    expect(query.exclude_paper_ids).toEqual(['p1', 'p2']);
+    expect(query.answered_only).toBe(true);
+  });
+
+  it('둘 다 비면 조건이 없다 — 문제 은행 화면의 요청이 달라지지 않는다', () => {
+    const query = toProblemQuery(EMPTY_FILTERS);
+    expect(query).not.toHaveProperty('exclude_paper_ids');
+    expect(query).not.toHaveProperty('answered_only');
+    expect(paperExclusionsOf(EMPTY_FILTERS)).toEqual({});
+  });
+
+  it('paperExclusionsOf 는 폴더 조건 없이 빼기 조건만 준다 — 지문 담기·상세 창이 받는다', () => {
+    const filters = { ...EMPTY_FILTERS, grade: '중2', exclude_papers: [week1], answered_only: true };
+    expect(paperExclusionsOf(filters)).toEqual({ exclude_paper_ids: ['p1'], answered_only: true });
+  });
+
+  it("⚠️ 조건으로 세지 않는다 — 세면 폴더 없이 '이 폴더 전체 담기' 가 열리고 '조건 지우기' 가 늘 떠 있다", () => {
+    expect(hasActiveFilters({ ...EMPTY_FILTERS, exclude_papers: [week1], answered_only: true })).toBe(false);
+  });
+
+  it('주소에 싣지 않는다', () => {
+    expect(filtersToQueryString({ ...EMPTY_FILTERS, exclude_papers: [week1], answered_only: true })).toBe('');
+    expect(filtersFromParams(new URLSearchParams('answered_only=1&exclude_papers=p1'))).toMatchObject({
+      exclude_papers: [], answered_only: false,
+    });
   });
 });

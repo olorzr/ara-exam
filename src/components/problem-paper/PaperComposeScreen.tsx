@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import ArchiveList from '@/components/problem-bank/ArchiveList';
@@ -11,6 +11,7 @@ import ProblemCard from '@/components/problem-bank/ProblemCard';
 import ProblemDetailDialog from '@/components/problem-bank/ProblemDetailDialog';
 import ProblemFilterBar from '@/components/problem-bank/ProblemFilterBar';
 import PaperCanvasColumn from '@/components/problem-paper/PaperCanvasColumn';
+import PaperExcludeBar from '@/components/problem-paper/PaperExcludeBar';
 import PaperPickBar from '@/components/problem-paper/PaperPickBar';
 import PassageAddButton from '@/components/problem-paper/PassageAddButton';
 import TypeMixDialog from '@/components/problem-paper/TypeMixDialog';
@@ -20,11 +21,14 @@ import { usePaperComposer } from '@/hooks/usePaperComposer';
 import { usePaperTypeMix } from '@/hooks/usePaperTypeMix';
 import { useProblemArchive, type ArchiveRow } from '@/hooks/useProblemArchive';
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls';
-import { EMPTY_FILTERS, type ProblemFilters } from '@/lib/problem-bank/filters';
+import { EMPTY_FILTERS, paperExclusionsOf, type ProblemFilters } from '@/lib/problem-bank/filters';
 import { fireGradeSync } from '@/lib/grade-sync-client';
 
+/** 첫 필터 — 정답 없는 문항은 처음부터 뺀다(2026-11-07 원장 결정, 체크를 풀면 돌아온다) */
+const COMPOSE_FILTERS: ProblemFilters = { ...EMPTY_FILTERS, answered_only: true };
+
 /** 평가문제집까지 보는 첫 필터 — 책 만들기의 문제지 만들기가 쓴다 */
-const WITH_WORKBOOK_FILTERS: ProblemFilters = { ...EMPTY_FILTERS, with_workbook: true };
+const WITH_WORKBOOK_FILTERS: ProblemFilters = { ...COMPOSE_FILTERS, with_workbook: true };
 
 interface PaperComposeScreenProps {
   /**
@@ -47,12 +51,14 @@ interface PaperComposeScreenProps {
  */
 export default function PaperComposeScreen({ withWorkbook = false }: PaperComposeScreenProps) {
   const router = useRouter();
-  const archive = useProblemArchive(withWorkbook ? WITH_WORKBOOK_FILTERS : EMPTY_FILTERS);
+  const archive = useProblemArchive(withWorkbook ? WITH_WORKBOOK_FILTERS : COMPOSE_FILTERS);
   const paper = usePaperComposer();
   const bulk = usePaperBulkAdd(archive, paper);
   const mix = usePaperTypeMix(archive, paper, bulk);
   /** 담기가 하나라도 도는 중인가 — 잠금이 하나라 단추를 **함께** 잠근다 */
   const addBusy = bulk.bulkBusy || mix.busy;
+  /** 상세 창의 형제 문항에도 같은 빼기 조건을 건다 */
+  const exclusions = useMemo(() => paperExclusionsOf(archive.filters), [archive.filters]);
   const canvasRef = useRef<HTMLDivElement>(null);
 
   /** 지금 끌고 있는 것 — 아카이브에서 새로 담는 중이거나, 캔버스 안에서 옮기는 중 */
@@ -98,6 +104,7 @@ export default function PaperComposeScreen({ withWorkbook = false }: PaperCompos
           고른 폴더를 <strong>통째로 담거나</strong>, 체크해서 여럿을, 또는
           <strong> 유형 비율</strong>(객관식 8 : 주관식 2 같은)로 무작위로 담을 수도 있어요.
           같은 지문의 문항은 자동으로 붙습니다.
+          다른 문제지에 이미 담은 문항이나 정답이 없는 문항은 빼고 볼 수 있어요.
         </p>
         {withWorkbook && (
           <p className="mt-1 text-sm text-gray-500">
@@ -136,6 +143,12 @@ export default function PaperComposeScreen({ withWorkbook = false }: PaperCompos
               total={archive.total}
               onChange={bulk.patch}
               onReset={bulk.reset}
+            />
+
+            <PaperExcludeBar
+              papers={archive.filters.exclude_papers}
+              answeredOnly={archive.filters.answered_only}
+              onChange={bulk.patch}
             />
 
             <PaperPickBar
@@ -227,6 +240,7 @@ export default function PaperComposeScreen({ withWorkbook = false }: PaperCompos
         onClose={() => setOpenId(null)}
         onAdd={bulk.addRows}
         addedIds={paper.added}
+        exclusions={exclusions}
       />
 
       <TypeMixDialog

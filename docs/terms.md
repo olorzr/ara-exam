@@ -433,6 +433,12 @@
 - 코드에서의 사용: `ProblemPaper`, `problem_papers` / `problem_paper_items`, RPC `create_problem_paper`
 - 관련 파일: src/lib/problem-paper/compose.ts, sql/17_problem_bank.sql, sql/54_problem_paper_omr_setting.sql(정식 정의)
 
+## 빼기 조건 (paper exclusions)
+- 정의: 문제지 만들기 화면에서 **고른 폴더와 상관없이** 문항을 걸러 내는 두 조건 — 다른 문제지에 이미 담긴 문항, 정답이 없는 문항(`answer = ''`, 기본으로 뺀다)
+- 폴더 조건이 아니라서 '조건 지우기' 로 풀리지 않고 주소에도 안 실리며, '이 지문 전체 담기' 와 상세 창의 형제 문항에도 걸린다
+- 코드에서의 사용: `ProblemFilters.exclude_papers`·`answered_only`, `PaperExclusionQuery`, `paperExclusionsOf`, RPC 인자 `p_exclude_papers`
+- 관련 파일: src/lib/problem-bank/paper-exclusions.ts, src/components/problem-paper/PaperExcludeBar.tsx, sql/97_problem_bank_archive_exclude_papers.sql
+
 ## OMR 채점 문제지 (omr paper)
 - 정의: 만들 때 **'OMR 채점(90A)'** 을 골라 둔 문제지. 저장 직후 학원 성적 시스템(ara-system)에 시험으로 등록되고,
   학생은 학원의 기성 **90A 답안지**에 객관식 답을 마킹한다. 주관식·서술형은 스캔 뒤 검수 화면에서 선생님이 O/X 로 채점한다

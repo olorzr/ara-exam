@@ -11,7 +11,8 @@ import type { ProblemQuery } from './queries';
  *
  * ⚠️ 함수 결과에도 PostgREST 가 select·임베드·수평 필터·정렬·쪽·count 를 그대로 건다 — 그래서 나머지 조건은
  *    query-chain.ts 의 **같은 체인**이 건다. 다만 운영 PostgREST 14.5 는 함수 결과의 **임베드에 필터를 못 건다**
- *    (`source.grade=…` → `column pgrst_call.grade does not exist`). 출처 칸은 함수 인자 `p_source` 로 넘긴다.
+ *    (`source.grade=…` → `column pgrst_call.grade does not exist`). 출처 칸은 함수 인자 `p_source` 로, 문제지 빼기는
+ *    `p_exclude_papers` 로 넘긴다(표 경로의 임베드 반조인이 같은 까닭으로 안 된다, sql/97).
  * ⚠️ 영역·단원 축은 함수로 보내지 않는다 — `area_path @> {'문학'}` 은 1만 5천 행이라 함수 결과를 구체화하는
  *    쪽이 순차 스캔보다 나쁘다. 그 축만 걸리면 예전처럼 표에서 출발한다.
  * ⚠️ postgrest-js `.rpc()` 기본값인 **POST** 로 부른다. GET 은 배열 인자를 따옴표 없이 `{a,b}` 로 실어
@@ -28,6 +29,8 @@ export interface ArchiveRpcArgs {
   p_grammar_paths: string[] | null;
   /** 출처 칸 — 키가 있으면 건다(`''` 은 미지정인 것만). 함수가 모르는 키는 거절한다 */
   p_source: SourceAxisArgs;
+  /** 이 문제지들에 담긴 문항은 뺀다(sql/97). 없으면 null */
+  p_exclude_papers: string[] | null;
 }
 
 /**
@@ -37,6 +40,7 @@ export interface ArchiveRpcArgs {
  */
 const RPC_COVERED_KEYS = [
   'work_title', 'only_work', 'grammar_paths', ...SOURCE_EQ_AXES, 'source_title', 'grades', 'exclude_source_type',
+  'exclude_paper_ids',
 ] as const satisfies readonly (keyof ProblemQuery)[];
 
 /** 함수 인자와 체인에 넘길 나머지 조건 */
@@ -67,6 +71,8 @@ export function splitArchiveRpc(query: ProblemQuery): ArchiveRpcSplit | null {
       p_only_work: workTitle !== null && Boolean(query.only_work),
       p_grammar_paths: grammarPaths,
       p_source: sourceAxisArgs(query),
+      p_exclude_papers: query.exclude_paper_ids && query.exclude_paper_ids.length > 0
+        ? [...query.exclude_paper_ids] : null,
     },
     rest,
   };

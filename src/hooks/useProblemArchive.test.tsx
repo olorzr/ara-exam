@@ -79,6 +79,20 @@ describe('useProblemArchive — 평가문제집 (2026-11-05)', () => {
     expect(hook.result.current.filters.with_workbook).toBe(true);
   });
 
+  it("⚠️ '조건 지우기' 는 빼기 조건을 풀지 않는다 — 폴더를 바꾸려다 1주차 빼기가 조용히 풀리면 안 된다", async () => {
+    fetchProblemPage.mockResolvedValue(page('a'));
+    const exclude_papers = [{ id: 'p1', title: '음운 1주차', total_questions: 112 }];
+    const hook = renderHook(() => useProblemArchive({ ...EMPTY_FILTERS, exclude_papers, answered_only: true }));
+    await waitFor(() => expect(hook.result.current.loading).toBe(false));
+    expect(fetchProblemPage.mock.calls[0][0]).toMatchObject({ exclude_paper_ids: ['p1'], answered_only: true });
+
+    act(() => hook.result.current.patch({ grade: '중2' }));
+    await waitFor(() => expect(hook.result.current.filters.grade).toBe('중2'));
+    act(() => hook.result.current.reset());
+    await waitFor(() => expect(hook.result.current.filters.grade).toBe(''));
+    expect(hook.result.current.filters).toMatchObject({ exclude_papers, answered_only: true });
+  });
+
   it('옛 링크의 평가문제집 조건은 풀고 시작한다 — 남으면 조용히 0건이다', async () => {
     fetchProblemPage.mockResolvedValue(page('a'));
     const hook = renderHook(() => useProblemArchive({ ...EMPTY_FILTERS, source_type: '평가문제집', source_title: '동아 책' }));
