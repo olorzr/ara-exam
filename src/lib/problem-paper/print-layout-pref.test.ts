@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
-  readPaperPrintLayout, readPaperTrimWorks, writePaperPrintLayout, writePaperTrimWorks,
+  readBookletDuplex, readPaperPrintLayout, readPaperTrimWorks,
+  writeBookletDuplex, writePaperPrintLayout, writePaperTrimWorks,
 } from './print-layout-pref';
 
 /**
@@ -61,6 +62,30 @@ describe('print-layout-pref', () => {
     });
     expect(readPaperPrintLayout()).toBe('single');
     expect(() => writePaperPrintLayout('booklet')).not.toThrow();
+  });
+
+  it('중철 양면 넘김 방향 — 처음엔 짧은 쪽, 긴 쪽을 고르면 새로고침해도 남는다', () => {
+    expect(readBookletDuplex()).toBe('short');
+    writeBookletDuplex('long');
+    expect(readBookletDuplex()).toBe('long');
+    expect(window.localStorage.getItem('ara-paper-booklet-duplex')).toBe('long');
+  });
+
+  it('중철 양면 넘김 방향 — 모르는 값은 읽을 때 짧은 쪽, 쓸 때는 무시한다', () => {
+    window.localStorage.setItem('ara-paper-booklet-duplex', 'sideways');
+    expect(readBookletDuplex()).toBe('short');
+    writeBookletDuplex('long');
+    writeBookletDuplex('sideways' as never);
+    expect(readBookletDuplex()).toBe('long');
+  });
+
+  it('저장소가 막혀도 중철 양면 넘김 방향은 짧은 쪽으로 돈다', () => {
+    setStorage({
+      getItem: () => { throw new Error('blocked'); },
+      setItem: () => { throw new Error('blocked'); },
+    });
+    expect(readBookletDuplex()).toBe('short');
+    expect(() => writeBookletDuplex('long')).not.toThrow();
   });
 
   it("'묻는 작품만 인쇄' 는 처음에 켜져 있다", () => {

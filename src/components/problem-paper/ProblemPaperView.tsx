@@ -5,6 +5,7 @@ import { A4Document, CompactPageHeader } from '@/components/print';
 import ExamPrintHeader from '@/components/exam/ExamPrintHeader';
 import type { LayoutHandler } from '@/hooks/useA4Pagination';
 import { PAPER_SPLIT_ADAPTER, usePaperSplit } from '@/hooks/usePaperSplit';
+import type { BookletDuplex } from '@/lib/print/booklet';
 import { buildPaperBlocks } from '@/lib/problem-paper/blocks';
 import type { PaperCover } from '@/lib/problem-paper/cover';
 import { OMR_SHEET_QUESTIONS } from '@/lib/omr-sheet';
@@ -33,6 +34,8 @@ interface ProblemPaperViewProps {
   showAnswers?: boolean;
   /** 중철 제본(A3 가로 양면)으로 그린다 */
   booklet?: boolean;
+  /** 중철 인쇄 창의 양면 넘김 방향 — 긴 쪽이면 뒷면을 돌려 찍는다 */
+  bookletDuplex?: BookletDuplex;
   /**
    * (가)(나) 복합 지문에서 담은 문항이 묻지 않는 작품의 구역을 빼고 그린다(trim-works.ts).
    * 확실하지 않은 지문은 그대로 전체를 그린다.
@@ -58,7 +61,7 @@ interface ProblemPaperViewProps {
  * 이어진다(`usePaperSplit`).
  */
 export default function ProblemPaperView({
-  paper, items, imageUrls, showAnswers = false, booklet = false, trimWorks = false, cover = null,
+  paper, items, imageUrls, showAnswers = false, booklet = false, bookletDuplex, trimWorks = false, cover = null,
   coverImages, coverTeacher, coverNotice, onLayout,
 }: ProblemPaperViewProps) {
   // OMR 문제지만 90A 답안지 안내를 붙인다 — 학생 종이에만(교사용은 채점하는 종이라 칸 안내가 필요 없다).
@@ -99,6 +102,7 @@ export default function ProblemPaperView({
       onSplitRequest={split.handleSplitRequest}
       onLayout={onLayout}
       booklet={booklet}
+      bookletDuplex={bookletDuplex}
       {...coverSlots}
       columns={paper.settings.columns}
       // `--paper` 가 문항 사이를 넓힌다(다른 `.pb-sheet` 문서는 그대로). A4Document 가 이 클래스를

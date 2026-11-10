@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { A4Document, CompactPageHeader } from '@/components/print';
 import ExamPrintHeader from '@/components/exam/ExamPrintHeader';
 import type { LayoutHandler } from '@/hooks/useA4Pagination';
+import type { BookletDuplex } from '@/lib/print/booklet';
 import { buildAnswerRows, explanationEntries } from '@/lib/problem-paper/answers';
 import type { PaperCover } from '@/lib/problem-paper/cover';
 import { coverYearOf } from '@/lib/problem-paper/cover-text';
@@ -16,6 +17,8 @@ interface ProblemAnswerKeyViewProps {
   items: PaperItemSnapshot[];
   /** 중철 제본(A3 가로 양면)으로 그린다 */
   booklet?: boolean;
+  /** 중철 인쇄 창의 양면 넘김 방향 — 긴 쪽이면 뒷면을 돌려 찍는다 */
+  bookletDuplex?: BookletDuplex;
   /** 표지 (없으면 null) — 문제지와 같은 표지에 ' - 답지' 꼬리 */
   cover?: PaperCover | null;
   /** 표지 그림(앞·뒤)의 서명 URL 과 깨짐 — 깨졌으면 그 자리에 인쇄되는 안내를 그린다 */
@@ -43,7 +46,7 @@ interface ProblemAnswerKeyViewProps {
  * 작아 격자에서 크게 찍는다(`.pb-answer-value--choice`).
  */
 export default function ProblemAnswerKeyView({
-  paper, items, booklet = false, cover = null, coverImages, coverTeacher, coverNotice, onLayout,
+  paper, items, booklet = false, bookletDuplex, cover = null, coverImages, coverTeacher, coverNotice, onLayout,
 }: ProblemAnswerKeyViewProps) {
   const title = `${paper.title} - 답지`;
   const rows = useMemo(() => buildAnswerRows(items), [items]);
@@ -61,6 +64,7 @@ export default function ProblemAnswerKeyView({
       blocks={blocks}
       onLayout={onLayout}
       booklet={booklet}
+      bookletDuplex={bookletDuplex}
       {...coverSlots}
       columns={1}
       className="pb-sheet"

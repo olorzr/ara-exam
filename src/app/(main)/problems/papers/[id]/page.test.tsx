@@ -21,9 +21,11 @@ const paper: ProblemPaper = {
 const state = {
   cover: null as PaperCover | null,
   printLayout: 'booklet' as 'single' | 'booklet',
+  duplex: 'short' as 'short' | 'long',
   pages: { paper: 3, teacher: 3, key: 1 },
 };
 const save = vi.fn(async () => true);
+const changeDuplex = vi.fn();
 const mounts = { paper: 0 };
 
 vi.mock('next/navigation', () => ({ useParams: () => ({ id: 'paper-1' }) }));
@@ -47,6 +49,7 @@ vi.mock('@/hooks/useCoverFontsReady', () => ({ useCoverFontsReady: () => true })
 vi.mock('@/hooks/usePaperPrintPrefs', () => ({
   usePaperPrintPrefs: () => ({
     printLayout: state.printLayout, changePrintLayout: vi.fn(), trimWorks: false, changeTrimWorks: vi.fn(),
+    bookletDuplex: state.duplex, changeBookletDuplex: changeDuplex,
   }),
 }));
 vi.mock('@/components/problem-paper/PaperCoverDialog', () => ({ default: () => null }));
@@ -67,17 +70,18 @@ function useReport(onLayout: LayoutHandler | undefined, pageCount: number) {
     onLayout?.(info);
   }, [onLayout, pageCount]);
 }
+interface DoubleProps { showAnswers?: boolean; onLayout?: LayoutHandler; bookletDuplex?: string }
 vi.mock('@/components/problem-paper/ProblemPaperView', () => ({
-  default: function PaperDouble({ showAnswers, onLayout }: { showAnswers?: boolean; onLayout?: LayoutHandler }) {
+  default: function PaperDouble({ showAnswers, onLayout, bookletDuplex }: DoubleProps) {
     useEffect(() => { mounts.paper += 1; }, []);
     useReport(onLayout, showAnswers ? state.pages.teacher : state.pages.paper);
-    return <div>{showAnswers ? '교사용 문서' : '학생용 문서'}</div>;
+    return <div data-duplex={bookletDuplex}>{showAnswers ? '교사용 문서' : '학생용 문서'}</div>;
   },
 }));
 vi.mock('@/components/problem-paper/ProblemAnswerKeyView', () => ({
-  default: function KeyDouble({ onLayout }: { onLayout?: LayoutHandler }) {
+  default: function KeyDouble({ onLayout, bookletDuplex }: DoubleProps) {
     useReport(onLayout, state.pages.key);
-    return <div>답지 문서</div>;
+    return <div data-duplex={bookletDuplex}>답지 문서</div>;
   },
 }));
 
@@ -90,9 +94,32 @@ const advice = () => screen.queryByText(ADVICE);
 beforeEach(() => {
   state.cover = designBack;
   state.printLayout = 'booklet';
+  state.duplex = 'short';
   state.pages = { paper: 3, teacher: 3, key: 1 };
   mounts.paper = 0;
   save.mockClear();
+  changeDuplex.mockClear();
+});
+
+describe('문제지 보기 — 중철 양면 넘김 방향', () => {
+  it('기억해 둔 방향이 학생용·교사용·답지 문서에 모두 가고, 안내의 단추가 방향을 바꾼다', () => {
+    state.duplex = 'long';
+    render(<ProblemPaperViewPage />);
+    expect(screen.getByText('학생용 문서').getAttribute('data-duplex')).toBe('long');
+    fireEvent.click(screen.getByRole('button', { name: '판:teacher' }));
+    expect(screen.getByText('교사용 문서').getAttribute('data-duplex')).toBe('long');
+    fireEvent.click(screen.getByRole('button', { name: '판:key' }));
+    expect(screen.getByText('답지 문서').getAttribute('data-duplex')).toBe('long');
+    expect(screen.getByRole('button', { name: '긴 쪽' }).getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: '짧은 쪽' }));
+    expect(changeDuplex).toHaveBeenCalledWith('short');
+  });
+
+  it('낱장이면 방향 단추를 내지 않는다', () => {
+    state.printLayout = 'single';
+    render(<ProblemPaperViewPage />);
+    expect(screen.queryByRole('group', { name: '양면 넘김 방향' })).toBeNull();
+  });
 });
 
 describe('문제지 보기 — 중철 뒷표지 안내', () => {

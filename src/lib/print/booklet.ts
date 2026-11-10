@@ -15,6 +15,9 @@
  *    바로 뒤가 뒷면 왼쪽(2쪽)이 된다. '긴 면' 이면 뒷면이 거꾸로 나온다. 드라이버가 방향을
  *    문서 기준으로 해석해 반대가 맞는 경우가 있어 화면 안내가 그것을 함께 알린다.
  *    **뒤집기 방향이 틀렸다고 공식을 고치지 말 것** — 프린터 설정 문제다.
+ *    인쇄 창이 늘 '긴 쪽' 으로 잡혀 있어 매번 바꾸기 불편하다는 원장님 요청(2026-11-10)으로 화면에서
+ *    넘김 방향을 고르게 했다. '긴 쪽' 을 고르면 이 공식은 그대로 두고 **뒷면만 180° 돌려 찍는다**
+ *    (`bookletTurnsBack`, print-booklet.css 의 `.booklet-side--turned`).
  *
  * 쪽 수가 4의 배수가 아니면 남는 자리는 **끝에** 빈 면으로 둔다.
  *
@@ -30,6 +33,27 @@
 
 /** A3 한 장(앞·뒤)에 들어가는 A4 쪽 수 */
 export const BOOKLET_PAGES_PER_SHEET = 4;
+
+/** 인쇄 창의 양면 넘김 방향 — 짧은 쪽(가장자리)으로 넘김 / 긴 쪽으로 넘김 */
+export type BookletDuplex = 'short' | 'long';
+
+/**
+ * 처음 값 — 뒷면을 돌리지 않는 예전 배치가 맞는 쪽.
+ * 모르는 사이 다른 선생님의 인쇄 결과가 바뀌지 않게 예전 그대로에서 시작한다.
+ */
+export const DEFAULT_BOOKLET_DUPLEX: BookletDuplex = 'short';
+
+/**
+ * 이 넘김 방향으로 뽑을 때 뒷면을 180° 돌려 찍어야 하는가.
+ *
+ * A3 가로를 긴 쪽으로 넘기면 뒷면이 위아래로 뒤집혀 나온다 — 미리 돌려 두면 똑바로 선다.
+ * 프린터가 방향을 반대로 해석하면 화면 안내대로 반대쪽 단추를 누르면 된다(공식은 고치지 않는다).
+ * @param duplex - 인쇄 창에서 고른 양면 넘김 방향
+ * @returns 뒷면을 돌려야 하면 true
+ */
+export function bookletTurnsBack(duplex: BookletDuplex): boolean {
+  return duplex === 'long';
+}
 
 /** 면의 한 자리 — 0-based 쪽 번호, 빈 면이면 null */
 export type BookletSlot = number | null;

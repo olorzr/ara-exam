@@ -49,7 +49,9 @@ export default function ProblemPaperViewPage() {
   const { paper, items, loaded, creatorName } = usePaperLoad(paperId);
   const [mode, setMode] = useState<PaperViewMode>('paper');
   // 인쇄 방식·'묻는 작품만 인쇄' 는 브라우저에 기억해 둔 값으로 시작한다
-  const { printLayout, changePrintLayout, trimWorks, changeTrimWorks } = usePaperPrintPrefs();
+  const {
+    printLayout, changePrintLayout, bookletDuplex, changeBookletDuplex, trimWorks, changeTrimWorks,
+  } = usePaperPrintPrefs();
   const [coverOpen, setCoverOpen] = useState(false);
   const coverState = usePaperCover(paperId);
   const { cover } = coverState;
@@ -184,7 +186,10 @@ export default function ProblemPaperViewPage() {
       />
 
       {printLayout === 'booklet' && (
-        <PaperPrintLayoutNotice blockedReason={bookletBlocked ? BOOKLET_BLOCKED_REASON : undefined} />
+        <PaperPrintLayoutNotice
+          blockedReason={bookletBlocked ? BOOKLET_BLOCKED_REASON : undefined}
+          duplex={bookletDuplex} onDuplexChange={changeBookletDuplex}
+        />
       )}
 
       {adviseDrop && cover && (
@@ -251,7 +256,8 @@ export default function ProblemPaperViewPage() {
           key={mode}
           paper={paper} items={items} imageUrls={images.urls}
           showAnswers={mode === 'teacher'} trimWorks={trimWorks}
-          booklet={booklet} cover={cover} coverImages={coverImages} coverTeacher={teacher}
+          booklet={booklet} bookletDuplex={bookletDuplex}
+          cover={cover} coverImages={coverImages} coverTeacher={teacher}
           coverNotice={coverUnknown ? COVER_FETCH_FAILED_NOTICE : undefined}
           onLayout={handleLayout}
         />
@@ -259,7 +265,8 @@ export default function ProblemPaperViewPage() {
       {mode === 'key' && (
         <ProblemAnswerKeyView
           paper={paper} items={items}
-          booklet={booklet} cover={cover} coverImages={coverImages} coverTeacher={teacher}
+          booklet={booklet} bookletDuplex={bookletDuplex}
+          cover={cover} coverImages={coverImages} coverTeacher={teacher}
           coverNotice={coverUnknown ? COVER_FETCH_FAILED_NOTICE : undefined}
           onLayout={handleLayout}
         />

@@ -83,6 +83,44 @@ describe('BookletStack', () => {
     expect(captions[1].textContent).toContain('1장 뒷면');
   });
 
+  it('양면을 긴 쪽으로 넘기면 뒷면에만 돌림 표시가 붙고, 캡션이 알린다(쪽 배치는 그대로)', () => {
+    const { container } = render(<BookletStack pages={pages(8)} duplex="long" />);
+    const sides = Array.from(container.querySelectorAll<HTMLElement>('.booklet-side'));
+    const turned = sides.map((s) => s.classList.contains('booklet-side--turned'));
+    expect(turned).toEqual([false, true, false, true]);
+    // 돌리는 것은 인쇄 CSS 몫이다 — 자리 배정(data-slot)은 짧은 쪽과 똑같다
+    expect(faces(container)).toEqual([['8', '1'], ['2', '7'], ['6', '3'], ['4', '5']]);
+    const captions = Array.from(container.querySelectorAll('.booklet-leaf__caption')).map((c) => c.textContent);
+    expect(captions.filter((c) => c!.includes('거꾸로'))).toEqual([captions[1], captions[3]]);
+    // 마지막 면 표시와 함께 붙는다
+    expect(sides[3].classList.contains('booklet-side--last')).toBe(true);
+  });
+
+  it('짧은 쪽(처음 값)이면 어느 면도 돌리지 않는다', () => {
+    for (const props of [{}, { duplex: 'short' as const }]) {
+      const { container, unmount } = render(<BookletStack pages={pages(8)} {...props} />);
+      expect(container.querySelectorAll('.booklet-side--turned')).toHaveLength(0);
+      expect(container.textContent).not.toContain('거꾸로');
+      unmount();
+    }
+  });
+
+  it('긴 쪽이어도 앞·뒤표지는 돌리지 않는 1장 앞면에 있다', () => {
+    const { container } = render(
+      <BookletStack
+        frontCover backCover duplex="long"
+        pages={[
+          <A4CoverSheet key="c"><div>표지</div></A4CoverSheet>,
+          ...pages(3),
+          <A4CoverSheet key="b" side="back" isLast><div>뒷표지</div></A4CoverSheet>,
+        ]}
+      />,
+    );
+    for (const cover of container.querySelectorAll('.a4-sheet--cover')) {
+      expect(cover.closest('.booklet-side')!.classList.contains('booklet-side--turned')).toBe(false);
+    }
+  });
+
   it('인쇄 용지를 A3 가로로 덮는 규칙을 함께 그린다', () => {
     const { container } = render(<BookletStack pages={pages(2)} />);
     expect(container.querySelector('style[data-booklet-page]')!.textContent).toContain('A3 landscape');
@@ -147,6 +185,20 @@ describe('BookletStack — 인쇄 CSS', () => {
     expect(number('left').gridRow).toBe('1');
     expect(number('right').gridColumn).toBe('3');
     expect(number('right').justifySelf).toBe('end');
+  });
+
+  // jsdom 은 @media print 를 계산하지 않아 글자로 본다
+  it('뒷면 돌리기는 인쇄에서만 — 자리 맞바꿈 + 낱장마다 180°, 면 자체는 돌리지 않는다', () => {
+    const css = readFileSync(join(process.cwd(), 'src/styles/print-booklet.css'), 'utf8');
+    const printAt = css.indexOf('@media print');
+    expect(printAt).toBeGreaterThan(0);
+    // 인쇄 블록 앞(주석 밖)에는 없어야 한다 — 화면 미리보기는 똑바로 둔다
+    expect(css.slice(0, printAt).replace(/\/\*[\s\S]*?\*\//g, '')).not.toContain('booklet-side--turned');
+    const print = css.slice(printAt);
+    expect(print).toMatch(/\.booklet-side--turned\s*\{\s*flex-direction:\s*row-reverse;\s*\}/);
+    expect(print).toMatch(/\.booklet-side--turned > \.booklet-slot > \*\s*\{\s*transform:\s*rotate\(180deg\);\s*\}/);
+    // ⚠️ 면을 통째로 돌리면 깎인 40px 자리가 종이 위로 올라가 뒷면이 앞면과 어긋난다
+    expect(print).not.toMatch(/\.booklet-side--turned\s*\{[^}]*transform/);
   });
 
   it('표지·뒷표지는 면 높이를 따르고(그림이 잘리지 않게), 본문 낱장은 A4 높이 그대로다', () => {

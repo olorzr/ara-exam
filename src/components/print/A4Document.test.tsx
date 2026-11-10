@@ -313,6 +313,21 @@ describe('A4Document', () => {
       expect(sides[0].querySelector('[data-slot="left"] .a4-footer__page')?.textContent).toBe('2 / 2');
     });
 
+    it('중철 + 긴 쪽 넘김 — 넘김 방향이 면 그리기까지 이어져 뒷면만 돌린다', () => {
+      const total = blocksPerPage(FIRST_HEADER_H) + blocksPerPage(LATER_HEADER_H) + 1;
+      const { container } = render(
+        <A4Document
+          booklet
+          bookletDuplex="long"
+          blocks={Array.from({ length: total }, (_, i) => <div key={i} data-h={BLOCK_H}>문항 {i + 1}</div>)}
+          firstPageHeader={<div data-h={FIRST_HEADER_H}>전체 헤더</div>}
+          laterPageHeader={<div data-h={LATER_HEADER_H}>컴팩트 헤더</div>}
+        />,
+      );
+      const sides = Array.from(container.querySelectorAll('.a4-stack .booklet-side'));
+      expect(sides.map((s) => s.classList.contains('booklet-side--turned'))).toEqual([false, true]);
+    });
+
     it('중철 + 표지 — 표지가 1쪽이 되어 1장 앞면 오른쪽에 온다', () => {
       const total = blocksPerPage(FIRST_HEADER_H) + blocksPerPage(LATER_HEADER_H) + 1;
       const { container } = render(

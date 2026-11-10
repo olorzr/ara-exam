@@ -1,7 +1,9 @@
 'use client';
 
+import { DEFAULT_BOOKLET_DUPLEX, type BookletDuplex } from '@/lib/print/booklet';
+
 /**
- * 문제지 인쇄 선택 (브라우저 전용) — 인쇄 방식과 '묻는 작품만 인쇄'.
+ * 문제지 인쇄 선택 (브라우저 전용) — 인쇄 방식, 중철의 양면 넘김 방향, '묻는 작품만 인쇄'.
  *
  * 학원에서 한 번 정하면 계속 같은 방식으로 뽑으므로 매번 고르게 하지 않고 기억한다
  * (`work-tree-pref.ts` 와 같은 규약 — 보는 방법이라 공용 PC 에 남아도 위험하지 않다).
@@ -22,6 +24,8 @@ export const DEFAULT_PAPER_TRIM_WORKS = true;
 
 const LAYOUT_KEY = 'ara-paper-print-layout';
 const TRIM_WORKS_KEY = 'ara-paper-trim-works';
+/** 프린터마다 정해진 값이라 그 컴퓨터에 남긴다 — 한 번 고르면 다시 안 고른다 */
+const BOOKLET_DUPLEX_KEY = 'ara-paper-booklet-duplex';
 
 /**
  * 저장값을 읽는다 — 없거나 저장소에 못 닿으면 null.
@@ -77,6 +81,33 @@ export function readPaperPrintLayout(): PaperPrintLayout {
 export function writePaperPrintLayout(layout: PaperPrintLayout): void {
   if (!isPaperPrintLayout(layout)) return;
   writeRaw(LAYOUT_KEY, layout);
+}
+
+/**
+ * 양면 넘김 방향 값인가.
+ * @param value - 검사할 값
+ * @returns 알려진 값이면 true
+ */
+export function isBookletDuplex(value: string): value is BookletDuplex {
+  return value === 'short' || value === 'long';
+}
+
+/**
+ * 저장된 중철 양면 넘김 방향을 읽는다.
+ * @returns 저장값 (없거나 모르는 값이면 짧은 쪽 — 뒷면을 돌리지 않는 예전 배치)
+ */
+export function readBookletDuplex(): BookletDuplex {
+  const raw = readRaw(BOOKLET_DUPLEX_KEY) ?? '';
+  return isBookletDuplex(raw) ? raw : DEFAULT_BOOKLET_DUPLEX;
+}
+
+/**
+ * 중철 양면 넘김 방향을 저장한다. 모르는 값은 무시한다.
+ * @param duplex - 저장할 방향
+ */
+export function writeBookletDuplex(duplex: BookletDuplex): void {
+  if (!isBookletDuplex(duplex)) return;
+  writeRaw(BOOKLET_DUPLEX_KEY, duplex);
 }
 
 /**

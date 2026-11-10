@@ -7,6 +7,7 @@ import {
   type LayoutHandler,
   type SplitRequestHandler,
 } from '@/hooks/useA4Pagination';
+import type { BookletDuplex } from '@/lib/print/booklet';
 import { A4_WIDTH_PX, CONTENT_WIDTH, getColumnWidth } from '@/lib/print/constants';
 import type { BreakBefore, PagePlan } from '@/lib/print/paginate';
 import A4CoverSheet from './A4CoverSheet';
@@ -51,6 +52,11 @@ interface A4DocumentBaseProps {
   onLayout?: LayoutHandler;
   /** 타이포그래피 스코프 클래스 (측정 컨테이너와 낱장 양쪽에 붙는다) */
   className?: string;
+  /**
+   * 중철 인쇄 창의 양면 넘김 방향 — 긴 쪽이면 뒷면을 인쇄할 때만 180° 돌린다(`BookletStack`).
+   * 낱장에서는 쓰지 않는다. 부르는 쪽이 `booklet` 을 불리언 변수로 넘겨 타입 갈래에 넣지 않았다.
+   */
+  bookletDuplex?: BookletDuplex;
 }
 
 /**
@@ -94,6 +100,7 @@ export default function A4Document({
   padPagesTo,
   onLayout,
   className = '',
+  bookletDuplex,
 }: A4DocumentProps) {
   const { measureRootRef, layout } = useA4Pagination({
     columns,
@@ -203,6 +210,7 @@ export default function A4Document({
               pages={[...cover, ...pages.map(renderPage), ...back]}
               frontCover={cover.length > 0}
               backCover={back.length > 0}
+              duplex={bookletDuplex}
             />
           ) : (
             [...cover, ...pages.map(renderPage), ...back]

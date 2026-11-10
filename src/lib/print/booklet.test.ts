@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { bookletBlankCount, bookletSheetCount, bookletSheets, type BookletSheet } from './booklet';
+import {
+  DEFAULT_BOOKLET_DUPLEX, bookletBlankCount, bookletSheetCount, bookletSheets, bookletTurnsBack,
+  type BookletSheet,
+} from './booklet';
 
 /** 1-based 로 적은 배치를 0-based 로 (빈 면은 0 → null) */
 function sheet(front: [number, number], back: [number, number]): BookletSheet {
@@ -198,6 +201,28 @@ describe('bookletSheets — 앞표지 안쪽 빈 면', () => {
           if (v === null && position !== 1) expect(position, label).toBeGreaterThan(lastBodyAt);
         });
       }
+    }
+  });
+});
+
+describe('bookletTurnsBack', () => {
+  it('긴 쪽으로 넘기면 뒷면을 돌리고, 짧은 쪽이면 그대로다', () => {
+    expect(bookletTurnsBack('long')).toBe(true);
+    expect(bookletTurnsBack('short')).toBe(false);
+  });
+
+  it('처음 값은 예전 배치 그대로(돌리지 않는다)다 — 모르는 사이 다른 선생님 인쇄가 바뀌지 않게', () => {
+    expect(bookletTurnsBack(DEFAULT_BOOKLET_DUPLEX)).toBe(false);
+  });
+
+  // 표지는 돌리지 않는 앞면에만 온다 — 돌린 면(뒷면)에 표지가 오면 표지 높이 규칙과 돌리기가 겹친다
+  it('앞·뒤표지 자리는 언제나 1장 앞면이다(돌리는 뒷면에 오지 않는다)', () => {
+    for (let n = 2; n <= 24; n++) {
+      const sheets = bookletSheets(n, { frontCover: true, backCover: true });
+      const backs = sheets.flatMap((s) => s.back);
+      expect(backs, `${n}쪽`).not.toContain(0);
+      expect(backs, `${n}쪽`).not.toContain(n - 1);
+      expect(sheets[0].front, `${n}쪽`).toEqual([n - 1, 0]);
     }
   });
 });

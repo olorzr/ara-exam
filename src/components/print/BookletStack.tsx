@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
-import { bookletSheets, type BookletSlot } from '@/lib/print/booklet';
+import {
+  DEFAULT_BOOKLET_DUPLEX, bookletSheets, bookletTurnsBack, type BookletDuplex, type BookletSlot,
+} from '@/lib/print/booklet';
 import { A4_HEIGHT_PX, A4_WIDTH_PX, BOOKLET_SIDE_HEIGHT_PX } from '@/lib/print/constants';
 
 interface BookletStackProps {
@@ -9,6 +11,8 @@ interface BookletStackProps {
   frontCover?: boolean;
   /** 마지막 낱장이 뒷표지다 — 책의 맨 뒤 자리에 놓고 빈 면은 그 앞에 둔다(`bookletSheets`) */
   backCover?: boolean;
+  /** 인쇄 창의 양면 넘김 방향 — 긴 쪽이면 뒷면을 인쇄할 때만 180° 돌린다(`bookletTurnsBack`) */
+  duplex?: BookletDuplex;
 }
 
 /**
@@ -16,6 +20,8 @@ interface BookletStackProps {
  *
  * 프린터 자동 양면('짧은 면 뒤집기')으로 뽑으면 앞·뒤가 번갈아 나가고, 쌓인 그대로 반으로 접으면
  * 쪽 순서가 맞는 책자가 된다. 면 배정은 `bookletSheets` 한 곳이 정한다.
+ * '긴 쪽' 으로 뽑는다고 고르면(`duplex`) 뒷면에 `booklet-side--turned` 를 붙여 **인쇄할 때만** 180° 돌린다
+ * (print-booklet.css). 화면 미리보기는 읽을 수 있게 똑바로 두고 캡션이 알린다.
  *
  * ⚠️ 용지 크기는 이 컴포넌트가 그리는 `<style>` 이 덮는다. 전역 `@page`(print-a4.css 의 A4 세로)는
  *    선택자로 좁힐 수 없고, 이름 붙인 페이지(`page:`)는 사파리가 지원하지 않는다. 같은 특이성의
@@ -26,8 +32,11 @@ interface BookletStackProps {
  * ⚠️ 낱장의 내용은 **이미 그린 것**을 받는다 — 측정 기계(`useA4Pagination`)와 떨어져 있어
  *    쪽 배정에 손대지 않는다.
  */
-export default function BookletStack({ pages, frontCover = false, backCover = false }: BookletStackProps) {
+export default function BookletStack({
+  pages, frontCover = false, backCover = false, duplex = DEFAULT_BOOKLET_DUPLEX,
+}: BookletStackProps) {
   const sheets = bookletSheets(pages.length, { frontCover, backCover });
+  const turnBack = bookletTurnsBack(duplex);
   const lastFace = sheets.length * 2 - 1;
   const frontSlot = frontCover && pages.length > 0 ? 0 : -1;
   const backSlot = backCover ? pages.length - 1 : -1;
@@ -54,13 +63,18 @@ export default function BookletStack({ pages, frontCover = false, backCover = fa
           const [left, right] = sheet[face];
           const faceIndex = k * 2 + f;
           const name = `${k + 1}장 ${face === 'front' ? '앞면' : '뒷면'}`;
+          const turned = face === 'back' && turnBack;
+          const sideClass = [
+            'booklet-side', turned && 'booklet-side--turned', faceIndex === lastFace && 'booklet-side--last',
+          ].filter(Boolean).join(' ');
           return (
             <div key={`${k}-${face}`} className="booklet-leaf" data-sheet={k + 1} data-face={face}>
               <p className="booklet-leaf__caption" data-no-print>
                 {name} — 왼쪽 {slotLabel(left)} · 오른쪽 {slotLabel(right)}
+                {turned && ' · 인쇄할 때 거꾸로 돌려 찍어요'}
               </p>
               <section
-                className={`booklet-side${faceIndex === lastFace ? ' booklet-side--last' : ''}`}
+                className={sideClass}
                 aria-label={name}
                 style={{ width: A4_WIDTH_PX * 2, height: BOOKLET_SIDE_HEIGHT_PX }}
               >
