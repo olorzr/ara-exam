@@ -53,14 +53,21 @@ vi.mock('@/hooks/usePaperPrintPrefs', () => ({
   }),
 }));
 vi.mock('@/components/problem-paper/PaperCoverDialog', () => ({ default: () => null }));
+const watch = { stale: false, check: vi.fn() };
+vi.mock('@/hooks/usePaperRevisionWatch', () => ({ usePaperRevisionWatch: () => watch }));
+const toolbar = { printDisabled: false, onPrint: () => {} };
 vi.mock('@/components/problem-paper/PaperViewToolbar', () => ({
-  default: ({ onModeChange }: { onModeChange: (mode: string) => void }) => (
-    <div>
-      {(['paper', 'teacher', 'key'] as const).map((mode) => (
-        <button key={mode} type="button" onClick={() => onModeChange(mode)}>{`판:${mode}`}</button>
-      ))}
-    </div>
-  ),
+  default: ({ onModeChange, printDisabled, onPrint }: { onModeChange: (mode: string) => void; printDisabled: boolean; onPrint: () => void }) => {
+    toolbar.printDisabled = printDisabled;
+    toolbar.onPrint = onPrint;
+    return (
+      <div>
+        {(['paper', 'teacher', 'key'] as const).map((mode) => (
+          <button key={mode} type="button" onClick={() => onModeChange(mode)}>{`판:${mode}`}</button>
+        ))}
+      </div>
+    );
+  },
 }));
 
 /** 엔진 대역 — 마운트하거나 알림 받이가 바뀌면 그 판의 본문 쪽 수를 알린다 */
@@ -179,3 +186,53 @@ describe('문제지 보기 — 중철 뒷표지 안내', () => {
     expect(advice()).not.toBeNull();
   });
 });
+
+describe('문제지 보기 — 다른 곳에서 고쳐짐(sql/103)', () => {
+  it('열어 둔 사이 고쳐졌으면 인쇄를 잠그고 인쇄물에도 찍히는 안내를 띄운다', () => {
+    watch.stale = true;
+    render(<ProblemPaperViewPage />);
+    const notice = screen.getByRole('alert');
+    expect(notice.textContent).toMatch(/다른 곳에서 이 문제지가 고쳐졌어요/);
+    expect(notice.hasAttribute('data-no-print')).toBe(false);
+    expect(toolbar.printDisabled).toBe(true);
+    watch.stale = false;
+  });
+
+  it('고쳐졌으면 문서를 그리지 않는다(중철 면 앞에 안내가 끼면 면 짝이 밀린다)', () => {
+    watch.stale = true;
+    const before = mounts.paper;
+    render(<ProblemPaperViewPage />);
+    expect(mounts.paper).toBe(before);
+    watch.stale = false;
+  });
+
+  it('인쇄 직전에 판을 확인하고, 바뀌었으면 인쇄하지 않는다', async () => {
+    const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+    watch.check.mockResolvedValueOnce(true);
+    render(<ProblemPaperViewPage />);
+    await act(async () => { toolbar.onPrint(); await Promise.resolve(); });
+    expect(watch.check).toHaveBeenCalled();
+    expect(print).not.toHaveBeenCalled();
+    watch.check.mockResolvedValueOnce(false);
+    await act(async () => { toolbar.onPrint(); await Promise.resolve(); });
+    expect(print).toHaveBeenCalledTimes(1);
+    print.mockRestore();
+  });
+
+  it('판을 확인하는 사이 잠금이 다시 걸리면 인쇄하지 않고, 확인하는 동안은 단추를 잠근다(두 번 누르지 않게)', async () => {
+    const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+    let resolve: (v: boolean) => void = () => {};
+    watch.check.mockReset();
+    watch.check.mockReturnValueOnce(new Promise<boolean>((r) => { resolve = r; }));
+    const { rerender } = render(<ProblemPaperViewPage />);
+    act(() => { toolbar.onPrint(); });
+    expect(toolbar.printDisabled).toBe(true); // 확인하는 동안
+    watch.stale = true; // 그사이 잠금이 걸렸다
+    rerender(<ProblemPaperViewPage />);
+    await act(async () => { resolve(false); await Promise.resolve(); });
+    expect(print).not.toHaveBeenCalled();
+    watch.stale = false;
+    print.mockRestore();
+  });
+});
+

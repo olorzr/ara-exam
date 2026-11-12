@@ -118,7 +118,7 @@
   `/api/integrations/problem-paper` 로 보낸다. 자리는 그쪽이 정한다 — 학교급별 **'문제은행 시험지'**(최상위,
   주간 알림톡 제외) > **만든 선생님** 폴더 > 문제지 하나 = 시험 하나(**회차 번호 없음**)
 - 인증: `Authorization: Bearer <supabase access_token>` (도메인 검사 포함)
-- Body: `{ paperId: string }` (UUID)
+- Body: `{ paperId: string, revision?: string }` (UUID / 보낸 화면이 보고 있는 문제지 `updated_at` — 있으면 지금 판과 같을 때만 보낸다, 다르면 409 `paper_changed`)
 - 보내는 것: `{ sourceExamId, title, totalQuestions, items: [{ no, answer, type }], division?, examDate, createdBy: { id, email } }` —
   `no` 는 문제지 안의 자리(`order_index + 1`), 객관식 `answer` 는 보기 번호 `'1'`~`'5'`(복수 정답 `'1,4'`),
   주관식·서술형은 `type: '주관식'`(스캔 뒤 검수 화면에서 O/X). 조립은 [omr-payload.ts](../src/lib/problem-paper/omr-payload.ts) —
@@ -133,6 +133,12 @@
 - 비고: 조합 화면이 저장 직후 **fire-and-forget** 으로 한 번 쏘고, 상세 화면의 '학원 성적에 등록' 단추가
   기다려서 결과를 보여 준다(수신부 멱등). 등록 상태는 이 앱에 저장하지 않는다(진실은 ara-system `source_exam_id`).
   학교급은 출처 학년으로 가르고 섞이면 빼서 수신부 기본(중등부)에 맡긴다
+- 문제지 판(2026-11-12): 보내는 것에 `sourceRevision`(문제지 `updated_at`, 글자 그대로)이 더해졌다 — ara-system 이 저장된 판보다
+  옛 판이면 정답표를 덮지 않고 result 에 **`stale: true`** 를 준다(겹친 전송, 그쪽 mig599). 항목을 읽은 뒤 문제지 판이 바뀌었으면
+  보내지 않고 **409 `paper_changed`** 로 끝난다(판과 정답표가 어긋난 채 실리지 않게)
+- 고친 문제지(2026-11-12): 고치기 화면이 저장 뒤 **기다려서** 한 번 보낸다. 등록이 성공하고 정답표가 얼지도(`answerKeyFrozen`) 더 새 판에 밀리지도(`stale`) 않았으면
+  `exam.problem_paper_sync_pending` 의 표시를 지운다 — 조건은 `edited_at <= 항목을 읽기 전에 읽은 문제지 updated_at`
+  (보내는 사이 또 고쳤으면 남는다). 등록 상태 저장의 **유일한 예외**다
 
 ## RPC exam.archive_facets
 - 설명: 기출 아카이브의 트리·선택지 재료(출처 조합·영역·단원·문법 묶음·작품 묶음·지문 작품 표) jsonb 하나
@@ -196,12 +202,33 @@
   지문이 두 번 나온다
 
 ## RPC exam.create_problem_paper
-- 설명: 문제지 생성. `problem_papers` 의 **유일한 쓰기 경로**다(직접 INSERT 는 RLS 로 막혀 있다)
+- 설명: 문제지 생성. `problem_papers` 의 쓰기 경로는 이것과 `update_problem_paper` **둘뿐**이다(직접 INSERT·UPDATE 는 RLS 에 쓰기 정책이 없어 막힌다)
 - 인자: `p_title text`, `p_problem_ids uuid[]`, `p_settings jsonb`
 - Response: 만들어진 문제지 `uuid`
 - 검증: 도메인 · 제목 비지 않음 · 1~200개 · 중복 없음 · 전부 실재 ·
   **같은 지문의 문항이 붙어 있을 것**(흩어지면 인쇄에서 지문이 여러 번 나온다)
 - 비고: 본문을 `problem_paper_items.snapshot` 에 굳힌다. 설정은 화이트리스트로 재조립한다
-  (`columns`·`showScore`·`showSource`·**`omr`** — `omr` 은 불리언 true 일 때만 켜진다, sql/54. **정식 정의는 sql/54**).
+  (`columns`·`showScore`·`showSource`·**`omr`** — `omr` 은 불리언 true 일 때만 켜진다, sql/54. **정식 정의는 sql/103** —
+  굳히는 식은 헬퍼 `paper_item_snapshot`·`paper_source_label`·`paper_settings_normalized` 로 고치기와 함께 쓴다).
   지문 스냅샷에 `figure_paths` 가 있다(sql/23) — 안 실으면 아카이브 화면은 멀쩡한데
   **인쇄물에서만** 그림이 사라진다. sql/23 이전 문제지에는 이 키가 없으므로 앱이 `?? []` 로 받는다
+
+## RPC exam.update_problem_paper
+- 설명: 저장된 문제지 고치기(2026-11-12, sql/103) — 순서 바꾸기·빼기·넣기 + 제목·단 수·출처 숨기기
+- 인자(**POST**): `p_paper_id uuid`, `p_expect_updated_at timestamptz`(읽어 둔 판 — **글자 그대로**, 낙관적 잠금),
+  `p_title text`(null 이면 그대로), `p_entries jsonb`(고친 뒤 차례대로 `[{"item": 기존 항목 id} | {"problem": 문항 id}]`),
+  `p_settings jsonb`(null 이면 그대로, `columns`·`showSource` 만 받는다 — `omr`·`showScore` 는 저장값 유지)
+- Response: `{ updated_at, total_questions, passage_changed: [번호…] }` — `passage_changed` 는 같은 묶음의 기존 지문 판을 물려받았는데 지금 원본과 다른 자리
+- 권한: 만든 선생님 또는 원장(JWT 이메일). 책에 담긴 문제지는 원장만. OMR 문제지는 채점 전까지만(ara-system `problem_paper_exam_state(id, true)` — OMR 저장과 같은 잠금을 잡고 판정, 실패하면 닫힌다)
+- 에러(SQLSTATE + **HINT**): 42501 `not_owner`/`in_book`(바깥 도메인은 HINT 없음) · 55000 `graded`/`grade_check_failed` · P0001 `conflict` · P0002 `missing` ·
+  23514 내용 검사(1~200, 중복, 남의 항목, 모양, 묶음 연속성, OMR 정답 모양·객관식 0 — 문구는 만들기와 같다) · 23503 없는 문항
+- 비고: 남긴 항목은 id·`problem_id`·스냅샷 그대로(sql/97 빼기 조건이 `problem_id` 를 본다), 자리는 `+10000` 두 단계로 다시 매긴다.
+  `total_questions`·`source_labels`(**스냅샷 기준**)를 다시 만들고, 그 문제지를 담은 책의 `page_counts` 를 비우고, OMR 이면
+  반영 대기 표시를 남긴다. 뺀 항목의 스냅샷은 감사 로그(`problem_paper_items` / UPDATE `old_data.removed`)에만 남는다
+
+## RPC exam.problem_paper_edit_states
+- 설명: 문제지들을 지금 사람이 고칠 수 있는지 — 보기 화면의 '수정' 단추·목록의 연필이 쓴다
+- 인자(**POST**, VOLATILE): `p_paper_ids uuid[]` (200장까지)
+- Response: `{ "<문제지 id>": { reason: null | 'not_owner' | 'in_book' | 'graded' | 'grade_check_failed', in_book: bool, pending: bool, workbook: bool } }` (없는 id 는 빠진다, `workbook` = 평가문제집 문항이 들어 있다 — 책 쪽 고치기 화면으로 연다)
+- 비고: DEFINER — 선생님은 `book_chapters` 를 RLS 로 못 읽어서. `pending` 은 위 반영 대기 표시
+

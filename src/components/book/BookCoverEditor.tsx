@@ -1,11 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { resolveSpinePages, type Book, type BookEdition } from '@/lib/book';
+import { useBookRevisionWatch } from '@/hooks/useBookRevisionWatch';
+import { bookCoverSignature, resolveSpinePages, type Book, type BookEdition } from '@/lib/book';
 import BookCoverMode from './BookCoverMode';
 import BookCoverPanel from './BookCoverPanel';
 import type { BookState } from './BookEditorShell';
 import BookFinishControl from './BookFinishControl';
+import BookStaleNotice from './BookStaleNotice';
 import BookToolbar from './BookToolbar';
 
 interface BookCoverEditorProps {
@@ -23,6 +25,10 @@ interface BookCoverEditorProps {
 export default function BookCoverEditor({ book, state }: BookCoverEditorProps) {
   const [edition, setEdition] = useState<BookEdition>('student');
   const spinePages = resolveSpinePages(book, state.chapters, edition);
+  // 열어 둔 사이 담긴 문제지가 고쳐지면(sql/103) DB 쪽 수가 비워진다 — 옛 책등으로 인쇄하지 않게 지켜본다(코덱스 5R)
+  const watch = useBookRevisionWatch(book.id, book.kind === 'book'
+    ? bookCoverSignature(book.pageCounts, state.chapters.map((c) => ({ paperId: c.paperId, revision: c.paper?.updated_at ?? '' })))
+    : null, true);
 
   return (
     <div className="space-y-4">
@@ -34,8 +40,13 @@ export default function BookCoverEditor({ book, state }: BookCoverEditorProps) {
       />
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
         <div className="min-w-0 flex-1">
-          {spinePages ? (
-            <BookCoverMode book={book} edition={edition} creatorName={state.creatorName} spinePages={spinePages} />
+          {watch.stale ? (
+            <BookStaleNotice message="담긴 문제지가 다른 곳에서 고쳐져 쪽 수(책등 두께)가 바뀌었을 수 있어요. 새로 고친 뒤 내지 쪽 수를 다시 확인해 주세요." />
+          ) : spinePages ? (
+            <BookCoverMode
+              book={book} edition={edition} creatorName={state.creatorName} spinePages={spinePages}
+              checkRevision={watch.check}
+            />
           ) : (
             <p className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900" data-no-print>
               책등 두께는 내지 쪽 수로 정해져요. 오른쪽 &lsquo;내지 쪽 수&rsquo; 를 채우면 여기에 표지 펼침면이 나와요.

@@ -15,7 +15,9 @@ export function bookLayoutKeyFor(book: Book, chapters: readonly BookChapter[], e
     edition,
     title: book.title,
     settings: book.settings,
-    chapters: chapters.map((c) => ({ paperId: c.paperId, title: chapterTitleOf(c) })),
+    // 문제지 판까지 — 문제지를 고치면 그 책은 다시 재야 한다(sql/103 은 page_counts 도 비운다. 열어 둔 내지 탭이
+    // 옛 쪽 수를 되살려도 지문이 달라 표지 화면이 막는다)
+    chapters: chapters.map((c) => ({ paperId: c.paperId, title: chapterTitleOf(c), revision: c.paper?.updated_at })),
   });
 }
 

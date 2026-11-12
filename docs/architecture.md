@@ -143,6 +143,7 @@ src/
 5. 개념지 저장 → `api/sync-concept-to-grades` → ara-system 성적에 채점 회차 멱등 등록. 폴더 매핑은 **그룹 = 중등/고등이면 출판사 · 외부지문이면 학교명**, **시리즈 = 학년 + 학기**(외부지문은 학기가 없어 학년만, 학년·학기 구분 없는 고등 선택과목은 `'선택과목'`), 회차명 = 단원(외부지문은 프린트/작품명). 년도는 시리즈에 넣지 않는다(회차 라벨이 연도별로 리셋됨). **합격 기준(`pass_percentage`, 기본 80)도 함께 보낸다** — 그쪽이 합격/불합격을 판정한다
 6. 재시험 생성 → `create_exam_with_words`(부모 단어 재조립·서버 셔플) → `api/sync-to-grades` → ara-system 이 **원본 회차에 딸린 재시험지**로 붙인다(회차를 새로 만들지 않는다, 그쪽 mig477). 학생별 차수는 채점할 때 `exam_results.attempt_no` 가 오른다. 원본이 미등록이면 409 → 경고 토스트
 7. **OMR 채점 문제지** 저장(`settings.omr`) → `api/sync-paper-to-grades` → 스냅샷으로 정답표 조립(`omr-payload.ts`) → ara-system `integrations/problem-paper` 가 **'문제은행 시험지' > 만든 선생님 폴더 > 단발 시험**(회차 없음)으로 멱등 등록하고 90A 양식을 붙인다(그쪽 mig519). 채점은 그쪽 OMR 스캔 화면에서 — 복수 정답(`'1,4'`)도 마킹 그대로 채점된다
+8. **문제지 고치기**(2026-11-12) → `exam.update_problem_paper`(sql/103). OMR 문제지면 같은 트랜잭션에서 ara-system 계약 함수 `public.problem_paper_exam_state`(그쪽 mig598)로 채점 여부를 OMR 저장과 같은 잠금 아래서 보고, 고친 뒤 `exam.problem_paper_sync_pending` 에 표시를 남긴다 → 고치기 화면이 `api/sync-paper-to-grades` 를 기다려 보내고, 라우트가 새 정답표가 들어갔을 때만 표시를 지운다(남으면 보기 화면이 경고). 그 문제지를 담은 책은 `page_counts` 가 비워지고 구성 지문(`bookLayoutKey`)에 문제지 판(`updated_at`)이 들어 있어 다시 재야 한다
 
 ## concept_sheets HTML 파이프라인
 - 입력이 둘이다: ① 선생님이 편집기에서 직접 친 것, ② **학교 프린트 읽기**가 만든 것
@@ -184,6 +185,9 @@ src/
           (상세 창에서도 바로 담는다 — 그 화면은 아카이브와 같은 목록 부품을 쓴다)
           → RPC create_problem_paper(스냅샷) → A4 인쇄 3종(문제지·교사용·답지)
           · 'OMR 채점' 을 켜면 → sync-paper-to-grades → 학원 성적 시험 등록(90A 스캔 채점)
+          · **고치기**(2026-11-12) — 같은 조합 화면(`PaperComposeBody`)에 저장된 항목을 씨앗으로 →
+            RPC update_problem_paper(남긴 항목은 스냅샷 그대로, 새 문항만 굳힘 · 낙관적 잠금 · 작성자/원장 ·
+            책이면 원장만 · OMR 은 ara-system `problem_paper_exam_state` 로 채점 전까지만) → OMR 이면 정답표 재등록을 기다림
 [O,X·단답형] 지문 붙여넣기(또는 '지문 불러오기' — 작품 전문·개념 / 기출 지문) → 코덱스 turn 한 번
           → 근거·답을 지문과 대조해 거르기 → 화면에서 수정·삭제 → 문제지·정답표 인쇄
           · **저장하지 않는다**(DB 표 없음, 새로고침하면 사라진다)
@@ -465,6 +469,7 @@ src/
 - 역할: 문제지 조합 규칙(지문 묶음 연속성)과 인쇄 블록 조립
 - 의존: lib/print(splitHtmlBlocks), lib/shuffle
 - 주요 파일: compose.ts, dnd.ts, blocks.ts, passage-blocks.ts(지문 묶음 블록), box-parts.ts,
+  edit-items.ts·canvas-display.ts·paper-edit.ts·paper-validate.ts(고치기 — 저장된 항목↔캔버스↔RPC 인자, 카드 표시 모델, 두 RPC 호출, 저장 전 검사),
   part-cuts.ts·part-measure.ts·part-split-plan.ts·question-units.ts·split-target.ts(긴 문단·문항을 자리에 맞춰 쪼개기), answers.ts, bulk-add.ts,
   html-trim.ts, settings.ts, shuffle-groups.ts, cover.ts, cover-image.ts, cover-queries.ts, print-layout-pref.ts,
   trim-works.ts(복합 지문에서 묻지 않는 작품 구역 빼기), print-label.ts(인쇄 단추 글자), booklet-advice.ts(중철 뒷표지 안내 판단),
@@ -474,7 +479,7 @@ src/
   간단 표지(제목·부제·이름 칸)와 그림 표지(올린 그림을 JPEG 로 다시 인코딩해 `papers/{id}/cover-{token}.jpg`)
   둘이다. `usePaperCover` 가 읽고 쓰고 `PaperCoverDialog` 가 고르며 `PaperCoverPage` 가 그린다.
   문제지·교사용·답지 셋에 같은 표지가 붙고 제목 꼬리만 다르다(`coverTitleFor`).
-  문제지 본문은 불변 스냅샷이라 칸을 더하지 않고 곁표에 둔다
+  문제지 본문 표는 RPC 로만 쓰므로 칸을 더하지 않고 곁표에 둔다(고치기가 생긴 뒤에도 표지는 학원 공유 곁표 그대로다)
 - **표지 디자인**(2026-10-13 · 2026-10-25): 간단 표지 안에서 일곱 디자인을 고른다(`layout`, sql/70 · CHECK 정본 sql/75 —
   2026-10-25 에 F 라인드로잉 `zine` 이 더해졌다). 그리는 쪽은 `components/problem-paper/covers/`(디자인마다 컴포넌트 하나 +
   `COVER_LAYOUT_COMPONENTS` 등록부), CSS 는 `styles/paper-covers/`(globals.css 에서 @import), 글꼴은 jsdelivr @fontsource.

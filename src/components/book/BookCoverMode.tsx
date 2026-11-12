@@ -3,6 +3,7 @@
 import { Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { renderCoverSlots } from '@/components/problem-paper/PaperCoverPage';
+import { useCheckedPrint } from '@/hooks/useCheckedPrint';
 import { useCoverFontsReady } from '@/hooks/useCoverFontsReady';
 import { useCoverImages } from '@/hooks/useCoverImages';
 import { useFontsReady } from '@/hooks/useFontsReady';
@@ -24,6 +25,8 @@ interface BookCoverModeProps {
    * 책은 내지 화면이 잰 값, 표지만은 직접 넣은 값이다.
    */
   spinePages: SpinePages;
+  /** 인쇄 직전에 담긴 문제지·쪽 수가 바뀌었는지 확인한다 — 바뀌었으면 true(`useBookRevisionWatch` 의 `check`) */
+  checkRevision: () => Promise<boolean>;
 }
 
 /**
@@ -33,7 +36,7 @@ interface BookCoverModeProps {
  *    옛 쪽 수로 그린 책등은 조용히 틀리므로 그 판정 없이 부르지 말 것. ⚠️ 그림 표지는 그림이 뜰 때까지 펼침면을
  *    그리지 않는다(문제지 화면과 같은 규약 — 그 틈에 Cmd/Ctrl+P 로 뽑으면 '불러오는 중' 이 표지로 나간다).
  */
-export default function BookCoverMode({ book, edition, creatorName, spinePages }: BookCoverModeProps) {
+export default function BookCoverMode({ book, edition, creatorName, spinePages, checkRevision }: BookCoverModeProps) {
   const cover = book.cover ?? DEFAULT_BOOK_COVER;
   const coverImages = useCoverImages(cover);
   const year = coverYearOf(book.createdAt);
@@ -54,7 +57,9 @@ export default function BookCoverMode({ book, edition, creatorName, spinePages }
     [spineFontSpec(spineFont), SPINE_BRAND_FONT_SPEC], `${spineTitle} ${COVER_COPY.brandKo}`, true,
   );
   const blocked = coverImages.pending || coverImages.broken || !fontsReady || !spineFontsReady;
-  const printLabel = coverImages.pending ? '표지 준비 중…'
+  // 인쇄 직전에 판을 확인한다 — 창을 보는 동안 담긴 문제지가 고쳐지면 1분 감시 전까지 옛 책등이 열려 있다(코덱스 10R)
+  const checked = useCheckedPrint(checkRevision, blocked);
+  const printLabel = checked.checking ? '확인 중…' : coverImages.pending ? '표지 준비 중…'
     : coverImages.broken ? '표지 그림 확인 필요' : !fontsReady || !spineFontsReady ? '글꼴 준비 중…' : '표지 인쇄';
 
   return (
@@ -64,7 +69,10 @@ export default function BookCoverMode({ book, edition, creatorName, spinePages }
         <span className="text-gray-600">
           {spinePages.source === 'manual' ? '입력한 내지' : '내지'} {spinePages.pages}쪽 · {paper.name} → 책등 <strong>{spine}mm</strong> · 작업사이즈 {geometry.widthMm} × {geometry.heightMm}mm
         </span>
-        <Button type="button" size="sm" className="ml-auto" disabled={blocked} onClick={() => window.print()}>
+        <Button
+          type="button" size="sm" className="ml-auto" disabled={blocked || checked.checking}
+          onClick={() => { void checked.run((nowBlocked) => { if (!nowBlocked) window.print(); }); }}
+        >
           <Printer className="h-3.5 w-3.5" />
           <span className="ml-1">{printLabel}</span>
         </Button>

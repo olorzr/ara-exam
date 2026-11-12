@@ -2,12 +2,14 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Trash2 } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { OwnerScopeTabs } from '@/components/ui/owner-scope-tabs';
 import { useCreatorNames } from '@/hooks/useCreatorNames';
+import { usePaperEditStates } from '@/hooks/usePaperEditStates';
 import { usePaperList } from '@/hooks/usePaperList';
 import type { OwnerScope } from '@/lib/owner-scope';
+import { paperEditHref } from '@/lib/problem-paper/paper-edit';
 import { normalizePaperSettings } from '@/lib/problem-paper/settings';
 import { PageTitle } from '@/components/magazine';
 
@@ -21,13 +23,15 @@ const EMPTY_TEXT: Record<OwnerScope, string> = {
  * 만든 문제지 목록 (`/problems/papers`).
  *
  * 내가 만든 것과 다른 선생님이 만든 것을 탭으로 가른다 — 들어올 때마다 **내 것부터** 연다.
- * 다른 선생님 것도 열고 지울 수 있다(권한은 그대로 학원 공유다).
+ * 다른 선생님 것도 열고 지울 수 있다(지우기 권한은 그대로 학원 공유다). **고치기**는 만든 선생님과 원장만이라
+ * 연필은 고칠 수 있는 문제지에만 그린다(책에 담기면 원장만, OMR 은 채점 전까지만 — sql/103).
  */
 export default function ProblemPapersPage() {
   const [scope, setScope] = useState<OwnerScope>('mine');
   const { papers, loading, remove } = usePaperList(scope);
   // 다른 선생님 탭에서만 누가 만들었는지 적는다 — 내 탭은 전부 나다
   const names = useCreatorNames(scope === 'others' ? papers.map((p) => p.user_id) : []);
+  const { states: editStates } = usePaperEditStates(papers.map((p) => p.id));
 
   return (
     <div className="space-y-4">
@@ -36,6 +40,7 @@ export default function ProblemPapersPage() {
           <PageTitle eyebrow="PROBLEM BANK">문제지</PageTitle>
           <p className="mt-1 text-sm text-gray-500">
             아카이브 문항으로 만든 문제지입니다. 본문은 만들 때 굳혀 두어 원본이 바뀌어도 그대로예요.
+            만든 뒤에도 연필을 눌러 순서를 바꾸거나 문항을 넣고 뺄 수 있어요.
           </p>
         </div>
         <Link
@@ -82,6 +87,15 @@ export default function ProblemPapersPage() {
                     {new Date(paper.created_at).toLocaleDateString('ko-KR')}
                   </p>
                 </Link>
+                {editStates.get(paper.id)?.reason === null && (
+                  <Link
+                    href={paperEditHref(paper.id, editStates.get(paper.id) ?? { inBook: false, workbook: false })}
+                    className="shrink-0 rounded p-2 text-gray-400 hover:bg-gray-100"
+                    aria-label={`${paper.title} 고치기`}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Link>
+                )}
                 <button
                   type="button"
                   onClick={() => remove(paper)}

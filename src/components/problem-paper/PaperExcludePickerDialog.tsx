@@ -17,6 +17,11 @@ interface PaperExcludePickerDialogProps {
   open: boolean;
   /** 지금 빼고 있는 문제지 — 체크된 채로 열린다 */
   selected: readonly ExcludedPaper[];
+  /**
+   * 목록에서 숨길 문제지 — 고치기 화면의 그 문제지 자신. 고르면 그 문제지에 지금 담긴 문항(방금 뺀 것까지)이
+   * 아카이브에서 사라져 다시 담을 수 없다('다른 문제지' 빼기는 저장된 담김을 본다, sql/97).
+   */
+  hidePaperId?: string;
   onClose: () => void;
   /** 고른 문제지로 통째로 바꾼다(아무것도 안 고르면 빈 배열) */
   onApply: (papers: ExcludedPaper[]) => void;
@@ -28,19 +33,19 @@ interface PaperExcludePickerDialogProps {
  * 장 고르기 창(`BookChapterPicker`)과 같은 목록을 쓴다. 다른 점은 하나를 고르면 바로 끝나는 것이 아니라
  * 체크해 두고 '빼기' 로 한 번에 정한다는 것이다 — 고를 때마다 목록이 다시 읽히면 창 뒤가 계속 바뀐다.
  */
-export default function PaperExcludePickerDialog({ open, selected, onClose, onApply }: PaperExcludePickerDialogProps) {
+export default function PaperExcludePickerDialog({ open, selected, hidePaperId, onClose, onApply }: PaperExcludePickerDialogProps) {
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogTitle className="text-base">담긴 문항을 뺄 문제지</DialogTitle>
         {/* 창을 열 때마다 처음부터 — 취소한 체크가 다음에 남으면 안 된다 */}
-        {open && <PickerBody selected={selected} onClose={onClose} onApply={onApply} />}
+        {open && <PickerBody selected={selected} hidePaperId={hidePaperId} onClose={onClose} onApply={onApply} />}
       </DialogContent>
     </Dialog>
   );
 }
 
-function PickerBody({ selected, onClose, onApply }: Omit<PaperExcludePickerDialogProps, 'open'>) {
+function PickerBody({ selected, hidePaperId, onClose, onApply }: Omit<PaperExcludePickerDialogProps, 'open'>) {
   const [search, setSearch] = useState('');
   const query = useDebouncedValue(search, SEARCH_DEBOUNCE_MS);
   /** `papers` 가 null 이면 못 읽었다 — '맞는 문제지가 없어요' 는 거짓말이 된다 */
@@ -51,14 +56,14 @@ function PickerBody({ selected, onClose, onApply }: Omit<PaperExcludePickerDialo
   useEffect(() => {
     let alive = true;
     fetchPapersForPicker(query)
-      .then((papers) => { if (alive) setLoaded({ query, papers }); })
+      .then((papers) => { if (alive) setLoaded({ query, papers: papers.filter((p) => p.id !== hidePaperId) }); })
       .catch((e) => {
         if (!alive) return;
         toast.error(e instanceof Error && e.message ? e.message : '문제지를 불러오지 못했어요.');
         setLoaded({ query, papers: null });
       });
     return () => { alive = false; };
-  }, [query]);
+  }, [query, hidePaperId]);
 
   const toggle = ({ id, title, total_questions }: PickerPaper) => {
     setPicked((prev) => {

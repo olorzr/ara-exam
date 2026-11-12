@@ -3,11 +3,13 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
-import type { Book, BookEdition } from '@/lib/book';
+import { useBookRevisionWatch } from '@/hooks/useBookRevisionWatch';
+import { bookCoverSignature, type Book, type BookEdition } from '@/lib/book';
 import BookComposePanel from './BookComposePanel';
 import type { BookState } from './BookEditorShell';
 import BookFinishControl from './BookFinishControl';
 import BookInnerMode from './BookInnerMode';
+import BookStaleNotice from './BookStaleNotice';
 import BookToolbar, { INNER_MODES, type BookMode } from './BookToolbar';
 
 interface BookInnerEditorProps {
@@ -24,6 +26,11 @@ interface BookInnerEditorProps {
 export default function BookInnerEditor({ book, state }: BookInnerEditorProps) {
   const [mode, setMode] = useState<BookMode>('compose');
   const [edition, setEdition] = useState<BookEdition>('student');
+  // 열어 둔 사이 담긴 문제지가 다른 곳에서 고쳐지면(sql/103) 옛 문항을 인쇄하지 않게 지켜본다(코덱스 6R).
+  // 쪽 수는 이 화면이 스스로 저장하므로 견주지 않는다
+  const watch = useBookRevisionWatch(book.id, book.kind === 'book'
+    ? bookCoverSignature(null, state.chapters.map((c) => ({ paperId: c.paperId, revision: c.paper?.updated_at ?? '' })))
+    : null, false);
 
   if (book.kind === 'cover') {
     return (
@@ -45,8 +52,14 @@ export default function BookInnerEditor({ book, state }: BookInnerEditorProps) {
         trailing={<BookFinishControl finishedAt={book.finishedAt} onToggle={(f) => { void state.setFinished(f); }} />}
       />
       {mode === 'compose' && <BookComposePanel book={book} state={state} />}
-      {mode === 'inner' && (
-        <BookInnerMode book={book} chapters={state.chapters} edition={edition} savePageCount={state.savePageCount} />
+      {mode === 'inner' && watch.stale && (
+        <BookStaleNotice message="담긴 문제지가 다른 곳에서 고쳐졌어요. 지금 내지는 고치기 전 내용이라 새로 고친 뒤 인쇄해 주세요." />
+      )}
+      {mode === 'inner' && !watch.stale && (
+        <BookInnerMode
+          book={book} chapters={state.chapters} edition={edition} savePageCount={state.savePageCount}
+          checkRevision={watch.check}
+        />
       )}
     </div>
   );

@@ -6,7 +6,7 @@ import {
 } from './settings';
 import { spineInkFor } from './spine';
 import { DEFAULT_SPINE_FONT } from './spine-fonts';
-import { chapterTitleOf, normalizeBookKind, type Book } from './types';
+import { chapterTitleOf, normalizeBookKind, type Book, type BookChapter } from './types';
 
 describe('normalizeBookSettings', () => {
   it('빈 값·옛 행은 기본 설정', () => {
@@ -104,6 +104,16 @@ describe('bookLayoutKey', () => {
     expect(bookLayoutKey({ ...input, chapters: [input.chapters[0], { paperId: 'b', title: '둘째' }] })).not.toBe(base);
   });
 
+  it('담긴 문제지의 판(revision)이 지문에 든다 — 문제지를 고치면 다시 재라고 막힌다(sql/103)', () => {
+    const base = bookLayoutKey(input);
+    // 판이 없으면 예전 지문 그대로다(장 항목 모양이 바뀌지 않는다)
+    expect(bookLayoutKey({ ...input, chapters: input.chapters.map((c) => ({ ...c, revision: '' })) })).toBe(base);
+    const v1 = { ...input, chapters: [{ ...input.chapters[0], revision: '2026-11-12T00:00:00+00:00' }, input.chapters[1]] };
+    const v2 = { ...input, chapters: [{ ...input.chapters[0], revision: '2026-11-12T01:00:00+00:00' }, input.chapters[1]] };
+    expect(bookLayoutKey(v1)).not.toBe(base);
+    expect(bookLayoutKey(v1)).not.toBe(bookLayoutKey(v2));
+  });
+
   it('인쇄 모양 개정 번호가 지문에 든다 — 올리면 이미 잰 책이 모두 다시 재라고 막힌다', () => {
     // 개정 번호를 빼고 같은 식으로 만든 지문과 달라야 한다(빠지면 글자 크기가 바뀌어도 옛 쪽 수가 '최신' 이다)
     const text = JSON.stringify([
@@ -131,6 +141,21 @@ describe('내지 구성 지문은 표지 쪽 설정에 흔들리지 않는다', 
       },
     };
     expect(bookLayoutKeyFor(other, [], 'student')).toBe(bookLayoutKeyFor(book, [], 'student'));
+  });
+});
+
+describe('bookLayoutKeyFor — 문제지를 고치면(updated_at) 지문이 바뀐다', () => {
+  it('장의 문제지 판이 다르면 다른 지문', () => {
+    const book: Book = {
+      id: 'b', title: '책', kind: 'book', finishedAt: null, settings: DEFAULT_BOOK_SETTINGS, pageCounts: {}, cover: null,
+      userId: 'u', createdAt: '', updatedAt: '',
+    };
+    const chapter = (updatedAt: string) => ({
+      id: 'c', bookId: 'b', paperId: 'p', orderIndex: 0, titleOverride: '1장',
+      paper: { id: 'p', updated_at: updatedAt } as BookChapter['paper'],
+    });
+    expect(bookLayoutKeyFor(book, [chapter('2026-11-12T00:00:00+00:00')], 'student'))
+      .not.toBe(bookLayoutKeyFor(book, [chapter('2026-11-12T01:00:00+00:00')], 'student'));
   });
 });
 

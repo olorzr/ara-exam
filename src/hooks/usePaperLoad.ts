@@ -17,6 +17,39 @@ export interface PaperLoadState {
   creatorName: string;
 }
 
+/** 읽는 사이 문제지가 고쳐지면 다시 읽는 횟수 */
+const CONSISTENT_READ_TRIES = 3;
+
+interface PaperRead {
+  row: ProblemPaper | null;
+  items: PaperItemSnapshot[];
+}
+
+/**
+ * 문제지 행과 항목을 **같은 판으로** 읽는다 — 행 → 항목 → 행(판만) 차례로 읽어 판이 같을 때만 쓴다.
+ *
+ * ⚠️ 문제지는 만든 뒤에도 고친다(sql/103). 둘을 따로(또는 동시에) 읽으면 그 사이 고치기가 끝났을 때 고치기 전 문항과
+ *    고친 뒤 설정이 섞인 문제지를 인쇄하게 된다 — 학원 성적에는 이미 새 차례의 정답표가 올라가 있다(코덱스 3R).
+ *    고치기 RPC 는 항목과 함께 문제지 행을 늘 고쳐 판(updated_at)이 오르므로 판이 같으면 항목도 같다.
+ */
+async function readPaperConsistent(paperId: string): Promise<PaperRead> {
+  for (let attempt = 0; attempt < CONSISTENT_READ_TRIES; attempt += 1) {
+    const paperRes = await supabase.from('problem_papers').select('*').eq('id', paperId).maybeSingle();
+    if (paperRes.error) throw paperRes.error;
+    const row = paperRes.data as ProblemPaper | null;
+    if (!row) return { row: null, items: [] };
+    const itemRes = await supabase.from('problem_paper_items').select('order_index, snapshot')
+      .eq('paper_id', paperId).order('order_index').limit(300);
+    if (itemRes.error) throw itemRes.error;
+    const again = await supabase.from('problem_papers').select('updated_at').eq('id', paperId).maybeSingle();
+    if (again.error) throw again.error;
+    if ((again.data as { updated_at?: string } | null)?.updated_at === row.updated_at) {
+      return { row, items: ((itemRes.data ?? []) as { snapshot: PaperItemSnapshot }[]).map((r) => r.snapshot) };
+    }
+  }
+  throw new Error('문제지가 방금 고쳐지는 중이었어요. 잠시 뒤 새로 고쳐 주세요.');
+}
+
 /**
  * 문제지와 항목 스냅샷, 만든 선생님 이름을 읽는다.
  *
@@ -34,19 +67,11 @@ export function usePaperLoad(paperId: string): PaperLoadState {
     (async () => {
       let next: PaperLoadState = { paper: null, items: [], loaded: true, creatorName: '' };
       try {
-        const [paperRes, itemRes] = await Promise.all([
-          supabase.from('problem_papers').select('*').eq('id', paperId).maybeSingle(),
-          supabase.from('problem_paper_items').select('order_index, snapshot')
-            .eq('paper_id', paperId).order('order_index').limit(300),
-        ]);
-        if (paperRes.error) throw paperRes.error;
-        if (itemRes.error) throw itemRes.error;
-
-        const row = paperRes.data as ProblemPaper | null;
+        const { row, items } = await readPaperConsistent(paperId);
         const names = row ? await fetchCreatorNames([row.user_id]) : new Map<string, string>();
         next = {
           paper: row ? { ...row, settings: normalizePaperSettings(row.settings) } : null,
-          items: ((itemRes.data ?? []) as { snapshot: PaperItemSnapshot }[]).map((r) => r.snapshot),
+          items,
           loaded: true,
           creatorName: row ? names.get(row.user_id) ?? '' : '',
         };

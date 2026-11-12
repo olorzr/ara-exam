@@ -6,6 +6,7 @@
 -- `settings.omr` 로 저장되고, 켜진 문제지만 저장 직후 성적 시스템(ara-system)에 시험으로 등록된다
 -- (`/api/sync-paper-to-grades` → ara-system `integrations/problem-paper`, 그쪽 mig519).
 --
+-- ⛔️ **[2026-11-12] 정식 정의는 이제 sql/103 이다**(그 전 sql/68). 이 파일을 단독으로 돌리면 sql/68 의 키가 빠진다 — sql/68 → sql/103 순서로 다시 돌릴 것.
 -- ⛔️ **[2026-10-11] 정식 정의는 이제 sql/68 이다.** 이 파일을 단독으로 다시 돌리면 스냅샷의
 --    `work_titles`·`passage.works` 가 조용히 빠져 새 문제지가 (가)(나) 지문을 통째로 인쇄한다.
 --    아래 '정식 정의' 문장은 당시 기록이다.

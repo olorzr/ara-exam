@@ -1,4 +1,5 @@
 export * from './cover';
+export * from './cover-revision';
 export * from './inner-papers';
 export * from './layout';
 export * from './queries';

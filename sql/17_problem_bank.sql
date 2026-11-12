@@ -170,6 +170,8 @@ CREATE INDEX IF NOT EXISTS idx_problems_work_title    ON exam.problems (work_tit
 -- ---------------------------------------------
 -- exams/exam_words 와 같은 규약: 본문은 **불변 스냅샷**이라 원본 문항을 고쳐도
 -- 이미 인쇄한 문제지는 변하지 않는다. 쓰기는 RPC 한 곳으로만 열린다.
+-- ⚠️ [2026-11-12] 쓰기 RPC 는 이제 둘이다 — 만들기·고치기(sql/103 `update_problem_paper`, 남긴 항목의 스냅샷은 그대로).
+--    표에는 여전히 INSERT·UPDATE 정책이 없다.
 CREATE TABLE IF NOT EXISTS exam.problem_papers (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title           TEXT NOT NULL CHECK (btrim(title) <> ''),

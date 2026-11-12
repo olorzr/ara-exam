@@ -9,6 +9,8 @@ import PaperExcludePickerDialog from './PaperExcludePickerDialog';
 interface PaperExcludeBarProps {
   papers: readonly ExcludedPaper[];
   answeredOnly: boolean;
+  /** 고치기 화면이면 그 문제지 id — 자신을 빼기에 고르면 방금 뺀 문항을 다시 담을 수 없게 된다 */
+  hidePaperId?: string;
   /** ⚠️ 조합 화면의 `bulk.patch` — 조건을 바꾸면 고른 행도 비워야 한다 */
   onChange: (patch: Partial<ProblemFilters>) => void;
 }
@@ -19,7 +21,7 @@ interface PaperExcludeBarProps {
  * 필터 줄에 넣지 않은 까닭: 그쪽은 '어느 폴더인가' 를 고르고 '조건 지우기' 로 풀리는데, 이 둘은 폴더를 바꿔도 남는다.
  * 그래서 지금 무엇을 빼고 있는지가 늘 보이도록 칩으로 둔다.
  */
-export default function PaperExcludeBar({ papers, answeredOnly, onChange }: PaperExcludeBarProps) {
+export default function PaperExcludeBar({ papers, answeredOnly, hidePaperId, onChange }: PaperExcludeBarProps) {
   const [picking, setPicking] = useState(false);
   const setPapers = (next: ExcludedPaper[]) => onChange({ exclude_papers: next, page: 0 });
 
@@ -70,6 +72,7 @@ export default function PaperExcludeBar({ papers, answeredOnly, onChange }: Pape
       <PaperExcludePickerDialog
         open={picking}
         selected={papers}
+        hidePaperId={hidePaperId}
         onClose={() => setPicking(false)}
         onApply={(next) => { setPicking(false); setPapers(next); }}
       />

@@ -11,6 +11,8 @@ import ProblemAnswerKeyView from '@/components/problem-paper/ProblemAnswerKeyVie
 import PaperBackCoverAdvice from '@/components/problem-paper/PaperBackCoverAdvice';
 import PaperCoverAlerts from '@/components/problem-paper/PaperCoverAlerts';
 import PaperCoverDialog from '@/components/problem-paper/PaperCoverDialog';
+import PaperRenumberNotice from '@/components/problem-paper/PaperRenumberNotice';
+import PaperStaleNotice from '@/components/problem-paper/PaperStaleNotice';
 import { PaperPrintLayoutNotice } from '@/components/problem-paper/PaperPrintLayoutToggle';
 import PaperViewToolbar, { type PaperViewMode } from '@/components/problem-paper/PaperViewToolbar';
 import { useImagesReady } from '@/hooks/useImagesReady';
@@ -19,6 +21,8 @@ import { useCoverImages } from '@/hooks/useCoverImages';
 import { usePaperCover } from '@/hooks/usePaperCover';
 import { usePaperBodyPages } from '@/hooks/usePaperBodyPages';
 import { usePaperLoad } from '@/hooks/usePaperLoad';
+import { usePaperRevisionWatch } from '@/hooks/usePaperRevisionWatch';
+import { useCheckedPrint } from '@/hooks/useCheckedPrint';
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls';
 import {
   imagePathsOf, renumberedImageItems, renumberedPrintConfirmMessage,
@@ -47,6 +51,8 @@ export default function ProblemPaperViewPage() {
   const paperId = params?.id ?? '';
 
   const { paper, items, loaded, creatorName } = usePaperLoad(paperId);
+  /** 열어 둔 사이 다른 곳에서 고쳐졌는가 — 고쳐졌으면 옛 차례를 인쇄하지 않는다 */
+  const revisionWatch = usePaperRevisionWatch(paperId, paper?.updated_at);
   const [mode, setMode] = useState<PaperViewMode>('paper');
   // 인쇄 방식·'묻는 작품만 인쇄' 는 브라우저에 기억해 둔 값으로 시작한다
   const {
@@ -120,23 +126,28 @@ export default function ProblemPaperViewPage() {
     window.print();
   }, [renumberAcked]);
 
-  /**
-   * 인쇄 — 번호가 어긋난 이미지 문항이 있으면 **한 번 묻는다**(코덱스 리뷰).
-   * 확인하면 안내를 인쇄물에서 빼고(위 효과가) 이어서 인쇄한다.
-   */
-  const handlePrint = () => {
-    const ask = printsProblems && !renumberAcked
-      ? renumberedPrintConfirmMessage(renumbered) : null;
-    if (!ask) { window.print(); return; }
-    if (!window.confirm(ask)) return;
-    printAfterAckRef.current = true;
-    setRenumberAcked(true);
-  };
-
   // 디자인 표지는 글꼴 조각을 받기 전에 인쇄하면 표지만 대체 글꼴로 찍힌다 — 그동안 단추를 잠근다(fail-open)
   const coverYear = coverYearOf(paper?.created_at);
   const teacher = coverTeacherName(cover, creatorName);
   const fontsReady = useCoverFontsReady(cover, { paperTitle: paper?.title ?? '', year: coverYear, teacher });
+
+  /** 인쇄를 막는 것들 — 그림·표지·글꼴 준비, 다른 곳에서 고쳐짐 */
+  const printBlocked = (printsProblems && imagesBlocked) || coverBlocked || !fontsReady || revisionWatch.stale;
+  /** 판을 확인하는 중 — 단추를 잠근다(두 번 눌러 겹쳐 돌지 않게) */
+  const checked = useCheckedPrint(revisionWatch.check, { printBlocked, printsProblems, renumberAcked, renumbered });
+
+  /**
+   * 인쇄 — 직전에 판을 확인하고(`useCheckedPrint`, 코덱스 9R P1), 번호가 어긋난 이미지 문항이 있으면 **한 번 묻는다**
+   * (확인하면 안내를 인쇄물에서 빼고 위 효과가 이어서 인쇄한다). 잠금은 기다린 뒤의 **지금 값**으로 다시 본다.
+   */
+  const handlePrint = () => checked.run((now) => {
+    if (now.printBlocked) return;
+    const ask = now.printsProblems && !now.renumberAcked ? renumberedPrintConfirmMessage(now.renumbered) : null;
+    if (!ask) { window.print(); return; }
+    if (!window.confirm(ask)) return;
+    printAfterAckRef.current = true;
+    setRenumberAcked(true);
+  });
 
   const printLabel = paperPrintLabel({
     coverLoading: coverState.loading, coverNeedsCheck: coverUnknown || coverImages.broken,
@@ -180,9 +191,10 @@ export default function ProblemPaperViewPage() {
         cover={cover}
         onCoverClick={() => setCoverOpen(true)}
         printLabel={printLabel}
-        printDisabled={(printsProblems && imagesBlocked) || coverBlocked || !fontsReady}
-        onPrint={handlePrint}
+        printDisabled={printBlocked || checked.checking}
+        onPrint={() => { void handlePrint(); }}
         trimWorks={trimmable ? { checked: trimWorks, onChange: changeTrimWorks } : undefined}
+        onGradeSynced={() => { void revisionWatch.check(); }}
       />
 
       {printLayout === 'booklet' && (
@@ -225,33 +237,16 @@ export default function ProblemPaperViewPage() {
       )}
 
       {printsProblems && renumbered.length > 0 && (
-        // ⚠️ 확인 전에는 `data-no-print` 를 붙이지 않는다 — Cmd/Ctrl+P 로 바로 뽑아도
-        //    이 안내가 함께 찍혀야 번호가 어긋난 사실이 조용히 넘어가지 않는다
-        <div
-          className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
-          data-no-print={renumberAcked ? '' : undefined}
-        >
-          <p className="font-semibold">이미지로 출제한 문항의 번호가 달라요.</p>
-          <p className="mt-0.5">
-            잘라 둔 이미지에는 원본 번호가 찍혀 있어 인쇄 번호와 함께 보입니다
-            ({renumbered.slice(0, 5).map((r) => `${r.printed}번(원본 ${r.original}번)`).join(', ')}
-            {renumbered.length > 5 && ` 외 ${renumbered.length - 5}개`}).
-            자리를 원래 번호에 맞추거나, 검수에서 그 문항을 글로 출제하도록 바꿔 주세요.
-          </p>
-          {!renumberAcked && (
-            <Button
-              type="button" variant="outline" size="sm" className="mt-2" data-no-print
-              onClick={() => setRenumberAcked(true)}
-            >
-              확인했어요 — 인쇄물에서 이 안내 빼기
-            </Button>
-          )}
-        </div>
+        <PaperRenumberNotice renumbered={renumbered} acked={renumberAcked} onAck={() => setRenumberAcked(true)} />
       )}
+
+      {/* 다른 곳에서 고쳐졌으면 인쇄를 잠그고, Cmd/Ctrl+P 로 뽑아도 이 안내가 함께 찍힌다(sql/103 고치기, 코덱스 4R) */}
+      {revisionWatch.stale && <PaperStaleNotice />}
 
       {/* 문제지와 교사용은 같은 컴포넌트다 — `key` 로 모드마다 따로 마운트해 A4Document 가 새로 재고 쪽 수를
           반드시 알리게 한다(같은 인스턴스면 쪽 배정이 우연히 같을 때 알림이 안 와 뒷표지 안내가 빠진다) */}
-      {printsProblems && (
+      {/* 다른 곳에서 고쳐졌으면 문서 대신 위 안내만 — 중철 면 앞에 안내가 끼면 면 짝이 밀린다(코덱스 9R) */}
+      {printsProblems && !revisionWatch.stale && (
         <ProblemPaperView
           key={mode}
           paper={paper} items={items} imageUrls={images.urls}
@@ -262,7 +257,7 @@ export default function ProblemPaperViewPage() {
           onLayout={handleLayout}
         />
       )}
-      {mode === 'key' && (
+      {mode === 'key' && !revisionWatch.stale && (
         <ProblemAnswerKeyView
           paper={paper} items={items}
           booklet={booklet} bookletDuplex={bookletDuplex}

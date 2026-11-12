@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+
+// 수정 입구는 RPC 로 상태를 묻는다 — 여기서는 툴바 배치만 본다(PaperEditEntry.test 가 입구를 본다)
+vi.mock('@/hooks/usePaperEditStates', () => ({ usePaperEditStates: () => ({ states: new Map(), failed: false }) }));
+
 import PaperViewToolbar from './PaperViewToolbar';
 import { DEFAULT_SIMPLE_COVER, type PaperCover } from '@/lib/problem-paper/cover';
 import type { ProblemPaper } from '@/types/problem-bank';

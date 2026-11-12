@@ -428,10 +428,22 @@
 - 관련 파일: src/types/problem-bank.ts, src/components/problem-review/ProblemEditorCard.tsx
 
 ## 문제지 (ProblemPaper)
-- 정의: 아카이브 문항을 골라 조합한 인쇄물. 본문은 만든 시점의 **스냅샷**이라 원본이 바뀌어도 변하지 않는다
+- 정의: 아카이브 문항을 골라 조합한 인쇄물. 본문은 담은 시점의 **스냅샷**이라 원본이 바뀌어도 변하지 않는다
 - 한 장은 **1~200문항**이다(RPC 가 강제하고 앱의 `PAPER_MAX_ITEMS` 가 그 거울이다)
-- 코드에서의 사용: `ProblemPaper`, `problem_papers` / `problem_paper_items`, RPC `create_problem_paper`
-- 관련 파일: src/lib/problem-paper/compose.ts, sql/17_problem_bank.sql, sql/54_problem_paper_omr_setting.sql(정식 정의)
+- 만든 뒤에도 **고칠 수 있다**(2026-11-12, 아래 '문제지 고치기')
+- 코드에서의 사용: `ProblemPaper`, `problem_papers` / `problem_paper_items`, RPC `create_problem_paper` · `update_problem_paper`
+- 관련 파일: src/lib/problem-paper/compose.ts, sql/17_problem_bank.sql, sql/103_problem_paper_edit.sql(두 RPC 의 정식 정의)
+
+## 문제지 고치기 (paper edit)
+- 정의: 저장된 문제지의 **순서 바꾸기 · 문항 빼기 · 새 문항 넣기**(+ 제목·단 수·출처 숨기기). 만들기와 같은 조합 화면(`PaperComposeBody`)을 쓴다
+- **남긴 문항은 담을 때 굳힌 내용 그대로**(`{ item }`)이고, 새로 담은 문항만 지금 원본으로 굳힌다(`{ problem }`). 뺐던 문항을 저장 전에 다시 담으면 원래 항목이 돌아온다
+- 같은 지문 묶음에 새 문항을 넣으면 그 묶음의 **지문 판을 물려받는다**(한 묶음 = 한 지문). 지금 원본과 다르면 저장 뒤 그 번호를 알린다.
+  묶음을 지금 문제 은행 것으로 바꾸는 길은 묶음 머리의 **'최신 지문으로'**(`refreshGroup` — 항목 id 를 떼어 새로 굳힌다)뿐이다
+- 누가: **만든 선생님 + 원장**. 책에 담긴 문제지는 **원장만**, OMR 채점 문제지는 **채점 전까지만**(판정은 ara-system 계약 함수 `problem_paper_exam_state`). OMR 켜기/끄기는 여전히 만들 때만
+- 막힌 까닭 토큰: `not_owner` · `in_book` · `graded` · `grade_check_failed`(그 밖에 충돌 `conflict`, 없음 `missing`)
+- **정답표 반영 대기**: OMR 문제지를 고치면 남는 표시(`exam.problem_paper_sync_pending`). 성적 시스템이 새 정답표를 받으면 발신 라우트가 지운다 — 남아 있으면 보기 화면이 누구에게나 경고한다
+- 코드에서의 사용: `PaperItem.itemId`, `StoredPaperItem`, `PaperEditEntry`, `PaperEditBlock`, `usePaperComposer(seed)`, `usePaperEditSave`, 화면 `/problems/papers/[id]/edit` · `/books/papers/[id]/edit`
+- 관련 파일: src/lib/problem-paper/edit-items.ts, src/lib/problem-paper/paper-edit.ts, src/components/problem-paper/PaperEditScreen.tsx, src/components/problem-paper/PaperEditWorkspace.tsx, sql/103_problem_paper_edit.sql
 
 ## 빼기 조건 (paper exclusions)
 - 정의: 문제지 만들기 화면에서 **고른 폴더와 상관없이** 문항을 걸러 내는 두 조건 — 다른 문제지에 이미 담긴 문항, 정답이 없는 문항(`answer = ''`, 기본으로 뺀다)
@@ -442,7 +454,7 @@
 ## OMR 채점 문제지 (omr paper)
 - 정의: 만들 때 **'OMR 채점(90A)'** 을 골라 둔 문제지. 저장 직후 학원 성적 시스템(ara-system)에 시험으로 등록되고,
   학생은 학원의 기성 **90A 답안지**에 객관식 답을 마킹한다. 주관식·서술형은 스캔 뒤 검수 화면에서 선생님이 O/X 로 채점한다
-- 옵트인이고 **만들 때만** 정한다 — 문제지는 불변 스냅샷이라 나중에 켤 길이 없다(새로 만든다)
+- 옵트인이고 **만들 때만** 정한다(나중에 켜거나 끌 수 없다 — 새로 만든다). 문항·순서는 **채점 전까지** 고칠 수 있고, 고치면 정답표를 다시 등록한다(2026-11-12, sql/103)
 - 성적 시스템 자리: 학교급 > **'문제은행 시험지'**(최상위 — 주간 내신 테스트 알림톡에 안 실린다) > **만든 선생님** 폴더 >
   문제지 하나 = 시험 하나(**회차 번호 없음**, 제목이 곧 시험 이름)
 - 정답표 규칙: 번호는 **문제지 안의 자리**, 객관식은 보기 번호 `'1'`~`'5'`, **복수 정답은 `'1,4'`**(오름차순·공백 없는 쉼표 —

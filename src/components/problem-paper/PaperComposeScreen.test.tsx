@@ -10,7 +10,7 @@ const useProblemArchive = vi.fn();
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('@/hooks/useProblemArchive', () => ({ useProblemArchive: (...a: unknown[]) => useProblemArchive(...a) }));
-vi.mock('@/hooks/usePaperComposer', () => ({ usePaperComposer: () => ({ items: [], added: new Set(), rows: new Map(), settings: {} }) }));
+vi.mock('@/hooks/usePaperComposer', () => ({ usePaperComposer: () => ({ items: [], added: new Set(), rows: new Map(), stored: new Map(), settings: {} }) }));
 vi.mock('@/hooks/usePaperBulkAdd', () => ({ usePaperBulkAdd: () => ({ selection: {}, bulkBusy: false }) }));
 vi.mock('@/hooks/usePaperTypeMix', () => ({ usePaperTypeMix: () => ({ busy: false }) }));
 vi.mock('@/hooks/useListDrag', () => ({ useListDrag: () => ({ handlers: {}, dragging: false }) }));

@@ -1,11 +1,13 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, BookOpen, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { COVER_LAYOUT_LABELS, type PaperCover } from '@/lib/problem-paper/cover';
 import type { PaperPrintLayout } from '@/lib/problem-paper/print-layout-pref';
 import type { ProblemPaper } from '@/types/problem-bank';
+import PaperEditEntry from './PaperEditEntry';
 import PaperGradeSyncButton from './PaperGradeSyncButton';
 import PaperPrintLayoutToggle from './PaperPrintLayoutToggle';
 
@@ -36,6 +38,8 @@ interface PaperViewToolbarProps {
    * 문제지·교사용에 함께 걸린다(problem-paper/trim-works.ts).
    */
   trimWorks?: { checked: boolean; onChange: (on: boolean) => void };
+  /** 학원 성적에 (다시) 보낸 뒤 — 보기 화면이 문제지 판을 다시 확인한다(그사이 다른 곳에서 고쳤을 수 있다) */
+  onGradeSynced?: () => void;
 }
 
 function coverLabel(cover: PaperCover | null): string {
@@ -45,13 +49,15 @@ function coverLabel(cover: PaperCover | null): string {
 }
 
 /**
- * 저장된 문제지 화면 위쪽 줄 — 목록으로 · 제목 · 보기 모드 · 표지 · 인쇄 방식 · 인쇄.
- * 인쇄물에는 나가지 않는다(`data-no-print`).
+ * 저장된 문제지 화면 위쪽 줄 — 목록으로 · 제목 · 수정 · 보기 모드 · 표지 · 인쇄 방식 · 인쇄.
+ * 인쇄물에는 나가지 않는다(`data-no-print`). 수정 입구와 '성적 반영 대기' 경고는 `PaperEditEntry` 가 그린다 —
+ * 학원 성적에 다시 등록하면 그 경고를 다시 묻는다(`syncRound`).
  */
 export default function PaperViewToolbar({
   paper, itemCount, mode, onModeChange, printLayout, onPrintLayoutChange,
-  cover, onCoverClick, printLabel, printDisabled, onPrint, trimWorks,
+  cover, onCoverClick, printLabel, printDisabled, onPrint, trimWorks, onGradeSynced,
 }: PaperViewToolbarProps) {
+  const [syncRound, setSyncRound] = useState(0);
   return (
     <div className="flex flex-wrap items-center gap-2" data-no-print>
       <Link
@@ -70,9 +76,15 @@ export default function PaperViewToolbar({
           OMR 채점
         </span>
       )}
+      <PaperEditEntry paperId={paper.id} refreshKey={syncRound} omr={paper.settings.omr} />
 
       <div className="ml-auto flex flex-wrap items-center gap-1">
-        {paper.settings.omr && <PaperGradeSyncButton paperId={paper.id} />}
+        {paper.settings.omr && (
+          <PaperGradeSyncButton
+            paperId={paper.id} revision={paper.updated_at}
+            onSynced={() => { setSyncRound((n) => n + 1); onGradeSynced?.(); }}
+          />
+        )}
         {VIEW_LABELS.map((v) => (
           <Button
             key={v.mode} type="button" size="sm"

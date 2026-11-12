@@ -178,3 +178,20 @@ describe('removeItem / renumber / groupRangeLabel', () => {
     expect(groupRangeLabel({ passageId: 'P1', start: 0, end: 0 })).toBe('1');
   });
 });
+
+describe('고치기 — 저장된 항목 id(itemId)는 옮겨도 따라간다', () => {
+  // 서버는 이 id 로 '스냅샷 그대로 둘 자리' 를 안다(sql/103). 함수가 객체를 새로 지으면 기존 항목이 새 문항으로 바뀐다
+  const stored = (): PaperItem[] => [
+    { problemId: 'a', passageId: 'P1', itemId: 'i-a' },
+    { problemId: 'b', passageId: 'P1', itemId: 'i-b' },
+    { problemId: 'c', passageId: null, itemId: 'i-c' },
+  ];
+  const ids = (list: PaperItem[]) => list.map((i) => `${i.problemId}=${i.itemId ?? '새'}`).join(' ');
+
+  it('옮기기·묶음 옮기기·넣기·빼기를 지나도 남는다', () => {
+    expect(ids(moveItem(stored(), 1, 0))).toBe('b=i-b a=i-a c=i-c');
+    expect(ids(moveGroup(stored(), 0, 1))).toBe('c=i-c a=i-a b=i-b');
+    expect(ids(insertItems(stored(), [{ problemId: 'd', passageId: 'P1' }], 3))).toBe('a=i-a b=i-b d=새 c=i-c');
+    expect(ids(removeItem(stored(), 'b'))).toBe('a=i-a c=i-c');
+  });
+});

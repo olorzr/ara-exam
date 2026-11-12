@@ -1,6 +1,7 @@
 'use client';
 
-import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CHAPTER_TITLE_MAX, type BookChapter } from '@/lib/book';
@@ -16,7 +17,7 @@ interface BookChapterListProps {
 }
 
 /**
- * 장 목록 — 차례 · 장 제목(비우면 문제지 제목) · 문항 수 · 출처, 위아래로 옮기기·빼기.
+ * 장 목록 — 차례 · 장 제목(비우면 문제지 제목) · 문항 수 · 출처, 위아래로 옮기기·빼기 · 문제지 고치기.
  * 장을 빼도 문제지는 그대로 남는다.
  */
 export default function BookChapterList({
@@ -57,6 +58,15 @@ export default function BookChapterList({
                   {chapter.paper && chapter.paper.source_labels.length > 0
                     && ` · ${chapter.paper.source_labels.join(', ')}`}
                 </p>
+                {/* 책에 담긴 문제지는 원장만 고친다(sql/103). 고치고 나면 이 책 쪽 수가 비워져 표지 화면이 다시 재라고 한다 */}
+                {chapter.paper && (
+                  <Link
+                    href={`/books/papers/${chapter.paperId}/edit?from=${chapter.bookId}`}
+                    className="inline-flex items-center gap-1 text-xs text-primary underline-offset-2 hover:underline"
+                  >
+                    <Pencil className="h-3 w-3" /> 문제지 고치기
+                  </Link>
+                )}
               </div>
               <div className="flex shrink-0 items-center">
                 <Button

@@ -31,6 +31,8 @@ const TABLE_LABEL: Record<string, string> = {
   passages: '지문',
   problems: '문항',
   problem_papers: '문제지',
+  // 문제지 고치기의 항목 바꾸기(sql/103) — 뺀 문항의 스냅샷이 old_data.removed 에 남는다
+  problem_paper_items: '문제지 문항',
   books: '책',
 };
 

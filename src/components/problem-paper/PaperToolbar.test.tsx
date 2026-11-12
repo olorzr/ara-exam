@@ -73,3 +73,49 @@ describe('PaperToolbar OMR 채점', () => {
     expect(screen.getByRole('status').textContent).toContain('3번 정답 미입력');
   });
 });
+
+describe('PaperToolbar 고치기 화면', () => {
+  function renderEdit(dirty: boolean, onReset = vi.fn(), onSave = vi.fn()) {
+    render(
+      <PaperToolbar
+        title="문제지" settings={{ ...DEFAULT_PAPER_SETTINGS, omr: true }} count={3} saving={false}
+        longestPassageChars={100} edit={{ dirty, onReset }}
+        onTitle={() => {}} onSettings={() => {}} onShuffle={() => {}} onClear={() => {}} onSave={onSave}
+      />,
+    );
+    return { onReset, onSave };
+  }
+
+  it('OMR 칸은 잠기고(만들 때만), 저장 단추는 \'수정 저장\' 이며 고친 것이 없으면 잠긴다', () => {
+    renderEdit(false);
+    expect((screen.getByLabelText('OMR 채점(90A)') as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: /수정 저장/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByRole('button', { name: /비우기/ })).toBeNull();
+  });
+
+  it('\'처음 상태로\' 는 확인한 뒤에만 되돌린다', () => {
+    const confirm = vi.spyOn(window, 'confirm');
+    const { onReset } = renderEdit(true);
+    confirm.mockReturnValueOnce(false);
+    fireEvent.click(screen.getByRole('button', { name: /처음 상태로/ }));
+    expect(onReset).not.toHaveBeenCalled();
+    confirm.mockReturnValueOnce(true);
+    fireEvent.click(screen.getByRole('button', { name: /처음 상태로/ }));
+    expect(onReset).toHaveBeenCalledTimes(1);
+    expect((screen.getByRole('button', { name: /수정 저장/ }) as HTMLButtonElement).disabled).toBe(false);
+    confirm.mockRestore();
+  });
+});
+
+describe('PaperToolbar 담는 중', () => {
+  it('문항을 담는 중이면 저장 단추를 잠근다(끝나기 전 저장하면 그 담기가 사라진다)', () => {
+    render(
+      <PaperToolbar
+        title="문제지" settings={DEFAULT_PAPER_SETTINGS} count={3} saving={false} longestPassageChars={0} saveBlocked
+        onTitle={() => {}} onSettings={() => {}} onShuffle={() => {}} onClear={() => {}} onSave={() => {}}
+      />,
+    );
+    expect((screen.getByRole('button', { name: /문제지 만들기/ }) as HTMLButtonElement).disabled).toBe(true);
+  });
+});
+

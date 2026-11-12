@@ -228,8 +228,11 @@ export interface BookLayoutInput {
   /** 책 제목(머리글에 찍힌다) */
   title: string;
   settings: Pick<BookSettings, 'columns' | 'chapterStart' | 'trimWorks' | 'toc'>;
-  /** 장 차례대로 — 문제지 id 와 장 제목(장 머리 블록 높이가 제목 길이를 따른다) */
-  chapters: readonly { paperId: string; title: string }[];
+  /**
+   * 장 차례대로 — 문제지 id 와 장 제목(장 머리 블록 높이가 제목 길이를 따른다). `revision` 은 담긴 문제지의 판(`updated_at`) — 문제지를 고치면(sql/103) 내용이 바뀌는데 id·제목은
+   * 그대로라, 이 값이 없으면 옛 쪽 수가 '최신' 으로 남아 책등이 조용히 틀린다. 비면 지문에 넣지 않는다.
+   */
+  chapters: readonly { paperId: string; title: string; revision?: string }[];
 }
 
 /**
@@ -255,7 +258,7 @@ export const BOOK_RENDER_REVISION = 5;
 export function bookLayoutKey(input: BookLayoutInput): string {
   const text = JSON.stringify([
     input.edition, input.title.trim(), input.settings.columns, input.settings.chapterStart, input.settings.trimWorks,
-    input.chapters.map((c) => [c.paperId, c.title.trim()]),
+    input.chapters.map((c) => (c.revision ? [c.paperId, c.title.trim(), c.revision] : [c.paperId, c.title.trim()])),
     // 목차는 맨 뒤에 덧붙였다 — 앞 칸의 차례를 바꾸지 않으려고(지문은 어차피 달라진다: 2026-10-26 기존 책은 다시 잰다)
     input.settings.toc,
     // 인쇄 모양 개정 — 맨 뒤에 덧붙였다(앞 칸 차례를 바꾸지 않으려고)

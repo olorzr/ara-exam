@@ -29,7 +29,11 @@ export interface GradeSyncResponse {
   /** 발신 라우트가 사람에게 보일 문구를 직접 만든 경우(`omr_blocked`) */
   message?: string;
   /** 성공 시 수신부 응답 */
-  result?: { created?: boolean; teacher?: string; answerKeyFrozen?: boolean; omrTemplateDetached?: boolean };
+  result?: {
+    created?: boolean; teacher?: string; answerKeyFrozen?: boolean; omrTemplateDetached?: boolean;
+    /** 더 새 판의 정답표가 이미 들어가 있어 아무것도 안 바꿨다(고친 문제지의 겹친 전송, Ara-system mig599) */
+    stale?: boolean;
+  };
 }
 
 /** 사유별 안내 문구. 선생님이 무엇을 해야 하는지가 드러나야 한다. */
@@ -48,6 +52,8 @@ const REASON_MESSAGES: Record<string, string> = {
   omr_not_enabled: 'OMR 채점을 켜지 않은 문제지예요',
   items_read_failed: '문제지 문항을 읽지 못했어요',
   items_mismatch: '문제지 문항 수가 맞지 않아요 (관리자에게 알려주세요)',
+  paper_changed: '문제지가 다른 곳에서 바뀌었어요. 새로 고친 뒤 다시 보내 주세요',
+  intake_unreadable: '학원 성적의 답을 읽지 못해 반영됐는지 모르겠어요. 다시 보내 주세요',
   omr_blocked: '정답이 OMR 로 채점할 수 없는 모양이에요',
   omr_no_objective: '객관식 문항이 없어 OMR 로 채점할 수 없어요',
   exception: '알 수 없는 오류가 났어요',

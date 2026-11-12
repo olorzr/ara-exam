@@ -5,6 +5,7 @@ import { AlertTriangle, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useBookChapterItems } from '@/hooks/useBookChapterItems';
 import { useBookPageCount, type BookPageCountStatus } from '@/hooks/useBookPageCount';
+import { useCheckedPrint } from '@/hooks/useCheckedPrint';
 import { useDocumentFontsReady } from '@/hooks/useDocumentFontsReady';
 import { useImagesReady } from '@/hooks/useImagesReady';
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls';
@@ -27,6 +28,8 @@ interface BookInnerModeProps {
   chapters: readonly BookChapter[];
   edition: BookEdition;
   savePageCount: (edition: BookEdition, count: BookPageCount) => Promise<boolean>;
+  /** 인쇄 직전에 담긴 문제지가 바뀌었는지 확인한다 — 바뀌었으면 true(`useBookRevisionWatch` 의 `check`) */
+  checkRevision: () => Promise<boolean>;
 }
 
 /**
@@ -35,7 +38,7 @@ interface BookInnerModeProps {
  * 인쇄·쪽 수 저장은 장의 문항과 그림이 **다 온 뒤**에만 연다 — 덜 온 채 뽑으면 그림이 빈칸으로 나가고,
  * 덜 온 채 잰 쪽 수로는 책등이 틀린다(문제지 보기 화면과 같은 잠금).
  */
-export default function BookInnerMode({ book, chapters, edition, savePageCount }: BookInnerModeProps) {
+export default function BookInnerMode({ book, chapters, edition, savePageCount, checkRevision }: BookInnerModeProps) {
   const paperIds = useMemo(() => chapters.map((c) => c.paperId), [chapters]);
   const chapterItems = useBookChapterItems(paperIds, true);
   const { trimWorks } = book.settings;
@@ -74,21 +77,26 @@ export default function BookInnerMode({ book, chapters, edition, savePageCount }
     window.print();
   }, [renumberAcked]);
   const renumberWarning = renumbered > 0 && !renumberAcked;
+  const printBlocked = !itemsReady || imagesBlocked || !fontsReady;
+  // 인쇄 직전에 판을 확인한다 — 창을 보는 동안 담긴 문제지가 고쳐지면 1분 감시 전까지 옛 문항이 열려 있다(코덱스 10R).
+  // 잠금·번호 확인은 기다린 뒤의 지금 값으로 다시 본다
+  const checked = useCheckedPrint(checkRevision, { printBlocked, renumbered, renumberAcked });
 
   if (chapters.length === 0) {
     return <p className="py-12 text-center text-sm text-gray-500">담은 장이 없어요. &lsquo;구성&rsquo; 에서 장을 먼저 담으세요.</p>;
   }
 
-  const handlePrint = () => {
-    if (renumbered === 0 || renumberAcked) { window.print(); return; }
+  const handlePrint = () => checked.run((now) => {
+    if (now.printBlocked) return;
+    if (now.renumbered === 0 || now.renumberAcked) { window.print(); return; }
     if (!window.confirm(
-      `이미지로 출제한 문항 ${renumbered}개는 원본 번호가 이미지에 찍혀 있어 인쇄 번호와 함께 보여요. 그대로 인쇄할까요?`,
+      `이미지로 출제한 문항 ${now.renumbered}개는 원본 번호가 이미지에 찍혀 있어 인쇄 번호와 함께 보여요. 그대로 인쇄할까요?`,
     )) return;
     // 확인하면 인쇄물에 찍히는 경고를 걷은 **뒤에** 인쇄한다(아래 효과)
     printAfterAckRef.current = true;
     setRenumberAcked(true);
-  };
-  const printLabel = !itemsReady ? '문항 준비 중…' : imagesBlocked ? '이미지 준비 중…' : !fontsReady ? '글꼴 준비 중…' : '내지 인쇄';
+  });
+  const printLabel = checked.checking ? '확인 중…' : !itemsReady ? '문항 준비 중…' : imagesBlocked ? '이미지 준비 중…' : !fontsReady ? '글꼴 준비 중…' : '내지 인쇄';
 
   return (
     <div className="space-y-4">
@@ -103,8 +111,8 @@ export default function BookInnerMode({ book, chapters, edition, savePageCount }
           <Button type="button" size="sm" variant="outline" onClick={pageCount.retry}>다시 저장</Button>
         )}
         <Button
-          type="button" size="sm" className="ml-auto" onClick={handlePrint}
-          disabled={!itemsReady || imagesBlocked || !fontsReady}
+          type="button" size="sm" className="ml-auto" onClick={() => { void handlePrint(); }}
+          disabled={printBlocked || checked.checking}
         >
           <Printer className="h-3.5 w-3.5" />
           <span className="ml-1">{printLabel}</span>

@@ -242,7 +242,7 @@ export interface PaperSettings {
   /**
    * OMR(90A) 채점 문제지인가 — 켜면 저장 직후 학원 성적 시스템에 시험으로 등록되고
    * 인쇄물에 답안지 안내가 붙는다(2026-09-29, sql/54). 기본 **꺼짐**.
-   * ⚠️ 만들 때만 정한다 — 문제지는 불변 스냅샷이라 나중에 켤 길이 없다.
+   * ⚠️ 만들 때만 정한다 — 고치기(sql/103)도 이 값은 저장값 그대로 둔다. 문항·순서는 채점 전까지 고칠 수 있다.
    */
   omr: boolean;
 }
@@ -304,7 +304,7 @@ export interface PaperSourceSnapshot {
 /**
  * 문제지 항목의 본문 스냅샷.
  * 원본 문항을 고치거나 지워도 이미 만든 문제지는 이 값으로 계속 인쇄된다
- * (exam_words 와 같은 규약).
+ * (exam_words 와 같은 규약). 문제지를 고쳐도(sql/103) 남긴 항목의 스냅샷은 그대로이고 새로 담은 항목만 새로 굳힌다.
  */
 export interface PaperItemSnapshot {
   number: number | null;

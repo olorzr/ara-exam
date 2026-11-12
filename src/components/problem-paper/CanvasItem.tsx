@@ -4,17 +4,20 @@ import { ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, GripVertical, X } fro
 import { Badge } from '@/components/ui/badge';
 import { areaPathLabel } from '@/lib/problem-bank/area-tree';
 import { excerptHtml } from '@/lib/html-excerpt';
-import type { ArchiveRow } from '@/hooks/useProblemArchive';
+import type { CanvasItemDisplay } from '@/lib/problem-paper/canvas-display';
 
 /** 카드에서 보여 줄 발문 길이 */
 const EXCERPT_LENGTH = 70;
 
 interface CanvasItemProps {
-  row: ArchiveRow | undefined;
+  /** 그릴 것 — 원본을 아직 못 받았으면 undefined */
+  display: CanvasItemDisplay | undefined;
   /** 인쇄에 찍힐 번호 (1부터) */
   number: number;
   /** 같은 지문 묶음의 첫 문항인가 — 지문 표시를 여기에만 붙인다 */
   groupStart: boolean;
+  /** 지문에 딸린 문항인가(캔버스 항목의 지문 id 로 정한다 — 기존 항목은 스냅샷의 지문) */
+  inPassage: boolean;
   dragHandlers: React.HTMLAttributes<HTMLElement>;
   onRemove: () => void;
   onMoveUp: () => void;
@@ -27,6 +30,16 @@ interface CanvasItemProps {
    */
   onMoveGroupUp?: () => void;
   onMoveGroupDown?: () => void;
+  /** 고치기 — 이 저장된 지문 묶음을 지금 문제 은행의 지문·문항으로 다시 담는다(묶음의 첫 문항에만, 다시 굳힐 수 있을 때만) */
+  onRefreshGroup?: () => void;
+}
+
+/** 고치기 화면의 갈래 표시 — 새로 담은 문항 · 원본이 지워진 저장 항목 */
+function OriginBadge({ display }: { display: CanvasItemDisplay }) {
+  if (display.orphan) return <Badge variant="outline" className="ml-1 align-middle text-[10px]">원본 삭제됨</Badge>;
+  if (display.origin === 'new') return <Badge variant="secondary" className="ml-1 align-middle text-[10px]">새로 담음</Badge>;
+  if (display.origin === 'refresh') return <Badge variant="secondary" className="ml-1 align-middle text-[10px]">최신으로 바꿈</Badge>;
+  return null;
 }
 
 /**
@@ -36,8 +49,8 @@ interface CanvasItemProps {
  * 터치 화면에서도 순서를 바꿀 수 있어야 한다.
  */
 export default function CanvasItem({
-  row, number, groupStart, dragHandlers, onRemove, onMoveUp, onMoveDown,
-  onMoveGroupUp, onMoveGroupDown,
+  display, number, groupStart, inPassage, dragHandlers, onRemove, onMoveUp, onMoveDown,
+  onMoveGroupUp, onMoveGroupDown, onRefreshGroup,
 }: CanvasItemProps) {
   return (
     <div
@@ -56,7 +69,7 @@ export default function CanvasItem({
       <span className="mt-0.5 w-6 shrink-0 text-sm font-semibold text-gray-700">{number}</span>
 
       <div className="min-w-0 flex-1">
-        {groupStart && row?.passage_id && (
+        {groupStart && inPassage && (
           <div className="mb-1 flex items-center gap-1">
             <Badge variant="outline">지문 묶음</Badge>
             {onMoveGroupUp && (
@@ -77,17 +90,27 @@ export default function CanvasItem({
                 <ChevronsDown className="h-3.5 w-3.5" />
               </button>
             )}
+            {onRefreshGroup && (
+              <button
+                type="button" onClick={onRefreshGroup}
+                className="ml-auto rounded px-1.5 py-0.5 text-[11px] text-gray-500 underline-offset-2 hover:bg-gray-100 hover:underline"
+                title="이 묶음을 지금 문제 은행의 지문·문항으로 다시 담아요(저장할 때 바뀌어요)"
+              >
+                최신 지문으로
+              </button>
+            )}
           </div>
         )}
         <p className="text-sm text-gray-800">
-          {row ? excerptHtml(row.stem_html, EXCERPT_LENGTH) : '(불러오지 못한 문항)'}
+          {display ? excerptHtml(display.stemHtml, EXCERPT_LENGTH) : '(불러오지 못한 문항)'}
+          {display && <OriginBadge display={display} />}
         </p>
-        {row && (
+        {display && (
           <p className="mt-0.5 text-xs text-gray-500">
-            {row.source.school_name || row.source.publisher} {row.source.year}
-            {row.work_title && ` · ${row.work_title}`}
-            {row.area_path.length > 0 && ` · ${areaPathLabel(row.area_path)}`}
-            {!row.answer && ' · 정답 없음'}
+            {display.sourceLabel}
+            {display.workTitle && ` · ${display.workTitle}`}
+            {display.areaPath.length > 0 && ` · ${areaPathLabel(display.areaPath)}`}
+            {!display.hasAnswer && ' · 정답 없음'}
           </p>
         )}
       </div>

@@ -105,3 +105,14 @@ describe('PaperExcludePickerDialog', () => {
     expect(onApply).not.toHaveBeenCalled();
   });
 });
+
+describe('PaperExcludePickerDialog — 고치기 화면', () => {
+  it('지금 고치는 문제지 자신은 목록에서 숨긴다', async () => {
+    fetchPapersForPicker.mockResolvedValue([week1, week2]);
+    render(
+      <PaperExcludePickerDialog open selected={[]} hidePaperId="p1" onClose={() => {}} onApply={() => {}} />,
+    );
+    await waitFor(() => expect(screen.getByText('음운 2주차')).toBeTruthy());
+    expect(screen.queryByText('음운 1주차')).toBeNull();
+  });
+});
