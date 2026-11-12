@@ -18,6 +18,7 @@ import {
 } from '@/lib/passage-quiz';
 import { hasMatchSignals, signalsFromDraft } from '@/lib/quiz-references/signals';
 import type { PickedPassageMeta } from '@/lib/quiz-references/types';
+import { PageTitle } from '@/components/magazine';
 
 type ViewMode = 'edit' | 'paper' | 'key';
 
@@ -100,9 +101,9 @@ export default function PassageQuizPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3" data-no-print>
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b-2 border-ink pb-3" data-no-print>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">✅ O,X·단답형</h1>
+          <PageTitle eyebrow="PROBLEM BANK">O,X·단답형</PageTitle>
           <p className="mt-1 text-sm text-gray-500">
             문학 작품이나 비문학 지문을 넣으면 O,X 와 단답형 문항을 만들어 드려요.
             만든 문항은 저장되지 않으니 인쇄해서 쓰세요.

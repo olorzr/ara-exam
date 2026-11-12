@@ -21,6 +21,7 @@ import { CategoryForm, WordEntryTable, DuplicateWordsDialog } from '@/components
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
+import { PageTitle } from '@/components/magazine';
 
 interface DraftShape {
   level: CategoryLevel;
@@ -220,14 +221,14 @@ export default function NewWordsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
+      <div className="flex items-end gap-4 border-b border-ink pb-3">
         <Link href="/words">
           <Button variant="ghost" size="sm">
             <ArrowLeft className="h-4 w-4 mr-1" />
             돌아가기
           </Button>
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">✏️ 단어 입력</h1>
+        <PageTitle eyebrow="WORDS" size="sm">단어 입력</PageTitle>
       </div>
 
       <CategoryForm

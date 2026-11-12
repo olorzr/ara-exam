@@ -21,6 +21,7 @@ import { looksLikeQaPrint, qaAnswerCounts, qaReferenceBlocker } from '@/lib/prin
 import { signalsFromBundle } from '@/lib/quiz-references/signals';
 import { isTypedBundle } from '@/lib/print-scan/typed';
 import type { PrintBundle, PrintScan } from '@/types/print-scan';
+import { PageTitle } from '@/components/magazine';
 
 /**
  * 학교 프린트 **문답 시험지** (`/print-sheets/[bundleId]/qa`).
@@ -160,9 +161,9 @@ function PrintQaWorkspace({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3" data-no-print>
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-ink pb-3" data-no-print>
         <div className="min-w-0">
-          <h1 className="truncate text-2xl font-bold text-gray-900">📝 {bundle.name}</h1>
+          <PageTitle eyebrow="SCHOOL PRINTS · Q&amp;A" size="sm" className="[&_h1]:truncate">{bundle.name}</PageTitle>
           <p className="mt-1 text-sm text-gray-500">
             프린트에 적힌 물음과 답으로 문제지·교사용·답지를 만들어요.{' '}
             <Link href={`/print-sheets/${bundle.id}`} className="text-primary underline underline-offset-2">

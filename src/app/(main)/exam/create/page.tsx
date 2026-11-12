@@ -19,6 +19,7 @@ import { shuffle } from '@/lib/shuffle';
 import { fireGradeSync } from '@/lib/grade-sync-client';
 import { MAX_EXAM_WORDS } from '@/lib/words-fetch';
 import { useExamCreateWords } from '@/hooks/useExamCreateWords';
+import { PageTitle } from '@/components/magazine';
 
 /**
  * 시험지 생성 페이지 (트리 구조 카테고리 선택, 합격선 설정, 셔플 옵션)
@@ -181,7 +182,9 @@ export default function ExamCreatePage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">✏️ 단어 시험지 생성</h1>
+      <div className="border-b-2 border-ink pb-3">
+        <PageTitle eyebrow="WORD TESTS">단어 시험지 생성</PageTitle>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* 왼쪽: 설정 */}

@@ -23,6 +23,7 @@ import { useProblemArchive, type ArchiveRow } from '@/hooks/useProblemArchive';
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls';
 import { EMPTY_FILTERS, paperExclusionsOf, type ProblemFilters } from '@/lib/problem-bank/filters';
 import { fireGradeSync } from '@/lib/grade-sync-client';
+import { PageTitle } from '@/components/magazine';
 
 /** 첫 필터 — 정답 없는 문항은 처음부터 뺀다(2026-11-07 원장 결정, 체크를 풀면 돌아온다) */
 const COMPOSE_FILTERS: ProblemFilters = { ...EMPTY_FILTERS, answered_only: true };
@@ -97,8 +98,8 @@ export default function PaperComposeScreen({ withWorkbook = false }: PaperCompos
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">🧩 {withWorkbook ? '문제지 만들기' : '문제지 조합'}</h1>
+      <div className="border-b border-ink pb-3">
+        <PageTitle eyebrow={withWorkbook ? 'BOOKS' : 'PROBLEM BANK'} size="sm">{withWorkbook ? '문제지 만들기' : '문제지 조합'}</PageTitle>
         <p className="mt-1 text-sm text-gray-500">
           왼쪽 트리에서 단원·학교·작품·문법을 고르고, 문항을 끌어다 오른쪽에 놓으세요.
           고른 폴더를 <strong>통째로 담거나</strong>, 체크해서 여럿을, 또는

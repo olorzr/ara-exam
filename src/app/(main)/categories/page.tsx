@@ -1,6 +1,7 @@
 'use client';
 
 import { CurriculumCategoryTab } from '@/components/words';
+import { PageTitle } from '@/components/magazine';
 
 /**
  * 카테고리 마스터 데이터 관리 페이지 (최상위 메뉴 `/categories`).
@@ -16,8 +17,8 @@ import { CurriculumCategoryTab } from '@/components/words';
 export default function CategoryManagePage() {
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">📂 카테고리 관리</h1>
+      <div className="border-b-2 border-ink pb-3">
+        <PageTitle eyebrow="CATEGORIES">카테고리 관리</PageTitle>
         <p className="text-sm text-gray-500 mt-1">
           중등 · 고등 교과서의 출판사 · 대단원 · 소단원을 관리합니다. 여기 등록한 교과서 목차가 학원 관리의 내신 시험범위에도 그대로 쓰여요.
         </p>

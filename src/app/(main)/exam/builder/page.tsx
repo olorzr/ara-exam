@@ -9,6 +9,7 @@ import { CategoryTree } from '@/components/words';
 import { ConceptSheetCard } from '@/components/exam-builder';
 import { PlusCircle, Search, FileText, List } from 'lucide-react';
 import { useConceptList } from '@/hooks/useConceptList';
+import { PageTitle } from '@/components/magazine';
 
 /**
  * 개념지 목록 페이지.
@@ -43,8 +44,8 @@ export default function ConceptListPage() {
   return (
     <div className="space-y-6">
       {/* 헤더 */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">📝 개념지</h1>
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b-2 border-ink pb-3">
+        <PageTitle eyebrow="CONCEPT SHEETS">개념지</PageTitle>
         <Link href="/exam/builder/new">
           <Button>
             <PlusCircle className="h-4 w-4 mr-2" />

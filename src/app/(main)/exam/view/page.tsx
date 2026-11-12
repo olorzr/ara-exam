@@ -11,6 +11,7 @@ import { ExamPaperView, MultipleChoiceView, MultipleChoiceAnswerView, WordBookVi
 import { Button } from '@/components/ui/button';
 import { Printer, FileText, ArrowLeft, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
+import { PageTitle } from '@/components/magazine';
 
 interface ExamData {
   id: string;
@@ -149,7 +150,7 @@ function ExamViewContent() {
               돌아가기
             </Button>
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900">{exam.title}</h1>
+          <PageTitle eyebrow="WORD TESTS" size="sm">{exam.title}</PageTitle>
         </div>
         {/* ⚠️ 문항을 믿을 수 없으면 보기·인쇄 단추 대신 안내와 다시 시도만 둔다 */}
         {wordsIssue ? (

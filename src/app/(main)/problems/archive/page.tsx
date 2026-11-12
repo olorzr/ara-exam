@@ -17,6 +17,7 @@ import { useProblemArchive } from '@/hooks/useProblemArchive';
 import { useWorkInProgress } from '@/hooks/useWorkInProgress';
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls';
 import { filtersFromParams, filtersToQueryString } from '@/lib/problem-bank/filters';
+import { PageTitle } from '@/components/magazine';
 
 /**
  * 기출 문제 아카이브 (`/problems/archive`).
@@ -58,9 +59,9 @@ function ArchiveContent() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b-2 border-ink pb-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">🗂️ 문제 아카이브</h1>
+          <PageTitle eyebrow="PROBLEM BANK">문제 아카이브</PageTitle>
           <p className="mt-1 text-sm text-gray-500">
             읽어 둔 기출 문항입니다. 왼쪽에서 교과서 단원이나 기출을 고르거나 조건으로 찾아 새 문제지를 만들 수 있어요.
           </p>
@@ -68,7 +69,7 @@ function ArchiveContent() {
         <div className="flex gap-2">
           <Link
             href="/problems/sources"
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700"
+            className="rounded-full border border-ink bg-card px-4 py-2 text-sm font-semibold text-ink hover:bg-muted"
           >
             올라간 기출
           </Link>

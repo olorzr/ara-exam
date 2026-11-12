@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Printer, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { formatCategoryLabel } from '@/lib/format';
+import { PageTitle } from '@/components/magazine';
 
 function WordsPrintContent() {
   const searchParams = useSearchParams();
@@ -77,7 +78,7 @@ function WordsPrintContent() {
               돌아가기
             </Button>
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900">단어장</h1>
+          <PageTitle eyebrow="WORDS" size="sm">단어장</PageTitle>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => window.print()}>

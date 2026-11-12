@@ -4,11 +4,24 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BookOpen, FileText, PlusCircle, History, Upload, FolderOpen, FolderCog, Library, Lightbulb, ListChecks } from 'lucide-react';
+import { Masthead, SectionLabel, StatGrid } from '@/components/magazine';
+
+/** 빠른 실행 — 잡지 지면의 번호 붙은 꼭지(#01 …)로 그린다 */
+const QUICK_ACTIONS = [
+  { href: '/exam/builder', label: '개념지', desc: '개념지를 만들고 관리해요 💡' },
+  { href: '/words/new', label: '단어 입력', desc: '새 단어를 추가해요 ✨' },
+  { href: '/words', label: '단어 관리', desc: '저장된 단어를 관리해요 📖' },
+  { href: '/categories', label: '카테고리 관리', desc: '출판사·단원을 정리해요 📂' },
+  { href: '/exam/create', label: '단어 시험지 생성', desc: '시험지를 만들어요 ✏️' },
+  { href: '/exam/history', label: '단어 시험지', desc: '이전 시험지를 확인해요 🔍' },
+  { href: '/problems/archive', label: '문제 아카이브', desc: '기출 문항을 찾아봐요 🗂️' },
+  { href: '/problems/sources', label: '올라간 기출', desc: '올라간 시험지를 한눈에 봐요 📚' },
+  { href: '/problems/papers/new', label: '문제지 조합', desc: '기출로 문제지를 만들어요 🧩' },
+  { href: '/problems/quiz', label: 'O,X·단답형', desc: '지문으로 O,X·단답형을 만들어요 ✅' },
+] as const;
 
 /**
- * 대시보드 페이지. 통계 요약과 빠른 실행 메뉴를 표시한다.
+ * 대시보드 페이지 — 잡지 표지처럼 머리띠·숫자 격자·번호 붙은 빠른 실행(연한 민트 잡지 테마, 2026-11-12).
  */
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -40,85 +53,47 @@ export default function DashboardPage() {
     loadStats();
   }, [user]);
 
-  const quickActions = [
-    { href: '/exam/builder', icon: Lightbulb, label: '개념지', desc: '개념지를 만들고 관리해요 💡' },
-    { href: '/words/new', icon: PlusCircle, label: '단어 입력', desc: '새 단어를 추가해요 ✨' },
-    { href: '/words', icon: FolderOpen, label: '단어 관리', desc: '저장된 단어를 관리해요 📖' },
-    { href: '/categories', icon: FolderCog, label: '카테고리 관리', desc: '출판사·단원을 정리해요 📂' },
-    { href: '/exam/create', icon: FileText, label: '단어 시험지 생성', desc: '시험지를 만들어요 ✏️' },
-    { href: '/exam/history', icon: History, label: '단어 시험지', desc: '이전 시험지를 확인해요 🔍' },
-    { href: '/problems/archive', icon: FolderOpen, label: '문제 아카이브', desc: '기출 문항을 찾아봐요 🗂️' },
-    { href: '/problems/sources', icon: Library, label: '올라간 기출', desc: '올라간 시험지를 한눈에 봐요 📚' },
-    { href: '/problems/papers/new', icon: FileText, label: '문제지 조합', desc: '기출로 문제지를 만들어요 🧩' },
-    { href: '/problems/quiz', icon: ListChecks, label: 'O,X·단답형', desc: '지문으로 O,X·단답형을 만들어요 ✅' },
-  ];
-
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">🏠 대시보드</h1>
-        <p className="text-gray-500 mt-1"><span style={{ fontFamily: "'Gmarket Sans', sans-serif", fontWeight: 700 }}>아라국어논술 시험 관리 시스템</span>에 오신 것을 환영해요 🌷</p>
-      </div>
+    <div className="mx-auto max-w-[1080px] space-y-10">
+      <Masthead
+        title="아라국어논술"
+        subtitle="시험 관리 시스템"
+        note="아라국어논술 시험 관리 시스템에 오신 것을 환영해요 🌷"
+      />
 
-      {/* 통계 카드 */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">📚 총 단어 수</CardTitle>
-            <BookOpen className="h-5 w-5 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{stats.words}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">📂 카테고리</CardTitle>
-            <Upload className="h-5 w-5 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{stats.categories}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">📝 시험지</CardTitle>
-            <FileText className="h-5 w-5 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{stats.exams}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">🗂 총 문제 수</CardTitle>
-            <Library className="h-5 w-5 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{stats.problems}</p>
-          </CardContent>
-        </Card>
-      </div>
+      <section aria-labelledby="dashboard-numbers" className="space-y-3">
+        <SectionLabel en="THE NUMBERS"><span id="dashboard-numbers">숫자로 보기</span></SectionLabel>
+        <StatGrid
+          items={[
+            { en: 'WORDS', label: '총 단어 수', value: stats.words },
+            { en: 'CATEGORIES', label: '카테고리', value: stats.categories },
+            { en: 'TESTS', label: '단어 시험지', value: stats.exams },
+            { en: 'PROBLEMS', label: '총 문제 수', value: stats.problems },
+          ]}
+        />
+      </section>
 
-      {/* 빠른 실행 */}
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">⚡ 빠른 실행</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
-          {quickActions.map((action) => (
-            <Link key={action.href} href={action.href}>
-              <Card className="hover:border-primary/50 hover:shadow-md hover:shadow-primary/10 transition-all cursor-pointer h-full">
-                <CardContent className="pt-6 flex flex-col items-center text-center gap-3">
-                  <action.icon className="h-10 w-10 text-primary" />
-                  <div>
-                    <p className="font-semibold text-gray-900">{action.label}</p>
-                    <p className="text-sm text-gray-500">{action.desc}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
+      <section aria-labelledby="dashboard-quick" className="space-y-3.5">
+        <SectionLabel en="QUICK START"><span id="dashboard-quick">빠른 실행</span></SectionLabel>
+        <ul className="grid grid-cols-2 gap-x-4 gap-y-6 sm:gap-x-6 sm:gap-y-7 lg:grid-cols-5">
+          {QUICK_ACTIONS.map((action, index) => (
+            <li key={action.href} className="flex">
+              <Link
+                href={action.href}
+                className="group flex flex-1 flex-col border-y-2 border-ink pt-1.5 pb-3.5 text-ink"
+              >
+                <span aria-hidden="true" className="flex items-baseline justify-end gap-2">
+                  <span className="font-label text-[10px] font-medium tracking-[0.18em]">( MENU )</span>
+                  <b className="font-label text-xl font-extrabold tracking-[0.02em]">#{String(index + 1).padStart(2, '0')}</b>
+                </span>
+                <hr className="mt-2 mb-3 border-0 border-t-2 border-dotted border-ink" />
+                <span className="font-display text-[17px] leading-snug font-bold group-hover:text-primary">{action.label}</span>
+                <span className="mt-1.5 text-[13px] leading-normal text-gray-500">{action.desc}</span>
+              </Link>
+            </li>
           ))}
-        </div>
-      </div>
+        </ul>
+      </section>
     </div>
   );
 }

@@ -8,6 +8,7 @@ import {
   BOOK_EDITIONS, EDITION_LABELS, spineMmOf, storedSpinePages, type BookListItem,
 } from '@/lib/book';
 import BookKindBadge from './BookKindBadge';
+import { PageTitle } from '@/components/magazine';
 
 /**
  * 목록 한 줄의 쪽 수 — 판마다 'N쪽 · 책등 Xmm'. 목록은 장을 읽지 않아 저장된 값을 그대로 보여 준다(`storedSpinePages`).
@@ -49,9 +50,9 @@ export default function BookListFrame({
 }: BookListFrameProps) {
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b-2 border-ink pb-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{heading}</h1>
+          <PageTitle eyebrow="BOOKS">{heading}</PageTitle>
           <p className="mt-1 text-sm text-gray-500">{description}</p>
         </div>
         {headerAction}

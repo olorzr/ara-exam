@@ -17,6 +17,7 @@ import {
 import { createTypedPrintSheet } from '@/lib/print-scan/typed-create';
 import { validateTypedSheet } from '@/lib/print-scan/typed';
 import type { SelectableSchool } from '@/types';
+import { PageTitle } from '@/components/magazine';
 
 /** 목록 경로 */
 const LIST_HREF = '/print-sheets';
@@ -75,8 +76,8 @@ export default function PrintSheetNewPage() {
 
   return (
     <div className="max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">✍️ 학교 프린트 직접 입력</h1>
+      <div className="border-b-2 border-ink pb-3">
+        <PageTitle eyebrow="SCHOOL PRINTS">학교 프린트 직접 입력</PageTitle>
         <p className="mt-1 text-sm text-gray-500">
           스캔 없이 프린트 내용을 직접 입력해 빈칸 시험지로 만듭니다. 개념지를 만들 때와 같아요.
         </p>

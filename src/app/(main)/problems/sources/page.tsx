@@ -13,6 +13,7 @@ import {
   EMPTY_SOURCE_LIST_FILTERS, hasActiveSourceFilters, sourceListFiltersFromParams,
   sourceListFiltersToQueryString, toSourceListQuery, type SourceListFilters,
 } from '@/lib/problem-bank/source-list-filters';
+import { PageTitle } from '@/components/magazine';
 
 /** 제목을 치는 동안 글자마다 묻지 않도록 잠깐 기다린다 */
 const SEARCH_DEBOUNCE_MS = 300;
@@ -66,8 +67,8 @@ function SourcesContent() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">📚 올라간 기출</h1>
+      <div className="border-b-2 border-ink pb-3">
+        <PageTitle eyebrow="PROBLEM BANK · UPLOADED EXAMS">올라간 기출</PageTitle>
         <p className="mt-1 text-sm text-gray-500">
           올라간 기출 시험지입니다. 제목을 누르면 원본과 나란히 보며 틀린 곳을 고칠 수 있어요.
         </p>

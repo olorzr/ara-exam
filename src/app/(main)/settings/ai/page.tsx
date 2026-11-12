@@ -6,6 +6,7 @@ import { useAiEnabled } from '@/hooks/useAiEnabled';
 import { getCodexPort } from '@/lib/ai/localPort';
 import AiConnectionCard from '@/components/ai/AiConnectionCard';
 import AiSetupGuide from '@/components/ai/AiSetupGuide';
+import { PageTitle } from '@/components/magazine';
 
 /**
  * AI 연결 설정 (`/settings/ai`).
@@ -22,8 +23,8 @@ export default function AiSettingsPage() {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">✨ AI 연결</h1>
+      <div className="border-b-2 border-ink pb-3">
+        <PageTitle eyebrow="SETTINGS">AI 연결</PageTitle>
         <p className="mt-1 text-sm text-gray-500">
           기출 PDF 를 읽어 문제로 옮기는 기능은 선생님 컴퓨터의 ChatGPT 를 씁니다. 학원 서버는
           로그인 정보를 보지도 저장하지도 않아요.

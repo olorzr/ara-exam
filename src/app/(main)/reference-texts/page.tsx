@@ -10,6 +10,7 @@ import { useReferenceTextFacets } from '@/hooks/useReferenceTextFacets';
 import { useReferenceTexts } from '@/hooks/useReferenceTexts';
 import { ALL_REFERENCE_TEXTS, describeAxis } from '@/lib/reference-texts/filters';
 import type { ReferenceTextListItem } from '@/types/reference-text';
+import { PageTitle } from '@/components/magazine';
 
 /**
  * 작품 전문 · 개념 목록 (`/reference-texts`).
@@ -45,9 +46,9 @@ export default function ReferenceTextsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b-2 border-ink pb-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">📖 작품 전문 · 개념</h1>
+          <PageTitle eyebrow="TEXTS &amp; CONCEPTS">작품 전문 · 개념</PageTitle>
           <p className="mt-1 text-sm text-gray-500">
             교과서 단원마다 작품 원문과 핵심 개념을 평가문제집처럼 모아 둬요. 눌러 보면 말머리 상자·어휘 풀이·여백 해설까지
             문제집 쪽처럼 보이고, 작품 전문은 문제 만들기가 지문과 함께 읽어요(해설은 빼고 원문만).

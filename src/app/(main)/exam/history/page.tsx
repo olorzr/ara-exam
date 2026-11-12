@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { FileText, Trash2, Search, CheckSquare, X } from 'lucide-react';
 import { ExamHistoryCard, ExamHistoryFilter } from '@/components/exam';
 import { useExamHistory } from '@/hooks/useExamHistory';
+import { PageTitle } from '@/components/magazine';
 
 /**
  * 단어 시험지 페이지. 원본 시험 아래에 재시험이 스레드로 표시되고,
@@ -25,8 +26,8 @@ export default function ExamHistoryPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">단어 시험지</h1>
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b-2 border-ink pb-3">
+        <PageTitle eyebrow="WORD TESTS">단어 시험지</PageTitle>
         <Link href="/exam/create">
           <Button>
             <FileText className="h-4 w-4 mr-2" />

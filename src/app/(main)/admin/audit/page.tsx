@@ -7,8 +7,9 @@ import { useAuth } from '@/lib/auth-context';
 import { ADMIN_EMAIL } from '@/lib/constants';
 import { formatDateKR } from '@/lib/format';
 import type { AuditLog } from '@/types';
-import { Shield, ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
+import { PageTitle } from '@/components/magazine';
 
 const ACTION_LABEL: Record<string, string> = {
   INSERT: '생성',
@@ -108,9 +109,8 @@ export default function AuditLogPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Shield className="h-6 w-6 text-primary" />
-        <h1 className="text-2xl font-bold text-gray-900">감사 로그</h1>
+      <div className="border-b-2 border-ink pb-3">
+        <PageTitle eyebrow="ADMIN">감사 로그</PageTitle>
       </div>
 
       {/* 필터 */}

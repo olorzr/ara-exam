@@ -16,6 +16,7 @@ import { fetchPassagesByIds } from '@/lib/problem-bank/detail-queries';
 import { fetchProblem, fetchSource } from '@/lib/problem-bank/source-queries';
 import { sourceMetaLabel } from '@/lib/problem-bank/source-label';
 import type { PassageWork, Problem, ProblemSource } from '@/types/problem-bank';
+import { PageTitle } from '@/components/magazine';
 
 /**
  * 문항 한 개 편집 (`/problems/edit/[id]`).
@@ -118,8 +119,8 @@ export default function ProblemEditPage() {
 
   return (
     <div className="max-w-3xl space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">✏️ 문항 편집</h1>
+      <div className="border-b border-ink pb-3">
+        <PageTitle eyebrow="PROBLEM BANK" size="sm">문항 편집</PageTitle>
         {source && (
           <p className="mt-1 text-sm text-gray-500">
             {source.title} · {sourceMetaLabel(source)} · {problem.page_no}쪽

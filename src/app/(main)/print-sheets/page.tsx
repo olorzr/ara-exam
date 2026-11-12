@@ -15,6 +15,7 @@ import { usePrintSheetList } from '@/hooks/usePrintSheetList';
 import { usePrintWordsRegister } from '@/hooks/usePrintWordsRegister';
 import type { OwnerScope } from '@/lib/owner-scope';
 import type { PrintBundleRow, PrintScanRow } from '@/types/print-scan';
+import { PageTitle } from '@/components/magazine';
 
 /**
  * 학교 프린트 시험지 목록 (`/print-sheets`).
@@ -54,9 +55,9 @@ export default function PrintSheetsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b-2 border-ink pb-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">🖨️ 학교 프린트 시험지</h1>
+          <PageTitle eyebrow="SCHOOL PRINTS">학교 프린트 시험지</PageTitle>
           <p className="mt-1 text-sm text-gray-500">
             아이들이 가져온 학교 프린트를 스캔해 올리거나 직접 입력하면 빈칸 시험지로 만들 수 있어요.
           </p>

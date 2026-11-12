@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { sourceMetaLabel } from '@/lib/problem-bank/source-label';
 import SourceTextbookPicker from './SourceTextbookPicker';
 import type { ProblemSource } from '@/types/problem-bank';
+import { PageTitle } from '@/components/magazine';
 
 /**
  * 시험지 화면 머리 — 출처 이름·문항 수·교과서·삭제.
@@ -33,9 +34,9 @@ export default function ReviewHeader({
   const textSource = source.ocr_meta?.textSource;
 
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="flex flex-wrap items-end justify-between gap-3 border-b border-ink pb-3">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">{source.title}</h1>
+        <PageTitle size="sm">{source.title}</PageTitle>
         <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
           <Badge variant="outline">{source.source_type}</Badge>
           {sourceMetaLabel(source)}

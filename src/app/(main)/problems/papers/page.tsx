@@ -9,6 +9,7 @@ import { useCreatorNames } from '@/hooks/useCreatorNames';
 import { usePaperList } from '@/hooks/usePaperList';
 import type { OwnerScope } from '@/lib/owner-scope';
 import { normalizePaperSettings } from '@/lib/problem-paper/settings';
+import { PageTitle } from '@/components/magazine';
 
 /** 탭마다 빈 목록 문구 */
 const EMPTY_TEXT: Record<OwnerScope, string> = {
@@ -30,9 +31,9 @@ export default function ProblemPapersPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b-2 border-ink pb-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">🧩 문제지</h1>
+          <PageTitle eyebrow="PROBLEM BANK">문제지</PageTitle>
           <p className="mt-1 text-sm text-gray-500">
             아카이브 문항으로 만든 문제지입니다. 본문은 만들 때 굳혀 두어 원본이 바뀌어도 그대로예요.
           </p>

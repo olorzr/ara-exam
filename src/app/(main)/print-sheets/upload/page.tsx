@@ -26,6 +26,7 @@ import {
 } from '@/lib/print-scan/scan-meta';
 import { OCR_CONFIRM_BATCH_THRESHOLD } from '@/lib/problem-ocr/constants';
 import type { SelectableSchool } from '@/types';
+import { PageTitle } from '@/components/magazine';
 
 /**
  * 학교 프린트 스캔 올리기 (`/print-sheets/upload`).
@@ -112,8 +113,8 @@ export default function PrintScanUploadPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">🖨️ 학교 프린트 올리기</h1>
+      <div className="border-b-2 border-ink pb-3">
+        <PageTitle eyebrow="SCHOOL PRINTS">학교 프린트 올리기</PageTitle>
         <p className="mt-1 text-sm text-gray-500">
           스캔한 PDF 를 올리고 쪽을 프린트별로 묶으면, 선생님 컴퓨터의 ChatGPT 가 읽어
           빈칸 시험지로 만듭니다.

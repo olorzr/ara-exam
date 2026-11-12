@@ -6,6 +6,7 @@ import type { ReferenceTextEditorState } from '@/hooks/useReferenceTextEditor';
 import ReferenceBodyField from './ReferenceBodyField';
 import ReferenceClassifySection from './ReferenceClassifySection';
 import ReferenceKindField from './ReferenceKindField';
+import { PageTitle } from '@/components/magazine';
 
 /**
  * 작품 전문 · 개념 편집 폼 — 조립만 한다.
@@ -43,10 +44,8 @@ export default function ReferenceTextForm({ editor, backHref, onBack }: Referenc
   const noun = draft.kind === '개념' ? '개념 정리' : '작품 전문';
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <h1 className="text-2xl font-bold text-gray-900">
-          {draft.kind === '개념' ? '💡' : '📖'} {isNew ? `새 ${noun}` : `${noun} 고치기`}
-        </h1>
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-ink pb-3">
+        <PageTitle eyebrow="TEXTS &amp; CONCEPTS" size="sm">{isNew ? `새 ${noun}` : `${noun} 고치기`}</PageTitle>
         <div className="flex items-center gap-2">
           <Link href={backHref}>
             <Button type="button" variant="outline">목록</Button>
