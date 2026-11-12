@@ -2,8 +2,16 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const guard = readFileSync(path.resolve(__dirname, 'print-guard.css'), 'utf8');
-const globals = readFileSync(path.resolve(__dirname, '../../app/globals.css'), 'utf8');
+/**
+ * 주석을 걷는다 — 설명 주석에 `html:root`·`:root` 같은 선택자 글자가 들어 있어, 걷지 않으면 주석 뒤의
+ * 엉뚱한 블록을 읽는다(코덱스 2R: 인쇄 블록 대신 화면 블록을 읽어 인쇄 블록을 지워도 통과했다).
+ */
+function stripComments(css: string): string {
+  return css.replace(/\/\*[\s\S]*?\*\//g, '');
+}
+
+const guard = stripComments(readFileSync(path.resolve(__dirname, 'print-guard.css'), 'utf8'));
+const globals = stripComments(readFileSync(path.resolve(__dirname, '../../app/globals.css'), 'utf8'));
 const tailwindTheme = readFileSync(
   path.resolve(__dirname, '../../../node_modules/tailwindcss/theme.css'),
   'utf8',
@@ -54,11 +62,34 @@ function declarationsAfter(css: string, marker: string): Record<string, string> 
   return out;
 }
 
-const screenGuard = declarationsAfter(guard, ':where(.a4-sheet');
-const printGuard = declarationsAfter(guard, 'html:root');
+/** `@media print { … }` 블록의 안쪽 글자 */
+function printMediaBody(css: string): string {
+  const start = css.indexOf('@media print');
+  if (start < 0) throw new Error('@media print 블록 없음');
+  const open = css.indexOf('{', start);
+  let depth = 0;
+  for (let i = open; i < css.length; i += 1) {
+    if (css[i] === '{') depth += 1;
+    if (css[i] === '}') depth -= 1;
+    if (depth === 0) return css.slice(open + 1, i);
+  }
+  throw new Error('@media print 블록이 닫히지 않음');
+}
+
+const layerBase = guard.slice(guard.indexOf('@layer base'), guard.indexOf('@media print'));
+const screenGuard = declarationsAfter(layerBase, ':where(.a4-sheet, .a4-measure, .book-cover)');
+const printBody = printMediaBody(guard);
+const printGuard = declarationsAfter(printBody, 'html:root');
 const root = declarationsAfter(globals.slice(globals.indexOf('\n:root {')), ':root {');
 
 describe('인쇄 가드(print-guard.css)', () => {
+  it('화면 미리보기 묶음은 @layer base 안, 인쇄 묶음은 @media print 안의 html:root 다', () => {
+    expect(guard.indexOf('@layer base')).toBeGreaterThanOrEqual(0);
+    expect(layerBase).toContain(':where(.a4-sheet, .a4-measure, .book-cover)');
+    expect(printBody).toContain('html:root');
+    expect(Object.keys(printGuard).length).toBeGreaterThan(20);
+  });
+
   it('화면 미리보기 묶음과 인쇄 묶음이 글자 그대로 같다', () => {
     expect(printGuard).toEqual(screenGuard);
   });
@@ -80,10 +111,21 @@ describe('인쇄 가드(print-guard.css)', () => {
     }
   });
 
-  it('화면 테마가 옛 값에서 바꾼 토큰은 전부 가드가 되돌린다', () => {
+  it('화면 테마가 옛 값에서 바꾼 토큰은 전부 가드가 되돌린다 — 화면 미리보기와 인쇄 둘 다', () => {
     const changed = Object.keys(LEGACY_ROOT).filter((key) => root[key] !== undefined && root[key] !== LEGACY_ROOT[key]);
     expect(changed.length).toBeGreaterThan(0);
-    for (const key of changed) expect(screenGuard[key], `${key} 가 가드에 없다`).toBe(LEGACY_ROOT[key]);
+    for (const key of changed) {
+      expect(screenGuard[key], `${key} 가 화면 가드에 없다`).toBe(LEGACY_ROOT[key]);
+      expect(printGuard[key], `${key} 가 인쇄 가드에 없다`).toBe(LEGACY_ROOT[key]);
+    }
+  });
+
+  it('인쇄 가드도 회색 계조 전부를 Tailwind 기본값으로 되돌린다', () => {
+    for (const step of ['50', '100', '200', '300', '400', '500', '600', '700', '800', '900', '950']) {
+      const key = `--color-gray-${step}`;
+      const original = tailwindTheme.match(new RegExp(`${key}:\\s*([^;]+);`))?.[1].trim();
+      expect(printGuard[key], key).toBe(original);
+    }
   });
 
   it('시트가 물려받는 글자색·글꼴은 화면 테마가 바꾸지 않는다', () => {
