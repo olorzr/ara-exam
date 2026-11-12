@@ -381,7 +381,11 @@ src/
   `applySourceAxes` — 올라간 기출 목록과 한 벌, 함수 인자 모양 `sourceAxisArgs` 도 같은 규칙), solo-filter.ts('그 작품만 · 그 문법만' — 작품 축은 `work_titles` 같음,
   문법 축은 지문 대영역 복제 칸 `passage_area`(sql/67) in), passage-shape.ts(지문 저장이 딸린 문항 행을 움직이는가),
   source-list.ts·source-list-filters.ts(올라간 기출 목록 — 칸 규칙은 `buildFilterAxes` 를 빌려 쓴다, 문항 수는 계산 열 `problem_count`(sql/74)),
-  source-queries.ts(한 출처를 통째로 — 시험지 화면),
+  source-queries.ts(한 출처를 통째로 — 시험지 화면 · 읽기 전용 시험 보기),
+  source-sets.ts·source-sets-payload.ts·source-set-link.ts·source-set-filters.ts·source-set-queries.ts(기출 세트 — 목록은
+    `exam.source_sets()`(sql/107) 한 번, 세트 한 장은 `fetchSources` + 계산 열로 그 세트 출처만, 아카이브로 넘기는 주소는 교과서가
+    있을 때만), exam-view-order.ts·exam-view-files.ts(읽기 전용 시험 보기 — 객관식·주관식 → 서술형 차례, 같은 지문이 이어지면
+    한 덩어리, 다시 나온 지문은 본문 없이 가리킨다 / 서명할 그림·쪽 이미지 경로),
   facets.ts(트리·선택지 재료 — `exam.archive_facets()` RPC 한 번(POST), 서버 캐시 sql/71. 평가문제집 몫은 서버가 갈라 주고 `withWorkbook` 일 때만 합친다, sql/85)·facets-payload.ts(응답 검사)·
     facets-cache.ts(탭 안 캐시 5분 — 쓰기 함수가 무효화한다, 의존성 없음),
   mutations.ts, mutations-source.ts, review-data.ts,
@@ -400,6 +404,9 @@ src/
   (중간 마디까지) 펴서 `overlaps(&&)`,
   필터 선택지는 `expandGrammarAncestors` 로 패싯의 조상을 편다. 마스터가 상수라 트리를
   못 읽는 fail-soft 경로가 없는 유일한 축이다
+- **기출 세트**(`/problems/sets`, 2026-11-13)는 트리가 아니라 카드로 훑는 또 하나의 진입로다 — 학교만 다른 같은 시험을
+  한 장으로 묶고(components/problem-sets), 학교를 누르면 읽기 전용 시험 보기가 열린다. 답지 PDF 는 CSP 가 iframe 을 막아
+  pdf.js(`hooks/usePdfUrlPages.ts`)로 그린다
 - 훑는 축이 네 가지다: 교과서 단원 트리, **학교 기출 트리**(학교 › 학년도 › 학년 › 학기·시험),
   **작품 트리**(문학·비문학 › 지은이 › 작품, `work-tree.ts` — 작품명순으로 바꿀 수 있고
   그 선택은 localStorage 에 남는다), **문법 트리**(대분류 › 중분류 › 개념,

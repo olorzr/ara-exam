@@ -88,6 +88,16 @@ describe('문제 은행 메뉴', () => {
     expect(isNavItemActive('/problems/edit/abc-123', findItem(sections, '/problems/sources'))).toBe(false);
   });
 
+  it('기출 세트의 세 화면은 기출 세트만 켠다 — 아카이브·올라간 기출로 새지 않는다', () => {
+    const sets = findItem(sections, '/problems/sets');
+    for (const path of ['/problems/sets', '/problems/sets/view', '/problems/sets/exam/abc-123']) {
+      expect(isNavItemActive(path, sets)).toBe(true);
+      expect(isNavItemActive(path, findItem(sections, '/problems/archive'))).toBe(false);
+      expect(isNavItemActive(path, findItem(sections, '/problems/sources'))).toBe(false);
+    }
+    expect(isNavItemActive('/problems/sources/abc-123', sets)).toBe(false);
+  });
+
   it('시험지 한 건의 화면은 올라간 기출에 붙는다', () => {
     const sources = findItem(sections, '/problems/sources');
     expect(isNavItemActive('/problems/sources/abc-123', sources)).toBe(true);
@@ -129,7 +139,7 @@ describe('buildNavSections', () => {
     // 그룹 이름은 '문제 은행' — 접힘 상태 저장 키(id)는 'problems' 그대로다
     expect(problems.kind === 'group' && problems.label).toBe('문제 은행');
     expect(problems.items.map((i) => i.label)).toEqual([
-      '문제 아카이브', '올라간 기출', '문제지 조합', 'O,X·단답형',
+      '문제 아카이브', '기출 세트', '올라간 기출', '문제지 조합', 'O,X·단답형',
     ]);
 
     const etc = sections.find((s) => s.id === 'etc')!;
@@ -144,7 +154,7 @@ describe('buildNavSections', () => {
     const admin = buildNavSections(true);
     expect(admin.map((s) => s.id)).toEqual(['home', 'concept', 'words', 'problems', 'books', 'etc', 'admin']);
     const adminProblems = admin.find((s) => s.id === 'problems')!;
-    expect(adminProblems.items.map((i) => i.label)).toEqual(['문제 아카이브', '올라간 기출', '문제지 조합', 'O,X·단답형']);
+    expect(adminProblems.items.map((i) => i.label)).toEqual(['문제 아카이브', '기출 세트', '올라간 기출', '문제지 조합', 'O,X·단답형']);
 
     const books = admin.find((s) => s.id === 'books')!;
     expect(books.kind).toBe('group');

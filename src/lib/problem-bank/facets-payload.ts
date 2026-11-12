@@ -69,21 +69,23 @@ const SOURCE_TEXT_KEYS = [
   'school_name', 'year', 'grade', 'textbook', 'source_type', 'semester', 'exam_type',
 ] as const;
 
-function isRecord(v: unknown): v is Record<string, unknown> {
+/** 배열이 아닌 객체인가 — 응답 원소 검사용(source-sets-payload.ts 도 쓴다) */
+export function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-function isStringArray(v: unknown): v is string[] {
+/** 글자 배열인가 */
+export function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every((x) => typeof x === 'string');
 }
 
 /** 개수 — 1 이상의 정수만 받는다(0·음수·소수는 서버가 낼 리 없으니 모양이 어긋난 것이다) */
-function isCount(v: unknown): v is number {
+export function isCount(v: unknown): v is number {
   return typeof v === 'number' && Number.isInteger(v) && v >= 1;
 }
 
 /** 배열이면 원소마다 고쳐 담고, 고칠 수 없는 원소는 버린다. 배열이 아니면 빈 배열 */
-function pickAll<T>(raw: unknown, pick: (item: unknown) => T | null): T[] {
+export function pickAll<T>(raw: unknown, pick: (item: unknown) => T | null): T[] {
   if (!Array.isArray(raw)) return [];
   const out: T[] = [];
   for (const item of raw) {

@@ -225,6 +225,15 @@
 - 코드에서의 사용: `SourceListFilters`, `toSourceListQuery`, `fetchSources`, `useSourceList`, `SourceTable`, `SourceFilterBar`
 - 관련 파일: `src/lib/problem-bank/source-list-filters.ts`, `src/lib/problem-bank/source-list.ts`, `src/app/(main)/problems/sources/page.tsx`
 
+## 기출 세트 (exam set)
+- 정의: **학교만 다른 같은 시험의 묶음.** 내신기출은 학년도·학년·학기·시험·교과서가 같은 시험들(예: 2026 고2 1학기 기말 · 문학 비상 — 82곳), 모의고사는 학년도·학년·회차·주관이 같은 과목들(예: 2027 고3 9월 모평 · 평가원 — 공통 · 언어와 매체 · 화법과 작문). 기출 공유 사이트(exam-share)의 '세트' 와 같은 뜻이다(2026-11-13 원장님 요청). 평가문제집·문제집·프린트는 세트가 아니다
+- 화면: 문제 은행 › **기출 세트**(`/problems/sets`) — 카드 격자 → 세트 한 장(`/problems/sets/view?type=…`, 학교 줄) → **읽기 전용 시험 보기**(`/problems/sets/exam/[id]`, 문항·지문 / 원본 / 답지 탭). 고치기는 '올라간 기출' 의 시험지 화면이 맡는다
+- ⚠️ 평가원 회차(수능·모평 등)는 학년이 빈 출처와 '고3' 출처를 **한 세트**로 합친다(기출 트리와 같은 규칙, `isKiceRound`)
+- ⚠️ 카드의 'N곳' 은 **학교 수**이고 시험 건수(`exam_count`)와 다를 수 있다 — 같은 학교가 한 세트에 두 건(과목 둘) 든 세트가 있다
+- ⚠️ 교과서가 빈 내신 세트(2015 개정 등)는 '문제 아카이브에서 모아 보기' 링크가 없다 — 아카이브의 교과서 칸은 '미지정만' 을 못 거른다
+- 코드에서의 사용: `SourceSet`·`SourceSetKey`, `exam.source_sets()`(sql/107), `sourceSetKey`(JSON 배열 열쇠)
+- 관련 파일: src/lib/problem-bank/source-sets.ts, source-sets-payload.ts, source-set-link.ts, source-set-filters.ts, source-set-queries.ts, exam-view-order.ts, src/components/problem-sets/, src/app/(main)/problems/sets/, sql/107_problem_source_sets.sql
+
 ## 지문 (Passage)
 - 정의: 여러 문항이 함께 쓰는 글. "[1~3] 다음 글을 읽고 물음에 답하시오" 의 그 글
 - 코드에서의 사용: `Passage`, `passages` 표, 문항의 `passage_id`
