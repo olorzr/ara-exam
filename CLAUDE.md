@@ -272,6 +272,9 @@ node /Users/ara/Projects/Ara-system/scripts/post-update.js "<HTML>"
 - [2026-11-07] **배포 뒤 '안 고쳐졌다' 는 제보는 먼저 그 탭의 코드를 의심할 것.** 문제 은행·문제지 조합은 머무는 동안 Next 서버를 안 불러 옛 코드가 그대로 돈다. 0.9.73 전에 연 탭은 감시 코드도 없으니 한 번은 손으로 새로 고쳐야 한다
 
 ## Architecture Decisions
+- [2026-11-13] **서울사대부중 2022 개정 기출에 천재(노미숙) — 2015 개정 시험지는 무조건 비워 둔다**([sql/105](sql/105_seouldaebu_2022_textbook.sql), `~/.claude/tools/ingest-exam.js` 의 `TEXTBOOK_2022`). 원장님: "서울사대부중 2022 개정은 천재(노미숙)" / "15개정은 무조건 냅둬". 되돌리지 말아야 할 판단들:
+  - **2015 개정으로 배운 내신기출(중·고 모두 학년 N > 연도 − 2024 — 2025 고2·2026 고3 까지가 2015 개정)은 교과서를 채우지 않는다** — 학교별 2015 교과서를 알아도(아래 2026-09-22 표) 손대지 말 것. 2026-11-13 기준 빈 칸 345건 중 거의 전부가 그쪽이다
+  - 2022 개정 표는 sql/62 + sql/105 와 `TEXTBOOK_2022` 가 같은 표다(기출 공유 사이트 `exam-share` 의 `bank-reader.ts` 사본은 check:drift 가 잡는다). 학교가 바뀌면 **셋 다** 고칠 것
 - [2026-11-13 · 0.9.85] **문제지 지우기도 만든 선생님 + 원장만 — DELETE 정책 하나**([sql/104](sql/104_problem_paper_delete_owner.sql), [paper-list.ts](src/lib/problem-paper/paper-list.ts) 의 `canDeletePaper`, [usePaperList.ts](src/hooks/usePaperList.ts)). 원장님: "지우기도 다른 선생님 껀 못 하게 해, 원장이랑 본인만 가능하게 해"(0.9.84 의 '받아들인 한계' 에 대한 답). 되돌리지 말아야 할 판단들:
   - **정책은 `user_id = (select auth.uid()) OR 원장 JWT 이메일 리터럴`** 이다. `exam.is_owner_email()` 을 부르지 않는 까닭: sql/103 이 그 함수를 브라우저에서 거뒀고 정책 식은 부르는 사람 권한으로 돌아, 부르면 선생님 요청이 권한 오류로 죽는다. 원장 리터럴 자리가 sql/104 하나 늘었다(`ADMIN_EMAIL` JSDoc, paper-edit-policy.test.ts 가 대조)
   - ⚠️⚠️ **정식 정의는 sql/104 이고 sql/17·65 는 그것이 적용된 DB 에서 옛 '도메인 전원' 삭제 정책을 건너뛴다**(sql/84 ↔ sql/65 의 reference_texts 와 같은 수법). 정책은 OR 로 합쳐져 옛것이 하나라도 되살아나면 남의 문제지를 다시 지울 수 있다. 정책 이름이 달라(`Owner or director can delete problem_papers`) sql/65 정책 수 검사는 그대로다. 적용 날 sql/65 를 다시 돌려 건너뛰는 것을 봤다
