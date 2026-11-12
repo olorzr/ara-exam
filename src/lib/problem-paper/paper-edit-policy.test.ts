@@ -30,3 +30,23 @@ describe('sql/103 거울 — 문제지 고치기', () => {
     expect(sql).toContain("jsonb_build_object('omr', v_old_settings -> 'omr', 'showScore', v_old_settings -> 'showScore')");
   });
 });
+
+/** sql/104 ↔ 앱 거울 — 지우기는 만든 선생님과 원장만 */
+describe('sql/104 거울 — 문제지 지우기', () => {
+  const sql = readFileSync(path.resolve(__dirname, '../../../sql/104_problem_paper_delete_owner.sql'), 'utf8');
+
+  it('원장 판정이 ADMIN_EMAIL 리터럴 한 곳이고, 작성자 조건과 OR 로 묶인다', () => {
+    expect(sql.split(`(select auth.jwt() ->> 'email') = '${ADMIN_EMAIL}'`).length - 1).toBe(1);
+    expect(sql).toMatch(/user_id = \(select auth\.uid\(\)\)\s+OR \(select auth\.jwt\(\) ->> 'email'\)/);
+  });
+
+  it('sql/17 · 65 를 다시 돌려도 옛 전원 삭제 정책을 되살리지 않는다', () => {
+    for (const file of ['17_problem_bank.sql', '65_exam_rls_initplan.sql']) {
+      const old = readFileSync(path.resolve(__dirname, `../../../sql/${file}`), 'utf8');
+      const guard = old.indexOf("policyname = 'Owner or director can delete problem_papers'");
+      const create = old.indexOf('CREATE POLICY "Authenticated users can delete problem_papers"');
+      expect(guard).toBeGreaterThan(-1);
+      expect(create).toBeGreaterThan(guard);
+    }
+  });
+});

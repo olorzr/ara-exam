@@ -14,7 +14,7 @@ vi.mock('@/lib/supabase', () => ({
   },
 }));
 
-const { deletePaper, PAPER_IN_BOOK_MESSAGE } = await import('./paper-list');
+const { canDeletePaper, deletePaper, PAPER_DELETE_DENIED_MESSAGE, PAPER_IN_BOOK_MESSAGE } = await import('./paper-list');
 
 describe('deletePaper', () => {
   beforeEach(() => { m.next = { data: [{ id: 'p1' }], error: null }; });
@@ -33,8 +33,26 @@ describe('deletePaper', () => {
     await expect(deletePaper('p1')).rejects.toMatchObject({ message: '네트워크' });
   });
 
-  it('0행이면 이미 지워졌다고 알린다', async () => {
+  it('0행이면 이미 지워졌거나 남의 문제지라고 알린다(RLS 는 오류 없이 0행으로 거른다, sql/104)', async () => {
     m.next = { data: [], error: null };
-    await expect(deletePaper('p1')).rejects.toThrow('이미 지워졌거나');
+    await expect(deletePaper('p1')).rejects.toThrow(PAPER_DELETE_DENIED_MESSAGE);
+  });
+});
+
+describe('canDeletePaper — 만든 선생님과 원장만(sql/104)', () => {
+  it('만든 선생님은 된다', () => {
+    expect(canDeletePaper({ user_id: 'u1' }, { userId: 'u1', email: 't@araeducation.co.kr' })).toBe(true);
+  });
+
+  it('다른 선생님은 안 된다', () => {
+    expect(canDeletePaper({ user_id: 'u1' }, { userId: 'u2', email: 't@araeducation.co.kr' })).toBe(false);
+  });
+
+  it('원장은 남의 문제지도 된다', () => {
+    expect(canDeletePaper({ user_id: 'u1' }, { userId: 'u9', email: 'ara0723@araeducation.co.kr' })).toBe(true);
+  });
+
+  it('로그인 전(빈 id)에는 안 된다', () => {
+    expect(canDeletePaper({ user_id: '' }, { userId: '', email: undefined })).toBe(false);
   });
 });

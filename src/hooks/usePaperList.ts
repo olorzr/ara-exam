@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
 import type { OwnerScope } from '@/lib/owner-scope';
-import { deletePaper, fetchPapers } from '@/lib/problem-paper/paper-list';
+import { canDeletePaper, deletePaper, fetchPapers } from '@/lib/problem-paper/paper-list';
 import type { ProblemPaper } from '@/types/problem-bank';
 
 /** 읽어 둔 목록 — 어느 탭의 것인지와 함께 든다 */
@@ -18,12 +18,14 @@ interface LoadedPapers {
  *
  * 로딩은 **"어느 탭의 목록을 읽어 두었는가" 에서 파생**한다 — 탭을 바꾼 직후 옛 탭의
  * 목록이 새 탭 이름 아래 보이면 안 되고, 효과에서 동기로 비우면 lint 가 막는다.
+ * 지우기는 만든 선생님과 원장만이다(sql/104) — `canDelete` 로 단추를 가리고 `remove` 도 첫 줄에서 한 번 더 막는다.
  * @param scope - 내 것 / 다른 선생님 것
- * @returns 목록·로딩·삭제
+ * @returns 목록·로딩·지울 수 있는가·삭제
  */
 export function usePaperList(scope: OwnerScope) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
+  const email = user?.email;
   const key = `${scope}:${userId}`;
   const [loaded, setLoaded] = useState<LoadedPapers | null>(null);
 
@@ -40,7 +42,10 @@ export function usePaperList(scope: OwnerScope) {
     return () => { alive = false; };
   }, [key, scope, userId]);
 
+  const canDelete = useCallback((paper: ProblemPaper) => canDeletePaper(paper, { userId, email }), [userId, email]);
+
   const remove = useCallback(async (paper: ProblemPaper) => {
+    if (!canDelete(paper)) return;
     if (!window.confirm(`'${paper.title}' 문제지를 지울까요? 담긴 문항은 아카이브에 그대로 남아요.`)) return;
     try {
       await deletePaper(paper.id);
@@ -51,8 +56,8 @@ export function usePaperList(scope: OwnerScope) {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '지우지 못했어요.');
     }
-  }, []);
+  }, [canDelete]);
 
   const current = loaded?.key === key ? loaded : null;
-  return { papers: current?.papers ?? [], loading: current === null, userId, remove };
+  return { papers: current?.papers ?? [], loading: current === null, userId, canDelete, remove };
 }

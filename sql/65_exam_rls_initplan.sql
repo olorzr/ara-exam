@@ -24,6 +24,9 @@
 -- ⚠️ [2026-10-28] reference_texts 정책의 정식 정의는 sql/84 다 — 이 파일은 그것이 적용된 DB 에서 그 표를 건너뛰고,
 --    정책 수 검사는 `15 + reference_texts 정책 수(1 또는 4)` 다.
 --
+-- ⚠️ [2026-11-13] problem_papers 지우기 정책의 정식 정의는 sql/104 다 — 그것이 적용된 DB 에서 이 파일은 그 정책을 건너뛴다
+--    (정책 수는 그대로 — 옛 이름 대신 sql/104 의 이름이 하나 있다).
+--
 -- ⛳️ 되돌릴 때: 같은 이름으로 감싸지 않은 식을 다시 CREATE 하면 된다(sql/17·57 의 원래 정의).
 --
 -- ⚠️ 정책 교체는 표마다 배타 잠금을 잡는다 — 적재 스크립트가 돌 때 다시 돌리면 교착(deadlock)으로
@@ -99,9 +102,21 @@ DROP POLICY IF EXISTS "Authenticated users can read problem_papers" ON exam.prob
 CREATE POLICY "Authenticated users can read problem_papers" ON exam.problem_papers
   FOR SELECT USING ((select auth.role()) = 'authenticated' AND (select exam.is_allowed_domain()));
 
-DROP POLICY IF EXISTS "Authenticated users can delete problem_papers" ON exam.problem_papers;
-CREATE POLICY "Authenticated users can delete problem_papers" ON exam.problem_papers
-  FOR DELETE USING ((select auth.role()) = 'authenticated' AND (select exam.is_allowed_domain()));
+-- ⚠️ 문제지 지우기 정책의 정식 정의는 이제 sql/104(만든 선생님 + 원장, 2026-11-13) — 그것이 적용된 DB 에서는 건너뛴다.
+--    건너뛰지 않으면 옛 '도메인 전원' 정책이 되살아나(정책은 OR 로 합쳐진다) 남의 문제지를 다시 지울 수 있다.
+DO $paper_delete$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_policies
+              WHERE schemaname = 'exam' AND tablename = 'problem_papers'
+                AND policyname = 'Owner or director can delete problem_papers') THEN
+    RAISE NOTICE 'sql/65: problem_papers 지우기는 sql/104 가 정식 정의라 건너뜀';
+    RETURN;
+  END IF;
+  DROP POLICY IF EXISTS "Authenticated users can delete problem_papers" ON exam.problem_papers;
+  CREATE POLICY "Authenticated users can delete problem_papers" ON exam.problem_papers
+    FOR DELETE USING ((select auth.role()) = 'authenticated' AND (select exam.is_allowed_domain()));
+END
+$paper_delete$;
 
 DROP POLICY IF EXISTS "Authenticated users can read problem_paper_items" ON exam.problem_paper_items;
 CREATE POLICY "Authenticated users can read problem_paper_items" ON exam.problem_paper_items

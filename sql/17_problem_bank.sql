@@ -356,9 +356,21 @@ CREATE POLICY "Authenticated users can manage problems" ON exam.problems
 DROP POLICY IF EXISTS "Authenticated users can read problem_papers" ON exam.problem_papers;
 CREATE POLICY "Authenticated users can read problem_papers" ON exam.problem_papers
   FOR SELECT USING (auth.role() = 'authenticated' AND exam.is_allowed_domain());
-DROP POLICY IF EXISTS "Authenticated users can delete problem_papers" ON exam.problem_papers;
-CREATE POLICY "Authenticated users can delete problem_papers" ON exam.problem_papers
-  FOR DELETE USING (auth.role() = 'authenticated' AND exam.is_allowed_domain());
+-- ⚠️ [2026-11-13] 지우기 정책의 정식 정의는 이제 sql/104(만든 선생님 + 원장) — 그것이 적용된 DB 에서는 건너뛴다.
+--    건너뛰지 않으면 이 파일을 다시 돌리는 순간 옛 '도메인 전원' 정책이 되살아나(정책은 OR) 남의 문제지를 지울 수 있다.
+DO $paper_delete$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_policies
+              WHERE schemaname = 'exam' AND tablename = 'problem_papers'
+                AND policyname = 'Owner or director can delete problem_papers') THEN
+    RAISE NOTICE 'sql/17: problem_papers 지우기는 sql/104 가 정식 정의라 건너뜀';
+    RETURN;
+  END IF;
+  DROP POLICY IF EXISTS "Authenticated users can delete problem_papers" ON exam.problem_papers;
+  CREATE POLICY "Authenticated users can delete problem_papers" ON exam.problem_papers
+    FOR DELETE USING (auth.role() = 'authenticated' AND exam.is_allowed_domain());
+END
+$paper_delete$;
 
 -- 항목은 읽기 전용(삭제는 부모 CASCADE)
 DROP POLICY IF EXISTS "Authenticated users can read problem_paper_items" ON exam.problem_paper_items;

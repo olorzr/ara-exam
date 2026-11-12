@@ -132,7 +132,7 @@
 ## 만든 사람 탭 (OwnerScope)
 - 정의: 목록을 **내가 만든 것 / 다른 선생님이 만든 것** 으로 가르는 탭. 문제지 조합 목록과 학교 프린트 시험지 목록이 쓴다. 들어올 때마다 내 것부터 연다(기억하지 않는다)
 - 가르는 기준은 행의 `user_id` 하나다(트리거가 `auth.uid()` 로 채우고 잠근다). 프린트는 **스캔**의 `user_id` 로 가른다 — 시험지 행은 '시험지 만들기' 를 누른 사람 것이 된다
-- ⚠️ **권한이 아니다.** RLS 는 그대로 학원 공유라 다른 선생님 것도 열고 지울 수 있다. 다른 선생님 탭에는 만든 사람 이름을 `public.profiles` 에서 읽어 붙인다(못 읽으면 말없이 생략)
+- ⚠️ **권한이 아니다.** 읽기는 학원 공유라 다른 선생님 것도 연다. 권한은 DB 정책이 따로 정한다 — 프린트는 학원 공유, 문제지는 고치기(sql/103)·지우기(sql/104)가 만든 선생님 + 원장뿐이다(2026-11-13). 다른 선생님 탭에는 만든 사람 이름을 `public.profiles` 에서 읽어 붙인다(못 읽으면 말없이 생략)
 - 코드에서의 사용: `OwnerScope`, `applyOwnerScope`, `OwnerScopeTabs`, `fetchCreatorNames`, `useCreatorNames`
 - 관련 파일: `src/lib/owner-scope.ts`, `src/components/ui/owner-scope-tabs.tsx`, `src/lib/creator-names.ts`
 
