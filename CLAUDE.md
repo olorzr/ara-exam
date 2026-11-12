@@ -274,6 +274,7 @@ node /Users/ara/Projects/Ara-system/scripts/post-update.js "<HTML>"
 ## Architecture Decisions
 - [2026-11-13] **서울사대부중 2022 개정 기출에 천재(노미숙) — 2015 개정 시험지는 무조건 비워 둔다**([sql/105](sql/105_seouldaebu_2022_textbook.sql), `~/.claude/tools/ingest-exam.js` 의 `TEXTBOOK_2022`). 원장님: "서울사대부중 2022 개정은 천재(노미숙)" / "15개정은 무조건 냅둬". 되돌리지 말아야 할 판단들:
   - **2015 개정으로 배운 내신기출(중·고 모두 학년 N > 연도 − 2024 — 2025 고2·2026 고3 까지가 2015 개정)은 교과서를 채우지 않는다** — 학교별 2015 교과서를 알아도(아래 2026-09-22 표) 손대지 말 것. 2026-11-13 기준 빈 칸 345건 중 거의 전부가 그쪽이다
+  - 같은 날 **고1 공통국어 3건은 같은 학교·해 다른 시험의 교과서로** 채웠다([sql/106](sql/106_high_2022_textbook_from_sibling.sql) — 2025 성수고 1학기 중간·기말 공통국어 창비, 2026 무학여고 1학기 중간 공통국어 천재(김수학)). 기출 공유 사이트가 가져올 때 이미 그렇게 채워 보여 주던 것을 원장님이 "문제은행도 똑같이" 라 했다. 대상은 id 로 못박았다 — 형제 시험 규칙으로 다른 시험지를 새로 채우지 말 것
   - 2022 개정 표는 sql/62 + sql/105 와 `TEXTBOOK_2022` 가 같은 표다(기출 공유 사이트 `exam-share` 의 `bank-reader.ts` 사본은 check:drift 가 잡는다). 학교가 바뀌면 **셋 다** 고칠 것
 - [2026-11-13 · 0.9.85] **문제지 지우기도 만든 선생님 + 원장만 — DELETE 정책 하나**([sql/104](sql/104_problem_paper_delete_owner.sql), [paper-list.ts](src/lib/problem-paper/paper-list.ts) 의 `canDeletePaper`, [usePaperList.ts](src/hooks/usePaperList.ts)). 원장님: "지우기도 다른 선생님 껀 못 하게 해, 원장이랑 본인만 가능하게 해"(0.9.84 의 '받아들인 한계' 에 대한 답). 되돌리지 말아야 할 판단들:
   - **정책은 `user_id = (select auth.uid()) OR 원장 JWT 이메일 리터럴`** 이다. `exam.is_owner_email()` 을 부르지 않는 까닭: sql/103 이 그 함수를 브라우저에서 거뒀고 정책 식은 부르는 사람 권한으로 돌아, 부르면 선생님 요청이 권한 오류로 죽는다. 원장 리터럴 자리가 sql/104 하나 늘었다(`ADMIN_EMAIL` JSDoc, paper-edit-policy.test.ts 가 대조)
