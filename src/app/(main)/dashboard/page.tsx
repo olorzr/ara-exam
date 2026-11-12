@@ -8,16 +8,16 @@ import { Masthead, SectionLabel, StatGrid } from '@/components/magazine';
 
 /** 빠른 실행 — 잡지 지면의 번호 붙은 꼭지(#01 …)로 그린다 */
 const QUICK_ACTIONS = [
-  { href: '/exam/builder', label: '개념지', desc: '개념지를 만들고 관리해요 💡' },
-  { href: '/words/new', label: '단어 입력', desc: '새 단어를 추가해요 ✨' },
-  { href: '/words', label: '단어 관리', desc: '저장된 단어를 관리해요 📖' },
-  { href: '/categories', label: '카테고리 관리', desc: '출판사·단원을 정리해요 📂' },
-  { href: '/exam/create', label: '단어 시험지 생성', desc: '시험지를 만들어요 ✏️' },
-  { href: '/exam/history', label: '단어 시험지', desc: '이전 시험지를 확인해요 🔍' },
-  { href: '/problems/archive', label: '문제 아카이브', desc: '기출 문항을 찾아봐요 🗂️' },
-  { href: '/problems/sources', label: '올라간 기출', desc: '올라간 시험지를 한눈에 봐요 📚' },
-  { href: '/problems/papers/new', label: '문제지 조합', desc: '기출로 문제지를 만들어요 🧩' },
-  { href: '/problems/quiz', label: 'O,X·단답형', desc: '지문으로 O,X·단답형을 만들어요 ✅' },
+  { href: '/exam/builder', label: '개념지', desc: '개념지를 만들고 관리해요' },
+  { href: '/words/new', label: '단어 입력', desc: '새 단어를 추가해요' },
+  { href: '/words', label: '단어 관리', desc: '저장된 단어를 관리해요' },
+  { href: '/categories', label: '카테고리 관리', desc: '출판사·단원을 정리해요' },
+  { href: '/exam/create', label: '단어 시험지 생성', desc: '시험지를 만들어요' },
+  { href: '/exam/history', label: '단어 시험지', desc: '이전 시험지를 확인해요' },
+  { href: '/problems/archive', label: '문제 아카이브', desc: '기출 문항을 찾아봐요' },
+  { href: '/problems/sources', label: '올라간 기출', desc: '올라간 시험지를 한눈에 봐요' },
+  { href: '/problems/papers/new', label: '문제지 조합', desc: '기출로 문제지를 만들어요' },
+  { href: '/problems/quiz', label: 'O,X·단답형', desc: '지문으로 O,X·단답형을 만들어요' },
 ] as const;
 
 /**
@@ -58,7 +58,7 @@ export default function DashboardPage() {
       <Masthead
         title="아라국어논술"
         subtitle="시험 관리 시스템"
-        note="아라국어논술 시험 관리 시스템에 오신 것을 환영해요 🌷"
+        note="아라국어논술 시험 관리 시스템에 오신 것을 환영해요"
       />
 
       <section aria-labelledby="dashboard-numbers" className="space-y-3">

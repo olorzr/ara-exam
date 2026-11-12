@@ -54,7 +54,7 @@ export default function LoginPage() {
         </h1>
         <hr className="mx-auto w-28 border-0 border-t border-gray-200" />
         <p className="mt-3 pl-[0.5em] font-display text-sm tracking-[0.5em] text-ink">시험 관리 시스템</p>
-        <p className="mt-1.5 text-[13px] text-gray-500">선생님 전용 🌷</p>
+        <p className="mt-1.5 text-[13px] text-gray-500">선생님 전용</p>
 
         <hr className="mt-6 mb-5 border-0 border-t-2 border-dotted border-ink" />
 
