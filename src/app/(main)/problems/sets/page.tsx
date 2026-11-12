@@ -29,10 +29,21 @@ const GRID_CLASS = 'grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 sm:gap-x-6 s
  */
 function SetsContent() {
   const searchParams = useSearchParams();
+  const urlQuery = searchParams.toString();
   const [filters, setFilters] = useState<SourceSetFilters>(
-    () => setFiltersFromParams(new URLSearchParams(searchParams.toString())),
+    () => setFiltersFromParams(new URLSearchParams(urlQuery)),
   );
   const { sets, loading, error, reload } = useSourceSets();
+
+  // 바깥에서 주소가 바뀌면(이 화면에서 사이드바 '기출 세트' 를 다시 누르는 등) 거르기를 주소에 맞춘다(코덱스 1R).
+  // App Router 는 같은 쪽이면 상태를 지켜, 그대로 두면 주소는 비었는데 목록은 옛 조건으로 남는다.
+  // 이 화면이 직접 적은 주소(`replaceState`)는 지금 거르기와 같은 글자라 아무것도 안 바뀐다 — 렌더 중 파생 상태로 맞춘다
+  const [seenQuery, setSeenQuery] = useState(urlQuery);
+  if (seenQuery !== urlQuery) {
+    setSeenQuery(urlQuery);
+    const fromUrl = setFiltersFromParams(new URLSearchParams(urlQuery));
+    if (setFiltersToQueryString(fromUrl) !== setFiltersToQueryString(filters)) setFilters(fromUrl);
+  }
 
   useEffect(() => {
     window.history.replaceState(null, '', `${SETS_PATH}${setFiltersToQueryString(filters)}`);

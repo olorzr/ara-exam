@@ -29,15 +29,27 @@ export async function fetchSourceSets(): Promise<SourceSet[]> {
   return toSourceSets(parseSourceSets(data)).sort(compareSourceSets);
 }
 
+/** 세트 한 장 */
+export interface SetSources {
+  /** 그 세트의 출처들 — 학교(모의고사는 과목) 차례 */
+  rows: SourceListRow[];
+  /**
+   * 같은 조회 범위에 걸렸지만 **다른 세트**인 출처 수 — 주관(publisher)이 다른 모의고사.
+   * 출처 조건에 주관 칸이 없어 받은 뒤 거른 수다. 0 이 아니면 아카이브(같은 범위를 주관 없이 읽는다)로 넘기면
+   * 다른 세트 문항이 섞이므로 화면이 '아카이브에서 모아 보기' 를 숨긴다(코덱스 1R).
+   */
+  outside: number;
+}
+
 /**
  * 세트 한 장에 든 출처 전부 — 문항 수(`problem_count`)와 함께.
  *
  * ⚠️ 말없이 자르지 않는다 — 990행을 넘으면 이어 읽는다(가장 큰 세트는 82곳이지만 늘어난다).
  * @param set - 세트 칸
- * @returns 학교(모의고사는 과목) 차례의 출처들
+ * @returns 그 세트의 출처들과, 같은 범위에서 빠진 다른 세트 출처 수
  * @throws 조회 실패 시
  */
-export async function fetchSetSources(set: SourceSetKey): Promise<SourceListRow[]> {
+export async function fetchSetSources(set: SourceSetKey): Promise<SetSources> {
   const query = setSourceQuery(set);
   const rows: SourceListRow[] = [];
   let total = Infinity;
@@ -52,5 +64,5 @@ export async function fetchSetSources(set: SourceSetKey): Promise<SourceListRow[
   const inSet = set.source_type === MOCK_EXAM_SOURCE_TYPE
     ? rows.filter((row) => (row.publisher ?? '') === set.publisher)
     : rows;
-  return orderSetSources(inSet);
+  return { rows: orderSetSources(inSet), outside: rows.length - inSet.length };
 }

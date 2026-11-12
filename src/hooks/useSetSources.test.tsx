@@ -21,7 +21,7 @@ const B: SourceSetKey = { ...A, exam_type: '기말' };
 
 describe('useSetSources', () => {
   it('렌더마다 새 객체를 넘겨도 같은 세트면 다시 읽지 않는다', async () => {
-    fetchSetSources.mockReset().mockResolvedValue([{ id: 's1' }]);
+    fetchSetSources.mockReset().mockResolvedValue({ rows: [{ id: 's1' }], outside: 0 });
     const hook = renderHook(() => useSetSources({ ...A }));
     await waitFor(() => expect(hook.result.current.rows).toHaveLength(1));
     hook.rerender();
@@ -30,16 +30,20 @@ describe('useSetSources', () => {
   });
 
   it('세트가 바뀌면 앞 세트의 학교를 보여 주지 않고, 늦게 온 앞 응답은 버린다', async () => {
-    const first = deferred<unknown[]>();
-    const second = deferred<unknown[]>();
+    const first = deferred<{ rows: unknown[]; outside: number }>();
+    const second = deferred<{ rows: unknown[]; outside: number }>();
     fetchSetSources.mockReset().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
     const hook = renderHook(({ set }) => useSetSources(set), { initialProps: { set: A } });
     hook.rerender({ set: B });
-    second.resolve([{ id: 'b1' }]);
+    // 앞 세트 응답 전에는 다른 세트 수도 모른다 — 아카이브 링크를 내지 않는다
+    expect(hook.result.current.outside).toBeNull();
+    second.resolve({ rows: [{ id: 'b1' }], outside: 2 });
     await waitFor(() => expect(hook.result.current.rows).toEqual([{ id: 'b1' }]));
-    first.resolve([{ id: 'a1' }]);
+    expect(hook.result.current.outside).toBe(2);
+    first.resolve({ rows: [{ id: 'a1' }], outside: 0 });
     await new Promise((r) => setTimeout(r, 0));
     expect(hook.result.current.rows).toEqual([{ id: 'b1' }]);
+    expect(hook.result.current.outside).toBe(2);
   });
 
   it('세트가 없으면 읽지 않는다', () => {

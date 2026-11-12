@@ -90,8 +90,9 @@ export function setSourceQuery(set: SourceSetKey): SourceListQuery {
 /**
  * 이 세트의 문항을 문제 아카이브에서 보는 주소.
  *
- * 기출 트리의 잎과 같은 필터(`schoolExamFilterPatch` — 학교는 비워 '전체')에 교과서를 더한다.
- * 모의고사는 주관 칸이 없지만 회차 이름이 주관을 가른다(학평은 교육청, 모평·수능은 평가원).
+ * 기출 트리의 잎과 같은 필터(`schoolExamFilterPatch` — 학교는 비워 '전체')에 교과서를 더한다. 범위는 `setSourceQuery` 와 같다.
+ * ⚠️ 아카이브에는 주관 칸이 없다 — 같은 회차에 주관이 다른 출처가 있으면 섞이므로, 화면이 `fetchSetSources` 의
+ *    `outside`(같은 범위의 다른 세트 출처 수)가 0 일 때만 이 주소를 낸다(코덱스 1R).
  * @param set - 세트 칸
  * @returns 주소. 아카이브가 같은 범위를 못 거르면(교과서가 빈 내신 세트) null
  */

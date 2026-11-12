@@ -230,7 +230,7 @@
 - 화면: 문제 은행 › **기출 세트**(`/problems/sets`) — 카드 격자 → 세트 한 장(`/problems/sets/view?type=…`, 학교 줄) → **읽기 전용 시험 보기**(`/problems/sets/exam/[id]`, 문항·지문 / 원본 / 답지 탭). 고치기는 '올라간 기출' 의 시험지 화면이 맡는다
 - ⚠️ 평가원 회차(수능·모평 등)는 학년이 빈 출처와 '고3' 출처를 **한 세트**로 합친다(기출 트리와 같은 규칙, `isKiceRound`)
 - ⚠️ 카드의 'N곳' 은 **학교 수**이고 시험 건수(`exam_count`)와 다를 수 있다 — 같은 학교가 한 세트에 두 건(과목 둘) 든 세트가 있다
-- ⚠️ 교과서가 빈 내신 세트(2015 개정 등)는 '문제 아카이브에서 모아 보기' 링크가 없다 — 아카이브의 교과서 칸은 '미지정만' 을 못 거른다
+- ⚠️ 교과서가 빈 내신 세트(2015 개정 등)는 '문제 아카이브에서 모아 보기' 링크가 없다 — 아카이브의 교과서 칸은 '미지정만' 을 못 거른다. 같은 회차에 주관이 다른 모의고사 출처가 섞인 세트도 없다(아카이브에 주관 칸이 없다)
 - 코드에서의 사용: `SourceSet`·`SourceSetKey`, `exam.source_sets()`(sql/107), `sourceSetKey`(JSON 배열 열쇠)
 - 관련 파일: src/lib/problem-bank/source-sets.ts, source-sets-payload.ts, source-set-link.ts, source-set-filters.ts, source-set-queries.ts, exam-view-order.ts, src/components/problem-sets/, src/app/(main)/problems/sets/, sql/107_problem_source_sets.sql
 

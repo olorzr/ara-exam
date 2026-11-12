@@ -78,7 +78,8 @@ describe('fetchSetSources', () => {
 
   it('세트 칸을 표 컬럼에 걸고(교과서 빈 값 = 빈 출처만) 문항 수 계산 열을 함께 받는다', async () => {
     respond = () => json([source(2, { school_name: '나고' }), source(1, { school_name: '가고' })], '0-1/2');
-    const rows = await fetchSetSources(set);
+    const { rows, outside } = await fetchSetSources(set);
+    expect(outside).toBe(0);
     const params = requests[0].url.searchParams;
     expect(params.get('select')).toBe('*,problem_count');
     expect(params.get('textbook')).toBe('eq.');
@@ -95,21 +96,22 @@ describe('fetchSetSources', () => {
       const rows = all.slice(offset, offset + limit);
       return json(rows, `${offset}-${offset + rows.length - 1}/${all.length}`);
     };
-    const rows = await fetchSetSources(set);
+    const { rows } = await fetchSetSources(set);
     expect(rows).toHaveLength(1000);
     expect(requests.length).toBe(2);
     expect(new Set(rows.map((r) => r.id)).size).toBe(1000);
   });
 
-  it('모의고사는 주관이 다른 행을 뺀다 — 출처 조건에 주관 칸이 없다', async () => {
+  it('모의고사는 주관이 다른 행을 빼고 그 수를 알린다 — 출처 조건(과 아카이브)에 주관 칸이 없다', async () => {
     respond = () => json([
       source(1, { source_type: '모의고사', publisher: '평가원', title: '수능 (공통)' }),
       source(2, { source_type: '모의고사', publisher: '교육청', title: '수능 (공통)' }),
     ], '0-1/2');
-    const rows = await fetchSetSources({
+    const { rows, outside } = await fetchSetSources({
       source_type: '모의고사', year: '2026', grade: '고3', semester: '', exam_type: '수능', textbook: '', publisher: '평가원',
     });
     expect(rows.map((r) => r.id)).toEqual(['s0001']);
+    expect(outside).toBe(1);
     // 평가원 회차는 학년을 걸지 않는다
     expect(requests[0].url.searchParams.get('grade')).toBeNull();
   });

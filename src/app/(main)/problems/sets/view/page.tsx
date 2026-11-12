@@ -16,13 +16,14 @@ import { setExamLabel, setTextbookLabel } from '@/lib/problem-bank/source-sets';
  * 세트 한 장 (`/problems/sets/view?type=…`) — 그 세트에 든 학교(모의고사는 과목)를 줄로 늘어놓는다.
  *
  * 세트는 주소의 칸 그대로다(source-set-link.ts — `book=` 빈 값은 '교과서 미지정 세트'). 학교 줄을 누르면 읽기 전용
- * 시험 보기가 열린다. 교과서가 있는 세트만 '문제 아카이브에서 보기' 를 낸다(아카이브는 교과서 '미지정만' 을 못 거른다).
+ * 시험 보기가 열린다. '문제 아카이브에서 보기' 는 아카이브가 같은 범위를 거를 수 있을 때만 낸다 — 교과서가 있고
+ * (아카이브는 교과서 '미지정만' 을 못 거른다), 같은 범위에 주관이 다른 모의고사 출처가 없을 때(아카이브에 주관 칸이 없다).
  */
 function SetViewContent() {
   const searchParams = useSearchParams();
   const query = searchParams.toString();
   const set = useMemo(() => setFromParams(new URLSearchParams(query)), [query]);
-  const { rows, loading, error, reload } = useSetSources(set);
+  const { rows, outside, loading, error, reload } = useSetSources(set);
 
   if (!set) {
     return (
@@ -34,7 +35,9 @@ function SetViewContent() {
   }
 
   const mock = set.source_type === MOCK_EXAM_SOURCE_TYPE;
-  const archiveHref = setArchiveHref(set);
+  // 아카이브는 같은 범위를 주관 없이 읽는다 — 그 범위에 다른 세트(주관이 다른 모의고사)가 섞여 있으면 숨긴다.
+  // 다 읽기 전에도(outside === null) 내지 않는다
+  const archiveHref = outside === 0 ? setArchiveHref(set) : null;
   const names = new Set(rows.map((r) => (mock ? r.title : r.school_name))).size;
   const problems = rows.reduce((sum, r) => sum + r.problem_count, 0);
 
