@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { Masthead, PageTitle, SectionLabel, StatGrid, issueLines } from './index';
+import { renderToString } from 'react-dom/server';
+import { IssueStamp, Masthead, PageTitle, SectionLabel, StatGrid, issueLines } from './index';
 
 describe('잡지 부품', () => {
   it('PageTitle — h1 의 이름은 한글 제목뿐이다(영문 라벨은 꾸밈이라 읽지 않는다)', () => {
@@ -31,6 +32,21 @@ describe('잡지 부품', () => {
   it('issueLines — 달이 곧 호수다', () => {
     expect(issueLines(new Date(2026, 10, 12))).toEqual(['NO. 11', '2026 NOVEMBER']);
     expect(issueLines(new Date(2027, 0, 3))).toEqual(['NO. 01', '2027 JANUARY']);
+  });
+
+  it('IssueStamp — 정적 사전 렌더(서버)에서는 비우고 브라우저에서 오늘로 채운다(빌드한 날로 굳지 않게)', () => {
+    const html = renderToString(<IssueStamp />);
+    expect(html).not.toContain('NO.');
+    const { container } = render(<IssueStamp />);
+    const [issue, month] = issueLines(new Date());
+    expect(container.textContent).toContain(issue);
+    expect(container.textContent).toContain(month);
+  });
+
+  it('IssueStamp — 날짜를 정해 주면 그 달이다', () => {
+    const { container } = render(<IssueStamp date={new Date(2026, 0, 5)} />);
+    expect(container.textContent).toContain('NO. 01');
+    expect(container.textContent).toContain('2026 JANUARY');
   });
 
   it('Masthead — 제호가 h1 이고 section 으로 감싼다', () => {

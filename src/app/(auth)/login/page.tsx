@@ -3,7 +3,7 @@
 import { Suspense } from 'react';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
-import { issueLines } from '@/components/magazine';
+import { IssueStamp } from '@/components/magazine';
 
 const ERROR_MESSAGES: Record<string, string> = {
   invalid_request: '인증 요청이 올바르지 않습니다. 다시 시도해주세요.',
@@ -35,16 +35,15 @@ function ErrorMessage() {
  * 네이버 웍스 단추는 그쪽 상표색(녹색) 그대로 둔다.
  */
 export default function LoginPage() {
-  const [issue, month] = issueLines(new Date());
   return (
     <div className="flex min-h-screen items-center justify-center px-4 py-12">
       <main className="w-full max-w-md border-y-2 border-ink bg-card px-8 pt-5 pb-8 text-center sm:px-9">
-        <div aria-hidden="true" className="flex items-start justify-between gap-3">
-          <p className="text-left font-display text-[12.5px] leading-[1.45] text-ink">Exam Desk<br />Teacher&apos;s Workroom</p>
-          {/* 서버(UTC)와 브라우저(KST)의 달이 달 첫날 아침에 갈릴 수 있다 — 꾸밈 글자라 브라우저 값을 받아들인다 */}
-          <p suppressHydrationWarning className="text-right font-label text-[10px] font-medium leading-[1.6] tracking-[0.14em] text-ink">
-            {issue}<br />{month}
+        <div className="flex items-start justify-between gap-3">
+          <p aria-hidden="true" className="text-left font-display text-[12.5px] leading-[1.45] text-ink">
+            Exam Desk<br />Teacher&apos;s Workroom
           </p>
+          {/* 이 화면은 정적으로 미리 그려진다 — 호수는 브라우저에서 오늘 날짜로 채운다(IssueStamp) */}
+          <IssueStamp className="text-[10px]" />
         </div>
         <Image src="/logo.png" alt="" width={64} height={64} className="mx-auto mt-6" priority />
         <h1

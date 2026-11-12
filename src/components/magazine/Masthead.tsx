@@ -1,20 +1,5 @@
 import { cn } from '@/lib/utils';
-
-/** 영문 달 이름 — 머리띠 오른쪽 위의 'NOVEMBER' */
-const MONTHS_EN = [
-  'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
-  'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER',
-] as const;
-
-/**
- * 머리띠 오른쪽 위의 호수 두 줄 — 달이 곧 호수다(NO. 11 / 2026 NOVEMBER).
- * @param date - 기준 날짜
- * @returns [호수 줄, 연·달 줄]
- */
-export function issueLines(date: Date): [string, string] {
-  const month = date.getMonth();
-  return [`NO. ${String(month + 1).padStart(2, '0')}`, `${date.getFullYear()} ${MONTHS_EN[month]}`];
-}
+import IssueStamp from './IssueStamp';
 
 interface MastheadProps {
   /** 가운데 큰 제호(학원 이름) */
@@ -23,7 +8,7 @@ interface MastheadProps {
   subtitle: string;
   /** 맨 아래 작은 안내 한 줄 */
   note?: string;
-  /** 호수 날짜(기본 오늘) */
+  /** 호수 날짜(테스트용). 없으면 브라우저의 오늘 */
   date?: Date;
   className?: string;
 }
@@ -37,14 +22,13 @@ interface MastheadProps {
  * @returns 머리띠
  */
 export default function Masthead({ title, subtitle, note, date, className }: MastheadProps) {
-  const [issue, month] = issueLines(date ?? new Date());
   return (
     <section aria-label="표지" className={cn('border-b border-ink pt-1 pb-6 text-center', className)}>
-      <div aria-hidden="true" className="flex items-start justify-between gap-3">
-        <p className="text-left font-display text-[13px] leading-[1.45] text-ink">Exam Desk<br />Teacher&apos;s Workroom</p>
-        <p className="text-right font-label text-[10.5px] font-medium leading-[1.6] tracking-[0.14em] text-ink">
-          {issue}<br />{month}
+      <div className="flex items-start justify-between gap-3">
+        <p aria-hidden="true" className="text-left font-display text-[13px] leading-[1.45] text-ink">
+          Exam Desk<br />Teacher&apos;s Workroom
         </p>
+        <IssueStamp date={date} className="text-[10.5px]" />
       </div>
       <hr className="mx-auto mt-5 w-36 border-0 border-t border-gray-200" />
       <h1

@@ -7,9 +7,7 @@ import { Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { PrintPageStrip } from '@/components/print-scan';
-import {
-  PrintQaKeyView, PrintQaList, PrintQaPaperView, PrintQaSaveConflict, PrintQaStatusCard,
-} from '@/components/print-qa';
+import { PrintQaKeyView, PrintQaList, PrintQaPaperView, PrintQaSaveConflict, PrintQaStatusCard } from '@/components/print-qa';
 import { QuizReferencesSection, ReferencePickerDialog } from '@/components/passage-quiz';
 import { useAiEnabled } from '@/hooks/useAiEnabled';
 import { useBundlePageImages } from '@/hooks/useBundlePageImages';
