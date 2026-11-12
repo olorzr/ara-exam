@@ -436,6 +436,16 @@ src/
   드러나고 타입은 멀쩡했던 버그라, 컴파일에서 잡히게 해 두었다
 - 주요 파일: `option-select.tsx`(+ 회귀 테스트), `select.tsx`
 - `owner-scope-tabs.tsx` — '내가 만든 것 / 다른 선생님이 만든 것' 탭(문제지 조합·학교 프린트 시험지 목록). 패널은 탭마다 `TabsContent` 로 두고 목록은 고른 탭에만 그린다
+- 모양(2026-11-12 연한 민트 잡지 테마): 알약 단추(주 단추 잉크, `accent` 짙은 청록), 흰 종이 입력칸·카드(가는 줄, 그림자 없음), 밑줄 탭, 위 잉크 줄 대화창, 상태 꼬리표(`ok`·`warn`·`danger`·`info`)
+
+## 화면 테마 층 (styles/theme, components/magazine — 2026-11-12)
+- 역할: 화면만 연한 민트 '종이 잡지' 로 그린다. 종이에 찍히는 모양은 예전 그대로 둔다
+- 토큰: `globals.css` 의 `:root`(민트 책상 `--background`, 순백 종이 `--card`·`--popover`, 강조 `--primary` #0f766e, `--ink`·`--accent-soft`)와 `@theme { --color-gray-* }`(Tailwind 회색 계조를 민트 기운 잉크 계조로)
+- 인쇄 가드: `styles/theme/print-guard.css` — 종이(`.a4-sheet`·`.a4-measure`·`.book-cover`) 안과 `@media print` 의 문서 뿌리에서 옛 토큰·회색을 되살린다(테스트가 옛 값과 대조)
+- 화면 전용 덮기: `styles/theme/screen.css`(`@media screen` 만)
+- 글꼴: `app/layout.tsx` 의 next/font(Jost · 고운바탕) → `font-label`·`font-display`. 기본·인쇄 글꼴(`--font-sans`)은 그대로
+- 잡지 부품(`components/magazine`): `PageTitle`(화면 제목), `Masthead`(대시보드 머리띠), `SectionLabel`(구역 제목), `StatGrid`(숫자 격자)
+- 의존: components/ui · lib/utils 만(기능 모듈을 import 하지 않는다)
 
 ## lib/book (책 만들기 — 원장 전용, 2026-10-25 · 2026-10-26 대분류 분리)
 - 역할: 저장된 문제지를 장으로 묶은 책(A4 무선제본)의 설정·판·쪽 수 기록·책등 두께·표지 펼침면 치수, 그리고 `exam.books`·`exam.book_chapters`(sql/76·77) 읽기·쓰기
