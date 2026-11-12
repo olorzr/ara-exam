@@ -25,7 +25,7 @@ export default function ExamOriginalTab({ source }: ExamOriginalTabProps) {
   const pages = useImageResign(signed.urls);
   /** 못 불러온 쪽 — 다시 서명해도 깨졌거나, 처음 서명이 끝났는데 주소가 없고 다시 받는 중도 아닌 쪽 */
   const failed = (path: string) => pages.broken.has(path)
-    || (!signed.loading && !pages.urlOf(path) && !pages.pending.has(path));
+    || (!signed.loading && !pages.urlOf(path) && !pages.signing.has(path));
   const failedCount = pagePaths.filter(failed).length;
 
   return (
@@ -50,15 +50,16 @@ export default function ExamOriginalTab({ source }: ExamOriginalTabProps) {
             return (
               <li key={path} className="rounded-lg border border-gray-200 bg-card p-2">
                 <p className="mb-1 font-label text-xs font-bold text-gray-500">{i + 1} / {pagePaths.length}</p>
-                {url && !pages.broken.has(path) ? (
-                  // 서명 URL 이라 next/image 최적화 대상이 아니다
+                {url && pages.showable(path) ? (
+                  // 서명 URL 이라 next/image 최적화 대상이 아니다. 주소마다 새 요소 — 옛 주소의 오류가 새 시도에 섞이지 않게
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
+                    key={url}
                     src={url}
                     alt={`원본 ${i + 1}쪽`}
                     loading="lazy"
                     className="w-full"
-                    onError={() => pages.onError(path)}
+                    onError={() => pages.onError(path, url)}
                     onLoad={() => pages.onLoad(path)}
                   />
                 ) : (
