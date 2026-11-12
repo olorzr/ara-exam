@@ -44,6 +44,14 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // ⚠️⚠️ Turbopack 빌드 캐시를 끈다(2026-11-12). Next 16.3 은 이것이 기본으로 켜져 있고 Vercel 이
+    // 앞 배포의 캐시를 되살려 빌드하는데, 그 캐시에서 globals.css 결과물이 **옛것 그대로** 나왔다 —
+    // 0.9.82(화면 테마) 배포가 새 JS·HTML 에 옛 CSS 를 붙여 나가 잉크색 단추·체크 표시가 칠해지지 않고
+    // 흰 바탕에 흰 글자로 사라졌다. 로컬에서 '옛 커밋 빌드 → 새 커밋 빌드' 로 똑같이 재현되고,
+    // 이 값을 끄면 같은 순서에서도 새 CSS 가 나온다. 켜면 CSS 를 고친 배포가 또 조용히 옛 화면이 된다
+    turbopackFileSystemCacheForBuild: false,
+  },
   // 열어 둔 탭이 옛 코드인지 가르는 값 — 브라우저·서버 번들에 같은 글자로 박힌다(src/lib/build-id.ts).
   // 값이 없으면 'dev' 가 되어 감시가 조용히 꺼지므로 배포 뒤 /api/version 이 실제 값을 답하는지 볼 것.
   // ⚠️ `??` 로 잇지 말 것 — 빈 글자에서 멈춘다. 그렇게 쓴 판은 커밋 값을 줘도 'dev' 를 답했다
