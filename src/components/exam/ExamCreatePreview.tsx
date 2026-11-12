@@ -67,7 +67,7 @@ export default function ExamCreatePreview({
         )}
 
         <Button
-          className="w-full bg-primary hover:bg-primary-hover text-white"
+          className="w-full"
           onClick={onCreate}
           disabled={creating || wordsLoading || wordsFailed || totalQuestions < MIN_EXAM_WORDS}
         >

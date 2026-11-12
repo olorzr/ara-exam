@@ -52,7 +52,7 @@ export default function WordEditDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>취소</Button>
-          <Button className="bg-primary hover:bg-primary-hover text-white" onClick={onSave}>
+          <Button onClick={onSave}>
             저장
           </Button>
         </DialogFooter>

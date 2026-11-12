@@ -1,15 +1,14 @@
 "use client"
 
-import { useTheme } from "next-themes"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
 
+// 이 앱은 라이트 고정이다(다크 모드 없음, ThemeProvider 없음). 예전엔 next-themes 의 기본값 'system' 으로
+// 떨어져 OS 가 다크면 토스트만 어둡게 나왔다
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme()
-
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
+      theme="light"
       className="toaster group"
       icons={{
         success: (

@@ -76,7 +76,6 @@ export default function PrintQaStatusCard({
                 type="button"
                 size="sm"
                 variant={empty ? 'default' : 'outline'}
-                className={empty ? 'bg-primary text-white hover:bg-primary-hover' : undefined}
                 disabled={!aiEnabled || saving}
                 title={aiEnabled ? undefined : 'ChatGPT 연결이 필요해요'}
                 onClick={onSplit}

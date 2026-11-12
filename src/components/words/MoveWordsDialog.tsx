@@ -92,7 +92,6 @@ export default function MoveWordsDialog({
         <DialogFooter>
           <Button variant="outline" onClick={() => handleOpenChange(false)}>취소</Button>
           <Button
-            className="bg-primary hover:bg-primary-hover text-white"
             disabled={!targetCategory}
             onClick={handleConfirm}
           >

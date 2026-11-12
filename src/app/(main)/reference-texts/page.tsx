@@ -57,7 +57,7 @@ export default function ReferenceTextsPage() {
         {isOwner && (
           <div className="flex gap-2">
             <Link href="/reference-texts/new">
-              <Button className="bg-primary hover:bg-primary-hover text-white">
+              <Button>
                 <PlusCircle className="mr-2 h-4 w-4" />
                 작품 전문 올리기
               </Button>

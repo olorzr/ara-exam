@@ -51,7 +51,7 @@ export default function AiPickSection(props: AiPickSectionProps) {
         <Button
           type="button"
           size="sm"
-          className="flex-1 bg-primary text-white hover:bg-primary-hover"
+          className="flex-1"
           onClick={pick.run}
           disabled={pick.running}
         >

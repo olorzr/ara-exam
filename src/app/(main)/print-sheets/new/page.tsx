@@ -121,7 +121,6 @@ export default function PrintSheetNewPage() {
           type="button"
           onClick={create}
           disabled={saving}
-          className="bg-primary text-white hover:bg-primary-hover"
         >
           {saving ? '만드는 중…' : '만들고 입력하기'}
         </Button>

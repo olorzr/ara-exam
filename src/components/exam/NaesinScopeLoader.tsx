@@ -211,7 +211,7 @@ export default function NaesinScopeLoader({ categories, onApply }: NaesinScopeLo
                 ].filter(Boolean).join(' · ')}
               </p>
             )}
-            <Button size="sm" className="mt-2 bg-primary hover:bg-primary-hover text-white" onClick={handleApply}>
+            <Button size="sm" className="mt-2" onClick={handleApply}>
               이 범위로 카테고리 자동 선택
             </Button>
             {unmatched.length > 0 && (

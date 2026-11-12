@@ -213,7 +213,6 @@ export default function WordEntryTable({
         <div className="flex justify-between items-center">
           <p className="text-sm text-gray-500">유효 단어: {validCount}개</p>
           <Button
-            className="bg-primary hover:bg-primary-hover text-white"
             onClick={onSave}
             disabled={saving}
           >

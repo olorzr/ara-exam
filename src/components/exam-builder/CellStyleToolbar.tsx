@@ -10,10 +10,14 @@ const BORDER_SIDES = [
   { attr: 'borderRight', label: '右', title: '오른쪽 테두리', svg: 'M14 2v12' },
 ] as const;
 
-/** 배경색 프리셋 */
+/**
+ * 배경색 프리셋.
+ * ⚠️ 회색 견본은 Tailwind 클래스(bg-gray-100)가 아니라 저장값 그대로 그린다 — 화면 테마가 회색 계조를
+ *    민트 기운으로 바꿔서(2026-11-12), 클래스로 그리면 견본과 실제로 저장·인쇄되는 #F3F4F6 이 달라진다.
+ */
 const BG_COLORS = [
   { value: null, label: '없음', css: 'bg-white' },
-  { value: '#F3F4F6', label: '회색', css: 'bg-gray-100' },
+  { value: '#F3F4F6', label: '회색', css: 'bg-[#F3F4F6]' },
   { value: '#FEF3C7', label: '노랑', css: 'bg-amber-100' },
   { value: '#DBEAFE', label: '파랑', css: 'bg-blue-100' },
   { value: '#D1FAE5', label: '초록', css: 'bg-emerald-100' },

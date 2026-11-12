@@ -48,7 +48,7 @@ function WordsContent() {
             </Button>
           </Link>
           <Link href="/words/new">
-            <Button className="bg-primary hover:bg-primary-hover text-white">
+            <Button>
               <PlusCircle className="h-4 w-4 mr-2" />
               단어 추가
             </Button>

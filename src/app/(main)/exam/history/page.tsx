@@ -28,7 +28,7 @@ export default function ExamHistoryPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">단어 시험지</h1>
         <Link href="/exam/create">
-          <Button className="bg-primary hover:bg-primary-hover text-white">
+          <Button>
             <FileText className="h-4 w-4 mr-2" />
             새 시험지
           </Button>

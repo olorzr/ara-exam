@@ -1,0 +1,78 @@
+/* ── 인쇄 가드 — 화면 테마(연한 민트 종이, 2026-11-12)가 종이에 찍히는 것으로 새지 않게 한다 ──────────
+   화면 테마는 globals.css 의 `:root` 토큰과 Tailwind 회색 계조(`--color-gray-*`)를 바꿔 전 화면을
+   한 번에 옮긴다. 그런데 인쇄 시트 안에도 Tailwind 회색·`rounded-*`(= --radius)·기본 테두리색
+   (= --border)·`text-primary` 를 쓰는 곳이 있다(ExamPrintHeader · WordBookView · ExamSheetRenderer ·
+   ReferenceTextView 머리, 문제지의 번호 어긋남 안내). 그래서 아래 두 겹으로 **옛 값**을 되살린다.
+
+   ① 화면 미리보기 — 종이(`.a4-sheet`)·측정 사본(`.a4-measure`)·책 표지(`.book-cover`) 안.
+      `:where()` + `@layer base` 라 특이성이 0 이다 — 종이 안 컴포넌트가 직접 정한 값은 언제나 이긴다.
+   ② 인쇄 — 문서 뿌리(`html:root`)에서 통째로. 시트 밖에서 찍히는 것(작품 전문 머리, 번호 어긋남
+      안내)까지 덮는다. `html:root`(0,1,1) 라 이 파일보다 **뒤에** 오는 globals.css 의 `:root`(0,1,0) 를
+      순서와 무관하게 이긴다.
+
+   ⚠️ 두 묶음은 옛 `:root` 값·Tailwind 기본값과 글자 그대로 같아야 한다 — print-guard.test.ts 가 대조한다.
+   ⚠️ `--foreground`·`--font-sans`·`--color-white` 는 화면 테마가 바꾸지 않는다(시트가 물려받는다). 바꾸게
+      되면 여기에도 더할 것.
+   ⚠️ 값을 `var()` 로 간접 참조하지 말 것 — 뿌리에서 풀린 값이 상속돼 범위 안에서 되돌아가지 않는다. */
+
+@layer base {
+  :where(.a4-sheet, .a4-measure, .book-cover) {
+    --background: #FFFFFF;
+    --card: #FFFFFF;
+    --popover: #FFFFFF;
+    --primary: #81D8D0;
+    --primary-hover: #6bc4bc;
+    --primary-foreground: #ffffff;
+    --secondary: #F8FAFB;
+    --muted: #F8F9FA;
+    --muted-foreground: oklch(0.556 0 0);
+    --accent: #F0FDFA;
+    --accent-foreground: oklch(0.205 0 0);
+    --border: #E5E7EB;
+    --input: #E5E7EB;
+    --ring: #81D8D0;
+    --radius: 0.625rem;
+    --color-gray-50: oklch(98.5% 0.002 247.839);
+    --color-gray-100: oklch(96.7% 0.003 264.542);
+    --color-gray-200: oklch(92.8% 0.006 264.531);
+    --color-gray-300: oklch(87.2% 0.01 258.338);
+    --color-gray-400: oklch(70.7% 0.022 261.325);
+    --color-gray-500: oklch(55.1% 0.027 264.364);
+    --color-gray-600: oklch(44.6% 0.03 256.802);
+    --color-gray-700: oklch(37.3% 0.034 259.733);
+    --color-gray-800: oklch(27.8% 0.033 256.848);
+    --color-gray-900: oklch(21% 0.034 264.665);
+    --color-gray-950: oklch(13% 0.028 261.692);
+  }
+}
+
+@media print {
+  html:root {
+    --background: #FFFFFF;
+    --card: #FFFFFF;
+    --popover: #FFFFFF;
+    --primary: #81D8D0;
+    --primary-hover: #6bc4bc;
+    --primary-foreground: #ffffff;
+    --secondary: #F8FAFB;
+    --muted: #F8F9FA;
+    --muted-foreground: oklch(0.556 0 0);
+    --accent: #F0FDFA;
+    --accent-foreground: oklch(0.205 0 0);
+    --border: #E5E7EB;
+    --input: #E5E7EB;
+    --ring: #81D8D0;
+    --radius: 0.625rem;
+    --color-gray-50: oklch(98.5% 0.002 247.839);
+    --color-gray-100: oklch(96.7% 0.003 264.542);
+    --color-gray-200: oklch(92.8% 0.006 264.531);
+    --color-gray-300: oklch(87.2% 0.01 258.338);
+    --color-gray-400: oklch(70.7% 0.022 261.325);
+    --color-gray-500: oklch(55.1% 0.027 264.364);
+    --color-gray-600: oklch(44.6% 0.03 256.802);
+    --color-gray-700: oklch(37.3% 0.034 259.733);
+    --color-gray-800: oklch(27.8% 0.033 256.848);
+    --color-gray-900: oklch(21% 0.034 264.665);
+    --color-gray-950: oklch(13% 0.028 261.692);
+  }
+}

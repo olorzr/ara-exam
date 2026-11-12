@@ -22,22 +22,23 @@ interface NavLinkProps {
   onNavigate?: () => void;
 }
 
-/** 메뉴 항목 하나(링크). 그룹 하위인지 여부는 감싸는 목록이 들여쓰기로 표현한다. */
+/**
+ * 메뉴 항목 하나(링크). 잡지 목차처럼 글자만 둔다(2026-11-12 민트 잡지 테마 — 아이콘은 빼고,
+ * 고른 항목은 옅은 민트 알약 + 굵은 글씨). 색만으로 알리지 않도록 굵기도 함께 바뀐다.
+ */
 function NavLink({ item, active, onNavigate }: NavLinkProps) {
-  const Icon = item.icon;
   return (
     <Link
       href={item.href}
       onClick={onNavigate}
       aria-current={active ? 'page' : undefined}
       className={cn(
-        'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors',
+        'flex items-center rounded-full px-3 py-1.5 text-sm transition-colors',
         active
-          ? 'bg-primary/15 font-semibold text-gray-900'
-          : 'font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900',
+          ? 'bg-accent-soft font-bold text-ink'
+          : 'font-medium text-gray-700 hover:bg-ink/5 hover:text-ink',
       )}
     >
-      {Icon && <Icon className={cn('h-4 w-4 shrink-0', active && 'text-primary')} />}
       <span className="truncate">{item.label}</span>
     </Link>
   );
@@ -55,30 +56,33 @@ interface NavGroupProps {
 
 /** 접기/펼치기가 되는 상위 카테고리와 그 하위 항목들 */
 function NavGroup({ section, pathname, open, active, onToggle, onNavigate }: NavGroupProps) {
-  const Icon = section.icon;
   const listId = `nav-group-${section.id}`;
 
   return (
-    <li>
+    <li className="pt-3 first:pt-0">
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={open}
         aria-controls={listId}
         className={cn(
-          'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors',
-          !open && active ? 'bg-primary/15 text-gray-900' : 'text-gray-700 hover:bg-gray-50',
+          'flex w-full items-baseline gap-2 rounded-full px-3 py-1 text-left transition-colors',
+          !open && active ? 'bg-accent-soft' : 'hover:bg-ink/5',
         )}
       >
-        <Icon className={cn('h-4 w-4 shrink-0', !open && active && 'text-primary')} />
-        <span className="truncate">{section.label}</span>
+        <span aria-hidden="true" className="font-label text-[10px] font-extrabold tracking-[0.18em] text-ink">
+          {section.labelEn}
+        </span>
+        <span className={cn('truncate font-display text-[13px] text-gray-500', !open && active && 'font-bold text-ink')}>
+          {section.label}
+        </span>
         <ChevronDown
-          className={cn('ml-auto h-4 w-4 shrink-0 text-gray-400 transition-transform', !open && '-rotate-90')}
+          className={cn('ml-auto h-3.5 w-3.5 shrink-0 self-center text-gray-400 transition-transform', !open && '-rotate-90')}
         />
       </button>
 
       {open && (
-        <ul id={listId} className="mt-0.5 ml-4 space-y-0.5 border-l border-gray-200 pl-2">
+        <ul id={listId} className="mt-1 space-y-0.5">
           {section.items.map((item) => (
             <li key={item.href}>
               <NavLink item={item} active={isNavItemActive(pathname, item)} onNavigate={onNavigate} />
@@ -124,7 +128,7 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       return next;
     });
 
-  const renderSection = (section: NavSection) => {
+  const renderSection = (section: NavSection, index: number) => {
     if (section.kind === 'group') {
       return (
         <NavGroup
@@ -138,8 +142,9 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         />
       );
     }
-    return section.items.map((item) => (
-      <li key={item.href}>
+    // 그룹 제목이 없는 구간은 앞 구간과 한 칸 띄운다(목차의 꼭지 사이)
+    return section.items.map((item, i) => (
+      <li key={item.href} className={i === 0 && index > 0 ? 'pt-3' : undefined}>
         <NavLink item={item} active={isNavItemActive(pathname, item)} onNavigate={onNavigate} />
       </li>
     ));
@@ -149,37 +154,42 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const footerSections = sections.filter((section) => section.footer);
 
   return (
-    <div className="flex h-full flex-col bg-white">
-      {/* 브랜드 */}
+    <div className="flex h-full flex-col bg-background">
+      {/* 브랜드 — 학원 이름은 로고 글꼴(지마켓 산스) 그대로, 아래에 잡지 제호 같은 영문 한 줄 */}
       <Link
         href="/dashboard"
         onClick={onNavigate}
-        className="flex h-16 shrink-0 items-center gap-2 border-b border-gray-200 px-4"
+        className="mx-3 flex h-16 shrink-0 items-center gap-2.5 border-b-2 border-ink px-1"
       >
-        <Image src="/logo.png" alt="아라국어논술" width={32} height={32} />
-        <span
-          className="truncate text-base font-bold text-gray-900"
-          style={{ fontFamily: "'Gmarket Sans', sans-serif" }}
-        >
-          아라국어논술
+        <Image src="/logo.png" alt="" width={32} height={32} />
+        <span className="flex min-w-0 flex-col">
+          <span
+            className="truncate text-base font-bold text-ink"
+            style={{ fontFamily: "'Gmarket Sans', sans-serif" }}
+          >
+            아라국어논술
+          </span>
+          <span aria-hidden="true" className="font-label text-[9.5px] font-bold tracking-[0.22em] text-ink">
+            EXAM DESK
+          </span>
         </span>
       </Link>
 
       {/* 메뉴 */}
-      <nav className="flex-1 overflow-y-auto px-3 py-3">
-        <ul className="space-y-1">{mainSections.map(renderSection)}</ul>
+      <nav aria-label="메뉴" className="flex-1 overflow-y-auto px-3 py-4">
+        <ul className="space-y-0.5">{mainSections.map(renderSection)}</ul>
       </nav>
 
       {/* 관리자 메뉴 + 계정 */}
-      <div className="shrink-0 border-t border-gray-200 px-3 py-3">
+      <div className="mx-3 shrink-0 border-t border-ink py-3">
         {footerSections.length > 0 && (
-          <ul className="mb-2 space-y-1">{footerSections.map(renderSection)}</ul>
+          <ul className="mb-2 space-y-0.5">{footerSections.map(renderSection)}</ul>
         )}
-        <p className="truncate px-3 pb-1 text-xs text-gray-400">{user?.email}</p>
+        <p className="truncate px-3 pb-1 text-xs text-gray-500">{user?.email}</p>
         <button
           type="button"
           onClick={signOut}
-          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-red-600"
+          className="flex w-full items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium text-gray-500 transition-colors hover:bg-ink/5 hover:text-red-700"
         >
           <LogOut className="h-4 w-4 shrink-0" />
           로그아웃

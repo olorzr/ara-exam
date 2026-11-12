@@ -53,6 +53,8 @@ export interface NavItemsSection extends NavSectionBase {
 export interface NavGroupSection extends NavSectionBase {
   kind: 'group';
   label: string;
+  /** 사이드바 목차의 영문 작은 대문자 라벨(잡지 테마, 2026-11-12) — 꾸밈이라 화면 읽기 프로그램에는 숨긴다 */
+  labelEn: string;
   icon: LucideIcon;
 }
 
@@ -107,6 +109,7 @@ export function buildNavSections(isAdmin: boolean): NavSection[] {
       kind: 'group',
       id: 'concept',
       label: '개념 관리',
+      labelEn: 'CONCEPT',
       icon: Lightbulb,
       items: [
         // 개념지 편집기(/exam/builder/new, /exam/builder/[id])도 이 항목에 속한다
@@ -124,6 +127,7 @@ export function buildNavSections(isAdmin: boolean): NavSection[] {
       kind: 'group',
       id: 'words',
       label: '단어',
+      labelEn: 'WORDS',
       icon: BookOpen,
       items: [
         // /words/new(단어 입력), /words/print(단어장)도 이 항목에 속한다
@@ -142,6 +146,7 @@ export function buildNavSections(isAdmin: boolean): NavSection[] {
       kind: 'group',
       id: 'problems',
       label: '문제 은행',
+      labelEn: 'PROBLEMS',
       icon: Library,
       items: [
         // 경로가 /problems 가 아니라 /problems/archive 인 이유: 활성 판정이 세그먼트
@@ -171,6 +176,7 @@ export function buildNavSections(isAdmin: boolean): NavSection[] {
             kind: 'group',
             id: 'books',
             label: '책 만들기',
+            labelEn: 'BOOKS',
             icon: BookMarked,
             items: [
               // 평가문제집이 보이는 유일한 문제지 조합 — 문제 은행의 조합 화면과 같은 화면이다(2026-11-05)

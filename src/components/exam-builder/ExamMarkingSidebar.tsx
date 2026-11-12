@@ -83,7 +83,7 @@ export default function ExamMarkingSidebar({
         </Button>
         <Button
           size="sm"
-          className="flex-1 bg-primary text-white hover:bg-primary-hover"
+          className="flex-1"
           onClick={onPreview}
           disabled={marks.length === 0}
         >

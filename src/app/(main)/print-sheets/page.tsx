@@ -69,7 +69,7 @@ export default function PrintSheetsPage() {
             </Button>
           </Link>
           <Link href="/print-sheets/upload">
-            <Button className="bg-primary hover:bg-primary-hover text-white">
+            <Button>
               <PlusCircle className="mr-2 h-4 w-4" />
               새 스캔 올리기
             </Button>

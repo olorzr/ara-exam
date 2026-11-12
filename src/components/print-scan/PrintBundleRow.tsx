@@ -161,7 +161,7 @@ export default function PrintBundleRow({
 
       {bundle.sheetId ? (
         <Link href={`/print-sheets/${bundle.id}`}>
-          <Button type="button" size="sm" className="bg-primary text-white hover:bg-primary-hover">
+          <Button type="button" size="sm">
             <FileText className="mr-1 h-3.5 w-3.5" />
             시험지 열기
           </Button>

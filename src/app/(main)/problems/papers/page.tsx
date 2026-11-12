@@ -39,7 +39,7 @@ export default function ProblemPapersPage() {
         </div>
         <Link
           href="/problems/papers/new"
-          className="shrink-0 rounded-md bg-primary px-3 py-2 text-sm text-white"
+          className="shrink-0 rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-ink/85"
         >
           + 문제지 만들기
         </Link>

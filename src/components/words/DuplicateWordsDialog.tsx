@@ -71,7 +71,6 @@ export default function DuplicateWordsDialog({
             수정하러 돌아가기
           </Button>
           <Button
-            className="bg-primary hover:bg-primary-hover text-white"
             onClick={onConfirmSkipDuplicates}
           >
             중복 제거하고 저장

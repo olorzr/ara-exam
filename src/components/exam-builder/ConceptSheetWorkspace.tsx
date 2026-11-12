@@ -96,7 +96,7 @@ export default function ConceptSheetWorkspace({
 
           <Button
             size="sm"
-            className="bg-primary hover:bg-primary-hover text-white ml-auto shrink-0"
+            className="ml-auto shrink-0"
             onClick={e.handleSave}
             disabled={e.saving}
           >

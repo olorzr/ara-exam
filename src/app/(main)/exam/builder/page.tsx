@@ -46,7 +46,7 @@ export default function ConceptListPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">📝 개념지</h1>
         <Link href="/exam/builder/new">
-          <Button className="bg-primary hover:bg-primary-hover text-white">
+          <Button>
             <PlusCircle className="h-4 w-4 mr-2" />
             새 개념지 만들기
           </Button>

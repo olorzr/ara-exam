@@ -143,7 +143,9 @@ export default function ProblemHtmlEditor({
   const yetClass = hasYetHangul(value) ? ` ${serif ? 'yet-hangul-serif' : 'yet-hangul'}` : '';
 
   return (
-    <div className={`pb-editor rounded-md border border-gray-200${yetClass}${literalPassageLabels ? ' pb-editor--literal-passage-labels' : ''}${reference ? ' pb-editor--reference' : ''}`}>
+    // bg-white: 문항 상자의 말머리가 흰 바탕으로 테두리를 가리므로 편집기는 늘 흰 종이 위에 둔다
+    // (민트 책상 위에 바로 놓이면 〈보기〉 말머리 뒤에 흰 조각이 보인다, 2026-11-12)
+    <div className={`pb-editor rounded-md border border-gray-200 bg-white${yetClass}${literalPassageLabels ? ' pb-editor--literal-passage-labels' : ''}${reference ? ' pb-editor--reference' : ''}`}>
       <ProblemEditorToolbar editor={editor} profile={profile} />
       <EditorContent editor={editor} className="px-3 py-2" style={{ minHeight }} />
     </div>

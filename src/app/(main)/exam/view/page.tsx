@@ -167,7 +167,7 @@ function ExamViewContent() {
             variant={viewMode === 'exam' ? 'default' : 'outline'}
             size="sm"
             onClick={() => { setViewMode('exam'); setShowAnswer(false); }}
-            className={viewMode === 'exam' ? 'bg-primary hover:bg-primary-hover text-white' : ''}
+            className={viewMode === 'exam' ? 'border-ink bg-ink text-white hover:bg-ink/85' : ''}
           >
             <FileText className="h-4 w-4 mr-1" />
             주관식 시험지
@@ -176,7 +176,7 @@ function ExamViewContent() {
             variant={viewMode === 'answer' ? 'default' : 'outline'}
             size="sm"
             onClick={() => { setViewMode('answer'); setShowAnswer(true); }}
-            className={viewMode === 'answer' ? 'bg-primary hover:bg-primary-hover text-white' : ''}
+            className={viewMode === 'answer' ? 'border-ink bg-ink text-white hover:bg-ink/85' : ''}
           >
             주관식 답안지
           </Button>
@@ -184,7 +184,7 @@ function ExamViewContent() {
             variant={viewMode === 'mc-exam' ? 'default' : 'outline'}
             size="sm"
             onClick={() => { setViewMode('mc-exam'); setShowAnswer(false); }}
-            className={viewMode === 'mc-exam' ? 'bg-primary hover:bg-primary-hover text-white' : ''}
+            className={viewMode === 'mc-exam' ? 'border-ink bg-ink text-white hover:bg-ink/85' : ''}
           >
             객관식 시험지
           </Button>
@@ -192,7 +192,7 @@ function ExamViewContent() {
             variant={viewMode === 'mc-answer' ? 'default' : 'outline'}
             size="sm"
             onClick={() => { setViewMode('mc-answer'); setShowAnswer(false); }}
-            className={viewMode === 'mc-answer' ? 'bg-primary hover:bg-primary-hover text-white' : ''}
+            className={viewMode === 'mc-answer' ? 'border-ink bg-ink text-white hover:bg-ink/85' : ''}
           >
             객관식 답안지
           </Button>
@@ -200,7 +200,7 @@ function ExamViewContent() {
             variant={viewMode === 'wordbook' ? 'default' : 'outline'}
             size="sm"
             onClick={() => { setViewMode('wordbook'); setShowAnswer(false); }}
-            className={viewMode === 'wordbook' ? 'bg-primary hover:bg-primary-hover text-white' : ''}
+            className={viewMode === 'wordbook' ? 'border-ink bg-ink text-white hover:bg-ink/85' : ''}
           >
             단어장
           </Button>

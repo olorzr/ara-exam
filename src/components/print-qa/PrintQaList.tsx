@@ -71,7 +71,6 @@ export default function PrintQaList({
           <Button
             type="button"
             size="sm"
-            className="bg-primary text-white hover:bg-primary-hover"
             disabled={disabled || items.length === 0 || picked.size === 0 || generateBlocker !== null}
             title={generateBlocker ?? undefined}
             onClick={onGenerate}

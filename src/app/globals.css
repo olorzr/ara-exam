@@ -36,6 +36,9 @@
 @import "../styles/book.css";
 @import "../styles/book-cover.css";
 @import "../styles/book-fonts.css";
+/* 화면 테마(연한 민트 종이) — 인쇄 가드가 종이 안과 인쇄에서 옛 값을 되살린다. 규칙은 CLAUDE.md '화면 테마 층' */
+@import "../styles/theme/print-guard.css";
+@import "../styles/theme/screen.css";
 
 /* ── 옛한글 글꼴 — 네이버 나눔 옛한글(SIL OFL 1.1, public/fonts 자체 호스팅) ──────────────
    Pretendard 에는 첫가끝 조합형 자모가 없어 중세국어가 깨진 네모로 나온다. 세 얼굴을 둔다:
@@ -84,6 +87,11 @@
   --color-foreground: var(--foreground);
   --font-sans: "Pretendard Variable", Pretendard, "Nanum Barun Gothic YetHangul", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  /* 화면 전용 글꼴 — layout.tsx 의 next/font 변수. 인쇄 시트는 쓰지 않는다(시트 글꼴은 --font-sans 그대로) */
+  --font-label: var(--font-jost), "Futura", "Avenir Next", system-ui, sans-serif;
+  --font-display: var(--font-gowun), "Gowun Batang", "Nanum Barun Gothic YetHangul", "Pretendard Variable", Pretendard, serif;
+  --color-ink: var(--ink);
+  --color-accent-soft: var(--accent-soft);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -123,32 +131,57 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* 화면 회색 계조 — 연한 민트 기운이 도는 잉크 계조(2026-11-12). Tailwind 기본 gray 를 덮어 회색 클래스
+   858곳이 한 번에 옮겨 간다. ⚠️ `@theme inline` 이나 `var()` 로 쓰지 말 것 — 인쇄 가드가 종이 안에서
+   옛 값으로 되돌리려면 유틸리티가 이 변수를 **참조**해야 하고, 값은 글자 그대로여야 한다.
+   400·500 은 민트 책상(#e8f6f2) 위에서도 읽히게 Tailwind 기본보다 짙다(500 은 5.6 : 1). */
+@theme {
+  --color-gray-50: #f3fbf9;
+  --color-gray-100: #e3efeb;
+  --color-gray-200: #c3dbd4;
+  --color-gray-300: #a7c1ba;
+  --color-gray-400: #6b827c;
+  --color-gray-500: #4d6560;
+  --color-gray-600: #3d524d;
+  --color-gray-700: #2e403c;
+  --color-gray-800: #1f2e2b;
+  --color-gray-900: #15211f;
+  --color-gray-950: #0c1513;
+}
+
+/* 화면 테마 — 연한 민트 책상 위에 흰 종이, 잉크 글자, 짙은 청록 강조 하나(아라마나방 잡지 결, 2026-11-12).
+   ⚠️ 종이(--card·--popover)는 순백이어야 한다 — 문항 상자의 말머리가 흰 바탕으로 테두리를 가린다.
+   ⚠️ --foreground 는 옛 값 그대로다 — 인쇄 시트가 물려받는다. 바꾸면 print-guard.css 에도 더할 것.
+   여기서 바꾼 토큰은 print-guard.css 가 종이 안과 인쇄에서 옛 값으로 되돌린다(print-guard.test.ts). */
 :root {
-  --background: #FFFFFF;
+  color-scheme: light;
+  --background: #e8f6f2;
   --foreground: oklch(0.145 0 0);
-  --card: #FFFFFF;
+  --card: #ffffff;
   --card-foreground: oklch(0.145 0 0);
-  --popover: #FFFFFF;
+  --popover: #ffffff;
   --popover-foreground: oklch(0.145 0 0);
-  --primary: #81D8D0;
-  --primary-hover: #6bc4bc;
+  --primary: #0f766e;
+  --primary-hover: #0b5f58;
   --primary-foreground: #ffffff;
-  --secondary: #F8FAFB;
+  --secondary: #f3fbf9;
   --secondary-foreground: oklch(0.205 0 0);
-  --muted: #F8F9FA;
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: #F0FDFA;
+  --muted: #f3fbf9;
+  --muted-foreground: #4d6560;
+  --accent: #dcf1ec;
   --accent-foreground: oklch(0.205 0 0);
+  --accent-soft: #c9ece6;
+  --ink: #15211f;
   --destructive: oklch(0.58 0.22 27);
-  --border: #E5E7EB;
-  --input: #E5E7EB;
-  --ring: #81D8D0;
+  --border: #c3dbd4;
+  --input: #c3dbd4;
+  --ring: #0f766e;
   --chart-1: oklch(0.809 0.105 251.813);
   --chart-2: oklch(0.623 0.214 259.815);
   --chart-3: oklch(0.546 0.245 262.881);
   --chart-4: oklch(0.488 0.243 264.376);
   --chart-5: oklch(0.424 0.199 265.638);
-  --radius: 0.625rem;
+  --radius: 0.25rem;
   --sidebar: #F9FAFB;
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: #81D8D0;
