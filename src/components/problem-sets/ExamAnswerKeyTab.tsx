@@ -1,9 +1,9 @@
 'use client';
 
-import { FileText } from 'lucide-react';
 import { useSignedImageUrls } from '@/hooks/useSignedImageUrls';
 import { PDF_VIEW_MAX_PAGES, usePdfUrlPages } from '@/hooks/usePdfUrlPages';
 import { isPdfPath } from '@/lib/problem-bank/exam-view-files';
+import SignedFileButton from './SignedFileButton';
 
 interface ExamAnswerKeyTabProps {
   /** `problem_sources.answer_key_paths` */
@@ -57,17 +57,8 @@ function AnswerKeyFile({ path, index, count, url, failed, onRetry }: {
     <section className="space-y-2 rounded-lg border border-gray-200 bg-card p-3">
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <span className="font-label font-bold">{title}</span>
-        {url && (
-          <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 font-semibold text-ink underline underline-offset-2"
-          >
-            <FileText className="h-4 w-4" aria-hidden="true" />
-            {pdf ? '답지 PDF 새 탭에서 열기' : '새 탭에서 열기'}
-          </a>
-        )}
+        {/* 누를 때 새로 서명한다 — 화면을 열 때 받은 주소는 한 시간이면 만료된다(코덱스 2R) */}
+        <SignedFileButton path={path}>{pdf ? '답지 PDF 새 탭에서 열기' : '새 탭에서 열기'}</SignedFileButton>
       </div>
 
       {failed ? (

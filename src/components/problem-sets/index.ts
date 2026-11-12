@@ -6,3 +6,4 @@ export { default as SetSourceList } from './SetSourceList';
 export { default as ExamItemsTab } from './ExamItemsTab';
 export { default as ExamOriginalTab } from './ExamOriginalTab';
 export { default as ExamAnswerKeyTab } from './ExamAnswerKeyTab';
+export { default as SignedFileButton } from './SignedFileButton';
