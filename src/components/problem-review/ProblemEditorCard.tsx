@@ -211,11 +211,11 @@ export default function ProblemEditorCard({
           {problem.number !== null ? `${problem.number}번` : '번호 없음'}
         </button>
         <Badge variant="outline">{problem.page_no}쪽</Badge>
-        {missingAnswer && <Badge className="bg-amber-500 text-white">정답 미입력</Badge>}
+        {missingAnswer && <Badge variant="warn">정답 미입력</Badge>}
         {issues && issues.length > 0 && (
-          <Badge className="bg-amber-500 text-white">확인 필요 {issues.length}</Badge>
+          <Badge variant="warn">확인 필요 {issues.length}</Badge>
         )}
-        {dirty && <Badge className="bg-sky-500 text-white">저장 안 됨</Badge>}
+        {dirty && <Badge variant="info">저장 안 됨</Badge>}
         {problem.render_mode === 'image' && <Badge variant="outline">이미지 출제</Badge>}
 
         <div className="ml-auto flex items-center gap-1">

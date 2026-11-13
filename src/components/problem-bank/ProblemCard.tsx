@@ -127,7 +127,7 @@ export default function ProblemCard({
         <div className="flex flex-wrap items-center gap-1.5">
           <Badge variant="outline">{problem.question_type}</Badge>
           {problem.render_mode === 'image' && <Badge variant="outline">이미지</Badge>}
-          {!problem.answer && <Badge className="bg-amber-500 text-white">정답 없음</Badge>}
+          {!problem.answer && <Badge variant="warn">정답 없음</Badge>}
         </div>
 
         <p className="mt-1 text-sm text-gray-800">{excerptHtml(problem.stem_html, EXCERPT_LENGTH)}</p>
@@ -143,13 +143,9 @@ export default function ProblemCard({
               다 쓰면 카드 한 줄이 경로 세 벌로 가득 찬다. 전체는 title 로 확인한다.
               중간 마디로 태깅된 문항('단어 > 품사')이면 '품사' 가 나온다 */}
           {problem.grammar_paths.map((path) => (
-            <span
-              key={path}
-              title={path}
-              className="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600"
-            >
+            <Badge key={path} title={path} variant="secondary">
               {parseGrammarPath(path).at(-1) ?? path}
-            </span>
+            </Badge>
           ))}
           {showEditLink && !selectMode && (
             <Link

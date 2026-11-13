@@ -10,6 +10,7 @@ import type { ProblemPaper } from '@/types/problem-bank';
 import PaperEditEntry from './PaperEditEntry';
 import PaperGradeSyncButton from './PaperGradeSyncButton';
 import PaperPrintLayoutToggle from './PaperPrintLayoutToggle';
+import { Badge } from '@/components/ui/badge';
 
 /** 보기 모드 — 문제지 / 교사용 / 답지 */
 export type PaperViewMode = 'paper' | 'teacher' | 'key';
@@ -69,12 +70,7 @@ export default function PaperViewToolbar({
       <span className="ml-2 font-semibold text-gray-900">{paper.title}</span>
       <span className="text-sm text-gray-500">{itemCount}문항</span>
       {paper.settings.omr && (
-        <span
-          className="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary"
-          title="학원 성적 시스템에 시험으로 등록되고 90A 답안지로 채점해요"
-        >
-          OMR 채점
-        </span>
+        <Badge title="학원 성적 시스템에 시험으로 등록되고 90A 답안지로 채점해요">OMR 채점</Badge>
       )}
       <PaperEditEntry paperId={paper.id} refreshKey={syncRound} omr={paper.settings.omr} />
 

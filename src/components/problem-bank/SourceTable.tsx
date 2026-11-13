@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Trash2 } from 'lucide-react';
 import type { SourceListRow } from '@/lib/problem-bank/source-list';
+import { Badge } from '@/components/ui/badge';
 
 interface SourceTableProps {
   rows: SourceListRow[];
@@ -85,12 +86,13 @@ export default function SourceTable({ rows, refreshing, deleting, onDelete }: So
                     {row.title || '제목 없는 시험지'}
                   </Link>
                   {warnings > 0 && (
-                    <span
-                      className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-900"
+                    <Badge
+                      variant="warn"
+                      className="ml-2 align-middle"
                       title="적재할 때 남긴 확인거리 — 시험지 화면 위쪽에 모여 있어요"
                     >
                       확인 필요 {warnings}
-                    </span>
+                    </Badge>
                   )}
                 </td>
                 <td className="whitespace-nowrap px-3 py-2 text-gray-600">{row.source_type}</td>
@@ -103,9 +105,7 @@ export default function SourceTable({ rows, refreshing, deleting, onDelete }: So
                     <span className="tabular-nums text-gray-700">{row.problem_count}</span>
                   ) : (
                     // 문항이 없는 시험지는 적재가 덜 끝난 것이다 — 숫자 0 만 두면 눈에 안 띈다
-                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-900">
-                      문항 없음
-                    </span>
+                    <Badge variant="warn">문항 없음</Badge>
                   )}
                 </td>
                 <td className="whitespace-nowrap px-3 py-2 text-gray-500">{uploadedCell(row.created_at)}</td>

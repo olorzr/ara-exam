@@ -12,6 +12,7 @@ import type { OwnerScope } from '@/lib/owner-scope';
 import { paperEditHref } from '@/lib/problem-paper/paper-edit';
 import { normalizePaperSettings } from '@/lib/problem-paper/settings';
 import { PageTitle } from '@/components/magazine';
+import { Badge } from '@/components/ui/badge';
 
 /** 탭마다 빈 목록 문구 */
 const EMPTY_TEXT: Record<OwnerScope, string> = {
@@ -75,9 +76,7 @@ export default function ProblemPapersPage() {
                     {paper.title}
                     {/* 옛 문제지는 키가 없다 — 정규화해서 읽는다(문자열 'true' 로 켜지지 않게) */}
                     {normalizePaperSettings(paper.settings).omr && (
-                      <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 align-middle text-xs font-medium text-primary">
-                        OMR
-                      </span>
+                      <Badge className="ml-2 align-middle">OMR</Badge>
                     )}
                   </p>
                   <p className="mt-0.5 text-xs text-gray-500">

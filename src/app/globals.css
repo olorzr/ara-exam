@@ -89,6 +89,8 @@
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
   /* 화면 전용 글꼴 — layout.tsx 의 next/font 변수. 인쇄 시트는 쓰지 않는다(시트 글꼴은 --font-sans 그대로) */
   --font-label: var(--font-jost), "Futura", "Avenir Next", system-ui, sans-serif;
+  /* 꼬리표(Badge) — 숫자·영문은 Jost, 한글은 Pretendard. --font-label 은 한글이 시스템 글꼴로 떨어져 꼬리표 안에서 글꼴이 섞인다 */
+  --font-tag: var(--font-jost), "Pretendard Variable", Pretendard, system-ui, sans-serif;
   --font-display: var(--font-gowun), "Gowun Batang", "Nanum Barun Gothic YetHangul", "Pretendard Variable", Pretendard, serif;
   --color-ink: var(--ink);
   --color-accent-soft: var(--accent-soft);

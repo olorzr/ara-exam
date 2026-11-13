@@ -46,7 +46,7 @@ export default function PaperExcludeBar({ papers, answeredOnly, hidePaperId, onC
           {papers.map((paper) => (
             <li
               key={paper.id}
-              className="inline-flex items-center gap-1 rounded-full bg-gray-100 py-1 pl-2.5 pr-1 text-xs text-gray-700"
+              className="inline-flex items-center gap-1 rounded-full border border-ink bg-card py-0.5 pl-2.5 pr-1 text-xs text-ink"
             >
               <span className="max-w-56 truncate">{paper.title}</span>
               <span className="shrink-0 text-gray-500">· {paper.total_questions}문항</span>
@@ -54,7 +54,7 @@ export default function PaperExcludeBar({ papers, answeredOnly, hidePaperId, onC
                 type="button"
                 aria-label={`${paper.title} 빼기 풀기`}
                 onClick={() => setPapers(papers.filter((p) => p.id !== paper.id))}
-                className="rounded-full p-0.5 text-gray-500 hover:bg-gray-200 hover:text-gray-800"
+                className="rounded-full p-0.5 text-gray-500 hover:bg-accent-soft hover:text-ink"
               >
                 <X className="h-3 w-3" />
               </button>

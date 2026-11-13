@@ -221,11 +221,11 @@ export default function PassageEditorCard({
         <Badge variant="outline">문항 {problemCount}개</Badge>
         {passage.render_mode === 'image' && <Badge variant="outline">이미지 출제</Badge>}
         {backToText && (
-          <Badge className="bg-sky-500 text-white">저장하면 글로 출제</Badge>
+          <Badge variant="info">저장하면 글로 출제</Badge>
         )}
-        {dirty && <Badge className="bg-sky-500 text-white">저장 안 됨</Badge>}
+        {dirty && <Badge variant="info">저장 안 됨</Badge>}
         {issues && issues.length > 0 && (
-          <Badge className="bg-amber-500 text-white">확인 필요 {issues.length}</Badge>
+          <Badge variant="warn">확인 필요 {issues.length}</Badge>
         )}
 
         <div className="ml-auto flex items-center gap-1">

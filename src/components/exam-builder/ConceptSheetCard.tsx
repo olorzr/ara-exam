@@ -27,7 +27,7 @@ export default function ConceptSheetCard({ sheet, onDelete }: ConceptSheetCardPr
           {/* 상단: 레벨 뱃지 + 삭제 */}
           <div className="flex items-center justify-between mb-3">
             {/* 외부지문 level 은 '외부지문 및 프린트'라 길다 — 뱃지가 2줄로 접히지 않게 한다 */}
-            <Badge variant="outline" className="text-xs whitespace-nowrap">
+            <Badge variant="outline">
               {sheet.level}
             </Badge>
             <button

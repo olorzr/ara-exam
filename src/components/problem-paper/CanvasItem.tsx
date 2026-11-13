@@ -36,9 +36,9 @@ interface CanvasItemProps {
 
 /** 고치기 화면의 갈래 표시 — 새로 담은 문항 · 원본이 지워진 저장 항목 */
 function OriginBadge({ display }: { display: CanvasItemDisplay }) {
-  if (display.orphan) return <Badge variant="outline" className="ml-1 align-middle text-[10px]">원본 삭제됨</Badge>;
-  if (display.origin === 'new') return <Badge variant="secondary" className="ml-1 align-middle text-[10px]">새로 담음</Badge>;
-  if (display.origin === 'refresh') return <Badge variant="secondary" className="ml-1 align-middle text-[10px]">최신으로 바꿈</Badge>;
+  if (display.orphan) return <Badge variant="warn" className="ml-1 align-middle">원본 삭제됨</Badge>;
+  if (display.origin === 'new') return <Badge variant="secondary" className="ml-1 align-middle">새로 담음</Badge>;
+  if (display.origin === 'refresh') return <Badge variant="secondary" className="ml-1 align-middle">최신으로 바꿈</Badge>;
   return null;
 }
 
