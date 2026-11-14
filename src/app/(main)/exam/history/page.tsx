@@ -71,7 +71,7 @@ export default function ExamHistoryPage() {
                   <X className="h-4 w-4 mr-1" />
                   선택 취소
                 </Button>
-                <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-4 py-2">
+                <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-card px-4 py-2">
                   <Button variant="ghost" size="sm" onClick={h.toggleSelectAll} className="text-xs">
                     {h.isAllSelected ? '전체 해제' : '전체 선택'}
                   </Button>
@@ -102,7 +102,7 @@ export default function ExamHistoryPage() {
 
       {h.filteredExams.length > 0 ? (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-x-6 gap-y-7 sm:grid-cols-2 lg:grid-cols-3">
             {h.visibleExams.map((exam) => (
               <ExamHistoryCard
                 key={exam.id}
@@ -133,7 +133,7 @@ export default function ExamHistoryPage() {
         </div>
       ) : (
         <div className="text-center py-20">
-          <div className="text-5xl mb-4">-</div>
+          <FileText className="mx-auto mb-3 h-10 w-10 text-gray-300" aria-hidden="true" />
           <p className="text-sm text-gray-500 font-medium">아직 시험지가 없어요!</p>
           <p className="text-xs text-gray-400 mt-1">첫 시험지를 만들어볼까요?</p>
           <Link href="/exam/create">

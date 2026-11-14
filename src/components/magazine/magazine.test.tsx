@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { renderToString } from 'react-dom/server';
-import { IssueStamp, Masthead, PageTitle, SectionLabel, StatGrid, issueLines } from './index';
+import { IssueStamp, ItemNo, Masthead, PageTitle, PaperList, SectionLabel, StatGrid, TileHead, issueLines } from './index';
 
 describe('잡지 부품', () => {
   it('PageTitle — h1 의 이름은 한글 제목뿐이다(영문 라벨은 꾸밈이라 읽지 않는다)', () => {
@@ -56,5 +56,29 @@ describe('잡지 부품', () => {
     expect(screen.getByRole('heading', { level: 1, name: '아라국어논술' })).toBeTruthy();
     expect(container.querySelector('header')).toBeNull();
     expect(screen.getByText('환영해요')).toBeTruthy();
+  });
+
+  it('PaperList — 흰 종이 한 장에 점선으로 줄을 나눈다(상자 안의 상자가 아니다), 차례가 없으면 ul', () => {
+    const { container, rerender } = render(<PaperList aria-label="목록"><li>가</li><li>나</li></PaperList>);
+    const list = container.firstElementChild!;
+    expect(list.tagName).toBe('OL');
+    expect(list.className).toContain('divide-dashed');
+    expect(list.className).toContain('bg-card');
+    expect(list.getAttribute('aria-label')).toBe('목록');
+    rerender(<PaperList as="ul"><li>가</li></PaperList>);
+    expect(container.firstElementChild!.tagName).toBe('UL');
+  });
+
+  it('ItemNo — 두 자리 번호이고 화면 읽기 프로그램에는 숨긴다', () => {
+    render(<ItemNo n={3} />);
+    expect(screen.getByText('03').getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('TileHead — 라벨·번호는 꾸밈이라 숨기고, 옆에 둔 단추는 숨기지 않는다', () => {
+    render(<TileHead label="SHEET" no={7} />);
+    expect(screen.getByText('( SHEET )').getAttribute('aria-hidden')).toBe('true');
+    expect(screen.getByText('#07').getAttribute('aria-hidden')).toBe('true');
+    render(<TileHead label="TEST" aside={<button type="button">지우기</button>} />);
+    expect(screen.getByRole('button', { name: '지우기' })).toBeTruthy();
   });
 });

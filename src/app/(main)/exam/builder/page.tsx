@@ -123,7 +123,7 @@ export default function ConceptListPage() {
                   </span>
                 )}
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-x-6 gap-y-7 md:grid-cols-2">
                 {visible.map((sheet) => (
                   <ConceptSheetCard
                     key={sheet.id}

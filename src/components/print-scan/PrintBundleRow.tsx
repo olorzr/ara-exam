@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { BookA, FileText, ListChecks, RefreshCw, Trash2, Wand2 } from 'lucide-react';
+import { ItemNo } from '@/components/magazine';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { qaChip } from '@/lib/print-qa';
 import { bundleWarnings, isStalledReading } from '@/lib/print-scan/reading-state';
@@ -12,6 +14,8 @@ import PrintBundleStatusBadge from './PrintBundleStatusBadge';
 
 interface PrintBundleRowProps {
   bundle: BundleRow;
+  /** 스캔 안에서의 줄 번호(1부터) */
+  no: number;
   busy: boolean;
   aiEnabled: boolean;
   onRead: (bundle: BundleRow) => void;
@@ -21,23 +25,25 @@ interface PrintBundleRowProps {
 }
 
 /** 칩 색 — '확인 필요'(호박색)와 겹치지 않게 고른다. 단어·문답 칩이 함께 쓴다 */
-const CHIP_CLASS: Record<'ok' | 'muted' | 'error', string> = {
-  ok: 'bg-emerald-100 text-emerald-800',
-  muted: 'bg-gray-100 text-gray-600',
-  error: 'bg-red-100 text-red-700',
-};
+/** 단어·문답 칩의 꼬리표 갈래 — 공용 Badge(2026-11-14) */
+const CHIP_VARIANT = { ok: 'ok', muted: 'muted', error: 'danger' } as const;
+
+/** 눌러서 건너가는 칩 — 꼬리표는 그대로 두고 링크가 감싼다(꼬리표 자체는 모양을 덮을 수 없다) */
+const CHIP_LINK_CLASS = 'shrink-0 rounded-full transition-opacity hover:opacity-75 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink';
 
 /**
  * 목록의 프린트 한 줄.
  *
  * ⚠️ 줄 전체를 `<Link>` 로 감싸지 않는다 — 그 안에 버튼을 넣으면 잘못된 HTML 이고
  *    키보드로도 못 쓴다(문제지 목록과 같은 모양: flex 래퍼 + 링크 + 형제 버튼).
+ * 모양(2026-11-14): 종이 목록 한 줄 — 번호 · 이름 · 꼬리표 줄 · 메타, 단추는 넓으면 오른쪽, 좁으면 아래 줄이다.
+ *    예전엔 한 줄에 이름·꼬리표·단추를 다 넣어 휴대폰 폭에서 단추가 이름을 덮었다.
  * ⚠️ **'읽는중' 이라고 버튼을 무조건 잠그지 않는다.** 탭이 닫히면 그 상태로 남는데
  *    잠가 두면 지우고 다시 올리는 것 말고는 되살릴 길이 없다 — 오래 멈춘 것은
  *    확인창을 한 번 거쳐 다시 읽는다([reading-state.ts](@/lib/print-scan/reading-state)).
  */
 export default function PrintBundleRow({
-  bundle, busy, aiEnabled, onRead, onCreateSheet, onRegisterWords, onDelete,
+  bundle, no, busy, aiEnabled, onRead, onCreateSheet, onRegisterWords, onDelete,
 }: PrintBundleRowProps) {
   const meta = [
     bundle.school_name, bundle.year && `${bundle.year}학년도`,
@@ -73,132 +79,113 @@ export default function PrintBundleRow({
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-md border border-gray-200 px-3 py-2">
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-medium text-gray-900">{bundle.name}</span>
-          {typed ? (
-            <span className="shrink-0 rounded bg-sky-100 px-1.5 py-0.5 text-xs font-medium text-sky-800">
-              직접 입력
-            </span>
-          ) : (
-            <PrintBundleStatusBadge status={bundle.status} />
-          )}
-          {/* 읽히긴 했는데 빠진 데가 있는 것 — '읽기완료' 만 보고 그대로 인쇄하면 안 된다 */}
-          {warnings.length > 0 && (
-            <span
-              className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-900"
-              title={warnings.join('\n')}
-            >
-              확인 필요 {warnings.length}
-            </span>
-          )}
-          {words && (
-            wordsHref ? (
-              // 등록된 카테고리로 곧장 건너뛴다 — 어디 들어갔는지 찾아다니지 않게
-              <Link
-                href={wordsHref}
-                title={`${words.title}\n눌러서 단어 관리에서 확인`}
-                className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-medium underline-offset-2 hover:underline ${CHIP_CLASS[words.tone]}`}
-              >
-                {words.label}
+    <div className="flex flex-col gap-2.5 px-4 py-3 sm:flex-row sm:items-center">
+      <div className="flex min-w-0 flex-1 items-start gap-2">
+        <ItemNo n={no} />
+        <div className="min-w-0 flex-1">
+          <p className="text-[15px] leading-snug font-semibold break-keep text-ink">{bundle.name}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            {typed ? <Badge variant="secondary">직접 입력</Badge> : <PrintBundleStatusBadge status={bundle.status} />}
+            {/* 읽히긴 했는데 빠진 데가 있는 것 — '읽기완료' 만 보고 그대로 인쇄하면 안 된다 */}
+            {warnings.length > 0 && (
+              <Badge variant="warn" title={warnings.join('\n')}>확인 필요 {warnings.length}</Badge>
+            )}
+            {words && (
+              wordsHref ? (
+                // 등록된 카테고리로 곧장 건너뛴다 — 어디 들어갔는지 찾아다니지 않게
+                <Link href={wordsHref} title={`${words.title}\n눌러서 단어 관리에서 확인`} className={CHIP_LINK_CLASS}>
+                  <Badge variant={CHIP_VARIANT[words.tone]}>{words.label} ›</Badge>
+                </Link>
+              ) : (
+                <Badge variant={CHIP_VARIANT[words.tone]} title={words.title}>{words.label}</Badge>
+              )
+            )}
+            {qa && (
+              <Link href={`/print-sheets/${bundle.id}/qa`} title={`${qa.title}\n눌러서 문답 시험지 열기`} className={CHIP_LINK_CLASS}>
+                <Badge variant={CHIP_VARIANT[qa.tone]}>{qa.label} ›</Badge>
               </Link>
-            ) : (
-              <span
-                className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-medium ${CHIP_CLASS[words.tone]}`}
-                title={words.title}
-              >
-                {words.label}
-              </span>
-            )
-          )}
-          {qa && (
-            <Link
-              href={`/print-sheets/${bundle.id}/qa`}
-              title={`${qa.title}\n눌러서 문답 시험지 열기`}
-              className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-medium underline-offset-2 hover:underline ${CHIP_CLASS[qa.tone]}`}
-            >
-              {qa.label}
-            </Link>
-          )}
+            )}
+          </div>
+          <p className="mt-1 text-xs text-gray-500">
+            {meta || '학교 미지정'}
+            {!typed && ` · ${bundle.pages.length}쪽`}
+            {bundle.sheetId && ` · 빈칸 ${bundle.markCount}개`}
+            {bundle.include_handwriting && ' · 손글씨 포함'}
+          </p>
         </div>
-        <p className="truncate text-xs text-gray-500">
-          {meta || '학교 미지정'}
-          {!typed && ` · ${bundle.pages.length}쪽`}
-          {bundle.sheetId && ` · 빈칸 ${bundle.markCount}개`}
-          {bundle.include_handwriting && ' · 손글씨 포함'}
-        </p>
       </div>
 
-      {/*
-        읽어 둔 원문이 있으면 언제든 단어만 따로 등록할 수 있다 — 업로드 때 체크를 안 켠
-        프린트와 이 기능이 생기기 전에 올린 프린트를 되살리는 유일한 길이다.
-      */}
-      {hasOcrText && (
-        <Button
-          type="button" size="sm" variant="outline"
-          onClick={() => onRegisterWords(bundle)}
-          disabled={busy || !aiEnabled}
-          title={aiEnabled ? undefined : 'ChatGPT 연결이 필요해요'}
-        >
-          <BookA className="mr-1 h-3.5 w-3.5" />
-          {bundle.words_meta?.status === 'done' ? '단어 다시 등록' : '단어 등록'}
-        </Button>
-      )}
-
-      {/*
-        문답 프린트('N. 물음 … 답: 정답')를 문제지·교사용·답지로 뽑는 길.
-        빈칸 시험지와 **다른 화면**이고 같은 원문에서 나온다 — 읽어 둔 원문만 있으면 언제든 연다
-      */}
-      {hasOcrText && (
-        <Link href={`/print-sheets/${bundle.id}/qa`}>
-          <Button type="button" size="sm" variant="outline" disabled={busy}>
-            <ListChecks className="mr-1 h-3.5 w-3.5" />
-            문답 시험지
+      <div className="flex flex-wrap items-center gap-1.5 pl-9 sm:shrink-0 sm:justify-end sm:pl-0">
+        {/*
+          읽어 둔 원문이 있으면 언제든 단어만 따로 등록할 수 있다 — 업로드 때 체크를 안 켠
+          프린트와 이 기능이 생기기 전에 올린 프린트를 되살리는 유일한 길이다.
+        */}
+        {hasOcrText && (
+          <Button
+            type="button" size="sm" variant="outline"
+            onClick={() => onRegisterWords(bundle)}
+            disabled={busy || !aiEnabled}
+            title={aiEnabled ? undefined : 'ChatGPT 연결이 필요해요'}
+          >
+            <BookA className="mr-1 h-3.5 w-3.5" />
+            {bundle.words_meta?.status === 'done' ? '단어 다시 등록' : '단어 등록'}
           </Button>
-        </Link>
-      )}
+        )}
 
-      {bundle.sheetId ? (
-        <Link href={`/print-sheets/${bundle.id}`}>
-          <Button type="button" size="sm">
-            <FileText className="mr-1 h-3.5 w-3.5" />
-            시험지 열기
+        {/*
+          문답 프린트('N. 물음 … 답: 정답')를 문제지·교사용·답지로 뽑는 길.
+          빈칸 시험지와 **다른 화면**이고 같은 원문에서 나온다 — 읽어 둔 원문만 있으면 언제든 연다
+        */}
+        {hasOcrText && (
+          <Link href={`/print-sheets/${bundle.id}/qa`}>
+            <Button type="button" size="sm" variant="outline" disabled={busy}>
+              <ListChecks className="mr-1 h-3.5 w-3.5" />
+              문답 시험지
+            </Button>
+          </Link>
+        )}
+
+        {bundle.sheetId ? (
+          <Link href={`/print-sheets/${bundle.id}`}>
+            <Button type="button" size="sm">
+              <FileText className="mr-1 h-3.5 w-3.5" />
+              시험지 열기
+            </Button>
+          </Link>
+        ) : hasOcrText || typed ? (
+          // 읽어 둔 원문이 있으니 ChatGPT 를 다시 쓰지 않는다(직접 입력은 빈 시험지를 만든다)
+          <Button
+            type="button" size="sm" variant="outline"
+            onClick={() => onCreateSheet(bundle)}
+            disabled={busy}
+          >
+            <Wand2 className="mr-1 h-3.5 w-3.5" />
+            시험지 만들기
           </Button>
-        </Link>
-      ) : hasOcrText || typed ? (
-        // 읽어 둔 원문이 있으니 ChatGPT 를 다시 쓰지 않는다(직접 입력은 빈 시험지를 만든다)
-        <Button
-          type="button" size="sm" variant="outline"
-          onClick={() => onCreateSheet(bundle)}
+        ) : (
+          <Button
+            type="button" size="sm" variant="outline"
+            onClick={read}
+            disabled={busy || (reading && !stalled) || !aiEnabled}
+            title={reading
+              ? (stalled ? '읽는 중으로 멈춘 지 오래됐어요 — 다시 읽을 수 있어요' : '다른 탭에서 읽고 있을 수 있어요')
+              : undefined}
+          >
+            <RefreshCw className="mr-1 h-3.5 w-3.5" />
+            {bundle.status === '실패' || stalled ? '다시 읽기' : '읽기'}
+          </Button>
+        )}
+
+        <button
+          type="button"
+          onClick={() => onDelete(bundle)}
           disabled={busy}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-30"
+          aria-label={`${bundle.name} 지우기`}
         >
-          <Wand2 className="mr-1 h-3.5 w-3.5" />
-          시험지 만들기
-        </Button>
-      ) : (
-        <Button
-          type="button" size="sm" variant="outline"
-          onClick={read}
-          disabled={busy || (reading && !stalled) || !aiEnabled}
-          title={reading
-            ? (stalled ? '읽는 중으로 멈춘 지 오래됐어요 — 다시 읽을 수 있어요' : '다른 탭에서 읽고 있을 수 있어요')
-            : undefined}
-        >
-          <RefreshCw className="mr-1 h-3.5 w-3.5" />
-          {bundle.status === '실패' || stalled ? '다시 읽기' : '읽기'}
-        </Button>
-      )}
-
-      <button
-        type="button"
-        onClick={() => onDelete(bundle)}
-        disabled={busy}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-30"
-        aria-label={`${bundle.name} 지우기`}
-      >
-        <Trash2 className="h-4 w-4" />
-      </button>
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
     </div>
   );
 }

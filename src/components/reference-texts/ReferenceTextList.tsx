@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { Trash2 } from 'lucide-react';
+import { ItemNo, PaperList } from '@/components/magazine';
+import { Badge } from '@/components/ui/badge';
 import { unitKey, unitLabel } from '@/lib/reference-texts/units';
 import type { ReferenceTextListItem } from '@/types/reference-text';
 
@@ -35,24 +37,21 @@ interface ReferenceTextListProps {
  * @returns 목록
  */
 export default function ReferenceTextList({ rows, busyId, onDelete }: ReferenceTextListProps) {
+  // 종이 목록 한 장 + 공용 꼬리표(2026-11-14 — 예전엔 회색·남색 네모 칩이 섞였다)
   return (
-    <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200">
-      {rows.map((row) => (
-        <li key={row.id} className="flex items-center gap-2 px-3 py-2.5">
+    <PaperList as="ul">
+      {rows.map((row, index) => (
+        <li key={row.id} className="flex items-start gap-2 px-4 py-3">
+          <ItemNo n={index + 1} />
           <div className="min-w-0 flex-1">
-            <Link href={`/reference-texts/${row.id}`} className="block hover:underline">
-              <span className="block truncate text-sm font-medium text-gray-900">
-                <span
-                  className={`mr-1.5 inline-block rounded px-1.5 py-px align-[1px] text-[11px] font-medium ${
-                    row.kind === '개념' ? 'bg-indigo-50 text-indigo-700' : 'bg-gray-100 text-gray-600'}`}
-                >
-                  {row.kind}
-                </span>
-                {row.seq !== null && <span className="mr-1 text-xs font-normal text-gray-400">#{row.seq}</span>}
-                {row.title}
-                {row.note && <span className="ml-2 text-xs font-normal text-amber-700">{row.note}</span>}
+            <Link href={`/reference-texts/${row.id}`} className="group block">
+              <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                <Badge variant={row.kind === '개념' ? 'secondary' : 'outline'}>{row.kind}</Badge>
+                {row.seq !== null && <span className="font-label text-xs text-gray-400">#{row.seq}</span>}
+                <span className="text-[15px] leading-snug font-semibold break-keep text-ink group-hover:text-primary">{row.title}</span>
+                {row.note && <span className="text-xs text-amber-700">{row.note}</span>}
               </span>
-              <span className="mt-0.5 block truncate text-xs text-gray-400">
+              <span className="mt-0.5 block truncate text-xs text-gray-500">
                 {[
                   row.author,
                   `${row.char_count.toLocaleString()}자`,
@@ -62,19 +61,15 @@ export default function ReferenceTextList({ rows, busyId, onDelete }: ReferenceT
               </span>
             </Link>
             {(row.units.length > 0 || row.tags.length > 0) && (
-              <ul className="mt-1 flex flex-wrap gap-1" aria-label="실린 교과서 단원과 태그">
+              <ul className="mt-1.5 flex flex-wrap gap-1" aria-label="실린 교과서 단원과 태그">
                 {row.units.slice(0, UNITS_SHOWN).map((unit) => (
-                  <li key={unitKey(unit)} className="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600">
-                    {unitLabel(unit)}
-                  </li>
+                  <li key={unitKey(unit)} className="max-w-full"><Badge variant="muted" className="max-w-full"><span className="min-w-0 truncate">{unitLabel(unit)}</span></Badge></li>
                 ))}
                 {row.units.length > UNITS_SHOWN && (
-                  <li className="px-1 py-0.5 text-[11px] text-gray-400">외 {row.units.length - UNITS_SHOWN}</li>
+                  <li className="px-1 text-[11px] text-gray-400">외 {row.units.length - UNITS_SHOWN}</li>
                 )}
                 {row.tags.slice(0, TAGS_SHOWN).map((tag) => (
-                  <li key={`tag:${tag}`} className="rounded border border-primary/30 px-1.5 py-0.5 text-[11px] text-primary">
-                    #{tag}
-                  </li>
+                  <li key={`tag:${tag}`}><Badge variant="ok">#{tag}</Badge></li>
                 ))}
               </ul>
             )}
@@ -85,13 +80,13 @@ export default function ReferenceTextList({ rows, busyId, onDelete }: ReferenceT
               disabled={busyId !== null}
               onClick={() => onDelete(row)}
               aria-label={`${row.title} 지우기`}
-              className="h-8 w-8 shrink-0 rounded text-gray-400 hover:bg-gray-100 hover:text-red-600 disabled:opacity-50"
+              className="h-8 w-8 shrink-0 rounded-full text-gray-400 hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
             >
               <Trash2 className="mx-auto h-4 w-4" />
             </button>
           )}
         </li>
       ))}
-    </ul>
+    </PaperList>
   );
 }

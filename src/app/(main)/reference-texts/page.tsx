@@ -11,6 +11,7 @@ import { useReferenceTexts } from '@/hooks/useReferenceTexts';
 import { ALL_REFERENCE_TEXTS, describeAxis } from '@/lib/reference-texts/filters';
 import type { ReferenceTextListItem } from '@/types/reference-text';
 import { PageTitle } from '@/components/magazine';
+import { Badge } from '@/components/ui/badge';
 
 /**
  * 작품 전문 · 개념 목록 (`/reference-texts`).
@@ -109,7 +110,7 @@ export default function ReferenceTextsPage() {
 
             {axisLabel && (
               <p className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
-                <span className="rounded bg-primary/10 px-2 py-0.5 font-medium text-primary">{axisLabel}</span>
+                <Badge variant="secondary">{axisLabel}</Badge>
                 <button
                   type="button"
                   className="text-xs text-primary underline underline-offset-2"

@@ -1,7 +1,7 @@
 'use client';
 
 import { Trash2 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { PaperList } from '@/components/magazine';
 import { formatDateKR } from '@/lib/format';
 import { isTypedBundle } from '@/lib/print-scan/typed';
 import type { PrintBundleRow, PrintScanRow } from '@/types/print-scan';
@@ -35,37 +35,43 @@ function scanSummary(scan: PrintScanRow, creatorName?: string): string {
   ].filter(Boolean).join(' · ');
 }
 
-/** 스캔 한 건 + 그 안의 프린트들 */
+/**
+ * 스캔 한 건 + 그 안의 프린트들.
+ *
+ * 모양(2026-11-14, 원장님 "학교 프린트 시험지라던가 이런게 디자인이 안 예뻐"): 잉크 줄 머리(`( SCAN )` · 바탕체 제목) 아래
+ * 흰 종이 목록 한 장 — 예전엔 흰 카드 안에 회색 테두리 상자를 또 쌓았다(상자 안의 상자).
+ */
 export default function PrintScanCard({
   scan, busy, aiEnabled, onRead, onCreateSheet, onRegisterWords, onDeleteBundle, onDeleteScan,
   creatorName,
 }: PrintScanCardProps) {
   return (
-    <Card>
-      <CardContent className="space-y-3 py-4">
-        <div className="flex items-center gap-2">
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate text-base font-semibold text-gray-900">
-              {scan.title || '제목 없는 스캔'}
-            </h2>
-            <p className="text-xs text-gray-500">{scanSummary(scan, creatorName)}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => onDeleteScan(scan)}
-            disabled={busy}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-30"
-            aria-label={`${scan.title || '제목 없는 스캔'} 통째로 지우기`}
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+    <section className="space-y-2" aria-label={scan.title || '제목 없는 스캔'}>
+      <div className="flex items-start gap-2 border-t-2 border-ink pt-2">
+        <div className="min-w-0 flex-1">
+          <p aria-hidden="true" className="font-label text-[10px] font-medium tracking-[0.18em] text-gray-500">( SCAN )</p>
+          <h2 className="mt-0.5 font-display text-[19px] leading-snug font-bold break-keep text-ink">
+            {scan.title || '제목 없는 스캔'}
+          </h2>
+          <p className="mt-0.5 text-xs text-gray-500">{scanSummary(scan, creatorName)}</p>
         </div>
+        <button
+          type="button"
+          onClick={() => onDeleteScan(scan)}
+          disabled={busy}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-30"
+          aria-label={`${scan.title || '제목 없는 스캔'} 통째로 지우기`}
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
 
-        <div className="space-y-1.5">
-          {scan.bundles.map((bundle) => (
+      <PaperList>
+        {scan.bundles.map((bundle, index) => (
+          <li key={bundle.id}>
             <PrintBundleRowItem
-              key={bundle.id}
               bundle={bundle}
+              no={index + 1}
               busy={busy}
               aiEnabled={aiEnabled}
               onRead={onRead}
@@ -73,9 +79,9 @@ export default function PrintScanCard({
               onRegisterWords={onRegisterWords}
               onDelete={onDeleteBundle}
             />
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+          </li>
+        ))}
+      </PaperList>
+    </section>
   );
 }

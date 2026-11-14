@@ -459,6 +459,7 @@ src/
 - 잡지 부품(`components/magazine`): `PageTitle`(화면 제목), `Masthead`(대시보드 머리띠), `SectionLabel`(구역 제목), `StatGrid`(숫자 격자)
 - 의존: components/ui · lib/utils 만(기능 모듈을 import 하지 않는다)
 
+- **목록 조각(2026-11-14)**: `PaperList`(흰 종이 한 장 + 점선 줄 — 상자 안의 상자 금지)·`ItemNo`(`01` 줄 번호)·`TileHead`(`( SHEET )  #01` 꼭지 머리). 목록형(학교 프린트·문제지·작품 전문·개념·세트 한 장)은 PaperList, 카드형(개념지·단어 시험지·세트 카드·대시보드 빠른 실행)은 위아래 잉크 줄 꼭지다. 단추는 늘 보이게 두고(마우스를 올려야 보이는 단추 금지 — 태블릿), 좁은 화면에서는 아래 줄로 내린다
 ## lib/book (책 만들기 — 원장 전용, 2026-10-25 · 2026-10-26 대분류 분리)
 - 역할: 저장된 문제지를 장으로 묶은 책(A4 무선제본)의 설정·판·쪽 수 기록·책등 두께·표지 펼침면 치수, 그리고 `exam.books`·`exam.book_chapters`(sql/76·77) 읽기·쓰기
 - 의존: lib/print(constants `MM_TO_PX`), lib/problem-paper(cover 모델·cover-scale·settings), lib/problem-bank(storage·query-chain)

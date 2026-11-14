@@ -1,8 +1,10 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Trash2, FileText, Calendar, CornerDownRight } from 'lucide-react';
+import { Trash2, CornerDownRight } from 'lucide-react';
+import { TileHead } from '@/components/magazine';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { formatDateKR } from '@/lib/format';
 
@@ -42,57 +44,50 @@ export default function ExamHistoryCard({ exam, retakes = [], onDelete, onRetest
     router.push(`/exam/view?id=${exam.id}`);
   };
 
+  // 모양(2026-11-14, 원장님 "학교 프린트 시험지라던가 이런게 디자인이 안 예뻐"): 기출 세트 카드와 같은 잡지 꼭지 —
+  // 위아래 잉크 줄 · `( TEST )` · 바탕체 제목 · 점선. 예전엔 그러데이션 아이콘에 그림자가 뜨는 흰 카드였다.
+  // ⚠️ 재시험·지우기 단추는 **늘 보인다** — 예전엔 마우스를 올려야 나타나 태블릿·휴대폰에서는 누를 길이 없었다
   return (
-    <div className="space-y-0">
-      {/* 원본 시험 카드 — 클릭 시 시험지 보기로 이동 */}
+    <div className="space-y-2">
       <div
-        className={`group relative bg-white border rounded-xl p-5 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer ${selected ? 'border-primary ring-1 ring-primary/30' : 'border-gray-200'}`}
+        className={`group relative flex cursor-pointer flex-col border-y-2 border-ink pt-1.5 pb-3.5 text-ink ${selected ? 'bg-accent-soft/50' : ''}`}
         onClick={handleCardClick}
       >
-        <div className="flex items-start gap-3">
-          {selectMode && onToggleSelect && (
-            <div className="shrink-0 pt-1" onClick={(e) => e.stopPropagation()}>
+        <TileHead
+          label="TEST"
+          aside={selectMode && onToggleSelect && (
+            <span onClick={(e) => e.stopPropagation()}>
               <Checkbox
                 checked={selected}
                 onCheckedChange={() => onToggleSelect(exam.id)}
                 aria-label={`${exam.title} 선택`}
               />
-            </div>
+            </span>
           )}
-          <div className="shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center">
-            <FileText className="h-5 w-5 text-primary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="font-bold text-gray-900 truncate pr-24">{exam.title}</h3>
-            <div className="flex items-center gap-1.5 mt-1 text-xs text-gray-400">
-              <Calendar className="h-3 w-3 text-gray-300" />
-              <span>{formatDateKR(exam.created_at)}</span>
-            </div>
-          </div>
-        </div>
+        />
+        <h3 className="mt-2 font-display text-[17px] leading-snug font-bold break-keep group-hover:text-primary">{exam.title}</h3>
+        <p className="mt-1 text-xs text-gray-500">{formatDateKR(exam.created_at)}</p>
 
-        <div className="flex gap-2 mt-4">
-          <Badge variant="muted">
-            {exam.total_questions}문항
-          </Badge>
-          <Badge variant="ok">
-            합격 {exam.pass_count}개 ({exam.pass_percentage}%)
-          </Badge>
+        <hr className="my-2.5 border-0 border-t-2 border-dotted border-ink" />
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Badge variant="muted">{exam.total_questions}문항</Badge>
+          <Badge variant="ok">합격 {exam.pass_count}개 ({exam.pass_percentage}%)</Badge>
         </div>
 
         {!selectMode && (
-          <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button
+          <div className="mt-3 flex items-center gap-1">
+            <Button
+              type="button" size="sm" variant="outline"
               onClick={(e) => { e.stopPropagation(); onRetest(exam.id); }}
               disabled={retesting}
-              className="px-2.5 py-1 rounded-md text-xs font-semibold hover:bg-primary/10 text-primary border border-primary/30 transition-colors disabled:opacity-50"
               aria-label="재시험지 생성"
             >
               {retesting ? '생성중...' : '재시험'}
-            </button>
+            </Button>
             <button
+              type="button"
               onClick={(e) => { e.stopPropagation(); onDelete(exam.id); }}
-              className="p-1.5 rounded-md hover:bg-red-50 hover:text-red-500 text-gray-400 transition-colors"
+              className="ml-auto flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
               aria-label="시험지 삭제"
             >
               <Trash2 className="h-4 w-4" />
@@ -101,9 +96,9 @@ export default function ExamHistoryCard({ exam, retakes = [], onDelete, onRetest
         )}
       </div>
 
-      {/* 재시험 스레드 */}
+      {/* 재시험 스레드 — 원본 꼭지 아래 점선 줄기 */}
       {retakes.length > 0 && (
-        <div className="ml-6 border-l-2 border-primary/30 pl-4 space-y-2 pt-2">
+        <div className="ml-3 space-y-1.5 border-l-2 border-dotted border-ink pl-3">
           {retakes.map((retake) => (
             <RetakeItem key={retake.id} retake={retake} onDelete={onDelete} />
           ))}
@@ -124,32 +119,25 @@ function RetakeItem({ retake, onDelete }: RetakeItemProps) {
 
   return (
     <div
-      className="group relative flex items-center gap-3 bg-gray-50/60 border border-gray-200 rounded-lg px-4 py-3 hover:bg-white hover:shadow-sm transition-all duration-200 cursor-pointer"
+      className="group flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-card px-3 py-2"
       onClick={() => router.push(`/exam/view?id=${retake.id}`)}
     >
-      <CornerDownRight className="h-4 w-4 text-gray-300 shrink-0" />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-gray-700">
-            재시험 {retake.retake_number}차
-          </span>
-          <span className="text-xs text-gray-400">{formatDateKR(retake.created_at)}</span>
+      <CornerDownRight className="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="text-sm font-semibold text-ink group-hover:text-primary">재시험 {retake.retake_number}차</span>
+          <Badge variant="muted">{retake.total_questions}문항</Badge>
         </div>
-        <div className="flex gap-1.5 mt-1">
-          <Badge variant="muted">
-            {retake.total_questions}문항
-          </Badge>
-        </div>
+        <p className="mt-0.5 text-xs text-gray-500">{formatDateKR(retake.created_at)}</p>
       </div>
-      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete(retake.id); }}
-          className="p-1 rounded-md hover:bg-red-50 hover:text-red-500 text-gray-400 transition-colors"
-          aria-label="재시험지 삭제"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onDelete(retake.id); }}
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
+        aria-label="재시험지 삭제"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 }

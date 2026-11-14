@@ -1,6 +1,7 @@
 'use client';
 
 import { Trash2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { answerLineCount } from '@/lib/print-qa';
@@ -111,20 +112,14 @@ export default function PrintQaItemRow({
           )}
           {/* 원문과 글자가 다른 물음 — 옮겨 적다 바뀌었을 수 있다(문항은 그대로 둔다) */}
           {!item.verified && (
-            <span
-              className="rounded bg-red-100 px-1.5 py-0.5 text-[11px] font-medium text-red-700"
-              title="이 물음은 프린트 원문에서 글자 그대로 찾지 못했어요. 원본과 대조해 주세요."
-            >
+            <Badge variant="danger" title="이 물음은 프린트 원문에서 글자 그대로 찾지 못했어요. 원본과 대조해 주세요.">
               원문과 달라요
-            </span>
+            </Badge>
           )}
           {item.answerSource === 'ai' && item.evidenceSource === null && (
-            <span
-              className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-900"
-              title="자료에서 근거 구절을 찾지 못한 답이에요. 꼭 확인해 주세요."
-            >
+            <Badge variant="warn" title="자료에서 근거 구절을 찾지 못한 답이에요. 꼭 확인해 주세요.">
               근거 없음
-            </span>
+            </Badge>
           )}
         </div>
 

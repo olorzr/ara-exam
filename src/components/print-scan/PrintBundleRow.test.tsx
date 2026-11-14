@@ -15,7 +15,7 @@ const row = (over: Partial<BundleRow> = {}): BundleRow => ({
 const noop = vi.fn();
 const renderRow = (bundle: BundleRow) => render(
   <PrintBundleRow
-    bundle={bundle} busy={false} aiEnabled
+    bundle={bundle} no={1} busy={false} aiEnabled
     onRead={noop} onCreateSheet={noop} onRegisterWords={noop} onDelete={noop}
   />,
 );

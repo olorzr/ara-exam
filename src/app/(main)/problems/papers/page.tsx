@@ -11,7 +11,7 @@ import { usePaperList } from '@/hooks/usePaperList';
 import type { OwnerScope } from '@/lib/owner-scope';
 import { paperEditHref } from '@/lib/problem-paper/paper-edit';
 import { normalizePaperSettings } from '@/lib/problem-paper/settings';
-import { PageTitle } from '@/components/magazine';
+import { ItemNo, PageTitle, PaperList } from '@/components/magazine';
 import { Badge } from '@/components/ui/badge';
 
 /** 탭마다 빈 목록 문구 */
@@ -65,14 +65,13 @@ export default function ProblemPapersPage() {
             </CardContent>
           </Card>
         ) : (
-          <ul className="space-y-2">
-            {papers.map((paper) => (
-              <li
-                key={paper.id}
-                className="flex items-center gap-3 rounded-lg border border-gray-200 p-4"
-              >
-                <Link href={`/problems/papers/${paper.id}`} className="min-w-0 flex-1">
-                  <p className="font-semibold text-gray-900">
+          // 종이 목록 한 장 — 예전엔 줄마다 따로 테두리 상자였다(2026-11-14, 학교 프린트 목록과 같은 결)
+          <PaperList>
+            {papers.map((paper, index) => (
+              <li key={paper.id} className="flex items-start gap-2 px-4 py-3">
+                <ItemNo n={index + 1} />
+                <Link href={`/problems/papers/${paper.id}`} className="group min-w-0 flex-1">
+                  <p className="text-[15px] leading-snug font-semibold break-keep text-ink group-hover:text-primary">
                     {paper.title}
                     {/* 옛 문제지는 키가 없다 — 정규화해서 읽는다(문자열 'true' 로 켜지지 않게) */}
                     {normalizePaperSettings(paper.settings).omr && (
@@ -90,7 +89,7 @@ export default function ProblemPapersPage() {
                 {editStates.get(paper.id)?.reason === null && (
                   <Link
                     href={paperEditHref(paper.id, editStates.get(paper.id) ?? { inBook: false, workbook: false })}
-                    className="shrink-0 rounded p-2 text-gray-400 hover:bg-gray-100"
+                    className="shrink-0 rounded-full p-2 text-gray-400 hover:bg-accent-soft hover:text-ink"
                     aria-label={`${paper.title} 고치기`}
                   >
                     <Pencil className="h-4 w-4" />
@@ -100,7 +99,7 @@ export default function ProblemPapersPage() {
                   <button
                     type="button"
                     onClick={() => remove(paper)}
-                    className="shrink-0 rounded p-2 text-gray-400 hover:bg-gray-100"
+                    className="shrink-0 rounded-full p-2 text-gray-400 hover:bg-red-50 hover:text-red-500"
                     aria-label={`${paper.title} 지우기`}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -108,7 +107,7 @@ export default function ProblemPapersPage() {
                 )}
               </li>
             ))}
-          </ul>
+          </PaperList>
         )}
       </OwnerScopeTabs>
     </div>
