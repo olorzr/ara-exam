@@ -45,4 +45,19 @@ describe('ExamHistoryCard', () => {
     expect(onToggle).toHaveBeenCalledWith('e1');
     expect(push).not.toHaveBeenCalled();
   });
+
+  it('재시험지를 만드는 중(잠긴 단추)에 그 자리를 눌러도 시험지 보기로 가지 않는다(코덱스 1R)', () => {
+    push.mockClear();
+    render(<ExamHistoryCard exam={exam} onDelete={vi.fn()} onRetest={vi.fn()} retesting />);
+    const retest = screen.getByRole('button', { name: '재시험지 생성' });
+    expect(retest.hasAttribute('disabled')).toBe(true);
+    // 잠긴 단추는 pointer-events-none 이라 클릭이 감싼 묶음으로 간다 — jsdom 은 CSS 를 안 따라 묶음을 직접 누른다
+    fireEvent.click(retest.parentElement!);
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('띄어쓰기 없는 긴 제목도 칸 안에서 줄을 바꾼다', () => {
+    render(<ExamHistoryCard exam={{ ...exam, title: '가'.repeat(80) }} onDelete={vi.fn()} onRetest={vi.fn()} />);
+    expect(screen.getByRole('heading', { level: 3 }).className).toContain('[overflow-wrap:anywhere]');
+  });
 });

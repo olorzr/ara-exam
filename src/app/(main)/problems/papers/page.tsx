@@ -71,7 +71,7 @@ export default function ProblemPapersPage() {
               <li key={paper.id} className="flex items-start gap-2 px-4 py-3">
                 <ItemNo n={index + 1} />
                 <Link href={`/problems/papers/${paper.id}`} className="group min-w-0 flex-1">
-                  <p className="text-[15px] leading-snug font-semibold break-keep text-ink group-hover:text-primary">
+                  <p className="text-[15px] leading-snug font-semibold break-keep [overflow-wrap:anywhere] text-ink group-hover:text-primary">
                     {paper.title}
                     {/* 옛 문제지는 키가 없다 — 정규화해서 읽는다(문자열 'true' 로 켜지지 않게) */}
                     {normalizePaperSettings(paper.settings).omr && (

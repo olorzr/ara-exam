@@ -48,7 +48,7 @@ export default function ReferenceTextList({ rows, busyId, onDelete }: ReferenceT
               <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
                 <Badge variant={row.kind === '개념' ? 'secondary' : 'outline'}>{row.kind}</Badge>
                 {row.seq !== null && <span className="font-label text-xs text-gray-400">#{row.seq}</span>}
-                <span className="text-[15px] leading-snug font-semibold break-keep text-ink group-hover:text-primary">{row.title}</span>
+                <span className="min-w-0 text-[15px] leading-snug font-semibold break-keep [overflow-wrap:anywhere] text-ink group-hover:text-primary">{row.title}</span>
                 {row.note && <span className="text-xs text-amber-700">{row.note}</span>}
               </span>
               <span className="mt-0.5 block truncate text-xs text-gray-500">
@@ -63,13 +63,21 @@ export default function ReferenceTextList({ rows, busyId, onDelete }: ReferenceT
             {(row.units.length > 0 || row.tags.length > 0) && (
               <ul className="mt-1.5 flex flex-wrap gap-1" aria-label="실린 교과서 단원과 태그">
                 {row.units.slice(0, UNITS_SHOWN).map((unit) => (
-                  <li key={unitKey(unit)} className="max-w-full"><Badge variant="muted" className="max-w-full"><span className="min-w-0 truncate">{unitLabel(unit)}</span></Badge></li>
+                  <li key={unitKey(unit)} className="max-w-full">
+                    <Badge variant="muted" className="max-w-full" title={unitLabel(unit)}>
+                      <span className="min-w-0 truncate">{unitLabel(unit)}</span>
+                    </Badge>
+                  </li>
                 ))}
                 {row.units.length > UNITS_SHOWN && (
                   <li className="px-1 text-[11px] text-gray-400">외 {row.units.length - UNITS_SHOWN}</li>
                 )}
                 {row.tags.slice(0, TAGS_SHOWN).map((tag) => (
-                  <li key={`tag:${tag}`}><Badge variant="ok">#{tag}</Badge></li>
+                  <li key={`tag:${tag}`} className="max-w-full">
+                    <Badge variant="ok" className="max-w-full" title={`#${tag}`}>
+                      <span className="min-w-0 truncate">#{tag}</span>
+                    </Badge>
+                  </li>
                 ))}
               </ul>
             )}

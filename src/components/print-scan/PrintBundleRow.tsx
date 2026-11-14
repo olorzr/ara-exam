@@ -83,7 +83,7 @@ export default function PrintBundleRow({
       <div className="flex min-w-0 flex-1 items-start gap-2">
         <ItemNo n={no} />
         <div className="min-w-0 flex-1">
-          <p className="text-[15px] leading-snug font-semibold break-keep text-ink">{bundle.name}</p>
+          <p className="text-[15px] leading-snug font-semibold break-keep [overflow-wrap:anywhere] text-ink">{bundle.name}</p>
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             {typed ? <Badge variant="secondary">직접 입력</Badge> : <PrintBundleStatusBadge status={bundle.status} />}
             {/* 읽히긴 했는데 빠진 데가 있는 것 — '읽기완료' 만 보고 그대로 인쇄하면 안 된다 */}

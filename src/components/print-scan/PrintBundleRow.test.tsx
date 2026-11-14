@@ -56,3 +56,18 @@ describe('PrintBundleRow — 스캔 프린트(그대로)', () => {
     expect(screen.queryByText('직접 입력')).toBeNull();
   });
 });
+
+describe('PrintBundleRow — 모양(2026-11-14)', () => {
+  it('번호를 달고, 띄어쓰기 없는 긴 이름도 칸 안에서 줄을 바꾼다(단추와 겹치지 않게)', () => {
+    renderRow(row({ name: '가'.repeat(60) }));
+    expect(screen.getByText('01').getAttribute('aria-hidden')).toBe('true');
+    expect(screen.getByText('가'.repeat(60)).className).toContain('[overflow-wrap:anywhere]');
+  });
+
+  it('좁은 화면에서는 단추 묶음이 이름 아래 줄로 내려간다(넓으면 오른쪽)', () => {
+    const { container } = renderRow(row());
+    const rowEl = container.firstElementChild!;
+    expect(rowEl.className).toContain('flex-col');
+    expect(rowEl.className).toContain('sm:flex-row');
+  });
+});

@@ -22,4 +22,18 @@ describe('ReferenceTextList', () => {
     expect(screen.queryByRole('button')).toBeNull();
     expect(screen.getByRole('link').getAttribute('href')).toBe('/reference-texts/r1');
   });
+
+  it('긴 단원·태그는 폭에 묶어 말줄임하고 전체 이름을 title 로 남긴다(코덱스 1R)', () => {
+    const long = '1. 문학의 즐거움과 삶의 성찰을 함께 읽기 — 아주 긴 대단원 이름';
+    render(<ReferenceTextList
+      busyId={null}
+      rows={[{ ...row, tags: ['가'.repeat(30)], units: [{ grade: '중2', textbook: '비상(박영민)', semester: '2학기', unit_path: [long, '(1) 소단원'] }] }]}
+    />);
+    const unitText = screen.getByText((_, el) => el?.tagName === 'SPAN' && el.className.includes('truncate') && (el.textContent ?? '').includes(long));
+    expect(unitText.parentElement!.getAttribute('title')).toContain(long);
+    const tagText = screen.getByText(`#${'가'.repeat(30)}`);
+    expect(tagText.className).toContain('truncate');
+    expect(tagText.parentElement!.getAttribute('title')).toBe(`#${'가'.repeat(30)}`);
+    expect(tagText.parentElement!.className).toContain('max-w-full');
+  });
 });

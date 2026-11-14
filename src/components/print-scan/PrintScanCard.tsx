@@ -50,7 +50,7 @@ export default function PrintScanCard({
       <div className="flex items-start gap-2 border-t-2 border-ink pt-2">
         <div className="min-w-0 flex-1">
           <p aria-hidden="true" className="font-label text-[10px] font-medium tracking-[0.18em] text-gray-500">( SCAN )</p>
-          <h2 className="mt-0.5 font-display text-[19px] leading-snug font-bold break-keep text-ink">
+          <h2 className="mt-0.5 font-display text-[19px] leading-snug font-bold break-keep [overflow-wrap:anywhere] text-ink">
             {scan.title || '제목 없는 스캔'}
           </h2>
           <p className="mt-0.5 text-xs text-gray-500">{scanSummary(scan, creatorName)}</p>

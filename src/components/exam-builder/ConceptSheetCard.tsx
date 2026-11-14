@@ -43,13 +43,13 @@ export default function ConceptSheetCard({ sheet, onDelete }: ConceptSheetCardPr
       />
 
       {/* 외부지문 level 은 '외부지문 및 프린트' 라 길다 — 꼬리표는 줄을 안 바꾸므로 폭에 묶는다 */}
-      <Badge variant="outline" className="mt-1.5 max-w-full self-start">
+      <Badge variant="outline" className="mt-1.5 max-w-full self-start" title={sheet.level}>
         <span className="min-w-0 truncate">{sheet.level}</span>
       </Badge>
 
       <Link
         href={`/exam/builder/${sheet.id}`}
-        className="mt-2 font-display text-[17px] leading-snug font-bold break-keep after:absolute after:inset-0 group-hover:text-primary"
+        className="mt-2 font-display text-[17px] leading-snug font-bold break-keep [overflow-wrap:anywhere] after:absolute after:inset-0 group-hover:text-primary"
       >
         <span className="line-clamp-2">{sheet.title}</span>
       </Link>

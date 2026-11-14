@@ -65,7 +65,7 @@ export default function ExamHistoryCard({ exam, retakes = [], onDelete, onRetest
             </span>
           )}
         />
-        <h3 className="mt-2 font-display text-[17px] leading-snug font-bold break-keep group-hover:text-primary">{exam.title}</h3>
+        <h3 className="mt-2 font-display text-[17px] leading-snug font-bold break-keep [overflow-wrap:anywhere] group-hover:text-primary">{exam.title}</h3>
         <p className="mt-1 text-xs text-gray-500">{formatDateKR(exam.created_at)}</p>
 
         <hr className="my-2.5 border-0 border-t-2 border-dotted border-ink" />
@@ -74,8 +74,9 @@ export default function ExamHistoryCard({ exam, retakes = [], onDelete, onRetest
           <Badge variant="ok">합격 {exam.pass_count}개 ({exam.pass_percentage}%)</Badge>
         </div>
 
+        {/* 단추 묶음이 클릭 전파를 막는다 — 잠긴 단추(생성 중)는 pointer-events-none 이라 클릭이 카드로 넘어가 시험지 보기로 갔다(코덱스 1R) */}
         {!selectMode && (
-          <div className="mt-3 flex items-center gap-1">
+          <div className="mt-3 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
             <Button
               type="button" size="sm" variant="outline"
               onClick={(e) => { e.stopPropagation(); onRetest(exam.id); }}
