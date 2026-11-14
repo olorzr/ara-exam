@@ -142,9 +142,11 @@ export default function ProblemCard({
           {/* 문법은 여러 개가 붙으므로 경로의 **마지막 마디만** 칩으로 낸다 — 전체 경로를
               다 쓰면 카드 한 줄이 경로 세 벌로 가득 찬다. 전체는 title 로 확인한다.
               중간 마디로 태깅된 문항('단어 > 품사')이면 '품사' 가 나온다 */}
+          {/* 꼬리표는 줄을 안 바꾼다 — 긴 개념 이름('중세 국어의 의문문과 시간 표현')이 좁은 화면에서 카드 밖으로 나가지
+              않게 칩을 줄 폭에 묶고 이름은 말줄임표로 줄인다(코덱스 1R). 전체 경로는 title 에 있다 */}
           {problem.grammar_paths.map((path) => (
-            <Badge key={path} title={path} variant="secondary">
-              {parseGrammarPath(path).at(-1) ?? path}
+            <Badge key={path} title={path} variant="secondary" className="max-w-full">
+              <span className="min-w-0 truncate">{parseGrammarPath(path).at(-1) ?? path}</span>
             </Badge>
           ))}
           {showEditLink && !selectMode && (
