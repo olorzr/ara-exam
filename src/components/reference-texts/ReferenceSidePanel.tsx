@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import FacetTree from '@/components/problem-bank/FacetTree';
+import { SIDE_PAPER_CLASS, TreeFrame } from '@/components/tree';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { FacetTreeNode } from '@/lib/problem-bank/school-exam-tree';
 import type { ReferenceFacetRow } from '@/lib/reference-texts/facets';
@@ -9,7 +10,6 @@ import {
   ALL_REFERENCE_TEXTS, REFERENCE_SIDE_TABS, axisKey, tabForAxis,
   type ReferenceBrowseAxis, type ReferenceSideTab,
 } from '@/lib/reference-texts/filters';
-import BrowseTreeFrame from './BrowseTreeFrame';
 import ReferenceWorkTreePanel from './ReferenceWorkTreePanel';
 
 interface ReferenceSidePanelProps {
@@ -54,7 +54,8 @@ export default function ReferenceSidePanel({
   };
 
   return (
-    <Tabs value={tab} onValueChange={changeTab}>
+    // 종이(위 잉크 줄 + 흰 바탕)는 Tabs 뿌리에 — 아카이브 왼쪽 패널과 같다
+    <Tabs value={tab} onValueChange={changeTab} className={SIDE_PAPER_CLASS}>
       <TabsList className="w-full">
         <TabsTrigger value="units">교과서 · 단원</TabsTrigger>
         <TabsTrigger value="works">작품</TabsTrigger>
@@ -63,7 +64,7 @@ export default function ReferenceSidePanel({
 
       <TabsContent value="units" keepMounted>
         {seen.has('units') && (
-          <BrowseTreeFrame
+          <TreeFrame
             title="교과서 · 단원"
             active={axis.kind === 'unit' || axis.kind === 'unit-none'}
             onClear={clear}
@@ -72,9 +73,10 @@ export default function ReferenceSidePanel({
               nodes={unitTree}
               selectedId={selectedId}
               onSelect={onChange}
+              searchPlaceholder="교과서·단원 찾기"
               emptyText="단원을 붙인 작품 전문·개념이 아직 없어요. 열어서 '단원 고르기' 로 붙이면 그 교과서 단원이 전부 여기 나와요."
             />
-          </BrowseTreeFrame>
+          </TreeFrame>
         )}
       </TabsContent>
       <TabsContent value="works" keepMounted>
@@ -82,14 +84,20 @@ export default function ReferenceSidePanel({
       </TabsContent>
       <TabsContent value="grammar" keepMounted>
         {seen.has('grammar') && (
-          <BrowseTreeFrame
+          <TreeFrame
             title="문법 개념"
             active={axis.kind === 'grammar' || axis.kind === 'grammar-none'}
             onClear={clear}
           >
             {/* 마스터 전체라 첫 화면에 대분류만 펼친다(문제 은행 문법 트리와 같다) */}
-            <FacetTree nodes={grammarTree} selectedId={selectedId} onSelect={onChange} defaultExpandedDepth={1} />
-          </BrowseTreeFrame>
+            <FacetTree
+              nodes={grammarTree}
+              selectedId={selectedId}
+              onSelect={onChange}
+              defaultExpandedDepth={1}
+              searchPlaceholder="문법 개념 찾기"
+            />
+          </TreeFrame>
         )}
       </TabsContent>
     </Tabs>

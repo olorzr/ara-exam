@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { facetNodeText } from '@/lib/problem-bank/facet-tree';
 import type { FacetTreeNode } from '@/lib/problem-bank/school-exam-tree';
 import type { ReferenceUnit } from '@/types/reference-text';
 import { buildReferenceGrammarTree, buildReferenceWorkTree, referenceWorkFacets } from './browse-trees';
@@ -16,8 +17,8 @@ const row = (id: string, over: Partial<ReferenceFacetRow> = {}): ReferenceFacetR
 
 /** 라벨로 자식 노드를 찾는다 */
 function child<T>(nodes: FacetTreeNode<T>[], label: string): FacetTreeNode<T> {
-  const hit = nodes.find((n) => n.label === label);
-  if (!hit) throw new Error(`${label} 없음: ${nodes.map((n) => n.label).join(', ')}`);
+  const hit = nodes.find((n) => facetNodeText(n) === label);
+  if (!hit) throw new Error(`${label} 없음: ${nodes.map(facetNodeText).join(', ')}`);
   return hit;
 }
 
@@ -26,7 +27,7 @@ describe('buildReferenceUnitTree', () => {
     const tree = buildReferenceUnitTree([row('a', { units: [unit()] })]);
     const major = child(child(child(child(tree, '중2 (1)').children, '천재(노미숙) (1)').children,
       '1학기 (1)').children, '1. 문학 (1)');
-    expect(major.children.map((n) => n.label)).toEqual(['(전체) (1)', '(1) 시 (1)']);
+    expect(major.children.map(facetNodeText)).toEqual(['(전체) (1)', '(1) 시 (1)']);
   });
 
   it('⚠️ 건수는 전문 수다 — 한 전문이 같은 대단원의 소단원 둘에 붙어도 대단원에서는 한 번', () => {
@@ -36,8 +37,8 @@ describe('buildReferenceUnitTree', () => {
     ]);
     const semester = child(child(child(tree, '중2 (2)').children, '천재(노미숙) (2)').children, '1학기 (2)');
     const major = child(semester.children, '1. 문학 (2)');
-    expect(major.children.map((n) => n.label)).toEqual(['(전체) (2)', '(1) 시 (2)', '(2) 소설 (1)']);
-    expect(semester.children[0].label).toBe('(전체) (2)');
+    expect(major.children.map(facetNodeText)).toEqual(['(전체) (2)', '(1) 시 (2)', '(2) 소설 (1)']);
+    expect(facetNodeText(semester.children[0])).toBe('(전체) (2)');
   });
 
   it('대단원의 (전체) 잎은 대단원만 든 범위라 그 아래 소단원까지 걸린다', () => {
@@ -53,7 +54,7 @@ describe('buildReferenceUnitTree', () => {
       row('b', { units: [unit({ unit_path: ['2. 비문학'] })] }),
     ]);
     const grade = child(tree, '중2 (2)');
-    expect(grade.children[0]).toMatchObject({ label: '(전체) (2)', value: { kind: 'unit', unit: { grade: '중2' } } });
+    expect(grade.children[0]).toMatchObject({ label: '(전체)', count: 2, value: { kind: 'unit', unit: { grade: '중2' } } });
     const textbook = child(grade.children, '천재(노미숙) (2)');
     expect(textbook.children[0].value).toEqual({ kind: 'unit', unit: { grade: '중2', textbook: '천재(노미숙)' } });
     const semester = child(textbook.children, '1학기 (2)');
@@ -89,10 +90,10 @@ describe('buildReferenceUnitTree', () => {
       row('b', { units: [unit({ grade: '중3', unit_path: ['10. 끝'] }), unit({ grade: '중3', unit_path: ['2. 중간'] })] }),
       row('c', { units: [unit({ grade: '중3', semester: '' })] }),
     ]);
-    expect(tree.map((n) => n.label)).toEqual(['중3 (2)', '고1 (1)']);
+    expect(tree.map(facetNodeText)).toEqual(['중3 (2)', '고1 (1)']);
     const semesters = tree[0].children[1].children;
-    expect(semesters.map((n) => n.label)).toEqual(['(전체) (2)', '1학기 (1)', '1. 문학 (1)']);
-    expect(semesters[1].children.map((n) => n.label)).toEqual(['(전체) (1)', '2. 중간 (1)', '10. 끝 (1)']);
+    expect(semesters.map(facetNodeText)).toEqual(['(전체) (2)', '1학기 (1)', '1. 문학 (1)']);
+    expect(semesters[1].children.map(facetNodeText)).toEqual(['(전체) (1)', '2. 중간 (1)', '10. 끝 (1)']);
   });
 
   it('학기 구분 없는 교과서(고등 선택과목)는 학기 폴더 없이 대단원이 교과서 바로 아래 온다', () => {
@@ -103,7 +104,7 @@ describe('buildReferenceUnitTree', () => {
       row('b', { units: [elective({ unit_path: ['2. 다양한 빛깔로 만나는, 문학'] })] }),
     ]);
     const textbook = child(child(tree, '고2 (2)').children, '문학 비상 (2)');
-    expect(textbook.children.map((n) => n.label))
+    expect(textbook.children.map(facetNodeText))
       .toEqual(['(전체) (2)', '1. 나를 깨우는, 문학 (1)', '2. 다양한 빛깔로 만나는, 문학 (1)']);
     // 범위에는 semester: '' 를 그대로 실어 학기 구분 없는 단원만 정확히 건다
     expect(textbook.children[1].value).toEqual({ kind: 'unit', unit: elective() });
@@ -114,15 +115,15 @@ describe('buildReferenceUnitTree', () => {
       row('a', { units: [unit({ grade: '', textbook: '문학 비상', semester: '', unit_path: ['1. 문학'] })] }),
       row('b', { units: [unit({ grade: '고1' })] }),
     ]);
-    expect(tree.map((n) => n.label)).toEqual(['고1 (1)', '선택과목 (1)']);
-    expect(child(child(tree, '선택과목 (1)').children, '문학 비상 (1)').children.map((n) => n.label))
+    expect(tree.map(facetNodeText)).toEqual(['고1 (1)', '선택과목 (1)']);
+    expect(child(child(tree, '선택과목 (1)').children, '문학 비상 (1)').children.map(facetNodeText))
       .toEqual(['(전체) (1)', '1. 문학 (1)']);
   });
 
   it('단원을 안 붙인 전문은 맨 끝 "분류 없음" 잎으로 찾는다', () => {
     const tree = buildReferenceUnitTree([row('a'), row('b'), row('c', { units: [unit()] })]);
     const last = tree[tree.length - 1];
-    expect(last).toMatchObject({ id: UNIT_NONE_KEY, label: '분류 없음 (2)', value: { kind: 'unit-none' } });
+    expect(last).toMatchObject({ id: UNIT_NONE_KEY, label: '분류 없음', count: 2, value: { kind: 'unit-none' } });
   });
 
   it('전문이 없으면 빈 트리', () => {
@@ -143,15 +144,15 @@ describe('referenceWorkFacets · buildReferenceWorkTree', () => {
 
   it('지은이 › 작품 — 문학 뿌리 폴더는 걷어 낸다', () => {
     const tree = buildReferenceWorkTree([row('a'), row('b', { title: '동백꽃' })], 'author');
-    expect(tree.map((n) => n.label)).toEqual(['김유정']);
-    expect(tree[0].children.map((n) => n.label)).toEqual(['동백꽃 (1)', '봄봄 (1)']);
+    expect(tree.map(facetNodeText)).toEqual(['김유정']);
+    expect(tree[0].children.map(facetNodeText)).toEqual(['동백꽃 (1)', '봄봄 (1)']);
     expect(tree[0].children[1].value).toEqual({ kind: 'work', title: '봄봄' });
     expect(tree[0].children[1].id).toBe(axisKey({ kind: 'work', title: '봄봄' }));
   });
 
   it('작품순이면 평면으로 지은이를 붙여 세운다', () => {
     const tree = buildReferenceWorkTree([row('a')], 'title');
-    expect(tree.map((n) => n.label)).toEqual(['봄봄 — 김유정 (1)']);
+    expect(tree.map(facetNodeText)).toEqual(['봄봄 — 김유정 (1)']);
   });
 });
 
@@ -160,7 +161,7 @@ describe('buildReferenceGrammarTree', () => {
     const tree = buildReferenceGrammarTree([row('a', { grammar_paths: ['단어 > 품사 > 명사'] })]);
     const word = child(tree, '단어 (1)');
     expect(word.children[0]).toMatchObject({
-      label: '(전체) (1)', value: { kind: 'grammar', path: ['단어'] },
+      label: '(전체)', count: 1, value: { kind: 'grammar', path: ['단어'] },
     });
     // 0건인 대분류도 흐리게 보인다
     expect(tree.some((n) => n.dimmed)).toBe(true);
@@ -175,7 +176,7 @@ describe('buildReferenceGrammarTree', () => {
   it('문법 분류가 없는 전문은 맨 끝 "분류 없음" 잎으로 찾는다', () => {
     const tree = buildReferenceGrammarTree([row('a'), row('b', { grammar_paths: ['담화'] })]);
     expect(tree[tree.length - 1]).toMatchObject({
-      id: GRAMMAR_NONE_KEY, label: '분류 없음 (1)', value: { kind: 'grammar-none' },
+      id: GRAMMAR_NONE_KEY, label: '분류 없음', count: 1, value: { kind: 'grammar-none' },
     });
   });
 });
@@ -203,14 +204,14 @@ describe('단원 트리 — 마스터로 빈 단원을 깐다 (2026-10-28)', () 
   it('아무것도 안 붙은 교과서는 마스터에 있어도 그리지 않는다 — 빈 폴더가 찾을 것을 묻는다', () => {
     const tree = buildReferenceUnitTree([row('a', { units: [unit()] })], master);
     const grade = child(tree, '중2 (1)');
-    expect(grade.children.map((n) => n.label)).not.toContain('동아 (0)');
+    expect(grade.children.map(facetNodeText)).not.toContain('동아 (0)');
   });
 
   it('마스터에 없는 붙은 단원도 그대로 나온다', () => {
     const odd = unit({ unit_path: ['9. 옛 단원'] });
     const tree = buildReferenceUnitTree([row('a', { units: [odd] })], master);
     const semester = child(child(child(tree, '중2 (1)').children, '천재(노미숙) (1)').children, '1학기 (1)');
-    expect(semester.children.map((n) => n.label)).toContain('9. 옛 단원 (1)');
+    expect(semester.children.map(facetNodeText)).toContain('9. 옛 단원 (1)');
   });
 });
 

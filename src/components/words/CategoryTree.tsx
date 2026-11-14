@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import type { Category } from '@/types';
 import type { CategoryTreeNode } from '@/lib/category-tree';
-import { ChevronRight, ChevronDown, FolderOpen, FileText } from 'lucide-react';
+import { TreeRow } from '@/components/tree';
 import { Checkbox } from '@/components/ui/checkbox';
 
 /** 이 깊이 미만의 노드는 기본으로 펼쳐 둔다 */
@@ -32,7 +32,7 @@ export default function CategoryTree({
   }
 
   return (
-    <div className="space-y-0.5">
+    <div>
       {nodes.map((node) => (
         <TreeNodeItem
           key={node.id}
@@ -85,42 +85,22 @@ function TreeNodeItem({
 
   return (
     <div>
-      <div
-        role="button"
-        tabIndex={0}
-        // 폴더는 접힘·펼침을 알린다(FacetTree 와 같은 규약) — 화살표는 눈으로만 보이는 표시다
-        aria-expanded={!isLeaf ? expanded : undefined}
-        className={`flex items-center gap-1.5 w-full px-2 py-1.5 rounded-md text-sm transition-colors text-left cursor-pointer ${
-          isSelected ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-gray-50'
-        }`}
-        style={{ paddingLeft: `${depth * 16 + 8}px` }}
-        onClick={handleClick}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(); } }}
-      >
-        {!isLeaf ? (
-          expanded
-            ? <ChevronDown className="h-4 w-4 shrink-0 text-gray-400" />
-            : <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
-        ) : (
-          <span className="w-4 shrink-0" />
-        )}
-
-        {multiSelect && isLeaf && node.category && (
+      {/* 줄 모양은 FacetTree 와 같은 `TreeRow`(기출 공유 사이트 트리 결, 2026-11-14) — 폴더·문서 그림은 걷었다 */}
+      <TreeRow
+        depth={depth}
+        label={node.label}
+        expanded={!isLeaf ? expanded : undefined}
+        selected={!!isSelected}
+        onActivate={handleClick}
+        leading={multiSelect && isLeaf && node.category ? (
           <Checkbox
             checked={!!isChecked}
             onCheckedChange={() => onToggle?.(node.category!.id)}
             onClick={(e) => e.stopPropagation()}
-            className="shrink-0"
+            className="mr-1 shrink-0"
           />
-        )}
-
-        {isLeaf
-          ? <FileText className="h-3.5 w-3.5 shrink-0 text-gray-400" />
-          : <FolderOpen className="h-3.5 w-3.5 shrink-0 text-amber-400" />
-        }
-
-        <span className="truncate">{node.label}</span>
-      </div>
+        ) : undefined}
+      />
 
       {expanded && node.children.length > 0 && (
         <div>

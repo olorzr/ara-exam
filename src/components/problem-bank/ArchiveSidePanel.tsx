@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { SIDE_PAPER_CLASS } from '@/components/tree';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import GrammarTreePanel from '@/components/problem-bank/GrammarTreePanel';
 import SchoolExamTreePanel from '@/components/problem-bank/SchoolExamTreePanel';
@@ -61,8 +62,8 @@ export default function ArchiveSidePanel({
 
   return (
     // Tabs 루트가 이미 `flex flex-col gap-2` 다 — 바깥에 래퍼를 하나 더 두면 감춘 패널에도
-    // 여백이 붙는 space-y 문제가 되살아난다(코덱스 리뷰 2R)
-    <Tabs value={tab} onValueChange={changeTab}>
+    // 여백이 붙는 space-y 문제가 되살아난다(코덱스 리뷰 2R). 그래서 종이(위 잉크 줄 + 흰 바탕)도 뿌리에 준다
+    <Tabs value={tab} onValueChange={changeTab} className={SIDE_PAPER_CLASS}>
       <TabsList className="w-full">
         <TabsTrigger value="units">교과서</TabsTrigger>
         <TabsTrigger value="schools">기출</TabsTrigger>

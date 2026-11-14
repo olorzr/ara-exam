@@ -31,6 +31,7 @@ export function mapTreeValues<A, B>(
     id: node.id,
     label: node.label,
     dimmed: node.dimmed,
+    count: node.count,
     children: mapTreeValues(node.children, map),
     ...(node.value !== undefined ? { value: map(node.value) } : {}),
   }));
@@ -100,7 +101,8 @@ export function buildReferenceGrammarTree(
   if (untagged > 0) {
     tree.push({
       id: GRAMMAR_NONE_KEY,
-      label: `${GRAMMAR_NONE_LABEL} (${untagged})`,
+      label: GRAMMAR_NONE_LABEL,
+      count: untagged,
       children: [],
       value: { kind: 'grammar-none' },
     });

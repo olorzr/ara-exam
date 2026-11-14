@@ -38,4 +38,14 @@ describe('UnitTreePanel', () => {
       grade: '중2', school_level: '', textbook: '천재(박영목)', unit_path: ['1. 문학', '(1) 시'],
     });
   });
+
+  it('교과서·단원 찾기 — 맞는 단원을 다 펼쳐 보이고, 없으면 알린다', async () => {
+    render(<UnitTreePanel filters={EMPTY_FILTERS} onChange={() => undefined} />);
+    const box = await screen.findByRole('searchbox', { name: '교과서·단원 찾기' });
+    expect(screen.queryByText('(1) 시')).toBeNull();
+    fireEvent.change(box, { target: { value: '문학 (1)' } });
+    expect(screen.getByText('(1) 시')).toBeTruthy();
+    fireEvent.change(box, { target: { value: '소설' } });
+    expect(screen.getByText('찾는 이름이 없어요.')).toBeTruthy();
+  });
 });

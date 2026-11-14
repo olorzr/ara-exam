@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { ChevronDown, ChevronRight, FileText, FolderOpen } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { TreeRow, TreeSearch } from '@/components/tree';
+import { filterFacetTree } from '@/lib/problem-bank/facet-tree';
 import type { FacetTreeNode } from '@/lib/problem-bank/school-exam-tree';
 
 /** 이 깊이 미만의 노드는 기본으로 펼쳐 둔다 (CategoryTree 와 같은 값) */
@@ -19,111 +20,69 @@ interface FacetTreeProps<T> {
    * 기출 트리도 1 이다(학교까지만 보이고 학년도부터는 접힌다 — 2026-10-10 사용자 요청).
    */
   defaultExpandedDepth?: number;
+  /** 있으면 트리 위에 이름 찾기 칸(이 글이 자리표시·칸 이름). 찾는 동안은 남은 가지를 다 펼친다 */
+  searchPlaceholder?: string;
 }
 
 /**
- * 아무 값이나 잎에 달 수 있는 폴더 트리.
+ * 아무 값이나 잎에 달 수 있는 폴더 트리 — 줄 모양은 `TreeRow`(기출 공유 사이트 트리와 같은 결, 2026-11-14).
  *
- * 카테고리 트리(`components/words/CategoryTree`)와 **보이는 모양이 같다** — 선생님이
- * 이미 아는 조작이라서다. 다만 그쪽은 잎 값이 `Category` 로 못 박혀 있고 단어·시험·개념지
- * 네 화면이 함께 쓰므로, 제네릭으로 고치는 대신 이 작은 형제를 둔다.
+ * 카테고리 트리(`components/words/CategoryTree`)와 **보이는 모양이 같다**(같은 `TreeRow`). 다만 그쪽은 잎 값이
+ * `Category` 로 못 박혀 있고 단어·시험·개념지 화면이 함께 쓰므로, 제네릭으로 고치는 대신 이 작은 형제를 둔다.
+ *
+ * 펼침은 **기본값(깊이)에서 손으로 바꾼 노드만** 기억한다(`flipped`). 노드마다 상태를 들면 찾기로 걸러졌다 돌아온
+ * 가지가 처음 모양으로 되돌아가고, 열린 노드 목록을 들면 늦게 온 노드(패싯을 받은 뒤)가 다 접힌 채 나온다.
  */
 export default function FacetTree<T>({
-  nodes, selectedId, onSelect, emptyText, defaultExpandedDepth = DEFAULT_EXPANDED_DEPTH,
+  nodes, selectedId, onSelect, emptyText, defaultExpandedDepth = DEFAULT_EXPANDED_DEPTH, searchPlaceholder,
 }: FacetTreeProps<T>) {
-  if (nodes.length === 0) {
-    return <p className="py-4 text-center text-sm text-gray-400">{emptyText ?? '항목이 없습니다.'}</p>;
-  }
+  const [flipped, setFlipped] = useState<ReadonlySet<string>>(() => new Set());
+  const [query, setQuery] = useState('');
+  const searching = query.trim() !== '';
+  const shown = useMemo(() => filterFacetTree(nodes, query), [nodes, query]);
 
-  return (
-    <div className="space-y-0.5">
-      {nodes.map((node) => (
-        <FacetTreeItem
-          key={node.id}
-          node={node}
-          selectedId={selectedId}
-          onSelect={onSelect}
-          depth={0}
-          expandedDepth={defaultExpandedDepth}
+  const toggle = (id: string) => setFlipped((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    return next;
+  });
+
+  const renderNodes = (list: readonly FacetTreeNode<T>[], depth: number) => list.map((node) => {
+    const hasKids = node.children.length > 0;
+    const expanded = hasKids && (searching || (depth < defaultExpandedDepth) !== flipped.has(node.id));
+    const isLeaf = !hasKids && node.value !== undefined;
+    const activate = () => {
+      if (isLeaf) onSelect(node.value as T);
+      else toggle(node.id);
+    };
+    return (
+      <div key={node.id}>
+        <TreeRow
+          depth={depth}
+          label={node.label}
+          count={node.count}
+          expanded={hasKids ? expanded : undefined}
+          selected={isLeaf && selectedId === node.id}
+          dimmed={node.dimmed}
+          onActivate={activate}
         />
-      ))}
-    </div>
-  );
-}
+        {expanded && <div>{renderNodes(node.children, depth + 1)}</div>}
+      </div>
+    );
+  });
 
-interface FacetTreeItemProps<T> {
-  node: FacetTreeNode<T>;
-  selectedId?: string;
-  onSelect: (value: T) => void;
-  depth: number;
-  expandedDepth: number;
-}
-
-function FacetTreeItem<T>({
-  node, selectedId, onSelect, depth, expandedDepth,
-}: FacetTreeItemProps<T>) {
-  const [collapsed, setCollapsed] = useState(depth >= expandedDepth);
-  const expanded = !collapsed;
-  const isLeaf = node.children.length === 0 && node.value !== undefined;
-  const isSelected = isLeaf && selectedId === node.id;
-
-  const handleClick = () => {
-    if (isLeaf) onSelect(node.value as T);
-    else setCollapsed(expanded);
-  };
-
+  const empty = nodes.length === 0;
   return (
     <div>
-      <div
-        role="button"
-        tabIndex={0}
-        // 폴더는 접힘·펼침을 알린다 — 화살표 아이콘은 눈으로만 보이는 표시라
-        // 스크린리더 사용자는 지금이 접힌 상태인지 알 길이 없다
-        aria-expanded={node.children.length > 0 ? expanded : undefined}
-        className={`flex w-full cursor-pointer items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-sm transition-colors ${
-          isSelected ? 'bg-primary/10 font-medium text-primary' : 'hover:bg-gray-50'
-        }`}
-        style={{ paddingLeft: `${depth * 16 + 8}px` }}
-        onClick={handleClick}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            handleClick();
-          }
-        }}
-      >
-        {node.children.length > 0 ? (
-          expanded
-            ? <ChevronDown className="h-4 w-4 shrink-0 text-gray-400" />
-            : <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
-        ) : (
-          <span className="w-4 shrink-0" />
+      {searchPlaceholder && !empty && <TreeSearch value={query} onChange={setQuery} placeholder={searchPlaceholder} />}
+      {shown.length > 0
+        ? <div>{renderNodes(shown, 0)}</div>
+        : (
+          <p className="px-2 py-4 text-center text-sm text-gray-400">
+            {empty ? (emptyText ?? '항목이 없습니다.') : '찾는 이름이 없어요.'}
+          </p>
         )}
-
-        {isLeaf
-          ? <FileText className="h-3.5 w-3.5 shrink-0 text-gray-400" />
-          : <FolderOpen className="h-3.5 w-3.5 shrink-0 text-amber-400" />}
-
-        {/* 0건은 흐리게. 건수는 라벨에 숫자로도 적혀 있다 — 색만으로 알리지 않는다 */}
-        <span className={`truncate ${node.dimmed && !isSelected ? 'text-gray-400' : ''}`}>
-          {node.label}
-        </span>
-      </div>
-
-      {expanded && node.children.length > 0 && (
-        <div>
-          {node.children.map((child) => (
-            <FacetTreeItem
-              key={child.id}
-              node={child}
-              selectedId={selectedId}
-              onSelect={onSelect}
-              depth={depth + 1}
-              expandedDepth={expandedDepth}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 }

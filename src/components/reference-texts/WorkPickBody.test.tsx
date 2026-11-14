@@ -22,22 +22,22 @@ describe('WorkPickBody', () => {
     const { onPick } = renderBody();
     // 첫 화면은 갈래만 펼쳐 지은이 폴더가 보인다
     fireEvent.click(screen.getByText('김유정'));
-    fireEvent.click(screen.getByText('봄봄 (3)'));
+    fireEvent.click(screen.getByRole('button', { name: '봄봄 (3)' }));
     expect(onPick).toHaveBeenCalledWith({ title: '봄봄', author: '김유정' });
   });
 
   it('검색하면 맞는 작품만 남기고 폴더를 펼쳐 바로 보인다', () => {
     renderBody();
     fireEvent.change(screen.getByLabelText('작품 검색'), { target: { value: '진달래' } });
-    expect(screen.getByText('진달래꽃 (5)')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '진달래꽃 (5)' })).toBeTruthy();
     expect(screen.queryByText('김유정')).toBeNull();
   });
 
   it('지은이로도 찾는다', () => {
     renderBody();
     fireEvent.change(screen.getByLabelText('작품 검색'), { target: { value: '김유정' } });
-    expect(screen.getByText('동백꽃 (14)')).toBeTruthy();
-    expect(screen.getByText('봄봄 (3)')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '동백꽃 (14)' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '봄봄 (3)' })).toBeTruthy();
   });
 
   it('맞는 작품이 없으면 직접 적어도 된다고 알린다', () => {

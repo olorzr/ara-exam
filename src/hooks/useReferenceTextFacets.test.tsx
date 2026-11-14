@@ -23,10 +23,10 @@ describe('useReferenceTextFacets', () => {
     const { result } = renderHook(() => useReferenceTextFacets());
     await waitFor(() => expect(result.current.rows).toHaveLength(1));
     expect(fetchReferenceTextFacets).toHaveBeenCalledTimes(1);
-    expect(result.current.unitTree[0].label).toBe('중2 (1)');
+    expect(result.current.unitTree[0]).toMatchObject({ label: '중2', count: 1 });
     // 문법은 마스터 전체를 그리고, 분류 없는 전문이 있으면 맨 끝에 잎이 붙는다
     const last = result.current.grammarTree[result.current.grammarTree.length - 1];
-    expect(last.label).toBe('분류 없음 (1)');
+    expect(last).toMatchObject({ label: '분류 없음', count: 1 });
   });
 
   it('다시 읽기를 부르면 새로 읽는다 — 지운 작품이 트리에 남지 않게', async () => {

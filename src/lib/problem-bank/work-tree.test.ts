@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { facetNodeText } from './facet-tree';
 import { EMPTY_FILTERS } from './filters';
 import type { WorkFacet } from './facets';
 import {
@@ -10,7 +11,7 @@ function work(over: Partial<WorkFacet> = {}): WorkFacet {
 }
 
 /** 트리의 라벨만 뽑아 본다 */
-const labels = (nodes: { label: string }[]) => nodes.map((n) => n.label);
+const labels = (nodes: { label: string; count?: number }[]) => nodes.map(facetNodeText);
 
 describe('buildWorkTree', () => {
   it('갈래 › 지은이 › 작품 세 단계로 묶는다', () => {

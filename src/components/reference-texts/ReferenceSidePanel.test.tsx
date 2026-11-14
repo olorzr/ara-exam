@@ -31,7 +31,7 @@ function renderPanel(axis: ReferenceBrowseAxis = ALL_REFERENCE_TEXTS) {
 
 /** 접혀 있으면 펼치고, 잎이면 누른다 */
 function open(label: string) {
-  const node = screen.getByText(label).closest('[role="button"]')!;
+  const node = screen.getByRole('button', { name: label });
   if (node.getAttribute('aria-expanded') !== 'true') fireEvent.click(node);
 }
 
@@ -50,8 +50,9 @@ describe('ReferenceSidePanel', () => {
 
   it('걸린 축의 탭을 열고 그 잎을 강조한다 — 같은 작품의 판본 둘은 한 잎에 (2)', () => {
     renderPanel({ kind: 'work', title: '봄봄' });
-    const leaf = screen.getByText('봄봄 (2)').closest('[role="button"]')!;
-    expect(leaf.className).toContain('bg-primary/10');
+    const leaf = screen.getByRole('button', { name: '봄봄 (2)' });
+    expect(leaf.getAttribute('data-selected')).toBe('true');
+    expect(leaf.className).toContain('bg-accent-soft');
   });
 
   it('축이 걸린 탭에서는 해제로 풀 수 있다', () => {

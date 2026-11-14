@@ -46,6 +46,8 @@ export interface FacetTreeNode<T> {
   value?: T;
   /** 문항 0건 — 흐리게 그린다(고를 수는 있다). 문법 트리만 쓴다 */
   dimmed?: boolean;
+  /** 건수 — 있으면 줄 오른쪽에 숫자로 찍는다(이름에 붙이지 않는다, `facetNodeText`) */
+  count?: number;
 }
 
 /** 학교 가지가 다루는 출처 유형 — 학교 기출만 학교·학기·시험이 다 채워진다 */

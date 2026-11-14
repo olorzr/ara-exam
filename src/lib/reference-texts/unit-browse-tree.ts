@@ -78,22 +78,19 @@ function compareNames(a: string, b: string): number {
 const compareGrades = (a: string, b: string): number =>
   gradeRank(a) - gradeRank(b) || compareNames(a, b);
 
-/** 이름과 건수 — 색만으로 알리지 않도록 숫자를 늘 적는다 */
-const labelWith = (name: string, count: number): string => `${name} (${count})`;
-
-/** 범위 잎 하나 (단원 잎이거나 폴더의 `(전체)` 잎) — 0건이면 흐리게(고를 수는 있다) */
+/** 범위 잎 하나 (단원 잎이거나 폴더의 `(전체)` 잎) — 0건이면 흐리게(고를 수는 있다). 건수는 0 도 늘 적는다(색만으로 알리지 않는다) */
 function unitLeaf(
   unit: ReferenceUnitScope, label: string, count: number,
 ): FacetTreeNode<ReferenceBrowseAxis> {
   const axis: ReferenceBrowseAxis = { kind: 'unit', unit };
-  const node: FacetTreeNode<ReferenceBrowseAxis> = { id: axisKey(axis), label: labelWith(label, count), children: [], value: axis };
+  const node: FacetTreeNode<ReferenceBrowseAxis> = { id: axisKey(axis), label, count, children: [], value: axis };
   if (count === 0) node.dimmed = true;
   return node;
 }
 
 /** 폴더 노드 — 0건이면 흐리게 */
 function folder(id: string, label: string, count: number, children: FacetTreeNode<ReferenceBrowseAxis>[]): FacetTreeNode<ReferenceBrowseAxis> {
-  const node: FacetTreeNode<ReferenceBrowseAxis> = { id, label: labelWith(label, count), children };
+  const node: FacetTreeNode<ReferenceBrowseAxis> = { id, label, count, children };
   if (count === 0) node.dimmed = true;
   return node;
 }
@@ -211,7 +208,8 @@ export function buildReferenceUnitTree(
   if (untagged > 0) {
     tree.push({
       id: UNIT_NONE_KEY,
-      label: labelWith(UNIT_NONE_LABEL, untagged),
+      label: UNIT_NONE_LABEL,
+      count: untagged,
       children: [],
       value: { kind: 'unit-none' },
     });

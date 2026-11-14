@@ -37,7 +37,8 @@ export default function WorkTreeOrderSelect({ value, onChange }: WorkTreeOrderSe
     <OptionSelect
       value={value}
       options={ORDER_OPTIONS}
-      className="h-8 w-[128px] text-xs"
+      // 148px — 128px 이면 '지은이순 (ㄱ~ㅎ)' 이 '(ㄱ' 에서 잘렸다(2026-11-14 트리 확인 때 봤다)
+      className="h-8 w-[148px] text-xs"
       ariaLabel="작품 트리 정렬"
       triggerIcon={<ArrowUpDown className="h-3 w-3 mr-1" />}
       onChange={handle}

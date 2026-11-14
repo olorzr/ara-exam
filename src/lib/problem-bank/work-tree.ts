@@ -82,11 +82,11 @@ function compareWithEmptyLast(a: string, b: string): number {
 
 /** 작품 잎 하나 */
 function workLeaf(work: WorkFacet, withAuthor: boolean): FacetTreeNode<WorkFacet> {
-  // 개수를 붙인다 — 어느 작품이 두툼하게 쌓였는지 한눈에 보여야 고르기 쉽다
+  // 개수를 단다 — 어느 작품이 두툼하게 쌓였는지 한눈에 보여야 고르기 쉽다(줄 오른쪽에 찍힌다)
   const name = withAuthor && work.author
     ? `${work.title}${TITLE_AUTHOR_JOIN}${work.author}`
     : work.title;
-  return { id: workKey(work), label: `${name} (${work.count})`, children: [], value: work };
+  return { id: workKey(work), label: name, count: work.count, children: [], value: work };
 }
 
 /** 지은이 폴더들 — 갈래 하나 아래 */

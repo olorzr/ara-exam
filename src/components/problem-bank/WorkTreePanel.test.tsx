@@ -22,6 +22,11 @@ function fakeStorage(): Storage {
 
 const original = Object.getOwnPropertyDescriptor(window, 'localStorage');
 
+/** 접힌 폴더를 차례로 편다 — 작품 트리는 처음에 다 접혀 있다 */
+function expand(...labels: string[]) {
+  for (const label of labels) fireEvent.click(screen.getByRole('button', { name: label }));
+}
+
 const WORKS: WorkFacet[] = [
   { title: '동백꽃', author: '김유정', count: 14, kind: 'literary' },
   { title: '홍길동전', author: '', count: 1, kind: 'literary' },
@@ -66,8 +71,19 @@ describe('WorkTreePanel', () => {
     expect(screen.getByText('비문학')).toBeTruthy();
   });
 
+  /** 2026-11-14 원장님 "작품 ㅈㄴ 많아서 빡쳐" — 처음엔 갈래만, 찾기 칸으로 바로 찾는다 */
+  it('처음엔 다 접혀 갈래만 보이고, 맨 위 찾기 칸으로 작품·지은이를 바로 찾는다', () => {
+    renderPanel();
+    expect(screen.queryByText('김유정')).toBeNull();
+    expect(screen.queryByRole('button', { name: '동백꽃 (14)' })).toBeNull();
+    fireEvent.change(screen.getByRole('searchbox', { name: '작품·지은이 찾기' }), { target: { value: '동백' } });
+    expect(screen.getByRole('button', { name: '동백꽃 (14)' })).toBeTruthy();
+    expect(screen.queryByText('비문학')).toBeNull();
+  });
+
   it('기본은 지은이순이라 지은이 폴더가 보인다', () => {
     renderPanel();
+    expand('문학', '비문학');
     expect(screen.getByText('김유정')).toBeTruthy();
     expect(screen.getByText('권재일')).toBeTruthy();
     // 갈래마다 따로 선다 — 문학의 『홍길동전』과 비문학의 『거울 뉴런』이 한 폴더에 섞이면 안 된다
@@ -79,11 +95,12 @@ describe('WorkTreePanel', () => {
   it('작품명순으로 열면 지은이 폴더가 사라지고 잎에 지은이가 붙는다', () => {
     storeOrder('title');
     renderPanel();
+    expand('문학');
 
     expect(screen.queryByText('김유정')).toBeNull();
-    expect(screen.getByText('동백꽃 — 김유정 (14)')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '동백꽃 — 김유정 (14)' })).toBeTruthy();
     // 지은이를 모르는 작품은 제목만
-    expect(screen.getByText('홍길동전 (1)')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '홍길동전 (1)' })).toBeTruthy();
     // 갈래는 정렬과 무관하게 그대로다
     expect(screen.getByText('비문학')).toBeTruthy();
     expect(screen.getByRole('combobox', { name: '작품 트리 정렬' }).textContent)
@@ -93,6 +110,7 @@ describe('WorkTreePanel', () => {
   it('저장값이 이상하면 기본 정렬로 연다 — 빈 트리가 되면 안 된다', () => {
     storeOrder('count');
     renderPanel();
+    expand('문학');
 
     expect(screen.getByText('김유정')).toBeTruthy();
     expect(screen.getByRole('combobox', { name: '작품 트리 정렬' }).textContent)
@@ -101,8 +119,9 @@ describe('WorkTreePanel', () => {
 
   it('작품을 누르면 그 작품으로 조건을 건다', () => {
     const onChange = renderPanel();
+    expand('문학', '김유정');
 
-    fireEvent.click(screen.getByText('동백꽃 (14)'));
+    fireEvent.click(screen.getByRole('button', { name: '동백꽃 (14)' }));
 
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
       work_title: '동백꽃', page: 0, school_name: '', unit_path: [],
@@ -112,8 +131,9 @@ describe('WorkTreePanel', () => {
   it('작품명순으로 눌러도 같은 조건이 걸린다', () => {
     storeOrder('title');
     const onChange = renderPanel();
+    expand('문학');
 
-    fireEvent.click(screen.getByText('동백꽃 — 김유정 (14)'));
+    fireEvent.click(screen.getByRole('button', { name: '동백꽃 — 김유정 (14)' }));
 
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ work_title: '동백꽃' }));
   });

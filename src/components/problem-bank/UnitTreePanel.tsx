@@ -1,10 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { TreeFrame, TreeSearch } from '@/components/tree';
 import CategoryTree from '@/components/words/CategoryTree';
 import { buildCategoryTree } from '@/lib/category-tree';
 import { getAllSelectableCategories } from '@/lib/category-master';
 import { EXTERNAL_LEVEL } from '@/lib/constants';
+import { formatCategoryLabel } from '@/lib/format';
+import { foldTreeQuery } from '@/lib/problem-bank/facet-tree';
 import { GRAMMAR_AXIS_CLEARED, type ProblemFilters } from '@/lib/problem-bank/filters';
 import { SCHOOL_AXES_CLEARED } from '@/lib/problem-bank/school-exam-tree';
 import { WORK_AXIS_CLEARED } from '@/lib/problem-bank/work-tree';
@@ -54,13 +57,21 @@ export default function UnitTreePanel({ filters, onChange }: UnitTreePanelProps)
     return () => { alive = false; };
   }, []);
 
-  const nodes = useMemo(() => buildCategoryTree(categories), [categories]);
+  const [query, setQuery] = useState('');
+  const keyword = foldTreeQuery(query);
+  // 찾기는 단원 하나의 전체 이름(학년 › 교과서 › 학기 › 대단원 › 소단원)으로 — 교과서 이름으로도, 단원 이름으로도 나온다
+  const nodes = useMemo(
+    () => buildCategoryTree(keyword
+      ? categories.filter((c) => foldTreeQuery(formatCategoryLabel(c)).includes(keyword))
+      : categories),
+    [categories, keyword],
+  );
 
   // 지금 필터가 그때 건 조건 그대로일 때만 강조한다
   const filterKey = [filters.grade, filters.textbook, filters.unit_path.join('>')].join('|');
   const selectedId = picked?.key === filterKey ? picked.id : undefined;
 
-  if (nodes.length === 0) return null;
+  if (categories.length === 0) return null;
 
   const handleSelect = (category: Category) => {
     const unitPath = category.sub_chapter
@@ -87,22 +98,16 @@ export default function UnitTreePanel({ filters, onChange }: UnitTreePanelProps)
   };
 
   return (
-    <div className="rounded-lg border border-gray-200 p-2">
-      <div className="flex items-center justify-between px-2 py-1">
-        <p className="text-xs font-medium text-gray-500">교과서 · 단원</p>
-        {filters.unit_path.length > 0 && (
-          <button
-            type="button"
-            className="text-xs text-primary underline underline-offset-2"
-            onClick={() => onChange({ unit_path: [], page: 0 })}
-          >
-            해제
-          </button>
-        )}
-      </div>
-      <div className="max-h-[70vh] overflow-y-auto">
-        <CategoryTree nodes={nodes} onSelect={handleSelect} selectedId={selectedId} />
-      </div>
-    </div>
+    <TreeFrame
+      title="교과서 · 단원"
+      active={filters.unit_path.length > 0}
+      onClear={() => onChange({ unit_path: [], page: 0 })}
+    >
+      <TreeSearch value={query} onChange={setQuery} placeholder="교과서·단원 찾기" />
+      {nodes.length > 0
+        // 찾는 동안은 맞은 단원이 접힌 폴더 안에 숨지 않게 다 펼친다
+        ? <CategoryTree nodes={nodes} onSelect={handleSelect} selectedId={selectedId} forceExpanded={keyword !== ''} />
+        : <p className="px-2 py-4 text-center text-sm text-gray-400">찾는 이름이 없어요.</p>}
+    </TreeFrame>
   );
 }

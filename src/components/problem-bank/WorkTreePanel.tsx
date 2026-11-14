@@ -3,12 +3,20 @@
 import { useMemo, useState } from 'react';
 import FacetTree from '@/components/problem-bank/FacetTree';
 import WorkTreeOrderSelect from '@/components/problem-bank/WorkTreeOrderSelect';
+import { TreeFrame } from '@/components/tree';
 import type { WorkFacet } from '@/lib/problem-bank/facets';
 import type { ProblemFilters } from '@/lib/problem-bank/filters';
 import {
   buildWorkTree, workFilterPatch, workKey, WORK_AXIS_CLEARED, type WorkTreeOrder,
 } from '@/lib/problem-bank/work-tree';
 import { readWorkTreeOrder } from '@/lib/problem-bank/work-tree-pref';
+
+/**
+ * 작품 트리는 **처음엔 다 접어 둔다**(갈래만 보인다) — 2026-11-14 원장님 "작품 ㅈㄴ 많아서 빡쳐".
+ * 예전 기본(2)은 문학 › 지은이까지 펼쳐 작품 2천여 줄이 쏟아졌다. 맨 위 '작품·지은이 찾기' 로 바로 찾는 것이
+ * 주된 길이다(기출 공유 사이트 문제 찾기도 작품 탭은 0 이다).
+ */
+const WORK_EXPANDED_DEPTH = 0;
 
 interface WorkTreePanelProps {
   filters: ProblemFilters;
@@ -51,30 +59,20 @@ export default function WorkTreePanel({ filters, works, onChange }: WorkTreePane
   };
 
   return (
-    <div className="rounded-lg border border-gray-200 p-2">
-      <div className="flex items-center justify-between gap-2 px-2 py-1">
-        <div className="flex items-center gap-2">
-          <p className="text-xs font-medium text-gray-500">작품</p>
-          <WorkTreeOrderSelect value={order} onChange={setOrder} />
-        </div>
-        {filters.work_title && (
-          <button
-            type="button"
-            className="shrink-0 text-xs text-primary underline underline-offset-2"
-            onClick={() => onChange({ ...WORK_AXIS_CLEARED, page: 0 })}
-          >
-            해제
-          </button>
-        )}
-      </div>
-      <div className="max-h-[70vh] overflow-y-auto">
-        <FacetTree
-          nodes={nodes}
-          onSelect={handleSelect}
-          selectedId={selectedId}
-          emptyText="작품명이 붙은 문항이 아직 없어요. 올라간 기출에서 지문의 작품명을 적으면 여기 나와요."
-        />
-      </div>
-    </div>
+    <TreeFrame
+      title="작품"
+      active={Boolean(filters.work_title)}
+      onClear={() => onChange({ ...WORK_AXIS_CLEARED, page: 0 })}
+      toolbar={<WorkTreeOrderSelect value={order} onChange={setOrder} />}
+    >
+      <FacetTree
+        nodes={nodes}
+        onSelect={handleSelect}
+        selectedId={selectedId}
+        defaultExpandedDepth={WORK_EXPANDED_DEPTH}
+        searchPlaceholder="작품·지은이 찾기"
+        emptyText="작품명이 붙은 문항이 아직 없어요. 올라간 기출에서 지문의 작품명을 적으면 여기 나와요."
+      />
+    </TreeFrame>
   );
 }

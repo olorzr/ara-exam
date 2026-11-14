@@ -1,4 +1,3 @@
-export { default as BrowseTreeFrame } from './BrowseTreeFrame';
 export { default as ReferenceAttachedBody } from './ReferenceAttachedBody';
 export { default as ReferenceBodyField } from './ReferenceBodyField';
 export { default as ReferenceBodyView } from './ReferenceBodyView';

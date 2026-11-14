@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import FacetTree from '@/components/problem-bank/FacetTree';
+import { TreeFrame } from '@/components/tree';
 import { GRAMMAR_AXIS_CLEARED, type ProblemFilters } from '@/lib/problem-bank/filters';
 import {
   buildGrammarBrowseTree, grammarFilterPatch, grammarNodeKey,
@@ -37,31 +38,24 @@ export default function GrammarTreePanel({ filters, counts, onChange }: GrammarT
     : undefined;
 
   return (
-    <div className="rounded-lg border border-gray-200 p-2">
-      <div className="flex items-center justify-between px-2 py-1">
-        <p className="text-xs font-medium text-gray-500">문법 개념</p>
-        {filters.grammar_path.length > 0 && (
-          <button
-            type="button"
-            className="text-xs text-primary underline underline-offset-2"
-            onClick={() => onChange({ ...GRAMMAR_AXIS_CLEARED, page: 0 })}
-          >
-            해제
-          </button>
-        )}
-      </div>
-      <p className="px-2 pb-1 text-[11px] leading-snug text-gray-400">
-        아직 문항이 없는 개념도 흐리게 보여 줍니다. 골라 둔 뒤 아카이브에서 문항을 고르면
-        문법 분류를 한 번에 붙일 수 있어요.
-      </p>
-      <div className="max-h-[70vh] overflow-y-auto">
-        <FacetTree
-          nodes={nodes}
-          onSelect={(path) => onChange(grammarFilterPatch(path))}
-          selectedId={selectedId}
-          defaultExpandedDepth={GRAMMAR_EXPANDED_DEPTH}
-        />
-      </div>
-    </div>
+    <TreeFrame
+      title="문법 개념"
+      active={filters.grammar_path.length > 0}
+      onClear={() => onChange({ ...GRAMMAR_AXIS_CLEARED, page: 0 })}
+      note={(
+        <p className="px-1 pb-1 text-[11px] leading-snug text-gray-400">
+          아직 문항이 없는 개념도 흐리게 보여 줍니다. 골라 둔 뒤 아카이브에서 문항을 고르면
+          문법 분류를 한 번에 붙일 수 있어요.
+        </p>
+      )}
+    >
+      <FacetTree
+        nodes={nodes}
+        onSelect={(path) => onChange(grammarFilterPatch(path))}
+        selectedId={selectedId}
+        defaultExpandedDepth={GRAMMAR_EXPANDED_DEPTH}
+        searchPlaceholder="문법 개념 찾기"
+      />
+    </TreeFrame>
   );
 }

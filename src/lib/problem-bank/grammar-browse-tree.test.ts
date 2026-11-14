@@ -15,7 +15,7 @@ function flatten(nodes: FacetTreeNode<string[]>[]): FacetTreeNode<string[]>[] {
 
 /** 이름으로 노드를 찾는다 (라벨에서 건수는 떼고 비교) */
 function findByName(nodes: FacetTreeNode<string[]>[], name: string) {
-  return flatten(nodes).find((n) => n.label.replace(/ \(\d+\)$/, '') === name);
+  return flatten(nodes).find((n) => n.label === name);
 }
 
 describe('buildGrammarBrowseTree', () => {
@@ -33,7 +33,7 @@ describe('buildGrammarBrowseTree', () => {
 
   it('교재 목차 순서를 지킨다 — 이름순이 아니다', () => {
     const nodes = buildGrammarBrowseTree(EMPTY);
-    const tops = nodes.map((n) => n.label.replace(/ \(\d+\)$/, ''));
+    const tops = nodes.map((n) => n.label);
 
     expect(tops).toEqual(GRAMMAR_TREE.map((n) => n.name));
     // 이름순이면 '국어의 역사' 가 맨 앞으로 온다
@@ -43,7 +43,7 @@ describe('buildGrammarBrowseTree', () => {
   it('9품사는 학교문법 순서 그대로다', () => {
     const 품사 = findByName(buildGrammarBrowseTree(EMPTY), '품사');
     const names = (품사?.children ?? [])
-      .map((c) => c.label.replace(/ \(\d+\)$/, ''))
+      .map((c) => c.label)
       .filter((n) => n !== GRAMMAR_SELF_LEAF);
 
     expect(names.slice(0, 3)).toEqual(['명사', '대명사', '수사']);
@@ -81,9 +81,9 @@ describe('buildGrammarBrowseTree', () => {
     const counts = new Map([['단어 > 품사 > 명사', 5]]);
     const nodes = buildGrammarBrowseTree(counts);
 
-    expect(findByName(nodes, '명사')?.label).toBe('명사 (5)');
+    expect(findByName(nodes, '명사')).toMatchObject({ label: '명사', count: 5 });
     expect(findByName(nodes, '명사')?.dimmed).toBe(false);
-    expect(findByName(nodes, '대명사')?.label).toBe('대명사 (0)');
+    expect(findByName(nodes, '대명사')).toMatchObject({ label: '대명사', count: 0 });
     expect(findByName(nodes, '대명사')?.dimmed).toBe(true);
   });
 

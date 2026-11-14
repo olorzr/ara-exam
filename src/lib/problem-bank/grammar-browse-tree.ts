@@ -61,9 +61,9 @@ export function grammarFilterPatch(path: string[]): Partial<ProblemFilters> {
   };
 }
 
-/** 건수를 이름 뒤에 붙인다 — 색만으로 알리지 않기 위해 숫자를 늘 적는다 */
-function labelWith(name: string, count: number): string {
-  return `${name} (${count})`;
+/** 이름과 건수 — 색만으로 알리지 않기 위해 0 도 숫자로 늘 적는다(줄 오른쪽 칸) */
+function named(name: string, count: number): Pick<FacetTreeNode<string[]>, 'label' | 'count'> {
+  return { label: name, count };
 }
 
 /**
@@ -83,7 +83,7 @@ function toNode(
   if (node.children.length === 0) {
     return {
       id: grammarNodeKey(path),
-      label: labelWith(node.name, count),
+      ...named(node.name, count),
       children: [],
       value: path,
       dimmed: count === 0,
@@ -92,7 +92,7 @@ function toNode(
 
   const selfLeaf: FacetTreeNode<string[]> = {
     id: grammarNodeKey([...path, GRAMMAR_SELF_LEAF]),
-    label: labelWith(GRAMMAR_SELF_LEAF, count),
+    ...named(GRAMMAR_SELF_LEAF, count),
     children: [],
     value: path,
     dimmed: count === 0,
@@ -100,7 +100,7 @@ function toNode(
 
   return {
     id: grammarNodeKey(path),
-    label: labelWith(node.name, count),
+    ...named(node.name, count),
     // ⚠️ 선언 순서가 곧 화면 순서다 — 정렬하지 말 것(9품사·음운 변동은 학교문법 순서가 있다)
     children: [selfLeaf, ...node.children.map((c) => toNode(c, path, counts))],
     dimmed: count === 0,

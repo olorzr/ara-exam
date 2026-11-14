@@ -79,7 +79,7 @@ export default function WorkPickBody({ facets, failed, onRetry, onPick }: WorkPi
         </div>
         <WorkTreeOrderSelect value={order} onChange={setOrder} />
       </div>
-      <p className="text-xs text-gray-500">괄호 안 숫자는 문제 은행에 쌓인 문항 수예요.</p>
+      <p className="text-xs text-gray-500">오른쪽 숫자는 문제 은행에 쌓인 문항 수예요.</p>
       <div className="max-h-[55vh] overflow-y-auto rounded-lg border border-gray-200 p-1">
         {/* ⚠️ 검색어가 바뀌면 다시 마운트한다 — 트리는 접힘을 처음 한 번만 정해서, 펼친 채로
             보여 주려면 새로 그려야 한다(검색 중에는 맞은 작품이 폴더 안에 숨지 않게) */}

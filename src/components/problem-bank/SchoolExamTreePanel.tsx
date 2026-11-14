@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import FacetTree from '@/components/problem-bank/FacetTree';
+import { TreeFrame } from '@/components/tree';
 import type { ProblemFilters } from '@/lib/problem-bank/filters';
 import {
   buildSchoolExamTree, MOCK_EXAM_SOURCE_TYPE, SCHOOL_AXES_CLEARED, schoolExamFilterPatch,
@@ -34,6 +35,8 @@ interface SchoolExamTreePanelProps {
  * 모의고사는 **학년 › 학년도 › 회차**("고3 › 2026학년도 › 수능", 평가원 회차는 고3). 잎을 고르면 그 시험의 문항만 남는다.
  *
  * 평가문제집(2026-10-28)은 맨 뒤 가지 — **교과서 › 학년·학기 › 책**(소단원 출처 하나가 책 하나). 잎은 출처 제목까지 건다.
+ *
+ * 위의 '학교 이름 찾기' 는 이름으로 트리를 거른다(기출 공유 사이트 문제 찾기와 같은 칸, 2026-11-14).
  *
  * ⚠️ 문제집·프린트는 나오지 않는다 — 학교도 회차도 없어 같은 축으로 묶이지 않는다.
  *    그쪽은 위 필터 줄로 찾는다.
@@ -68,35 +71,28 @@ export default function SchoolExamTreePanel({
     onChange(patch);
   };
 
+  const active = Boolean(filters.school_name) || filters.source_type === MOCK_EXAM_SOURCE_TYPE
+    || filters.source_type === WORKBOOK_SOURCE_TYPE;
+
   return (
-    <div className="rounded-lg border border-gray-200 p-2">
-      <div className="flex items-center justify-between px-2 py-1">
-        <p className="text-xs font-medium text-gray-500">기출</p>
-        {(filters.school_name || filters.source_type === MOCK_EXAM_SOURCE_TYPE
-          || filters.source_type === WORKBOOK_SOURCE_TYPE) && (
-          <button
-            type="button"
-            className="text-xs text-primary underline underline-offset-2"
-            // 평가문제집 잎은 교과서까지 걸었다 — 해제할 때 함께 푼다
-            onClick={() => onChange({
-              ...SCHOOL_AXES_CLEARED,
-              ...(filters.source_type === WORKBOOK_SOURCE_TYPE ? { textbook: '' } : {}),
-              page: 0,
-            })}
-          >
-            해제
-          </button>
-        )}
-      </div>
-      <div className="max-h-[70vh] overflow-y-auto">
-        <FacetTree
-          nodes={nodes}
-          onSelect={handleSelect}
-          selectedId={selectedId}
-          defaultExpandedDepth={SCHOOL_EXAM_EXPANDED_DEPTH}
-          emptyText="읽어 둔 기출이 아직 없어요."
-        />
-      </div>
-    </div>
+    <TreeFrame
+      title="기출"
+      active={active}
+      // 평가문제집 잎은 교과서까지 걸었다 — 해제할 때 함께 푼다
+      onClear={() => onChange({
+        ...SCHOOL_AXES_CLEARED,
+        ...(filters.source_type === WORKBOOK_SOURCE_TYPE ? { textbook: '' } : {}),
+        page: 0,
+      })}
+    >
+      <FacetTree
+        nodes={nodes}
+        onSelect={handleSelect}
+        selectedId={selectedId}
+        defaultExpandedDepth={SCHOOL_EXAM_EXPANDED_DEPTH}
+        searchPlaceholder="학교 이름 찾기"
+        emptyText="읽어 둔 기출이 아직 없어요."
+      />
+    </TreeFrame>
   );
 }

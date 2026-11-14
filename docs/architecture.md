@@ -459,6 +459,7 @@ src/
 - 잡지 부품(`components/magazine`): `PageTitle`(화면 제목), `Masthead`(대시보드 머리띠), `SectionLabel`(구역 제목), `StatGrid`(숫자 격자)
 - 의존: components/ui · lib/utils 만(기능 모듈을 import 하지 않는다)
 
+- **트리 조각(`components/tree`, 2026-11-14)**: `TreeRow`(트리 한 줄 — 작은 화살표 · 이름 · 오른쪽 건수 숫자, 고른 줄은 연한 민트)·`TreeFrame`(트리 한 칸의 머리글·해제·스크롤 상자 — 테두리 상자 없음)·`TreeSearch`(이름 찾기 칸, 스크롤 상자 위에 붙는다)·`SIDE_PAPER_CLASS`(왼쪽 패널 종이 — 위 잉크 줄 + 흰 바탕). 기출 공유 사이트 문제 찾기 트리와 같은 결이다. `FacetTree`(문제 은행 네 트리·작품 전문 트리)와 `CategoryTree`(단어·시험·개념지·단원 고르기)가 같은 `TreeRow` 를 쓴다. 건수는 트리 노드의 `count` 칸이고 이름(`label`)에 붙이지 않는다 — 줄의 `aria-label` 은 `facetNodeText`(`이름 (n)`), 찾기는 `filterFacetTree`(`lib/problem-bank/facet-tree.ts`)
 - **목록 조각(2026-11-14)**: `PaperList`(흰 종이 한 장 + 점선 줄 — 상자 안의 상자 금지)·`ItemNo`(`01` 줄 번호)·`TileHead`(`( SHEET )  #01` 꼭지 머리). 목록형(학교 프린트·문제지·작품 전문·개념·세트 한 장)은 PaperList, 카드형(개념지·단어 시험지·세트 카드·대시보드 빠른 실행)은 위아래 잉크 줄 꼭지다. 단추는 늘 보이게 두고(마우스를 올려야 보이는 단추 금지 — 태블릿), 좁은 화면에서는 아래 줄로 내린다
 ## lib/book (책 만들기 — 원장 전용, 2026-10-25 · 2026-10-26 대분류 분리)
 - 역할: 저장된 문제지를 장으로 묶은 책(A4 무선제본)의 설정·판·쪽 수 기록·책등 두께·표지 펼침면 치수, 그리고 `exam.books`·`exam.book_chapters`(sql/76·77) 읽기·쓰기
