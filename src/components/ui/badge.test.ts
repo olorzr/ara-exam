@@ -10,7 +10,8 @@ import { badgeVariants } from './badge';
  * 색·크기·여백은 갈래(variant)로만 고르고, className 에는 **배치**(바깥 여백·정렬·폭 제한)만 둔다.
  *
  * ⚠️ 어떤 `<태그>` 가 공용 Badge 인지는 **TypeScript 타입 검사기에 묻는다** — 태그의 기호를 별칭(들여오기·다시 내보내기·
- *    기본 내보내기·이름공간·`const Tag = Badge`)을 따라 끝까지 풀어 badge.tsx 의 `Badge` 함수에 닿는지 본다.
+ *    기본 내보내기·이름공간·`const Tag = Badge`)을 따라 끝까지 풀고, 안 되면 태그의 타입(호출 시그니처의 선언)이 badge.tsx 의
+ *    `Badge` 함수인지 본다(구조 분해·괄호·`as` 로 이름을 바꿔 담은 경우, 코덱스 4R).
  *    정규식(코덱스 1R)이나 손으로 짠 경로 풀기(코덱스 2·3R — 상대 경로, 배럴의 `export { Badge }`·`export * as`·기본 내보내기를
  *    차례로 놓쳤다)로 되돌리지 말 것. 저장소 전체를 여는 데 1초쯤이다.
  * ⚠️ 클래스는 **허용 목록**(배치)에 든 것만 통과한다 — 금지 목록은 `text-lg`·`pl-8`·`hover:bg-…` 처럼 빠진 것이 늘 남는다.
@@ -68,13 +69,26 @@ function finalSymbol(checker: ts.TypeChecker, start: ts.Symbol | undefined): ts.
   return symbol;
 }
 
-/** 이 태그가 공용 Badge(badge.tsx 의 `Badge` 함수)인가 */
+/** badge.tsx 의 `Badge` 함수 선언인가 */
+function declaresBadge(decl: ts.Declaration | undefined): boolean {
+  return Boolean(decl && resolve(decl.getSourceFile().fileName) === BADGE_PATH
+    && ts.isFunctionDeclaration(decl) && decl.name?.text === 'Badge');
+}
+
+/**
+ * 이 태그가 공용 Badge(badge.tsx 의 `Badge` 함수)인가.
+ *
+ * 먼저 기호를 별칭 따라 풀고(들여오기·다시 내보내기·기본·이름공간), 안 되면 **태그의 타입**을 본다 — 구조 분해
+ * (`const { Badge: Tag } = UI`)·괄호(`const Tag = (Badge)`)·`as` 처럼 이름을 바꿔 담아도 타입은 Badge 함수 그 자체라
+ * 호출 시그니처의 선언이 badge.tsx 의 `Badge` 다(코덱스 4R).
+ */
 function isSharedBadge(checker: ts.TypeChecker, tag: ts.JsxTagNameExpression): boolean {
+  // 내장 태그(div·span …)는 소문자 이름이다
+  if (ts.isIdentifier(tag) && /^[a-z]/.test(tag.text)) return false;
   const at = ts.isPropertyAccessExpression(tag) ? tag.name : tag;
   const symbol = finalSymbol(checker, checker.getSymbolAtLocation(at));
-  return Boolean(symbol?.declarations?.some((d) => (
-    resolve(d.getSourceFile().fileName) === BADGE_PATH && ts.isFunctionDeclaration(d) && d.name?.text === 'Badge'
-  )));
+  if (symbol?.declarations?.some(declaresBadge)) return true;
+  return checker.getTypeAtLocation(tag).getCallSignatures().some((sig) => declaresBadge(sig.getDeclaration()));
 }
 
 /** className 값 — 글자로 읽을 수 없으면 null */
@@ -136,6 +150,9 @@ const PROBES: Record<string, { source: string; want: string[] }> = {
   barrelDefault: { source: `import Tag from '@/components/ui/zz-barrel-default';\nexport const A = () => <Tag className="bg-red-50">a</Tag>;`, want: ['bg-red-50'] },
   barrelStar: { source: `import { Badge } from '@/components/ui/zz-barrel-star';\nexport const A = () => <Badge className="pl-8">a</Badge>;`, want: ['pl-8'] },
   variableAlias: { source: `${IMPORT}const Tag = Badge;\nexport const A = () => <Tag className="bg-red-50">a</Tag>;`, want: ['bg-red-50'] },
+  destructure: { source: `import * as UI from '@/components/ui/badge';\nconst { Badge: Tag } = UI;\nexport const A = () => <Tag className="bg-red-500" />;`, want: ['bg-red-500'] },
+  parenthesized: { source: `${IMPORT}const Tag = (Badge);\nexport const A = () => <Tag className="bg-red-500" />;`, want: ['bg-red-500'] },
+  asCast: { source: `${IMPORT}const Tag = Badge as typeof Badge;\nexport const A = () => <Tag className="text-lg" />;`, want: ['text-lg'] },
   importAlias: { source: `import { Badge as Tag } from '@/components/ui/badge';\nexport const A = () => <Tag className="bg-red-50" />;`, want: ['bg-red-50'] },
   quoting: {
     source: `${IMPORT}export const A = () => <><Badge className={'bg-amber-500 text-white'}>a</Badge><Badge className='bg-sky-500'>b</Badge><Badge className={\`text-[10px]\`}>c</Badge></>;`,
