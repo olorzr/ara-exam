@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import FacetTree from '@/components/problem-bank/FacetTree';
+import CategoryTree from '@/components/words/CategoryTree';
+import { buildCategoryTree } from '@/lib/category-tree';
 import type { FacetTreeNode } from '@/lib/problem-bank/school-exam-tree';
+import type { Category } from '@/types';
 import { SIDE_PAPER_CLASS, TreeFrame, TreeRow } from '.';
 
 /**
@@ -142,6 +145,17 @@ describe('FacetTree 찾기 · 펼침', () => {
     expect(screen.getByRole('button', { name: '고등' }).getAttribute('aria-expanded')).toBe('false');
   });
 
+  it('찾는 말을 지웠다 같은 말을 다시 쳐도 옛 접힘이 되살아나지 않는다(코덱스 2R)', () => {
+    render(<FacetTree nodes={TREE} onSelect={() => undefined} defaultExpandedDepth={0} searchPlaceholder="학교 이름 찾기" />);
+    const box = screen.getByRole('searchbox', { name: '학교 이름 찾기' });
+    fireEvent.change(box, { target: { value: '무학' } });
+    fireEvent.click(screen.getByRole('button', { name: '고등' }));
+    expect(screen.queryByText('무학여고')).toBeNull();
+    fireEvent.change(box, { target: { value: '' } });
+    fireEvent.change(box, { target: { value: '무학' } });
+    expect(screen.getByText('무학여고')).toBeTruthy();
+  });
+
   it('늦게 온 노드도 기본 깊이만큼 펼쳐진다 — 처음엔 비어 있다가 패싯이 와도', () => {
     const { rerender } = render(<FacetTree nodes={[]} onSelect={() => undefined} defaultExpandedDepth={1} emptyText="비었어요" />);
     expect(screen.getByText('비었어요')).toBeTruthy();
@@ -162,5 +176,35 @@ describe('FacetTree 찾기 · 펼침', () => {
     expect(onSelect).toHaveBeenCalledWith('ss-1');
     rerender(<FacetTree nodes={TREE} onSelect={onSelect} defaultExpandedDepth={9} selectedId="ss-1" />);
     expect(screen.getByRole('button', { name: '1학기 기말고사' }).getAttribute('data-selected')).toBe('true');
+  });
+});
+
+describe('CategoryTree 찾기 중 접기', () => {
+  const cat = (id: string, sub: string): Category => ({
+    id, level: '중등', year: '', grade: '중2', publisher: '비상(박영민)', semester: '1학기',
+    chapter: '1. 문학의 갈래', sub_chapter: sub, user_id: 'u', created_at: '',
+  });
+  const ALL = buildCategoryTree([cat('c1', '(1) 동백꽃'), cat('c2', '(2) 엄마 걱정')]);
+  const ONE = buildCategoryTree([cat('c1', '(1) 동백꽃')]);
+  const expandedOf = (name: string) => screen.getByRole('button', { name }).getAttribute('aria-expanded');
+
+  it('찾는 동안 누른 접기는 찾기에만 남고, 찾기를 지우면 원래 펼침 그대로다(코덱스 2R)', () => {
+    const { rerender } = render(<CategoryTree nodes={ALL} onSelect={() => undefined} />);
+    expect(expandedOf('중등')).toBe('true');
+    rerender(<CategoryTree nodes={ONE} onSelect={() => undefined} forceExpanded />);
+    // 찾는 중에도 접을 수 있다
+    fireEvent.click(screen.getByRole('button', { name: '중등' }));
+    expect(expandedOf('중등')).toBe('false');
+    rerender(<CategoryTree nodes={ALL} onSelect={() => undefined} />);
+    expect(expandedOf('중등')).toBe('true');
+  });
+
+  it('걸러진 트리가 바뀌면(찾는 말이 바뀌면) 다시 다 펼친다', () => {
+    const { rerender } = render(<CategoryTree nodes={ONE} onSelect={() => undefined} forceExpanded />);
+    fireEvent.click(screen.getByRole('button', { name: '중등' }));
+    expect(expandedOf('중등')).toBe('false');
+    rerender(<CategoryTree nodes={buildCategoryTree([cat('c1', '(1) 동백꽃')])} onSelect={() => undefined} forceExpanded />);
+    expect(expandedOf('중등')).toBe('true');
+    expect(screen.getByText('(1) 동백꽃')).toBeTruthy();
   });
 });

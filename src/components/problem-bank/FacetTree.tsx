@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { TreeRow, TreeSearch } from '@/components/tree';
+import { EMPTY_IDS, TreeRow, TreeSearch, toggled } from '@/components/tree';
 import { filterFacetTree } from '@/lib/problem-bank/facet-tree';
 import type { FacetTreeNode } from '@/lib/problem-bank/school-exam-tree';
 
@@ -39,33 +39,27 @@ export default function FacetTree<T>({
   const [flipped, setFlipped] = useState<ReadonlySet<string>>(() => new Set());
   const [query, setQuery] = useState('');
   /**
-   * 찾는 동안 접은 가지 — **그 찾는 말에만** 묶는다(코덱스 1R). 찾는 동안 가지를 눌러 `flipped` 를 뒤집으면 화면은
-   * 그대로(찾는 중엔 다 펼친다)인데 찾기를 지우는 순간 처음엔 접혀 있던 가지가 펼쳐진 채 남았다. 찾는 말이 바뀌면 비운다.
+   * 찾는 동안 접은 가지 — `flipped` 와 따로 둔다(코덱스 1R). 찾는 동안 가지를 눌러 `flipped` 를 뒤집으면 화면은
+   * 그대로(찾는 중엔 다 펼친다)인데 찾기를 지우는 순간 처음엔 접혀 있던 가지가 펼쳐진 채 남았다.
+   * ⚠️ 찾는 말이 **바뀔 때마다 실제로 비운다**(`changeQuery`, 코덱스 2R) — 찾는 말에 묶어 두고 무시만 하면 지웠다가
+   * 같은 말을 다시 치는 순간 옛 접힘이 되살아나 결과가 숨었다.
    */
-  const [searchClosed, setSearchClosed] = useState<{ query: string; ids: ReadonlySet<string> }>(
-    () => ({ query: '', ids: new Set() }),
-  );
-  const trimmed = query.trim();
-  const searching = trimmed !== '';
-  const closedNow = searchClosed.query === trimmed ? searchClosed.ids : null;
+  const [searchClosed, setSearchClosed] = useState<ReadonlySet<string>>(EMPTY_IDS);
+  const searching = query.trim() !== '';
   const shown = useMemo(() => filterFacetTree(nodes, query), [nodes, query]);
 
+  const changeQuery = (next: string) => {
+    setQuery(next);
+    setSearchClosed(EMPTY_IDS);
+  };
+
   const toggle = (id: string) => {
-    const flip = (prev: ReadonlySet<string>) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    };
-    if (searching) {
-      setSearchClosed((prev) => ({ query: trimmed, ids: flip(prev.query === trimmed ? prev.ids : new Set()) }));
-      return;
-    }
-    setFlipped(flip);
+    if (searching) setSearchClosed((prev) => toggled(prev, id));
+    else setFlipped((prev) => toggled(prev, id));
   };
 
   const isOpen = (id: string, depth: number) => (searching
-    ? !(closedNow?.has(id) ?? false)
+    ? !searchClosed.has(id)
     : (depth < defaultExpandedDepth) !== flipped.has(id));
 
   const renderNodes = (list: readonly FacetTreeNode<T>[], depth: number) => list.map((node) => {
@@ -95,7 +89,7 @@ export default function FacetTree<T>({
   const empty = nodes.length === 0;
   return (
     <div>
-      {searchPlaceholder && !empty && <TreeSearch value={query} onChange={setQuery} placeholder={searchPlaceholder} />}
+      {searchPlaceholder && !empty && <TreeSearch value={query} onChange={changeQuery} placeholder={searchPlaceholder} />}
       {shown.length > 0
         ? <div>{renderNodes(shown, 0)}</div>
         : (
