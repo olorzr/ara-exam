@@ -20,16 +20,27 @@ interface CategoryTreeProps {
   forceExpanded?: boolean;
 }
 
+/** 가지의 펼침을 묻고 바꾸는 손잡이 — 트리 전체에 하나(노드마다 상태를 들지 않는다) */
+interface Fold {
+  isOpen: (id: string, depth: number) => boolean;
+  toggle: (id: string) => void;
+}
+
 /**
  * 카테고리를 계층 트리 구조로 표시하는 컴포넌트.
  * 단일 선택 또는 체크박스 다중 선택 모드를 지원한다.
+ *
+ * 펼침은 **트리 전체에서 기본값(깊이)에서 손으로 바꾼 노드 집합**(`flipped`)이다 — `FacetTree` 와 같은 수법.
+ * 예전처럼 노드마다 `collapsed` 를 들면 찾기로 걸러지거나 찾는 중 접은 가지 아래 노드가 사라질 때(언마운트) 손으로 편
+ * 상태가 지워졌다(코덱스 3R 정지 게이트).
  */
 export default function CategoryTree({
   nodes, selectedId, onSelect, selectedIds, onToggle, multiSelect, forceExpanded,
 }: CategoryTreeProps) {
+  const [flipped, setFlipped] = useState<ReadonlySet<string>>(EMPTY_IDS);
   /**
-   * 찾는 동안(`forceExpanded`) 접은 가지 — 노드마다의 펼침과 따로 둔다(코덱스 2R). 찾는 동안 가지를 누르면 화면은
-   * 그대로인데 노드의 `collapsed` 가 뒤집혀, 찾기를 지우는 순간 펼쳐 두었던 가지가 접혔다.
+   * 찾는 동안(`forceExpanded`) 접은 가지 — `flipped` 와 따로 둔다(코덱스 2R). 찾는 동안 가지를 누르면 화면은 그대로인데
+   * 저장된 펼침이 뒤집혀, 찾기를 지우는 순간 펼쳐 두었던 가지가 접혔다.
    * 걸러진 트리(`nodes`)가 바뀌면 — 찾는 말이 바뀌면 — 비운다(렌더 중 파생 상태).
    */
   const [searchClosed, setSearchClosed] = useState<ReadonlySet<string>>(EMPTY_IDS);
@@ -39,7 +50,15 @@ export default function CategoryTree({
     setSeenSearchKey(searchKey);
     setSearchClosed(EMPTY_IDS);
   }
-  const onSearchToggle = (id: string) => setSearchClosed((prev) => toggled(prev, id));
+  const fold: Fold = {
+    isOpen: (id, depth) => (forceExpanded
+      ? !searchClosed.has(id)
+      : (depth < DEFAULT_EXPANDED_DEPTH) !== flipped.has(id)),
+    toggle: (id) => {
+      if (forceExpanded) setSearchClosed((prev) => toggled(prev, id));
+      else setFlipped((prev) => toggled(prev, id));
+    },
+  };
 
   if (nodes.length === 0) {
     return <p className="text-sm text-gray-400 text-center py-4">카테고리가 없습니다.</p>;
@@ -56,9 +75,7 @@ export default function CategoryTree({
           selectedIds={selectedIds}
           onToggle={onToggle}
           multiSelect={multiSelect}
-          forceExpanded={forceExpanded}
-          searchClosed={searchClosed}
-          onSearchToggle={onSearchToggle}
+          fold={fold}
           depth={0}
         />
       ))}
@@ -73,19 +90,15 @@ interface TreeNodeItemProps {
   selectedIds?: string[];
   onToggle?: (catId: string) => void;
   multiSelect?: boolean;
-  forceExpanded?: boolean;
-  /** 찾는 동안 접은 가지(트리 전체에 하나) */
-  searchClosed: ReadonlySet<string>;
-  onSearchToggle: (id: string) => void;
+  fold: Fold;
   depth: number;
 }
 
 function TreeNodeItem({
-  node, selectedId, onSelect, selectedIds, onToggle, multiSelect, forceExpanded, searchClosed, onSearchToggle, depth,
+  node, selectedId, onSelect, selectedIds, onToggle, multiSelect, fold, depth,
 }: TreeNodeItemProps) {
-  const [collapsed, setCollapsed] = useState(depth >= DEFAULT_EXPANDED_DEPTH);
-  // 검색 중에는 사용자가 접어둔 상태를 무시하고 전부 펼친다 — 그동안 누른 접기는 찾기용 집합에만 남는다
-  const expanded = forceExpanded ? !searchClosed.has(node.id) : !collapsed;
+  // 검색 중에는 손으로 접어 둔 것을 무시하고 전부 펼친다 — 그동안 누른 접기는 찾기용 집합에만 남는다(`fold`)
+  const expanded = fold.isOpen(node.id, depth);
   const isLeaf = node.children.length === 0;
   const isSelected = node.category && selectedId === node.category.id;
   const isChecked = node.category && selectedIds?.includes(node.category.id);
@@ -97,10 +110,8 @@ function TreeNodeItem({
       } else if (onSelect) {
         onSelect(node.category);
       }
-    } else if (forceExpanded) {
-      onSearchToggle(node.id);
     } else {
-      setCollapsed(expanded);
+      fold.toggle(node.id);
     }
   };
 
@@ -134,9 +145,7 @@ function TreeNodeItem({
               selectedIds={selectedIds}
               onToggle={onToggle}
               multiSelect={multiSelect}
-              forceExpanded={forceExpanded}
-              searchClosed={searchClosed}
-              onSearchToggle={onSearchToggle}
+              fold={fold}
               depth={depth + 1}
             />
           ))}

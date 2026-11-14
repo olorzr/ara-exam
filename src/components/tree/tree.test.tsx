@@ -199,6 +199,25 @@ describe('CategoryTree 찾기 중 접기', () => {
     expect(expandedOf('중등')).toBe('true');
   });
 
+  it('손으로 편 가지는 찾기로 걸러지거나 찾는 중 위 가지를 접어 사라져도 그대로다(코덱스 3R 정지 게이트)', () => {
+    const OTHER: Category = { ...cat('c9', '(1) 멍키 스패너'), grade: '중1', publisher: '천재(정호웅)', semester: '2학기', chapter: '3. 소설' };
+    const BOTH = buildCategoryTree([cat('c1', '(1) 동백꽃'), OTHER]);
+    const { rerender } = render(<CategoryTree nodes={BOTH} onSelect={() => undefined} />);
+    // 기본은 학년까지 펼침(깊이 2) — 교과서 폴더 둘을 손으로 편다
+    fireEvent.click(screen.getByRole('button', { name: '비상(박영민)' }));
+    fireEvent.click(screen.getByRole('button', { name: '천재(정호웅)' }));
+    expect(expandedOf('천재(정호웅)')).toBe('true');
+    // 찾기로 중1 가지가 걸러져 사라지고, 남은 중등 가지도 찾는 중에 접는다
+    rerender(<CategoryTree nodes={buildCategoryTree([cat('c1', '(1) 동백꽃')])} onSelect={() => undefined} forceExpanded />);
+    expect(screen.queryByRole('button', { name: '천재(정호웅)' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '중등' }));
+    expect(screen.queryByRole('button', { name: '비상(박영민)' })).toBeNull();
+    // 찾기를 지우면 손으로 편 두 교과서가 그대로 펼쳐져 있다
+    rerender(<CategoryTree nodes={BOTH} onSelect={() => undefined} />);
+    expect(expandedOf('비상(박영민)')).toBe('true');
+    expect(expandedOf('천재(정호웅)')).toBe('true');
+  });
+
   it('걸러진 트리가 바뀌면(찾는 말이 바뀌면) 다시 다 펼친다', () => {
     const { rerender } = render(<CategoryTree nodes={ONE} onSelect={() => undefined} forceExpanded />);
     fireEvent.click(screen.getByRole('button', { name: '중등' }));
