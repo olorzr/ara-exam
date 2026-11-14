@@ -37,4 +37,12 @@ describe('ReferenceTextList', () => {
       expect(el.parentElement!.className).toContain('max-w-full');
     }
   });
+
+  it('판본 메모도 띄어쓰기 없는 긴 글이면 칸 안에서 줄을 바꾼다(코덱스 3R)', () => {
+    const note = 'A'.repeat(200);
+    render(<ReferenceTextList busyId={null} rows={[{ ...row, note }]} />);
+    const el = screen.getByText(note);
+    expect(el.className).toContain('min-w-0');
+    expect(el.className).toContain('[overflow-wrap:anywhere]');
+  });
 });

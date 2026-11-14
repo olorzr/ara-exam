@@ -49,7 +49,7 @@ export default function ReferenceTextList({ rows, busyId, onDelete }: ReferenceT
                 <Badge variant={row.kind === '개념' ? 'secondary' : 'outline'}>{row.kind}</Badge>
                 {row.seq !== null && <span className="font-label text-xs text-gray-400">#{row.seq}</span>}
                 <span className="min-w-0 text-[15px] leading-snug font-semibold break-keep [overflow-wrap:anywhere] text-ink group-hover:text-primary">{row.title}</span>
-                {row.note && <span className="text-xs text-amber-700">{row.note}</span>}
+                {row.note && <span className="min-w-0 text-xs break-keep text-amber-700 [overflow-wrap:anywhere]">{row.note}</span>}
               </span>
               <span className="mt-0.5 block truncate text-xs text-gray-500">
                 {[
