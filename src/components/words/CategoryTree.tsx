@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import type { Category } from '@/types';
 import type { CategoryTreeNode } from '@/lib/category-tree';
-import { EMPTY_IDS, TreeRow, toggled } from '@/components/tree';
+import { EMPTY_IDS, TreeRow, toggled, treePathKey } from '@/components/tree';
 import { Checkbox } from '@/components/ui/checkbox';
 
 /** 이 깊이 미만의 노드는 기본으로 펼쳐 둔다 */
@@ -18,9 +18,11 @@ interface CategoryTreeProps {
   multiSelect?: boolean;
   /** 모든 노드를 펼친 상태로 렌더한다(검색 결과 표시용) */
   forceExpanded?: boolean;
+  /** 노드가 없을 때 안내 — 찾기 결과가 없을 때 등. 트리는 언마운트하지 않는다(펼침 기억이 지워진다) */
+  emptyText?: string;
 }
 
-/** 가지의 펼침을 묻고 바꾸는 손잡이 — 트리 전체에 하나(노드마다 상태를 들지 않는다) */
+/** 가지의 펼침을 묻고 바꾸는 손잡이 — 트리 전체에 하나(노드마다 상태를 들지 않는다). 열쇠는 조상 경로(`treePathKey`) */
 interface Fold {
   isOpen: (id: string, depth: number) => boolean;
   toggle: (id: string) => void;
@@ -32,10 +34,12 @@ interface Fold {
  *
  * 펼침은 **트리 전체에서 기본값(깊이)에서 손으로 바꾼 노드 집합**(`flipped`)이다 — `FacetTree` 와 같은 수법.
  * 예전처럼 노드마다 `collapsed` 를 들면 찾기로 걸러지거나 찾는 중 접은 가지 아래 노드가 사라질 때(언마운트) 손으로 편
- * 상태가 지워졌다(코덱스 3R 정지 게이트).
+ * 상태가 지워졌다(코덱스 3R 정지 게이트). 기억의 열쇠는 노드 id 가 아니라 **조상 경로**다(`treePathKey`, 코덱스 4R) —
+ * `buildCategoryTree` 의 id 는 이름을 `-` 로 이어 만들어, 출판사 `비상` 의 `1학기` 폴더와 출판사 `비상-1학기` 폴더가
+ * 같은 id 가 된다. 한 집합을 쓰면 한쪽을 펼칠 때 다른 쪽도 펼쳐졌다.
  */
 export default function CategoryTree({
-  nodes, selectedId, onSelect, selectedIds, onToggle, multiSelect, forceExpanded,
+  nodes, selectedId, onSelect, selectedIds, onToggle, multiSelect, forceExpanded, emptyText = '카테고리가 없습니다.',
 }: CategoryTreeProps) {
   const [flipped, setFlipped] = useState<ReadonlySet<string>>(EMPTY_IDS);
   /**
@@ -61,7 +65,7 @@ export default function CategoryTree({
   };
 
   if (nodes.length === 0) {
-    return <p className="text-sm text-gray-400 text-center py-4">카테고리가 없습니다.</p>;
+    return <p className="text-sm text-gray-400 text-center py-4">{emptyText}</p>;
   }
 
   return (
@@ -76,6 +80,7 @@ export default function CategoryTree({
           onToggle={onToggle}
           multiSelect={multiSelect}
           fold={fold}
+          pathKey={treePathKey('', node.id)}
           depth={0}
         />
       ))}
@@ -91,14 +96,16 @@ interface TreeNodeItemProps {
   onToggle?: (catId: string) => void;
   multiSelect?: boolean;
   fold: Fold;
+  /** 조상 경로 열쇠 — 펼침 기억에 쓴다 */
+  pathKey: string;
   depth: number;
 }
 
 function TreeNodeItem({
-  node, selectedId, onSelect, selectedIds, onToggle, multiSelect, fold, depth,
+  node, selectedId, onSelect, selectedIds, onToggle, multiSelect, fold, pathKey, depth,
 }: TreeNodeItemProps) {
   // 검색 중에는 손으로 접어 둔 것을 무시하고 전부 펼친다 — 그동안 누른 접기는 찾기용 집합에만 남는다(`fold`)
-  const expanded = fold.isOpen(node.id, depth);
+  const expanded = fold.isOpen(pathKey, depth);
   const isLeaf = node.children.length === 0;
   const isSelected = node.category && selectedId === node.category.id;
   const isChecked = node.category && selectedIds?.includes(node.category.id);
@@ -111,7 +118,7 @@ function TreeNodeItem({
         onSelect(node.category);
       }
     } else {
-      fold.toggle(node.id);
+      fold.toggle(pathKey);
     }
   };
 
@@ -146,6 +153,7 @@ function TreeNodeItem({
               onToggle={onToggle}
               multiSelect={multiSelect}
               fold={fold}
+              pathKey={treePathKey(pathKey, child.id)}
               depth={depth + 1}
             />
           ))}

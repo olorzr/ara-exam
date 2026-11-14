@@ -104,10 +104,15 @@ export default function UnitTreePanel({ filters, onChange }: UnitTreePanelProps)
       onClear={() => onChange({ unit_path: [], page: 0 })}
     >
       <TreeSearch value={query} onChange={setQuery} placeholder="교과서·단원 찾기" />
-      {nodes.length > 0
-        // 찾는 동안은 맞은 단원이 접힌 폴더 안에 숨지 않게 다 펼친다
-        ? <CategoryTree nodes={nodes} onSelect={handleSelect} selectedId={selectedId} forceExpanded={keyword !== ''} />
-        : <p className="px-2 py-4 text-center text-sm text-gray-400">찾는 이름이 없어요.</p>}
+      {/* 찾는 동안은 맞은 단원이 접힌 폴더 안에 숨지 않게 다 펼친다. ⚠️ 맞는 것이 없어도 트리를 언마운트하지 않는다 —
+          손으로 편 가지의 기억이 트리 안에 있어 지워진다(코덱스 4R). 빈 안내는 트리가 그린다 */}
+      <CategoryTree
+        nodes={nodes}
+        onSelect={handleSelect}
+        selectedId={selectedId}
+        forceExpanded={keyword !== ''}
+        emptyText="찾는 이름이 없어요."
+      />
     </TreeFrame>
   );
 }

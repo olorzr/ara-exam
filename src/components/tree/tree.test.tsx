@@ -218,6 +218,18 @@ describe('CategoryTree 찾기 중 접기', () => {
     expect(expandedOf('천재(정호웅)')).toBe('true');
   });
 
+  it('id 가 겹치는 다른 자리의 두 가지는 따로 펼친다 — 펼침 기억은 조상 경로로(코덱스 4R)', () => {
+    // 출판사 '비상' 의 '1학기' 폴더와 출판사 '비상-1학기' 폴더는 이름을 '-' 로 이은 id 가 같다
+    const A: Category = { ...cat('a1', '(1) 동백꽃'), publisher: '비상', semester: '1학기' };
+    const B: Category = { ...cat('b1', '(1) 시'), publisher: '비상-1학기', semester: '2학기' };
+    render(<CategoryTree nodes={buildCategoryTree([A, B])} onSelect={() => undefined} />);
+    fireEvent.click(screen.getByRole('button', { name: '비상' }));
+    expect(expandedOf('1학기')).toBe('false');
+    fireEvent.click(screen.getByRole('button', { name: '비상-1학기' }));
+    expect(expandedOf('비상-1학기')).toBe('true');
+    expect(expandedOf('1학기')).toBe('false');
+  });
+
   it('걸러진 트리가 바뀌면(찾는 말이 바뀌면) 다시 다 펼친다', () => {
     const { rerender } = render(<CategoryTree nodes={ONE} onSelect={() => undefined} forceExpanded />);
     fireEvent.click(screen.getByRole('button', { name: '중등' }));

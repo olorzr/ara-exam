@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { EMPTY_IDS, TreeRow, TreeSearch, toggled } from '@/components/tree';
+import { EMPTY_IDS, TreeRow, TreeSearch, toggled, treePathKey } from '@/components/tree';
 import { filterFacetTree } from '@/lib/problem-bank/facet-tree';
 import type { FacetTreeNode } from '@/lib/problem-bank/school-exam-tree';
 
@@ -62,13 +62,15 @@ export default function FacetTree<T>({
     ? !searchClosed.has(id)
     : (depth < defaultExpandedDepth) !== flipped.has(id));
 
-  const renderNodes = (list: readonly FacetTreeNode<T>[], depth: number) => list.map((node) => {
+  // 펼침 기억의 열쇠는 조상 경로다 — 빌더가 id 를 이름 이어 붙이기로 만들면 다른 자리끼리 겹칠 수 있다(코덱스 4R, CategoryTree)
+  const renderNodes = (list: readonly FacetTreeNode<T>[], depth: number, parentKey: string) => list.map((node) => {
+    const pathKey = treePathKey(parentKey, node.id);
     const hasKids = node.children.length > 0;
-    const expanded = hasKids && isOpen(node.id, depth);
+    const expanded = hasKids && isOpen(pathKey, depth);
     const isLeaf = !hasKids && node.value !== undefined;
     const activate = () => {
       if (isLeaf) onSelect(node.value as T);
-      else toggle(node.id);
+      else toggle(pathKey);
     };
     return (
       <div key={node.id}>
@@ -81,7 +83,7 @@ export default function FacetTree<T>({
           dimmed={node.dimmed}
           onActivate={activate}
         />
-        {expanded && <div>{renderNodes(node.children, depth + 1)}</div>}
+        {expanded && <div>{renderNodes(node.children, depth + 1, pathKey)}</div>}
       </div>
     );
   });
@@ -91,7 +93,7 @@ export default function FacetTree<T>({
     <div>
       {searchPlaceholder && !empty && <TreeSearch value={query} onChange={changeQuery} placeholder={searchPlaceholder} />}
       {shown.length > 0
-        ? <div>{renderNodes(shown, 0)}</div>
+        ? <div>{renderNodes(shown, 0, '')}</div>
         : (
           <p className="px-2 py-4 text-center text-sm text-gray-400">
             {empty ? (emptyText ?? '항목이 없습니다.') : '찾는 이름이 없어요.'}

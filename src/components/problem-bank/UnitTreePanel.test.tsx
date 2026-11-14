@@ -48,4 +48,15 @@ describe('UnitTreePanel', () => {
     fireEvent.change(box, { target: { value: '소설' } });
     expect(screen.getByText('찾는 이름이 없어요.')).toBeTruthy();
   });
+
+  it('맞는 것이 없는 찾기를 다녀와도 손으로 편 가지는 그대로다 — 트리를 언마운트하지 않는다(코덱스 4R)', async () => {
+    render(<UnitTreePanel filters={EMPTY_FILTERS} onChange={() => undefined} />);
+    const box = await screen.findByRole('searchbox', { name: '교과서·단원 찾기' });
+    fireEvent.click(screen.getByRole('button', { name: '천재(박영목)' }));
+    expect(screen.getByRole('button', { name: '천재(박영목)' }).getAttribute('aria-expanded')).toBe('true');
+    fireEvent.change(box, { target: { value: '없는말' } });
+    expect(screen.getByText('찾는 이름이 없어요.')).toBeTruthy();
+    fireEvent.change(box, { target: { value: '' } });
+    expect(screen.getByRole('button', { name: '천재(박영목)' }).getAttribute('aria-expanded')).toBe('true');
+  });
 });

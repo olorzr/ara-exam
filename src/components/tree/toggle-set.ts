@@ -13,3 +13,16 @@ export function toggled(prev: ReadonlySet<string>, id: string): ReadonlySet<stri
   else next.add(id);
   return next;
 }
+
+/** 조상 경로 열쇠의 구분자 — 트리 이름·id 에 나오지 않는 제어 문자 */
+const PATH_SEP = '\u001f';
+
+/**
+ * 조상 경로 열쇠 — 펼침 기억에 쓴다. 노드 id 만으로는 다른 자리의 두 노드가 겹칠 수 있다(카테고리 트리 id 는 이름을 `-` 로 잇는다).
+ * @param parentKey - 부모의 경로 열쇠(뿌리면 '')
+ * @param id - 이 노드의 id
+ * @returns 이 노드의 경로 열쇠
+ */
+export function treePathKey(parentKey: string, id: string): string {
+  return parentKey ? `${parentKey}${PATH_SEP}${id}` : id;
+}
