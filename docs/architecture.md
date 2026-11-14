@@ -448,7 +448,7 @@ src/
 - 주요 파일: `option-select.tsx`(+ 회귀 테스트), `select.tsx`
 - `owner-scope-tabs.tsx` — '내가 만든 것 / 다른 선생님이 만든 것' 탭(문제지 조합·학교 프린트 시험지 목록). 패널은 탭마다 `TabsContent` 로 두고 목록은 고른 탭에만 그린다
 - 모양(2026-11-12 연한 민트 잡지 테마): 알약 단추(주 단추 잉크, `accent` 짙은 청록), 흰 종이 입력칸·카드(가는 줄, 그림자 없음), 밑줄 탭, 위 잉크 줄 대화창, 상태 꼬리표(`ok`·`warn`·`danger`·`info`)
-- **꼬리표(`badge.tsx`, 2026-11-13)**: 1px 테두리 알약 · 굵은 11px · 숫자·영문은 Jost(한글은 Pretendard — `font-tag` 토큰). 주 꼬리표(default)는 잉크, 그 밖은 갈래(`outline`·`secondary`·`muted`·`ok`·`warn`·`danger`·`info`). ⚠️ 쓰는 곳에서 색·크기를 덮을 수 없다 — `Badge` 가 className 에서 배치(`ml-*`·`align-*`·`max-w-*` 등, `badgeLayoutClass`)만 남기고 나머지는 버린다. `render`·`style` 은 받지 않는다
+- **꼬리표(`badge.tsx`, 2026-11-13)**: 1px 테두리 알약 · 굵은 11px · 숫자·영문은 Jost(한글은 Pretendard — `font-tag` 토큰). 주 꼬리표(default)는 잉크, 그 밖은 갈래(`outline`·`secondary`·`muted`·`ok`·`warn`·`danger`·`info`). ⚠️ 쓰는 곳에서 색·크기를 덮을 수 없다 — `Badge` 가 className 에서 배치(`ml-*`·`align-*`·`max-w-*` 등, `badgeLayoutClass`)만 남기고 나머지는 버린다. `render`·`style` 은 받지 않는다. 길이가 정해지지 않은 글은 `wrap` 갈래(줄바꿈 — 말줄임 금지)
 
 ## 화면 테마 층 (styles/theme, components/magazine — 2026-11-12)
 - 역할: 화면만 연한 민트 '종이 잡지' 로 그린다. 종이에 찍히는 모양은 예전 그대로 둔다

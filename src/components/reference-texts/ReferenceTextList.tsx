@@ -64,9 +64,7 @@ export default function ReferenceTextList({ rows, busyId, onDelete }: ReferenceT
               <ul className="mt-1.5 flex flex-wrap gap-1" aria-label="실린 교과서 단원과 태그">
                 {row.units.slice(0, UNITS_SHOWN).map((unit) => (
                   <li key={unitKey(unit)} className="max-w-full">
-                    <Badge variant="muted" className="max-w-full" title={unitLabel(unit)}>
-                      <span className="min-w-0 truncate">{unitLabel(unit)}</span>
-                    </Badge>
+                    <Badge variant="muted" wrap>{unitLabel(unit)}</Badge>
                   </li>
                 ))}
                 {row.units.length > UNITS_SHOWN && (
@@ -74,9 +72,7 @@ export default function ReferenceTextList({ rows, busyId, onDelete }: ReferenceT
                 )}
                 {row.tags.slice(0, TAGS_SHOWN).map((tag) => (
                   <li key={`tag:${tag}`} className="max-w-full">
-                    <Badge variant="ok" className="max-w-full" title={`#${tag}`}>
-                      <span className="min-w-0 truncate">#{tag}</span>
-                    </Badge>
+                    <Badge variant="ok" wrap>#{tag}</Badge>
                   </li>
                 ))}
               </ul>

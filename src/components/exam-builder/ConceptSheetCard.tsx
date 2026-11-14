@@ -42,17 +42,15 @@ export default function ConceptSheetCard({ sheet, onDelete }: ConceptSheetCardPr
         )}
       />
 
-      {/* 외부지문 level 은 '외부지문 및 프린트' 라 길다 — 꼬리표는 줄을 안 바꾸므로 폭에 묶는다 */}
-      <Badge variant="outline" className="mt-1.5 max-w-full self-start" title={sheet.level}>
-        <span className="min-w-0 truncate">{sheet.level}</span>
-      </Badge>
+      {/* 외부지문 level 은 '외부지문 및 프린트' 라 길다 — 좁으면 줄을 바꾼다 */}
+      <Badge variant="outline" wrap className="mt-1.5 self-start">{sheet.level}</Badge>
 
-      <Link
-        href={`/exam/builder/${sheet.id}`}
-        className="mt-2 font-display text-[17px] leading-snug font-bold break-keep [overflow-wrap:anywhere] after:absolute after:inset-0 group-hover:text-primary"
-      >
-        <span className="line-clamp-2">{sheet.title}</span>
-      </Link>
+      {/* 제목은 h3 그대로 — 화면 읽기 프로그램의 제목 탐색에서 꼭지마다 잡힌다(코덱스 2R). 링크가 꼭지 전체를 덮는다 */}
+      <h3 className="mt-2 font-display text-[17px] leading-snug font-bold break-keep [overflow-wrap:anywhere] group-hover:text-primary">
+        <Link href={`/exam/builder/${sheet.id}`} className="line-clamp-2 after:absolute after:inset-0">
+          {sheet.title}
+        </Link>
+      </h3>
       {categoryLabel && <p className="mt-1 truncate text-xs text-gray-500">{categoryLabel}</p>}
 
       <div className="mt-auto pt-3">

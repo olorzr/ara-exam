@@ -36,9 +36,18 @@ const badgeVariants = cva(
         danger: "border-red-400 bg-red-50 text-red-700",
         info: "border-sky-500 bg-sky-50 text-sky-800",
       },
+      /**
+       * 줄 바꾸기 — 길이가 정해지지 않은 글(단원 경로·태그·분류 축·문법 이름·개념지 갈래).
+       * 말줄임 + title 은 휴대폰·태블릿에서 전체를 볼 길이가 없어 버렸다(코덱스 2R). 한 줄이면 알약과 똑같이 보인다.
+       */
+      wrap: {
+        true: "max-w-full shrink rounded-xl text-left whitespace-normal break-keep [overflow-wrap:anywhere]",
+        false: "",
+      },
     },
     defaultVariants: {
       variant: "default",
+      wrap: false,
     },
   }
 )
@@ -73,7 +82,7 @@ type BadgeProps = Omit<useRender.ComponentProps<"span">, "render" | "style" | "c
  * @param props - 갈래(variant)·배치 className·span 속성
  * @returns span
  */
-function Badge({ className, variant = "default", ...props }: BadgeProps) {
+function Badge({ className, variant = "default", wrap = false, ...props }: BadgeProps) {
   const layout = badgeLayoutClass(className)
   if (layout.dropped.length > 0 && process.env.NODE_ENV !== "production") {
     console.warn(`[Badge] 색·크기는 갈래(variant)로 고른다 — 버린 클래스: ${layout.dropped.join(" ")}`)
@@ -82,7 +91,7 @@ function Badge({ className, variant = "default", ...props }: BadgeProps) {
     defaultTagName: "span",
     props: mergeProps<"span">(
       {
-        className: cn(badgeVariants({ variant }), layout.kept),
+        className: cn(badgeVariants({ variant, wrap }), layout.kept),
       },
       props
     ),

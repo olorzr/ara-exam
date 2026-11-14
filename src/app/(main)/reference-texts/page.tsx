@@ -110,10 +110,8 @@ export default function ReferenceTextsPage() {
 
             {axisLabel && (
               <p className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
-                {/* 꼬리표는 줄을 안 바꾼다 — 긴 단원·문법 경로는 폭에 묶고 말줄임, 전체는 title 로(코덱스 1R) */}
-                <Badge variant="secondary" className="max-w-full" title={axisLabel}>
-                  <span className="min-w-0 truncate">{axisLabel}</span>
-                </Badge>
+                {/* 긴 단원·문법 경로 — 줄을 바꿔 다 보인다(말줄임은 터치에서 전체를 못 본다, 코덱스 1·2R) */}
+                <Badge variant="secondary" wrap>{axisLabel}</Badge>
                 <button
                   type="button"
                   className="text-xs text-primary underline underline-offset-2"

@@ -68,6 +68,17 @@ describe('Badge', () => {
     expect([withRender, withStyle, withFn]).toHaveLength(3);
   });
 
+  it('길이가 정해지지 않은 글은 wrap 으로 줄을 바꾼다 — 기본은 한 줄 알약', () => {
+    render(<><Badge>OMR</Badge><Badge variant="muted" wrap>중2 비상(박영민) 2학기 2. 문학의 갈래 &gt; (1) 동백꽃</Badge></>);
+    const pill = screen.getByText('OMR').className.split(/\s+/);
+    expect(pill).toContain('whitespace-nowrap');
+    expect(pill).toContain('rounded-full');
+    const wrapped = screen.getByText(/문학의 갈래/).className.split(/\s+/);
+    expect(wrapped).toContain('whitespace-normal');
+    expect(wrapped).not.toContain('whitespace-nowrap');
+    expect(wrapped).toContain('max-w-full');
+  });
+
   it('갈래 — 상태와 덜 중요한 수, 주 꼬리표는 잉크', () => {
     for (const variant of ['default', 'outline', 'secondary', 'muted', 'ok', 'warn', 'danger', 'info'] as const) {
       expect(badgeVariants({ variant })).toContain('border');

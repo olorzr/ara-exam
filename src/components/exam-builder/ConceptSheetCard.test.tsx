@@ -14,6 +14,8 @@ describe('ConceptSheetCard', () => {
     render(<ConceptSheetCard sheet={sheet} onDelete={onDelete} />);
     const link = screen.getByRole('link');
     expect(link.getAttribute('href')).toBe('/exam/builder/s1');
+    // 제목은 h3 그대로 — 제목 탐색에서 꼭지마다 잡힌다(코덱스 2R)
+    expect(screen.getByRole('heading', { level: 3 }).contains(link)).toBe(true);
     expect(link.textContent).toContain('동백꽃 핵심 개념');
     const del = screen.getByRole('button', { name: '동백꽃 핵심 개념 삭제' });
     expect(link.contains(del)).toBe(false);
