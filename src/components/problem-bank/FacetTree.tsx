@@ -38,19 +38,39 @@ export default function FacetTree<T>({
 }: FacetTreeProps<T>) {
   const [flipped, setFlipped] = useState<ReadonlySet<string>>(() => new Set());
   const [query, setQuery] = useState('');
-  const searching = query.trim() !== '';
+  /**
+   * 찾는 동안 접은 가지 — **그 찾는 말에만** 묶는다(코덱스 1R). 찾는 동안 가지를 눌러 `flipped` 를 뒤집으면 화면은
+   * 그대로(찾는 중엔 다 펼친다)인데 찾기를 지우는 순간 처음엔 접혀 있던 가지가 펼쳐진 채 남았다. 찾는 말이 바뀌면 비운다.
+   */
+  const [searchClosed, setSearchClosed] = useState<{ query: string; ids: ReadonlySet<string> }>(
+    () => ({ query: '', ids: new Set() }),
+  );
+  const trimmed = query.trim();
+  const searching = trimmed !== '';
+  const closedNow = searchClosed.query === trimmed ? searchClosed.ids : null;
   const shown = useMemo(() => filterFacetTree(nodes, query), [nodes, query]);
 
-  const toggle = (id: string) => setFlipped((prev) => {
-    const next = new Set(prev);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    return next;
-  });
+  const toggle = (id: string) => {
+    const flip = (prev: ReadonlySet<string>) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    };
+    if (searching) {
+      setSearchClosed((prev) => ({ query: trimmed, ids: flip(prev.query === trimmed ? prev.ids : new Set()) }));
+      return;
+    }
+    setFlipped(flip);
+  };
+
+  const isOpen = (id: string, depth: number) => (searching
+    ? !(closedNow?.has(id) ?? false)
+    : (depth < defaultExpandedDepth) !== flipped.has(id));
 
   const renderNodes = (list: readonly FacetTreeNode<T>[], depth: number) => list.map((node) => {
     const hasKids = node.children.length > 0;
-    const expanded = hasKids && (searching || (depth < defaultExpandedDepth) !== flipped.has(node.id));
+    const expanded = hasKids && isOpen(node.id, depth);
     const isLeaf = !hasKids && node.value !== undefined;
     const activate = () => {
       if (isLeaf) onSelect(node.value as T);

@@ -123,6 +123,25 @@ describe('FacetTree 찾기 · 펼침', () => {
     expect(screen.queryByText('1학기 중간고사')).toBeNull();
   });
 
+  it('찾는 동안 접고 편 것은 찾기에만 남는다 — 지우면 처음 모양(코덱스 1R)', () => {
+    render(<FacetTree nodes={TREE} onSelect={() => undefined} defaultExpandedDepth={0} searchPlaceholder="학교 이름 찾기" />);
+    const box = screen.getByRole('searchbox', { name: '학교 이름 찾기' });
+    expect(screen.getByRole('button', { name: '고등' }).getAttribute('aria-expanded')).toBe('false');
+    fireEvent.change(box, { target: { value: '무학' } });
+    // 찾는 중에도 가지를 접을 수 있다(죽은 단추가 아니다)
+    fireEvent.click(screen.getByRole('button', { name: '고등' }));
+    expect(screen.getByRole('button', { name: '고등' }).getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByText('무학여고')).toBeNull();
+    // 찾는 말이 바뀌면 다시 다 펼친다
+    fireEvent.change(box, { target: { value: '무학여' } });
+    expect(screen.getByText('무학여고')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '고등' }));
+    fireEvent.click(screen.getByRole('button', { name: '고등' }));
+    fireEvent.change(box, { target: { value: '' } });
+    // 원래 접혀 있던 가지는 접힌 채다
+    expect(screen.getByRole('button', { name: '고등' }).getAttribute('aria-expanded')).toBe('false');
+  });
+
   it('늦게 온 노드도 기본 깊이만큼 펼쳐진다 — 처음엔 비어 있다가 패싯이 와도', () => {
     const { rerender } = render(<FacetTree nodes={[]} onSelect={() => undefined} defaultExpandedDepth={1} emptyText="비었어요" />);
     expect(screen.getByText('비었어요')).toBeTruthy();
