@@ -1,5 +1,5 @@
-import { readdirSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { readdirSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { badgeVariants } from './badge';
@@ -9,92 +9,72 @@ import { badgeVariants } from './badge';
  * 예전에는 쓰는 곳마다 `bg-amber-500 text-white`·`bg-sky-500`·`text-[10px]` 를 덮어 꼬리표가 제각각이었다.
  * 색·크기·여백은 갈래(variant)로만 고르고, className 에는 **배치**(바깥 여백·정렬·폭 제한)만 둔다.
  *
- * ⚠️ 정규식으로 찾지 않는다(코덱스 1R) — `className={'…'}`·작은따옴표·템플릿 표기를 놓치고, 금지 목록은 `text-lg`·`pl-8`·
- *    `hover:bg-…` 처럼 빠진 것이 늘 남는다. 그래서 TypeScript 구문 트리로 **공용 Badge 를 들여온 파일의** `<Badge>` 만 찾고,
- *    클래스는 **허용 목록**(배치)에 든 것만 통과시킨다. 글자로 못 읽는 className(`cn(…)`·변수)은 그 자체로 막는다.
+ * ⚠️ 어떤 `<태그>` 가 공용 Badge 인지는 **TypeScript 타입 검사기에 묻는다** — 태그의 기호를 별칭(들여오기·다시 내보내기·
+ *    기본 내보내기·이름공간·`const Tag = Badge`)을 따라 끝까지 풀어 badge.tsx 의 `Badge` 함수에 닿는지 본다.
+ *    정규식(코덱스 1R)이나 손으로 짠 경로 풀기(코덱스 2·3R — 상대 경로, 배럴의 `export { Badge }`·`export * as`·기본 내보내기를
+ *    차례로 놓쳤다)로 되돌리지 말 것. 저장소 전체를 여는 데 1초쯤이다.
+ * ⚠️ 클래스는 **허용 목록**(배치)에 든 것만 통과한다 — 금지 목록은 `text-lg`·`pl-8`·`hover:bg-…` 처럼 빠진 것이 늘 남는다.
+ *    글자로 못 읽는 className(`cn(…)`·변수)과 props 펼치기도 막는다.
  */
 
-const SRC = join(__dirname, '..', '..');
-/** 공용 Badge 파일(확장자 없이) */
-const BADGE_FILE = join(SRC, 'components', 'ui', 'badge');
+const ROOT = join(__dirname, '..', '..', '..');
+const SRC = join(ROOT, 'src');
+const BADGE_PATH = join(SRC, 'components', 'ui', 'badge.tsx');
 
-/** 허용하는 배치 유틸리티 — 앞에 변형(`hover:` 등)이 붙으면 안 된다 */
+/** 허용하는 배치 유틸리티 — 앞에 변형(`hover:`·`md:` 등)이 붙으면 안 된다 */
 const LAYOUT_CLASS = /^(?:-?m[trblxy]?-[\w.[\]/-]+|align-[\w-]+|self-[\w-]+|order-[\w-]+|max-w-[\w.[\]/-]+|min-w-0|shrink(?:-0)?|grow(?:-0)?)$/;
 
-/** 모듈 경로 → 그 모듈이 공용 Badge 로 내보내는 이름들 */
-type Exporters = Map<string, Set<string>>;
-
-/** 파일 경로를 모듈 열쇠로 — 확장자·끝의 index 를 뗀다 */
-function moduleKey(path: string): string {
-  return path.replace(/\.(?:tsx?|jsx?)$/, '').replace(/[/\\]index$/, '');
+/** 저장소 tsconfig 의 컴파일 설정(`@/` 별칭 포함) */
+function compilerOptions(): ts.CompilerOptions {
+  const config = ts.readConfigFile(join(ROOT, 'tsconfig.json'), ts.sys.readFile);
+  return ts.parseJsonConfigFileContent(config.config, ts.sys, ROOT).options;
 }
 
 /**
- * 모듈 지정자를 실제 경로(모듈 열쇠)로 — `@/` 별칭과 상대 경로를 같은 자리로 맞춘다(코덱스 2R: `../ui/badge` 로 빠져나갔다).
- * @returns 저장소 밖(패키지)이면 null
+ * 프로그램을 만든다 — `virtual` 의 파일은 디스크 대신 그 글로 읽는다(짧은 글로 검사할 때).
+ * @param rootNames - 시작 파일들
+ * @param virtual - 경로 → 글
+ * @returns 프로그램
  */
-function resolveModule(spec: string, fromFile: string): string | null {
-  if (spec.startsWith('@/')) return moduleKey(join(SRC, spec.slice(2)));
-  if (spec.startsWith('.')) return moduleKey(resolve(dirname(fromFile), spec));
-  return null;
+function makeProgram(rootNames: readonly string[], virtual: ReadonlyMap<string, string> = new Map()): ts.Program {
+  const options = compilerOptions();
+  const host = ts.createCompilerHost(options, true);
+  const { fileExists, readFile, getSourceFile } = host;
+  host.fileExists = (f) => virtual.has(f) || fileExists.call(host, f);
+  host.readFile = (f) => virtual.get(f) ?? readFile.call(host, f);
+  host.getSourceFile = (f, lang, onError, create) => {
+    const text = virtual.get(f);
+    return text !== undefined ? ts.createSourceFile(f, text, lang, true) : getSourceFile.call(host, f, lang, onError, create);
+  };
+  return ts.createProgram({ rootNames: [...rootNames, ...virtual.keys()], options, host });
 }
 
-/** TSX/TS 를 구문 트리로 */
-function parse(path: string, source: string): ts.SourceFile {
-  return ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, path.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
-}
-
-/**
- * 공용 Badge 를 내보내는 모듈들 — badge.tsx 와, 그것을 다시 내보내는 파일(배럴)을 더 늘지 않을 때까지 따라간다.
- * @param files - 저장소의 파일들
- * @returns 모듈 열쇠 → 내보낸 이름
- */
-function badgeExporters(files: readonly { path: string; file: ts.SourceFile }[]): Exporters {
-  const exporters: Exporters = new Map([[BADGE_FILE, new Set(['Badge'])]]);
-  for (let changed = true; changed;) {
-    changed = false;
-    for (const { path, file } of files) {
-      for (const statement of file.statements) {
-        if (!ts.isExportDeclaration(statement) || !statement.moduleSpecifier || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
-        const from = resolveModule(statement.moduleSpecifier.text, path);
-        const names = from ? exporters.get(from) : undefined;
-        if (!names) continue;
-        const clause = statement.exportClause;
-        const exported = !clause ? [...names]
-          : ts.isNamedExports(clause)
-            ? clause.elements.filter((e) => names.has((e.propertyName ?? e.name).text)).map((e) => e.name.text)
-            : [];
-        const key = moduleKey(path);
-        const mine = exporters.get(key) ?? new Set<string>();
-        for (const name of exported) {
-          if (!mine.has(name)) { mine.add(name); changed = true; }
-        }
-        exporters.set(key, mine);
-      }
-    }
-  }
-  return exporters;
-}
-
-/** 이 파일에서 공용 Badge 를 가리키는 이름 — 낱개로 들여온 이름(별칭 포함)과 묶어 들여온 이름공간 */
-function badgeBindings(path: string, file: ts.SourceFile, exporters: Exporters) {
-  const names = new Set<string>();
-  const namespaces = new Map<string, Set<string>>();
-  for (const statement of file.statements) {
-    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
-    const from = resolveModule(statement.moduleSpecifier.text, path);
-    const exported = from ? exporters.get(from) : undefined;
-    const bindings = statement.importClause?.namedBindings;
-    if (!exported || !bindings) continue;
-    if (ts.isNamespaceImport(bindings)) {
-      namespaces.set(bindings.name.text, exported);
+/** 기호가 가리키는 끝 — 별칭과 `const Tag = Badge` 를 따라간다 */
+function finalSymbol(checker: ts.TypeChecker, start: ts.Symbol | undefined): ts.Symbol | undefined {
+  let symbol = start;
+  for (let hop = 0; symbol && hop < 20; hop += 1) {
+    if (symbol.flags & ts.SymbolFlags.Alias) {
+      symbol = checker.getAliasedSymbol(symbol);
       continue;
     }
-    for (const element of bindings.elements) {
-      if (exported.has((element.propertyName ?? element.name).text)) names.add(element.name.text);
+    const decl = symbol.valueDeclaration;
+    const init = decl && ts.isVariableDeclaration(decl) ? decl.initializer : undefined;
+    if (init && (ts.isIdentifier(init) || ts.isPropertyAccessExpression(init))) {
+      symbol = checker.getSymbolAtLocation(ts.isPropertyAccessExpression(init) ? init.name : init);
+      continue;
     }
+    break;
   }
-  return { names, namespaces };
+  return symbol;
+}
+
+/** 이 태그가 공용 Badge(badge.tsx 의 `Badge` 함수)인가 */
+function isSharedBadge(checker: ts.TypeChecker, tag: ts.JsxTagNameExpression): boolean {
+  const at = ts.isPropertyAccessExpression(tag) ? tag.name : tag;
+  const symbol = finalSymbol(checker, checker.getSymbolAtLocation(at));
+  return Boolean(symbol?.declarations?.some((d) => (
+    resolve(d.getSourceFile().fileName) === BADGE_PATH && ts.isFunctionDeclaration(d) && d.name?.text === 'Badge'
+  )));
 }
 
 /** className 값 — 글자로 읽을 수 없으면 null */
@@ -110,21 +90,19 @@ function literalClassName(attribute: ts.JsxAttribute): string | null {
 
 /**
  * 한 파일에서 공용 Badge 의 className 이 배치 밖으로 나간 곳을 찾는다.
- * @param path - 파일 경로(상대 경로 들여오기를 풀 기준)
- * @param source - 글
- * @param exporters - 공용 Badge 를 내보내는 모듈들
- * @returns 어긋난 className 들(글자로 못 읽으면 '<식>', props 펼치기는 '<펼침>')
+ * @param program - 그 파일이 든 프로그램
+ * @param fileName - 파일 경로
+ * @returns 찾은 공용 Badge 수와 어긋난 className 들(글자로 못 읽으면 '<식>', props 펼치기는 '<펼침>')
  */
-function badgeClassOffenders(path: string, source: string, exporters: Exporters): string[] {
-  const file = parse(path, source);
-  const { names, namespaces } = badgeBindings(path, file, exporters);
-  if (names.size === 0 && namespaces.size === 0) return [];
-  const isBadgeTag = (tag: ts.JsxTagNameExpression) => (ts.isIdentifier(tag) && names.has(tag.text))
-    || (ts.isPropertyAccessExpression(tag) && ts.isIdentifier(tag.expression)
-      && Boolean(namespaces.get(tag.expression.text)?.has(tag.name.text)));
+function scanBadges(program: ts.Program, fileName: string): { found: number; offenders: string[] } {
+  const file = program.getSourceFile(fileName);
+  if (!file) throw new Error(`프로그램에 없는 파일: ${fileName}`);
+  const checker = program.getTypeChecker();
   const out: string[] = [];
+  let found = 0;
   const visit = (node: ts.Node) => {
-    if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && isBadgeTag(node.tagName)) {
+    if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && isSharedBadge(checker, node.tagName)) {
+      found += 1;
       for (const prop of node.attributes.properties) {
         if (ts.isJsxSpreadAttribute(prop)) { out.push('<펼침>'); continue; }
         if (!ts.isIdentifier(prop.name) || prop.name.text !== 'className') continue;
@@ -136,75 +114,68 @@ function badgeClassOffenders(path: string, source: string, exporters: Exporters)
     ts.forEachChild(node, visit);
   };
   visit(file);
-  return out;
+  return { found, offenders: out };
 }
 
-/** src 아래 .ts·.tsx 전부(테스트 제외) */
-function sourceFiles(): { path: string; file: ts.SourceFile; text: string }[] {
+/** src 아래 화면 파일 전부(테스트 제외) */
+function srcTsxFiles(): string[] {
   return (readdirSync(SRC, { recursive: true }) as string[])
-    .filter((f) => /\.tsx?$/.test(f) && !f.includes('.test.') && !f.endsWith('.d.ts'))
-    .map((f) => {
-      const path = join(SRC, f);
-      const text = readFileSync(path, 'utf8');
-      return { path, file: parse(path, text), text };
-    });
+    .filter((f) => f.endsWith('.tsx') && !f.includes('.test.'))
+    .map((f) => join(SRC, f));
 }
 
-/** 짧은 글로 검사 — 문항 은행 폴더의 파일인 셈 친다 */
-const FAKE = join(SRC, 'components', 'problem-bank', 'Fake.tsx');
-const DIRECT: Exporters = new Map([[BADGE_FILE, new Set(['Badge'])]]);
+/** 짧은 글 검사용 가짜 파일들 — 실제 폴더 자리에 둔 셈 친다(상대 경로를 풀려고) */
+const UI = join(SRC, 'components', 'ui');
+const BANK = join(SRC, 'components', 'problem-bank');
 const IMPORT = `import { Badge } from '@/components/ui/badge';\n`;
-const check = (source: string, exporters: Exporters = DIRECT) => badgeClassOffenders(FAKE, source, exporters);
+const PROBES: Record<string, { source: string; want: string[] }> = {
+  relative: { source: `import { Badge } from '../ui/badge';\nexport const A = () => <Badge className="bg-red-500 text-lg pl-8">a</Badge>;`, want: ['bg-red-500 text-lg pl-8'] },
+  namespace: { source: `import * as UI from '@/components/ui/badge';\nexport const A = () => <UI.Badge className="text-lg">a</UI.Badge>;`, want: ['text-lg'] },
+  barrelLocal: { source: `import { Badge } from '@/components/ui/zz-barrel-local';\nexport const A = () => <Badge className="bg-sky-500">a</Badge>;`, want: ['bg-sky-500'] },
+  barrelNamespace: { source: `import { UI } from '@/components/ui/zz-barrel-ns';\nexport const A = () => <UI.Badge className="text-lg">a</UI.Badge>;`, want: ['text-lg'] },
+  barrelDefault: { source: `import Tag from '@/components/ui/zz-barrel-default';\nexport const A = () => <Tag className="bg-red-50">a</Tag>;`, want: ['bg-red-50'] },
+  barrelStar: { source: `import { Badge } from '@/components/ui/zz-barrel-star';\nexport const A = () => <Badge className="pl-8">a</Badge>;`, want: ['pl-8'] },
+  variableAlias: { source: `${IMPORT}const Tag = Badge;\nexport const A = () => <Tag className="bg-red-50">a</Tag>;`, want: ['bg-red-50'] },
+  importAlias: { source: `import { Badge as Tag } from '@/components/ui/badge';\nexport const A = () => <Tag className="bg-red-50" />;`, want: ['bg-red-50'] },
+  quoting: {
+    source: `${IMPORT}export const A = () => <><Badge className={'bg-amber-500 text-white'}>a</Badge><Badge className='bg-sky-500'>b</Badge><Badge className={\`text-[10px]\`}>c</Badge></>;`,
+    want: ['bg-amber-500 text-white', 'bg-sky-500', 'text-[10px]'],
+  },
+  allowList: {
+    source: `${IMPORT}export const A = () => <>${['text-lg', 'text-ink', 'pl-8', 'hover:bg-red-500', 'font-normal', 'border-0', 'md:ml-2'].map((c) => `<Badge className="${c}">a</Badge>`).join('')}</>;`,
+    want: ['text-lg', 'text-ink', 'pl-8', 'hover:bg-red-500', 'font-normal', 'border-0', 'md:ml-2'],
+  },
+  dynamic: { source: `${IMPORT}declare const cn: (...a: unknown[]) => string;\ndeclare const props: object;\nexport const A = () => <><Badge className={cn('ml-2')}>a</Badge><Badge {...props}>b</Badge></>;`, want: ['<식>', '<펼침>'] },
+  layout: { source: `${IMPORT}export const A = () => <><Badge className="ml-2 align-middle">a</Badge><Badge className="max-w-full -mt-0.5 self-start">b</Badge></>;`, want: [] },
+  localSameName: { source: `function Badge(p: { className?: string }) { return <span {...p} />; }\nexport const A = () => <Badge className="bg-ink" />;`, want: [] },
+  otherModuleSameName: { source: `import { Badge } from './zz-other-badge';\nexport const A = () => <Badge className="bg-ink" />;`, want: [] },
+};
+const VIRTUAL = new Map<string, string>([
+  ...Object.entries(PROBES).map(([name, probe]) => [join(BANK, `zz-probe-${name}.tsx`), probe.source] as [string, string]),
+  [join(UI, 'zz-barrel-local.ts'), `import { Badge } from './badge';\nexport { Badge };\n`],
+  [join(UI, 'zz-barrel-ns.ts'), `export * as UI from './badge';\n`],
+  [join(UI, 'zz-barrel-default.ts'), `export { Badge as default } from './badge';\n`],
+  [join(UI, 'zz-barrel-star.ts'), `export * from './badge';\n`],
+  [join(BANK, 'zz-other-badge.tsx'), `export function Badge(p: { className?: string }) { return <span {...p} />; }\n`],
+]);
 
 describe('Badge 덮어쓰기 검사', () => {
   it('src 의 모든 공용 Badge 는 className 에 배치만 둔다 — 색·크기·여백은 갈래(variant)로', () => {
-    const files = sourceFiles();
-    const exporters = badgeExporters(files);
-    const offenders: string[] = [];
-    for (const { path, text } of files) {
-      for (const bad of badgeClassOffenders(path, text, exporters)) offenders.push(`${path.slice(SRC.length + 1)}: ${bad}`);
-    }
+    const files = srcTsxFiles();
+    const program = makeProgram(files);
+    const scans = files.map((f) => ({ f, ...scanBadges(program, f) }));
+    const offenders = scans.flatMap(({ f, offenders: bad }) => bad.map((b) => `${f.slice(SRC.length + 1)}: ${b}`));
     expect(offenders).toEqual([]);
-  });
+    // 헛통과 막기 — 경로 풀기가 조용히 실패하면 공용 Badge 를 하나도 못 찾고 통과한다(2026-11-14 운영 코드 34곳)
+    expect(scans.reduce((n, s) => n + s.found, 0)).toBeGreaterThanOrEqual(30);
+  }, 60_000);
 
-  it('들여오는 길이 달라도 공용 Badge 다 — 상대 경로 · 이름공간 · 배럴', () => {
-    expect(check(`import { Badge } from '../ui/badge';\n<Badge className="bg-red-500 text-lg pl-8">a</Badge>`)).toHaveLength(1);
-    expect(check(`import { Badge } from '../ui/badge.tsx';\n<Badge className="bg-red-500">a</Badge>`)).toHaveLength(1);
-    expect(check(`import * as UI from '@/components/ui/badge';\n<UI.Badge className="text-lg">a</UI.Badge>`)).toEqual(['text-lg']);
-    // 배럴 — components/ui/index.ts 가 다시 내보내면 '@/components/ui' 로 들여와도 잡는다
-    const barrel = { path: join(SRC, 'components', 'ui', 'index.ts'), file: parse('index.ts', `export { Badge } from './badge';\nexport * from './badge';`) };
-    const viaBarrel = badgeExporters([barrel]);
-    expect(check(`import { Badge } from '@/components/ui';\n<Badge className="bg-sky-500">a</Badge>`, viaBarrel)).toHaveLength(1);
-    // 같은 이름이라도 다른 모듈이면 상관하지 않는다
-    expect(check(`import { Badge } from '../covers/Badge';\n<Badge className="bg-ink" />`)).toEqual([]);
-  });
-
-  it('표기가 달라도 잡는다 — 작은따옴표 · 식 안의 글자 · 템플릿 · 별칭', () => {
-    expect(check(`${IMPORT}<Badge className={'bg-amber-500 text-white'}>a</Badge>`)).toHaveLength(1);
-    expect(check(`${IMPORT}<Badge className='bg-sky-500'>a</Badge>`)).toHaveLength(1);
-    expect(check(`${IMPORT}<Badge className={\`text-[10px]\`}>a</Badge>`)).toHaveLength(1);
-    expect(check(`import { Badge as Tag } from '@/components/ui/badge';\n<Tag className="bg-red-50" />`)).toHaveLength(1);
-  });
-
-  it('금지 목록이 아니라 허용 목록이다 — 크기·색·안쪽 여백·변형 표기는 다 막힌다', () => {
-    for (const cls of ['text-lg', 'text-ink', 'pl-8', 'hover:bg-red-500', 'font-normal', 'border-0', 'md:ml-2']) {
-      expect(check(`${IMPORT}<Badge className="${cls}">a</Badge>`)).toEqual([cls]);
+  it('들여오는 길·표기가 달라도 공용 Badge 면 잡고, 이름만 같은 다른 것은 놔둔다', () => {
+    const program = makeProgram([], VIRTUAL);
+    for (const [name, probe] of Object.entries(PROBES)) {
+      expect({ name, got: scanBadges(program, join(BANK, `zz-probe-${name}.tsx`)).offenders }).toEqual({ name, got: probe.want });
     }
-  });
-
-  it('글자로 못 읽는 className 과 props 펼치기는 막는다', () => {
-    expect(check(`${IMPORT}<Badge className={cn('ml-2', x)}>a</Badge>`)).toEqual(['<식>']);
-    expect(check(`${IMPORT}<Badge {...props}>a</Badge>`)).toEqual(['<펼침>']);
-  });
-
-  it('배치는 통과한다 — 바깥 여백 · 정렬 · 폭 제한', () => {
-    expect(check(`${IMPORT}<Badge className="ml-2 align-middle">a</Badge>`)).toEqual([]);
-    expect(check(`${IMPORT}<Badge className="max-w-full -mt-0.5 self-start">a</Badge>`)).toEqual([]);
-  });
-
-  it('공용 Badge 를 들여오지 않은 파일의 같은 이름은 상관하지 않는다(표지의 번호 Badge 등)', () => {
-    expect(check(`function Badge() { return null }\n<Badge className="bg-ink" />`)).toEqual([]);
-  });
+  }, 60_000);
 });
 
 describe('Badge 갈래', () => {
