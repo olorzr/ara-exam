@@ -5,7 +5,7 @@
 -- 배경(원장님 2026-11-15, sql/108 바로 뒤): "품사 부분에도 문제가 있고 … 전수조사 해야 할 것 같은데?!"
 --
 -- 문법 태그가 붙은 문항 10,140건 가운데 sql/108 이 이미 본 음운·단어의 형성 문항(품사 태그가 없는 것)을 뺀
--- 7,384건(평가문제집 포함)을 하나씩 다시 읽고, 바뀐 1372건을 기록한다(코덱스 리뷰 1R 뒤 21건을 옛 값으로 되돌려 1,393 → 1,372). 그중 37건은 문법 문항이 아니라서
+-- 7,384건(평가문제집 포함)을 하나씩 다시 읽고, 바뀐 1370건을 기록한다(코덱스 리뷰 1R·2R 지적으로 앞선 판의 24건을 고쳐 1,393 → 1370). 그중 37건은 문법 문항이 아니라서
 -- 태그를 비우고 영역을 문학·독서·작문·화법으로 옮긴다(영역이 '언어' 인데 태그가 빈 문항은 0건으로 지킨다).
 -- 정한 기준(sql/108 의 음운·어문 규정 경계에 더해):
 --   - 품사: 한 품사를 물으면 그 잎. 체언(명사·대명사·수사)을 묶어 묻거나 품사의 개념·분류 기준·품사 전반을 물으면
@@ -22,7 +22,7 @@
 --   - 통일 단원·담화 관습·인용 표현·어휘 양상 단원의 문항은 글을 읽는 형식이어도 선지가 그 문법 지식을 물으면 문법 문항이다.
 --
 -- ⚠️ **사람이 읽고 정한 값이라 재계산할 수 없다.** 아래 목록이 유일한 원본이다(sql/32·69·108 과 같은 성질).
---    판정 근거는 저장소 밖 ~/.claude/tools/exam-specs/grammar-audit-2026-11-15/ (코덱스 읽기 전용 판정 + 총괄 교정 329건).
+--    판정 근거는 저장소 밖 ~/.claude/tools/exam-specs/grammar-audit-2026-11-15/ (코덱스 읽기 전용 판정 + 총괄 교정 368건).
 -- ⚠️ 문항은 **id 전체**로 찾고, **지금 태그가 옛 값과 같을 때만**(영역을 옮기는 문항은 영역도 '화법과 언어 > 언어' 일 때만)
 --    바꾼다. 이미 새 값이면 건너뛰고(멱등), 둘 다 아니면 그 뒤 누군가 손으로 고친 것이라 덮지 않고 알린다.
 -- ⚠️ 적재 스펙(JSON)으로 들어온 기출은 스펙 파일도 같은 값으로 고쳤다(다시 적재하면 문항 id 가 새로 나온다).
@@ -1295,9 +1295,6 @@ BEGIN
     -- 2025 압구정중학교 중2 2학기 중간 12번 — 서문에 나타난 쉬운 학습과 창제 정신을 물음
     ('4e2a6fbe-8caa-5a5b-b04b-9a7da60dc371', ARRAY['국어의 역사 > 훈민정음 > 훈민정음 창제 원리']::TEXT[],
       ARRAY['국어의 역사 > 훈민정음 > 세종어제훈민정음']::TEXT[], NULL),
-    -- 2024 무학중학교 중1 2학기 기말 26번 — 사회적 요인에 따른 어휘와 지역 방언을 구별함
-    ('4e5cd8a4-cb8c-46a2-a698-4de8b5697ca5', ARRAY['단어 > 어휘 체계와 양상 > 유행어·은어·전문어']::TEXT[],
-      ARRAY['단어 > 어휘 체계와 양상 > 유행어·은어·전문어', '단어 > 어휘 체계와 양상 > 표준어·방언']::TEXT[], NULL),
     -- 천재(노미숙) 중1-2 평가문제집 2-(1) 대중매체와 개인 인터넷 방송 (평가문제집) 1번 — 뜻풀이와 문맥에 맞는 낱말 선택
     ('4e661402-6b0e-4a1b-a710-9c8fe20f30f1', ARRAY['단어 > 단어의 의미 > 단어의 의미 유형']::TEXT[],
       ARRAY['단어 > 단어의 의미 > 혼합']::TEXT[], NULL),
@@ -2168,9 +2165,6 @@ BEGIN
     -- 2023 마장중학교 중2 2학기 기말 18번 — 창제·운용 원리를 넘어 한글의 우수성 전반을 물음
     ('82de8ddb-793b-4c43-a793-b851881ff87c', ARRAY['국어의 역사 > 훈민정음 > 훈민정음 창제 원리', '국어의 역사 > 훈민정음 > 훈민정음 운용 원리']::TEXT[],
       ARRAY['국어의 역사 > 훈민정음 > 혼합']::TEXT[], NULL),
-    -- 천재(정호웅) 중1-1 평가문제집 시험 대비 예상 문제 3 (평가문제집) 55번 — 활용형으로 동사·형용사를 가른다 — 활용을 명시적으로 묻는다
-    ('8307385d-cc84-4884-abdf-0ad8022dcdcd', ARRAY['단어 > 품사 > 동사', '단어 > 용언 > 용언의 활용']::TEXT[],
-      ARRAY['단어 > 품사 > 동사', '단어 > 품사 > 형용사', '단어 > 용언 > 용언의 활용']::TEXT[], NULL),
     -- 2026 숙명여자고등학교 고1 1학기 중간 6번 — 뜻풀이에 맞는 낱말을 고르는 어휘 문항
     ('831037ba-96e0-49a5-bb2d-5244e66c5e00', ARRAY['단어 > 단어의 의미 > 단어의 의미 유형']::TEXT[],
       ARRAY['단어 > 단어의 의미 > 혼합']::TEXT[], NULL),
@@ -2933,9 +2927,9 @@ BEGIN
     -- 2025 숭의여자고등학교 고1 1학기 기말 1번 — 종결 유형과 간접 발화의 관계를 함께 물음
     ('b086840f-48e0-4929-bb35-72336bc21fa3', ARRAY['문장 > 문법 요소 > 종결 표현']::TEXT[],
       ARRAY['문장 > 문법 요소 > 종결 표현', '담화 > 담화 표현 방식']::TEXT[], NULL),
-    -- 2023 무학중학교 중1 2학기 중간 11번 — 주어·목적어·부사어·보어·서술어의 역할을 비교함
+    -- 2023 무학중학교 중1 2학기 중간 11번 — 빈칸과 같은 역할(보어)을 찾는 문항 — 코덱스 2R
     ('b116a057-8b9f-4add-b821-581ee6a4cf64', ARRAY['단어 > 품사 > 명사']::TEXT[],
-      ARRAY['문장 > 문장 성분 > 혼합']::TEXT[], NULL),
+      ARRAY['문장 > 문장 성분 > 보어']::TEXT[], NULL),
     -- 2024 대원국제중학교 중2 1학기 중간 23번 — 문맥에 맞는 낱말 사용을 판단하는 어휘 문항
     ('b187cf62-e89a-4bd1-a931-ccb1c77d649f', ARRAY['단어 > 단어의 의미 > 단어의 의미 유형']::TEXT[],
       ARRAY['단어 > 단어의 의미 > 혼합']::TEXT[], NULL),
@@ -4162,37 +4156,10 @@ BEGIN
       ARRAY['남북한 언어 > 남북한 표기와 맞춤법 차이']::TEXT[], NULL);
 
   SELECT count(*) INTO v FROM audit_fix;
-  IF v <> 1372 THEN RAISE EXCEPTION '목록 수가 다르다: %', v; END IF;
+  IF v <> 1370 THEN RAISE EXCEPTION '목록 수가 다르다: %', v; END IF;
 
   -- 순서와 상관없이 같은 값이면 같은 것으로 본다(배열 정렬 비교)
-  SELECT count(*) INTO v FROM audit_fix WHERE new_area IS NOT NULL;
-  IF v <> 37 THEN RAISE EXCEPTION '영역을 옮길 문항 수가 다르다: %', v; END IF;
-
-  UPDATE exam.problems p
-     SET grammar_paths = f.new_paths,
-         area_path = COALESCE(f.new_area, p.area_path)
-    FROM audit_fix f
-   WHERE p.id = f.id
-     AND (SELECT array_agg(x ORDER BY x) FROM unnest(p.grammar_paths) x)
-         IS NOT DISTINCT FROM (SELECT array_agg(x ORDER BY x) FROM unnest(f.old_paths) x)
-     AND (f.new_area IS NULL OR p.area_path = ARRAY['화법과 언어', '언어']::TEXT[]);
-  GET DIAGNOSTICS v_changed = ROW_COUNT;
-
-  SELECT count(*) INTO v_already FROM exam.problems p JOIN audit_fix f ON f.id = p.id
-   WHERE (SELECT array_agg(x ORDER BY x) FROM unnest(p.grammar_paths) x)
-         IS NOT DISTINCT FROM (SELECT array_agg(x ORDER BY x) FROM unnest(f.new_paths) x);
-  SELECT count(*) INTO v FROM audit_fix f WHERE NOT EXISTS (SELECT 1 FROM exam.problems p WHERE p.id = f.id);
-  RAISE NOTICE '바꿈 %건 · 새 값인 문항(이번 포함) %건 · 없는 문항 %건 / 목록 %건', v_changed, v_already, v, 1372;
-
-  FOR r IN
-    SELECT p.id, p.grammar_paths FROM exam.problems p JOIN audit_fix f ON f.id = p.id
-     WHERE (SELECT array_agg(x ORDER BY x) FROM unnest(p.grammar_paths) x)
-           IS DISTINCT FROM (SELECT array_agg(x ORDER BY x) FROM unnest(f.new_paths) x)
-  LOOP
-    RAISE NOTICE '손으로 고친 값이 있어 건너뜀: % %', r.id, r.grammar_paths;
-  END LOOP;
-
-  -- 앞선 판(3799d80, 운영에 한 번 적용됨)이 '한 갈래를 찾는 문항' 에 오답 선지의 갈래까지 붙인 21건을 옛 값으로 되돌린다.
+  -- 앞선 판(3799d80, 운영에 한 번 적용됨)이 '한 갈래를 찾는 문항' 에 오답 선지의 갈래까지 붙인 24건을 옛 값으로 되돌린 뒤 아래 목록을 적용한다(되돌리는 단계가 먼저다 — 최종 값이 바뀐 문항도 옛 값을 거쳐 새 값이 된다).
   -- 지금 값이 그 판이 넣은 값일 때만 바꾼다(그 판을 안 거친 DB 에서는 아무것도 하지 않는다).
   CREATE TEMP TABLE audit_revert(id UUID PRIMARY KEY, applied TEXT[], old_paths TEXT[]) ON COMMIT DROP;
   INSERT INTO audit_revert VALUES
@@ -4206,16 +4173,22 @@ BEGIN
     ('3efa43cf-beb8-4273-ab53-4385f5d904c5', ARRAY['문장 > 문법 요소 > 피동 표현', '문장 > 문법 요소 > 사동 표현']::TEXT[], ARRAY['문장 > 문법 요소 > 피동 표현']::TEXT[]),
     -- 2025 영동일고등학교 고1 1학기 중간 23번
     ('4cbb4f29-386a-4b6d-8075-fb63161c45f9', ARRAY['문장 > 문법 요소 > 피동 표현', '문장 > 문법 요소 > 사동 표현']::TEXT[], ARRAY['문장 > 문법 요소 > 피동 표현']::TEXT[]),
+    -- 2024 무학중학교 중1 2학기 기말 26번
+    ('4e5cd8a4-cb8c-46a2-a698-4de8b5697ca5', ARRAY['단어 > 어휘 체계와 양상 > 유행어·은어·전문어', '단어 > 어휘 체계와 양상 > 표준어·방언']::TEXT[], ARRAY['단어 > 어휘 체계와 양상 > 유행어·은어·전문어']::TEXT[]),
     -- 2026 와부고등학교 고1 1학기 기말 17번
     ('5fde93b7-e437-40d0-a116-745c1e8a511a', ARRAY['문장 > 문법 요소 > 피동 표현', '문장 > 문법 요소 > 사동 표현']::TEXT[], ARRAY['문장 > 문법 요소 > 피동 표현']::TEXT[]),
     -- 2025 대성고등학교(대전) 고1 1학기 기말 7번
     ('76f0e03a-ae7a-4d7e-a252-eabc4fc58d63', ARRAY['문장 > 문법 요소 > 피동 표현', '문장 > 문법 요소 > 사동 표현']::TEXT[], ARRAY['문장 > 문법 요소 > 피동 표현']::TEXT[]),
+    -- 천재(정호웅) 중1-1 평가문제집 시험 대비 예상 문제 3 (평가문제집) 55번
+    ('8307385d-cc84-4884-abdf-0ad8022dcdcd', ARRAY['단어 > 품사 > 동사', '단어 > 품사 > 형용사', '단어 > 용언 > 용언의 활용']::TEXT[], ARRAY['단어 > 품사 > 동사', '단어 > 용언 > 용언의 활용']::TEXT[]),
     -- 2025 명신여자고등학교 고1 1학기 기말 10번
     ('9071e647-0998-4859-b49e-9cdc12fc8095', ARRAY['문장 > 문법 요소 > 사동 표현', '문장 > 문법 요소 > 피동 표현']::TEXT[], ARRAY['문장 > 문법 요소 > 사동 표현']::TEXT[]),
     -- 해냄 중2-1 평가문제집 2-(1) 피동 표현과 인용 표현 (평가문제집) 31번
     ('a6978356-7308-4699-a217-5490ce70b8bb', ARRAY['문장 > 문법 요소 > 피동 표현', '문장 > 문법 요소 > 사동 표현']::TEXT[], ARRAY['문장 > 문법 요소 > 피동 표현']::TEXT[]),
     -- 2020학년도 11월 고1 전국연합학력평가 (모의고사) 13번
     ('ac1789e4-736c-4ff8-a1e1-04788129fb27', ARRAY['문장 > 문법 요소 > 피동 표현', '문장 > 문법 요소 > 사동 표현']::TEXT[], ARRAY['문장 > 문법 요소 > 피동 표현']::TEXT[]),
+    -- 2023 무학중학교 중1 2학기 중간 11번
+    ('b116a057-8b9f-4add-b821-581ee6a4cf64', ARRAY['문장 > 문장 성분 > 혼합']::TEXT[], ARRAY['단어 > 품사 > 명사']::TEXT[]),
     -- 2023 현대고등학교 고1 1학기 기말 19번
     ('b1edf330-1c22-4387-abe9-281fb76b49e7', ARRAY['문장 > 문법 요소 > 사동 표현', '문장 > 문법 요소 > 피동 표현']::TEXT[], ARRAY['문장 > 문법 요소 > 사동 표현']::TEXT[]),
     -- 천재(노미숙) 중2-1 평가문제집 2-(2) 피동 표현과 인용 표현 활용하기 (평가문제집) 75번
@@ -4245,7 +4218,34 @@ BEGIN
      AND (SELECT array_agg(x ORDER BY x) FROM unnest(p.grammar_paths) x)
          IS NOT DISTINCT FROM (SELECT array_agg(x ORDER BY x) FROM unnest(rv.applied) x);
   GET DIAGNOSTICS v = ROW_COUNT;
-  RAISE NOTICE '앞선 판이 잘못 바꾼 문항 되돌림 %건 / 목록 21건', v;
+  RAISE NOTICE '앞선 판이 잘못 바꾼 문항 되돌림 %건 / 목록 24건', v;
+
+  SELECT count(*) INTO v FROM audit_fix WHERE new_area IS NOT NULL;
+  IF v <> 37 THEN RAISE EXCEPTION '영역을 옮길 문항 수가 다르다: %', v; END IF;
+
+  UPDATE exam.problems p
+     SET grammar_paths = f.new_paths,
+         area_path = COALESCE(f.new_area, p.area_path)
+    FROM audit_fix f
+   WHERE p.id = f.id
+     AND (SELECT array_agg(x ORDER BY x) FROM unnest(p.grammar_paths) x)
+         IS NOT DISTINCT FROM (SELECT array_agg(x ORDER BY x) FROM unnest(f.old_paths) x)
+     AND (f.new_area IS NULL OR p.area_path = ARRAY['화법과 언어', '언어']::TEXT[]);
+  GET DIAGNOSTICS v_changed = ROW_COUNT;
+
+  SELECT count(*) INTO v_already FROM exam.problems p JOIN audit_fix f ON f.id = p.id
+   WHERE (SELECT array_agg(x ORDER BY x) FROM unnest(p.grammar_paths) x)
+         IS NOT DISTINCT FROM (SELECT array_agg(x ORDER BY x) FROM unnest(f.new_paths) x);
+  SELECT count(*) INTO v FROM audit_fix f WHERE NOT EXISTS (SELECT 1 FROM exam.problems p WHERE p.id = f.id);
+  RAISE NOTICE '바꿈 %건 · 새 값인 문항(이번 포함) %건 · 없는 문항 %건 / 목록 %건', v_changed, v_already, v, 1370;
+
+  FOR r IN
+    SELECT p.id, p.grammar_paths FROM exam.problems p JOIN audit_fix f ON f.id = p.id
+     WHERE (SELECT array_agg(x ORDER BY x) FROM unnest(p.grammar_paths) x)
+           IS DISTINCT FROM (SELECT array_agg(x ORDER BY x) FROM unnest(f.new_paths) x)
+  LOOP
+    RAISE NOTICE '손으로 고친 값이 있어 건너뜀: % %', r.id, r.grammar_paths;
+  END LOOP;
 
   -- -------------------------------------------
   -- 검증 — 규칙이 표 전체에서 지켜지는가
