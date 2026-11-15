@@ -8,6 +8,7 @@ import { markYetHangul } from '@/lib/yet-hangul';
 import type { PaperItemSnapshot } from '@/types/problem-bank';
 import { isInlineNode, splitPassagePieces, type BoxPart, type PassagePiece } from './box-parts';
 import { stripTrailingEmptyParagraphs } from './html-trim';
+import { splitLongLinePieces, type StemLinePiece } from './stem-line-units';
 
 /**
  * 문항을 '단위' 로 나눈다 — 단 끝에서 자를 수 있는 자리는 단위 사이뿐이다.
@@ -15,15 +16,19 @@ import { stripTrailingEmptyParagraphs } from './html-trim';
  * 원장님(2026-11-06): "문제를 다음 다단으로 넘기는 걸 만들어야 할 것 같음." 문항이 통째로 넘어가 앞 단이 절반 비고,
  * 한 단보다 큰 문항은 70% 로 줄어 찍혔다. 평가원 시험지처럼 〈보기〉가 단 바닥에, 선지가 다음 단 머리에 오면 된다.
  *
- * 한 선지·한 문단 안은 자르지 않는다. 답 빈칸·교사용 답은 바로 앞 단위에 붙어 간다(`questionCuts`).
+ * 한 선지·한 문단 안은 자르지 않는다 — 단, 6줄 넘는 줄바꿈 문단(〈보기〉 속 시·대화)은 단위를 만들 때 두 줄 묶음으로
+ * 미리 나눠 둔다(`splitLongLinePieces`, 2026-11-15). 답 빈칸·교사용 답은 바로 앞 단위에 붙어 간다(`questionCuts`).
  */
 
 /** 문항의 한 단위 — 차례는 늘 머리 · 발문 조각 · 그림 · 선지 · 빈칸 · 답이다 */
 export type QuestionUnit =
-  /** 번호와 나란히 서는 발문 첫 조각 — 늘 0번 */
-  | { kind: 'head'; html: string; box?: BoxPart }
-  /** 발문의 나머지 조각. 〈보기〉 상자는 지문처럼 자식 단위로 터뜨린다 */
-  | { kind: 'stem'; html: string; box?: BoxPart }
+  /**
+   * 번호와 나란히 서는 발문 첫 조각 — 늘 0번. `joined` 는 같은 문단의 다음 줄 묶음이 바로 뒤에 온다는 표시다
+   * (`splitLongLinePieces` — 묶음 사이에 간격이 없어야 쪼개지지 않은 모양이 예전 그대로다)
+   */
+  | { kind: 'head'; html: string; box?: BoxPart; joined?: true }
+  /** 발문의 나머지 조각. 〈보기〉 상자는 지문처럼 자식 단위로 터뜨리고, 긴 줄바꿈 문단은 줄 묶음으로 나눈다 */
+  | { kind: 'stem'; html: string; box?: BoxPart; joined?: true }
   /** 자리표시자 없이 발문 끝에 붙는 그림 */
   | { kind: 'figure'; path: string }
   | { kind: 'choice'; index: number }
@@ -97,6 +102,14 @@ function stemPieces(html: string, figures: readonly string[]): PassagePiece[] {
   return inline ? [{ html }] : splitPassagePieces(html, figures, { keepMissingFigures: true });
 }
 
+/** 발문 조각의 상자·이어짐 표시 — 없는 칸은 싣지 않는다(단위 모양을 견주는 테스트가 키 유무를 본다) */
+function pieceMarks(piece: StemLinePiece | undefined): { box?: BoxPart; joined?: true } {
+  return {
+    ...(piece?.box ? { box: piece.box } : {}),
+    ...(piece?.joined ? { joined: true as const } : {}),
+  };
+}
+
 /** 선지 자리의 단위들 */
 function answerAreaUnits(snapshot: PaperItemSnapshot, layout: QuestionChoiceLayout, showAnswers: boolean): QuestionUnit[] {
   if (layout.paired || layout.matrix) return [{ kind: 'choices-table' }];
@@ -114,10 +127,10 @@ function answerAreaUnits(snapshot: PaperItemSnapshot, layout: QuestionChoiceLayo
 export function questionUnits(snapshot: PaperItemSnapshot, showAnswers: boolean): QuestionUnit[] {
   const layout = questionChoiceLayout(snapshot);
   const html = questionStemHtml(snapshot, layout);
-  const [head, ...rest] = stemPieces(html, snapshot.figure_paths);
+  const [head, ...rest] = splitLongLinePieces(stemPieces(html, snapshot.figure_paths));
   return [
-    { kind: 'head', html: head?.html ?? '', ...(head?.box ? { box: head.box } : {}) },
-    ...rest.map((piece): QuestionUnit => ({ kind: 'stem', html: piece.html, ...(piece.box ? { box: piece.box } : {}) })),
+    { kind: 'head', html: head?.html ?? '', ...pieceMarks(head) },
+    ...rest.map((piece): QuestionUnit => ({ kind: 'stem', html: piece.html, ...pieceMarks(piece) })),
     ...unplacedFigures(html, snapshot.figure_paths).map(({ path }): QuestionUnit => ({ kind: 'figure', path })),
     ...answerAreaUnits(snapshot, layout, showAnswers),
     ...(showAnswers ? [{ kind: 'answer' } as const] : []),

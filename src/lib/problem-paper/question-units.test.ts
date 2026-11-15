@@ -56,6 +56,26 @@ describe('questionUnits', () => {
     expect(units[2]).toMatchObject({ box: { label: '보기', first: false, last: true } });
   });
 
+  it('〈보기〉 속 긴 줄바꿈 문단은 두 줄 묶음 단위로 나뉘어 그 사이에서도 자를 수 있다', () => {
+    const lines = Array.from({ length: 7 }, (_, i) => `•학생${i + 1}: 말`).join('<br>');
+    const units = questionUnits(snap({ stem_html: `<p>물음</p><blockquote data-box="보기"><p>${lines}</p></blockquote>` }), false);
+    // 7줄: 2 · 2 · 3
+    expect(kinds(units)).toEqual(['head', 'stem', 'stem', 'stem', 'choice', 'choice', 'choice', 'choice', 'choice']);
+    expect(units.slice(1, 4)).toMatchObject([
+      { joined: true, box: { first: true, last: false } },
+      { joined: true, box: { first: false, last: false } },
+      { box: { first: false, last: true } },
+    ]);
+    expect(units[3]).not.toHaveProperty('joined');
+    expect(questionCuts(units, { from: 0, to: units.length })).toEqual([2, 3, 4, 5, 6, 7, 8]);
+  });
+
+  it('짧은 줄바꿈 문단은 예전처럼 한 단위이고 이어짐 표시가 없다', () => {
+    const units = questionUnits(snap({ stem_html: '<p>물음</p><blockquote data-box="보기"><p>㉠ 가<br>㉡ 나<br>㉢ 다</p></blockquote>' }), false);
+    expect(kinds(units).filter((kind) => kind === 'stem')).toHaveLength(1);
+    expect(units.some((unit) => 'joined' in unit)).toBe(false);
+  });
+
   it('상자로 시작하는 발문은 머리가 상자 조각이다', () => {
     const [head] = questionUnits(snap({ stem_html: '<blockquote data-box="보기"><p>가</p></blockquote><p>물음</p>' }), false);
     expect(head).toMatchObject({ kind: 'head', box: { label: '보기' } });

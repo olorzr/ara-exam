@@ -92,3 +92,32 @@ describe('문제지 문항의 옛한글 글꼴', () => {
     expect(c.querySelector('.pb-q')?.className).not.toContain('yet-hangul');
   });
 });
+
+/**
+ * 〈보기〉 속 긴 줄바꿈 문단은 줄 묶음 단위로 나뉘어 그려진다(2026-11-15, 압구정중 17번). 묶음 사이 간격을 떼는
+ * 표시(`pb-q__unit--joined`)는 같은 문단의 다음 묶음이 바로 뒤에 오는 단위에만 붙는다.
+ */
+describe('문제지 문항의 줄 묶음', () => {
+  const lines = (n: number) => Array.from({ length: n }, (_, i) => `줄${i + 1}`).join('<br>');
+
+  it('긴 문단은 묶음마다 단위이고 마지막 묶음 말고는 이어짐 표시가 있다', () => {
+    const c = draw(snapshot({ stem_html: `<p>물음</p><blockquote data-box="보기"><p>${lines(6)}</p></blockquote>` }));
+    const units = [...c.querySelectorAll('.pb-q__stem > .pb-q__unit')];
+    expect(units.map((el) => el.classList.contains('pb-q__unit--joined'))).toEqual([false, true, true, false]);
+    expect(units.slice(1).map((el) => el.querySelector('blockquote')?.className)).toEqual([
+      'pb-box-part pb-box-part--first', 'pb-box-part', 'pb-box-part pb-box-part--last',
+    ]);
+    expect(units.slice(1).map((el) => el.textContent).join('')).toBe('줄1줄2줄3줄4줄5줄6');
+  });
+
+  it('갈린 뒤 조각도 묶음 표시를 그대로 가진다', () => {
+    const c = draw(snapshot({ stem_html: `<p>물음</p><blockquote data-box="보기"><p>${lines(6)}</p></blockquote>` }), false, { from: 2, to: 9 });
+    const units = [...c.querySelectorAll('.pb-q__stem > .pb-q__unit')];
+    expect(units.map((el) => el.classList.contains('pb-q__unit--joined'))).toEqual([true, false]);
+  });
+
+  it('짧은 문단에는 표시가 없다', () => {
+    const c = draw(snapshot({ stem_html: `<p>물음</p><blockquote data-box="보기"><p>${lines(3)}</p></blockquote>` }));
+    expect(c.querySelector('.pb-q__unit--joined')).toBeNull();
+  });
+});

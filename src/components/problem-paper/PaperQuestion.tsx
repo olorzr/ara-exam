@@ -61,9 +61,11 @@ function StemPiece({
     );
   }
   const body = { __html: renderFiguresInHtml(unit.html, paths, imageUrls) };
-  if (!unit.box) return <div className="pb-q__unit" data-q-unit="" dangerouslySetInnerHTML={body} />;
+  // 같은 문단의 다음 줄 묶음이 바로 뒤에 오면 그 사이 간격을 뗀다(problem-paper.css) — 안 쪼개지면 예전 모양 그대로
+  const className = unit.joined ? 'pb-q__unit pb-q__unit--joined' : 'pb-q__unit';
+  if (!unit.box) return <div className={className} data-q-unit="" dangerouslySetInnerHTML={body} />;
   return (
-    <div className="pb-q__unit" data-q-unit="">
+    <div className={className} data-q-unit="">
       <blockquote
         data-box={unit.box.label ?? undefined}
         className={boxPartClassName(unit.box)}
