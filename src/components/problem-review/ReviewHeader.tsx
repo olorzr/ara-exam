@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { sourceMetaLabel } from '@/lib/problem-bank/source-label';
 import { examViewHref } from '@/lib/problem-bank/source-set-link';
+import { leavesCurrentPage } from '@/lib/nav-guard';
 import { sourceSetOf } from '@/lib/problem-bank/source-sets';
 import SourceTextbookPicker from './SourceTextbookPicker';
 import type { ProblemSource } from '@/types/problem-bank';
@@ -70,7 +71,15 @@ export default function ReviewHeader({
           <Link
             href={examViewHref(source.id)}
             prefetch={false}
-            onClick={(e) => { if (unsavedCount > 0 && !window.confirm(LEAVE_PROMPT(unsavedCount))) e.preventDefault(); }}
+            onClick={(e) => {
+              if (unsavedCount === 0) return;
+              // 새 탭·새 창(보조키)은 이 화면이 남는다 — 묻지 않는다(코덱스 2R, 이탈 확인과 같은 판정 `leavesCurrentPage`)
+              const a = e.currentTarget;
+              const leaving = leavesCurrentPage(
+                { href: a.href, target: a.target, download: a.hasAttribute('download') }, e, window.location.href,
+              );
+              if (leaving && !window.confirm(LEAVE_PROMPT(unsavedCount))) e.preventDefault();
+            }}
             className="inline-flex h-9 items-center gap-1.5 rounded-full border border-ink bg-card px-4 text-sm font-semibold text-ink hover:bg-muted"
           >
             <Eye className="h-4 w-4" aria-hidden="true" />

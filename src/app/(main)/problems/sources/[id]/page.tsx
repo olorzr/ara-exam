@@ -142,6 +142,10 @@ function ProblemSourceReviewContent() {
 
   // 미저장 수정을 지키는 확인 절차는 한 곳에 모아 둔다 — 세 가지가 규칙이 서로 다르다
   const guards = useReviewGuards(review, dirtyIds);
+  // 고치던 카드 가운데 아직 화면에 있는 것만 — 지운 카드의 표시가 남아 '수정이 사라진다' 고 헛되이 묻지 않게(코덱스 2R)
+  const liveDirtyCount = useMemo(() => [...dirtyIds].filter((id) => (
+    review.problems.some((p) => p.id === id) || review.passages.some((p) => p.id === id)
+  )).length, [dirtyIds, review.problems, review.passages]);
   // 지운 뒤에는 돌아갈 화면이 없다(이 주소가 곧 사라진 출처다) — 목록으로 보낸다
   const del = useSourceDelete(() => router.push('/problems/sources'));
 
@@ -181,7 +185,7 @@ function ProblemSourceReviewContent() {
         source={source}
         problemCount={review.problems.length}
         onTextbook={(textbook) => review.changeTextbook(textbook, () => dirtyIds.size)}
-        unsavedCount={dirtyIds.size}
+        unsavedCount={liveDirtyCount}
         // 지우기는 원장만 — 아니면 단추가 없다(sql/57)
         onDelete={del.canDelete ? () => del.requestDelete(source) : undefined}
         deleting={del.deletingId !== null}

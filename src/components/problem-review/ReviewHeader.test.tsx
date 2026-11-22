@@ -59,6 +59,15 @@ describe('ReviewHeader', () => {
     confirm.mockRestore();
   });
 
+  it('새 탭으로 열면(보조키) 이 화면이 남으니 묻지 않는다(코덱스 2R)', () => {
+    const confirm = vi.spyOn(window, 'confirm');
+    render(<ReviewHeader source={source} problemCount={23} onTextbook={vi.fn()} unsavedCount={2} />);
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true, metaKey: true });
+    screen.getByRole('link', { name: '읽기 전용으로 보기' }).dispatchEvent(click);
+    expect(confirm).not.toHaveBeenCalled();
+    confirm.mockRestore();
+  });
+
   it('고치던 것이 없으면 묻지 않는다', () => {
     const confirm = vi.spyOn(window, 'confirm');
     draw();
