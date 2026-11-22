@@ -1,14 +1,9 @@
 'use client';
 
-import { useSyncExternalStore, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { PageTitle } from '@/components/magazine';
-import {
-  EXAM_SHEET_TABS, examSheetHref, examSheetPath, type ExamSheetView,
-} from '@/lib/problem-bank/exam-sheet-tabs';
-
-/** 기억은 바뀜을 알리지 않는다 — 화면을 열 때 한 번 읽으면 된다 */
-const noSubscribe = () => () => undefined;
+import { EXAM_SHEET_TABS, type ExamSheetView } from '@/lib/problem-bank/exam-sheet-tabs';
 
 interface ExamSheetTabsProps {
   /** 지금 화면 */
@@ -21,13 +16,10 @@ interface ExamSheetTabsProps {
  * '기출 시험지' 머리 — 제목 + [세트로 보기][목록으로 보기] 링크 탭 + 설명 (2026-11-22, '기출 세트'·'올라간 기출' 을 합쳤다).
  *
  * 화면이 둘(주소 둘)이라 base-ui `Tabs` 상태가 아니라 링크다. 지금 화면 탭은 링크가 아닌 글(`aria-current="page"`) —
- * 눌러도 보던 조건이 그대로다. 모양은 앱 탭(`TabsTrigger`)과 같은 밑줄 하나. 반대편 탭은 그 화면에서 마지막으로 보던
- * 조건으로 간다(`examSheetHref`).
+ * 눌러도 보던 조건이 그대로다. 모양은 앱 탭(`TabsTrigger`)과 같은 밑줄 하나. 반대편 탭은 그 화면의 맨 주소로 간다
+ * (조건 이어 가기를 걷은 까닭은 exam-sheet-tabs.ts).
  */
 export default function ExamSheetTabs({ current, children }: ExamSheetTabsProps) {
-  const other: ExamSheetView = current === 'sets' ? 'sources' : 'sets';
-  // 기억은 그 탭의 sessionStorage 다 — 서버 그림(맨 주소)과 어긋나지 않게 하이드레이션 뒤에 읽는다
-  const otherHref = useSyncExternalStore(noSubscribe, () => examSheetHref(other), () => examSheetPath(other));
   return (
     <div className="space-y-2">
       <div className="space-y-3 border-b-2 border-ink">
@@ -46,7 +38,7 @@ export default function ExamSheetTabs({ current, children }: ExamSheetTabsProps)
             ) : (
               <Link
                 key={tab.view}
-                href={otherHref}
+                href={tab.path}
                 prefetch={false}
                 className="relative pb-2 text-sm font-medium text-gray-500 transition-colors hover:text-ink"
               >

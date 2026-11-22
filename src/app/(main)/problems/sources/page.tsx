@@ -14,7 +14,6 @@ import {
   sourceListFiltersToQueryString, toSourceListQuery, type SourceListFilters,
 } from '@/lib/problem-bank/source-list-filters';
 import ExamSheetTabs from '@/components/problem-sets/ExamSheetTabs';
-import { rememberExamSheetQuery } from '@/lib/problem-bank/exam-sheet-tabs';
 
 /** 제목을 치는 동안 글자마다 묻지 않도록 잠깐 기다린다 */
 const SEARCH_DEBOUNCE_MS = 300;
@@ -41,10 +40,7 @@ function SourcesContent() {
   //    들어올 때와 제목을 칠 때마다 요청이 붙었다(2026-10-22, 아카이브의 2026-10-15 와 같은 판단). 이 화면은 주소를
   //    **처음 한 번만** 읽으므로(useState 초기화) 적기만 하면 되고, Next 16 은 네이티브 history 를 useSearchParams 와 맞춘다
   useEffect(() => {
-    const query = sourceListFiltersToQueryString(filters);
-    window.history.replaceState(null, '', `/problems/sources${query}`);
-    // '세트로 보기' 에서 돌아올 때 이 조건으로 오게(ExamSheetTabs)
-    rememberExamSheetQuery('sources', query);
+    window.history.replaceState(null, '', `/problems/sources${sourceListFiltersToQueryString(filters)}`);
   }, [filters]);
 
   // 제목은 치기를 멈춘 뒤에 묻는다

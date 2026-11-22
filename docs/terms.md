@@ -219,9 +219,9 @@
 - 관련 파일: src/types/problem-bank.ts, src/lib/problem-bank/source-form.ts, sql/17_problem_bank.sql
 
 ## 기출 시험지 (exam sheets)
-- 정의: 문제 은행 메뉴 **'기출 시험지'** — 2026-11-22 '기출 세트' 와 '올라간 기출' 을 한 메뉴로 합쳤다. 화면 위 링크 탭 두 개: **[세트로 보기]**(`/problems/sets`, 아래 '기출 세트') · **[목록으로 보기]**(`/problems/sources`, 아래 '올라간 기출'). 주소는 둘 그대로이고, 반대편 탭은 그 화면에서 마지막으로 보던 조건으로 간다
+- 정의: 문제 은행 메뉴 **'기출 시험지'** — 2026-11-22 '기출 세트' 와 '올라간 기출' 을 한 메뉴로 합쳤다. 화면 위 링크 탭 두 개: **[세트로 보기]**(`/problems/sets`, 아래 '기출 세트') · **[목록으로 보기]**(`/problems/sources`, 아래 '올라간 기출'). 주소는 둘 그대로이고, 탭은 반대편 화면의 맨 주소로 간다(지금 화면 탭은 링크가 아니다)
 - 보기 → 고치기: 세트 한 장의 학교 줄 '고치기', 읽기 전용 시험 보기 머리 '원본 대조로 고치기'. 고치기 화면에서 읽기 전용 보기로 가는 링크는 두지 않는다(끝나지 않은 쓰기와 겹친다)
-- 코드에서의 사용: `ExamSheetTabs`, `rememberExamSheetQuery`·`examSheetHref`, `sourceEditHref`
+- 코드에서의 사용: `ExamSheetTabs`, `EXAM_SHEET_TABS`, `sourceEditHref`
 - 관련 파일: `src/components/problem-sets/ExamSheetTabs.tsx`, `src/lib/problem-bank/exam-sheet-tabs.ts`, `src/components/layout/nav-items.ts`
 
 ## 올라간 기출 (source list)

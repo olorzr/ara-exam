@@ -1,9 +1,6 @@
 import { render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
-import { rememberExamSheetQuery, resetExamSheetQueries } from '@/lib/problem-bank/exam-sheet-tabs';
+import { describe, expect, it } from 'vitest';
 import ExamSheetTabs from './ExamSheetTabs';
-
-beforeEach(() => resetExamSheetQueries());
 
 describe('ExamSheetTabs — 기출 시험지 머리 탭 (2026-11-22)', () => {
   it('제목은 기출 시험지 하나, 지금 화면 탭에 aria-current', () => {
@@ -18,11 +15,9 @@ describe('ExamSheetTabs — 기출 시험지 머리 탭 (2026-11-22)', () => {
     expect(screen.getByText('설명')).toBeTruthy();
   });
 
-  it('반대편 탭은 그 화면에서 마지막으로 보던 조건으로 간다', () => {
-    rememberExamSheetQuery('sources', '?school=압구정중학교');
-    rememberExamSheetQuery('sets', '?year=2025');
-    render(<ExamSheetTabs current="sets" />);
-    expect(screen.getByRole('link', { name: '목록으로 보기' }).getAttribute('href')).toBe('/problems/sources?school=압구정중학교');
-    expect(screen.queryByRole('link', { name: '세트로 보기' })).toBeNull();
+  it('반대편 탭은 그 화면의 맨 주소로 간다', () => {
+    render(<ExamSheetTabs current="sources" />);
+    expect(screen.getByRole('link', { name: '세트로 보기' }).getAttribute('href')).toBe('/problems/sets');
+    expect(screen.queryByRole('link', { name: '목록으로 보기' })).toBeNull();
   });
 });

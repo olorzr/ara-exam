@@ -11,7 +11,6 @@ import {
   EMPTY_SET_FILTERS, filterSourceSets, hasActiveSetFilters, setFiltersFromParams, setFiltersToQueryString,
   setNameMatcher, setYearOptions, type SourceSetFilters,
 } from '@/lib/problem-bank/source-set-filters';
-import { rememberExamSheetQuery } from '@/lib/problem-bank/exam-sheet-tabs';
 import { SETS_PATH } from '@/lib/problem-bank/source-set-link';
 import { sourceSetKey, type SourceSet } from '@/lib/problem-bank/source-sets';
 
@@ -47,10 +46,7 @@ function SetsContent() {
   }
 
   useEffect(() => {
-    const query = setFiltersToQueryString(filters);
-    window.history.replaceState(null, '', `${SETS_PATH}${query}`);
-    // '목록으로 보기' 에서 돌아올 때 이 조건으로 오게(ExamSheetTabs)
-    rememberExamSheetQuery('sets', query);
+    window.history.replaceState(null, '', `${SETS_PATH}${setFiltersToQueryString(filters)}`);
   }, [filters]);
 
   const shown = useMemo(() => filterSourceSets(sets, filters), [sets, filters]);
