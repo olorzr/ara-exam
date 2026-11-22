@@ -123,3 +123,34 @@ export async function fetchProblemSourceIds(problemIds: readonly string[]): Prom
   for (const row of (data ?? []) as { id: string; source_id: string }[]) map.set(row.id, row.source_id);
   return map;
 }
+
+/** 문항이 원본 시험지의 어디에 있나 — 신고 창이 그 쪽 이미지를 보여 준다 */
+export interface ProblemOrigin {
+  sourceId: string;
+  /** 문항이 실린 쪽(1부터) */
+  pageNo: number;
+  /** 원본의 쪽 수 — 앞뒤 쪽 넘기기의 끝 */
+  pageCount: number;
+  sourceType: string;
+}
+
+/**
+ * 문항의 원본 쪽 — 문항 + 출처 한 번 조회(2026-11-22 원장 요청 "오류 신고할 때 그 시험지(원본 사진)를 보여 주면").
+ * 쪽 이미지는 적재 때 만든 `sources/{id}/pages/{n}.jpg` 다(읽기 전용 시험 보기의 원본 탭과 같다).
+ * @param problemId - 문항 id
+ * @returns 원본 쪽. 문항이 없거나(지워졌다) 쪽 정보가 비었으면 null
+ * @throws 조회 실패 시(창은 '원본을 불러오지 못했어요' 로 알리고 신고는 막지 않는다)
+ */
+export async function fetchProblemOrigin(problemId: string): Promise<ProblemOrigin | null> {
+  const { data, error } = await supabase.from('problems')
+    .select('page_no, source:problem_sources!inner(id, page_count, source_type)')
+    .eq('id', problemId).maybeSingle();
+  if (error) throw error;
+  const row = data as { page_no?: unknown; source?: { id?: unknown; page_count?: unknown; source_type?: unknown } | null } | null;
+  const source = row?.source;
+  const pageNo = row?.page_no;
+  const pageCount = source?.page_count;
+  if (typeof source?.id !== 'string' || typeof pageNo !== 'number' || typeof pageCount !== 'number') return null;
+  if (!Number.isInteger(pageNo) || !Number.isInteger(pageCount) || pageNo < 1 || pageNo > pageCount) return null;
+  return { sourceId: source.id, pageNo, pageCount, sourceType: typeof source.source_type === 'string' ? source.source_type : '' };
+}

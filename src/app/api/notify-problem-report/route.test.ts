@@ -10,6 +10,7 @@ const REPORT_ID = '22222222-2222-4222-8222-222222222222';
 const baseRow = {
   id: REPORT_ID, user_id: 'u1', notified_at: null as string | null, category: 'answer', note: '정답이 ④예요',
   paper_title: '형태소 복합어 단일어', printed_no: 17, source_label: '2025 중1 압구정중학교 2학기 기말',
+  original_no: 12 as unknown,
 };
 let row: typeof baseRow | null = baseRow;
 /** 조건부로 잡기(`update … is null … select`)가 돌려줄 행 — 비면 다른 요청이 먼저 잡은 것 */
@@ -66,10 +67,20 @@ describe('POST /api/notify-problem-report', () => {
     expect((init.headers as Record<string, string>).authorization).toBe('Bearer s');
     expect(JSON.parse(String(init.body))).toMatchObject({
       reportId: REPORT_ID, reporterId: 'u1', paperTitle: '형태소 복합어 단일어', printedNo: 17, category: '정답 오류',
+      sourceLabel: '2025 중1 압구정중학교 2학기 기말 · 원래 12번',
     });
     expect(updates).toHaveLength(1);
     expect(typeof updates[0].set?.notified_at).toBe('string');
     expect(updates[0].is).toEqual([['notified_at', null]]);
+  });
+
+  it('스냅샷에 원래 번호가 없으면 출처 줄만 보낸다', async () => {
+    row = { ...baseRow, original_no: null };
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true, reached: true })));
+    vi.stubGlobal('fetch', fetchMock);
+    await call();
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(String(init.body)).sourceLabel).toBe('2025 중1 압구정중학교 2학기 기말');
   });
 
   it('다른 요청이 먼저 잡았으면 보내지 않는다(겹친 두 요청이 DM 을 두 번 보내지 않게)', async () => {

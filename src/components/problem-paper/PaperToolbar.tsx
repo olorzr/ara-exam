@@ -79,15 +79,20 @@ export default function PaperToolbar({
         </div>
 
         {/* 출처는 기본 표시라 체크박스는 '숨기기' 다. 저장 키는 `showSource` 그대로이고
-            뒤집는 곳은 여기 하나뿐이다 — 렌더러·RPC·옛 문제지는 그 키를 그대로 본다 */}
-        <label className="flex items-center gap-1.5 text-gray-600">
-          <input
-            type="checkbox" checked={!settings.showSource}
-            onChange={(e) => onSettings({ showSource: !e.target.checked })}
-            className="h-4 w-4 accent-[color:var(--primary)]"
-          />
-          출처 숨기기
-        </label>
+            뒤집는 곳은 여기 하나뿐이다 — 렌더러·RPC·옛 문제지는 그 키를 그대로 본다.
+            숨겨도 교사용에는 출처 + 원래 번호가 늘 찍힌다(QuestionSource) — '안 먹힌다' 로 읽히지 않게 옆에 적는다 */}
+        <span className="flex items-center gap-1.5">
+          <label className="flex items-center gap-1.5 text-gray-600">
+            <input
+              type="checkbox" checked={!settings.showSource}
+              onChange={(e) => onSettings({ showSource: !e.target.checked })}
+              aria-describedby="paper-source-hint"
+              className="h-4 w-4 accent-[color:var(--primary)]"
+            />
+            출처 숨기기
+          </label>
+          <span id="paper-source-hint" className="text-xs text-gray-400">(교사용에는 늘 보여요)</span>
+        </span>
 
         {/* 켜면 저장 직후 학원 성적 시스템에 시험으로 등록되고 인쇄물에 90A 답안지 안내가 붙는다.
             **만들 때만** 정한다 — 고치기에서는 잠근다(서버도 저장값을 그대로 둔다, sql/103) */}

@@ -5,7 +5,7 @@ import { GripVertical, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { areaPathLabel } from '@/lib/problem-bank/area-tree';
-import { sourceLabel } from '@/lib/problem-bank/source-label';
+import { sourceLabelWithNumber } from '@/lib/problem-bank/source-label';
 import { parseGrammarPath } from '@/lib/problem-bank/grammar-tree';
 import { unitPathLabel } from '@/lib/problem-bank/unit-tree';
 import { excerptHtml } from '@/lib/html-excerpt';
@@ -133,7 +133,8 @@ export default function ProblemCard({
         <p className="mt-1 text-sm text-gray-800">{excerptHtml(problem.stem_html, EXCERPT_LENGTH)}</p>
 
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-500">
-          <span>{sourceLabel(problem.source)}</span>
+          {/* 원래 번호까지 — 원본 시험지에서 바로 짚게(2026-11-22) */}
+          <span>{sourceLabelWithNumber(problem.source, problem.number)}</span>
           {/* ⚠️ 파생 문자열(`work_title`)이 아니라 낱개로 찍는다 — `(가)(나)` 문항을
               '먼 후일 · 독은 아름답다' 한 덩어리로 보이면 어느 작품 것인지 읽히지 않는다 */}
           {(problem.work_titles ?? []).map((title) => <span key={title}>· {title}</span>)}

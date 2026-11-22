@@ -486,3 +486,48 @@ describe('renderPaperBlocks — 갈린 문항', () => {
     expect(render(<div>{nodes}</div>).container.querySelectorAll('.mc-sheet-break')).toHaveLength(0);
   });
 });
+
+describe('문항 위 출처 줄 — 교사용은 늘 출처 + 원래 번호 (2026-11-22)', () => {
+  // 원장님: "출처 숨기기 하면 교사용에서는 안 숨기게 — 문제 오류 확인을 해야 해서",
+  // "원본에서는 그 시험지의 몇 번이었는지 교사용에서는 보여 줘"
+  const drawWith = (items: PaperItemSnapshot[], showAnswers: boolean, showSource: boolean, imageUrls = new Map<string, string>()) => {
+    const nodes = renderPaperBlocks({
+      blocks: buildPaperBlocks(items, showAnswers), settings: { ...SETTINGS, showSource }, imageUrls, showAnswers,
+    });
+    return render(<div>{nodes}</div>).container;
+  };
+  const sources = (c: HTMLElement) => [...c.querySelectorAll('.pb-q__source')].map((p) => p.textContent);
+  const item = snapshot({ number: 17 });
+  const image = snapshot({ number: 9, render_mode: 'image', image_path: 'p/9.png' });
+  const urls = new Map([['p/9.png', 'https://x/9.png']]);
+
+  it('학생용은 출처를 숨기면 없다(글 문항·그림 문항)', () => {
+    expect(sources(drawWith([item, image], false, false, urls))).toEqual([]);
+  });
+
+  it('학생용은 출처를 보여도 원래 번호는 붙이지 않는다', () => {
+    expect(sources(drawWith([item, image], false, true, urls))).toEqual([
+      '2026 중2 상현중학교 1학기 중간', '2026 중2 상현중학교 1학기 중간',
+    ]);
+  });
+
+  it('교사용은 출처를 숨긴 문제지에도 출처 + 원래 번호를 찍는다(글 문항·그림 문항)', () => {
+    expect(sources(drawWith([item, image], true, false, urls))).toEqual([
+      '2026 중2 상현중학교 1학기 중간 17번', '2026 중2 상현중학교 1학기 중간 9번',
+    ]);
+  });
+
+  it('교사용은 출처를 보이는 문제지에서도 원래 번호를 붙인다', () => {
+    expect(sources(drawWith([item], true, true))).toEqual(['2026 중2 상현중학교 1학기 중간 17번']);
+  });
+
+  it('교사용에서 갈린 문항의 뒤 조각에는 출처 줄이 없다', () => {
+    const block = buildPaperBlocks([item], true).find((b) => b.kind === 'problem');
+    if (block?.kind !== 'problem') throw new Error('문항 블록이 없다');
+    const nodes = renderPaperBlocks({
+      blocks: [{ ...block, range: { from: 3, to: block.units.length } }], settings: { ...SETTINGS, showSource: false },
+      imageUrls: new Map(), showAnswers: true,
+    });
+    expect(render(<div>{nodes}</div>).container.querySelector('.pb-q__source')).toBeNull();
+  });
+});

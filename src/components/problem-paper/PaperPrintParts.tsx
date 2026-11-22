@@ -1,9 +1,9 @@
 'use client';
 
-import { sourceLabel } from '@/lib/problem-bank/source-label';
+import { sourceLabelWithNumber } from '@/lib/problem-bank/source-label';
 import { explanationHtml, formatAnswer, splitsExplanation } from '@/lib/problem-paper/answers';
 import { yetHangulClass } from '@/lib/yet-hangul';
-import type { PaperItemSnapshot } from '@/types/problem-bank';
+import type { PaperItemSnapshot, PaperSettings } from '@/types/problem-bank';
 
 /**
  * 문제지 인쇄물의 작은 조각들 — 그림 한 장, 출처 한 줄, 교사용 답 한 덩어리.
@@ -49,10 +49,27 @@ export function PrintImage({
  *    예전에는 여기서 학년을 뺀 짧은 판을 따로 만들어, 같은 출처가 화면(카드·상세)에서는
  *    '2026 중2 상현중 중간' 인데 인쇄물에서는 '2026 상현중 중간' 으로 찍혔다.
  */
-export function SourceLine({ source }: { source: PaperItemSnapshot['source'] }) {
-  const text = sourceLabel(source);
+export function SourceLine({ source, number = null }: { source: PaperItemSnapshot['source']; number?: number | null }) {
+  const text = sourceLabelWithNumber(source, number);
   if (!text) return null;
   return <p className="pb-q__source">{text}</p>;
+}
+
+/**
+ * 문항 위 출처 줄을 찍을지·무엇을 찍을지 — 글 문항(`PaperQuestion`)과 그림 문항(`PaperPrintBlocks`)이 같이 쓴다.
+ *
+ * - 학생용: 문제지 설정(`showSource`, 툴바의 '출처 숨기기')대로, 원래 번호는 없다
+ * - **교사용: 설정과 상관없이 출처 + 원래 번호**(2026-11-22 원장 요청 — "출처 숨기기 하면 교사용에서는 안 숨기게, 문제 오류 확인을 해야 해서",
+ *   "원본에서는 그 시험지의 몇 번이었는지 교사용에서는 보여 줘"). 틀린 문항을 원본 시험지에서 바로 짚게 한다
+ *
+ * ⚠️ 규칙을 호출부(문제지 보기·책 내지)에 두지 말 것 — 기출 공유 사이트가 이 파일을 그대로 옮겨 쓰므로 여기 하나여야
+ *    세 곳(문제지·책·공유 사이트)의 교사용이 같다. 쪼개기·쪽 나눔은 그려진 DOM 을 재므로 줄이 늘어도 따로 할 일이 없다.
+ */
+export function QuestionSource({
+  snapshot, settings, showAnswers,
+}: { snapshot: PaperItemSnapshot; settings: Pick<PaperSettings, 'showSource'>; showAnswers: boolean }) {
+  if (showAnswers) return <SourceLine source={snapshot.source} number={snapshot.number} />;
+  return settings.showSource ? <SourceLine source={snapshot.source} /> : null;
 }
 
 /**

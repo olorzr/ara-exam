@@ -150,6 +150,21 @@ describe('내지 목록 — 지문을 쪼갠 뒤에도 자리가 맞는다', () 
     const { container } = render(<>{blocks.map((b, i) => <div key={i}>{b}</div>)}</>);
     expect(container.querySelectorAll('.pb-q__source')).toHaveLength(2);
   });
+
+  it('교사용 판은 출처를 숨긴 장에도 출처 + 원래 번호를 찍는다(2026-11-22)', () => {
+    const noSource = { ...paper('p2', '고전'), settings: { columns: 2 as const, showScore: false, showSource: false, omr: false } };
+    const mixed: BookChapter[] = [chapters[0], { ...chapters[1], paper: noSource }];
+    const draw = (edition: 'student' | 'teacher') => {
+      const list = buildBookInnerList({ edition, chapters: mixed, itemsByPaper, settings: { chapterStart: 'page', trimWorks: true } });
+      const { blocks } = renderBookInnerBlocks(list, { ...context, edition, chapters: mixed });
+      const { container } = render(<>{blocks.map((b, i) => <div key={i}>{b}</div>)}</>);
+      return [...container.querySelectorAll('.pb-q__source')].map((p) => p.textContent ?? '');
+    };
+    const student = draw('student');
+    const teacher = draw('teacher');
+    expect(teacher.length).toBeGreaterThan(student.length);
+    expect(teacher.every((line) => /\d+번$/.test(line))).toBe(true);
+  });
 });
 
 describe('buildBookTocBlocks — 목차', () => {

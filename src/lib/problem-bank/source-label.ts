@@ -75,3 +75,18 @@ export function sourceMetaLabel(source: SourceLabelInput): string {
 export function sourceLabelWithType(source: SourceLabelInput): string {
   return `${source.source_type} · ${sourceLabel(source)}`;
 }
+
+/**
+ * 출처 줄 + 원래 번호 — '2026 중2 상현중 1학기 중간 17번'.
+ *
+ * 교사용 인쇄물의 출처 줄과 문제 은행 화면(카드·조합 화면·신고 목록)이 같이 쓴다(2026-11-22 원장 요청: "원본에서는 그 시험지의
+ * 몇 번이었는지 교사용에서는 보여 줘 … 다른 데에서도"). 틀린 문항을 찾았을 때 원본 시험지에서 바로 짚을 수 있게 한다.
+ * @param source - 출처
+ * @param number - 원본 시험지에서의 번호(없으면 라벨만)
+ * @returns 라벨 뒤에 번호를 붙인 글. 라벨이 비면 번호만('17번'), 둘 다 없으면 ''
+ */
+export function sourceLabelWithNumber(source: SourceLabelInput, number: number | null | undefined): string {
+  const label = sourceLabel(source);
+  const no = typeof number === 'number' && Number.isFinite(number) ? `${number}번` : '';
+  return [label, no].filter(Boolean).join(' ');
+}

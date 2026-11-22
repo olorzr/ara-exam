@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { sourceLabel, sourceLabelWithType, sourceMetaLabel, type SourceLabelInput } from './source-label';
+import {
+  sourceLabel, sourceLabelWithNumber, sourceLabelWithType, sourceMetaLabel, type SourceLabelInput,
+} from './source-label';
 
 function source(over: Partial<SourceLabelInput> = {}): SourceLabelInput {
   return {
@@ -81,5 +83,29 @@ describe('평가문제집은 제목을 쓴다 (sql/80)', () => {
       source_type: '평가문제집', title: '동아 중2-1 평가문제집 2-(1) 시와 화자', year: '2026', grade: '중2',
       school_name: '', publisher: '동아출판', semester: '1학기', exam_type: '',
     })).toBe('동아 중2-1 평가문제집 2-(1) 시와 화자');
+  });
+});
+
+describe('sourceLabelWithNumber — 원래 번호까지 (2026-11-22)', () => {
+  it('라벨 뒤에 원래 번호를 붙인다', () => {
+    expect(sourceLabelWithNumber(source(), 17)).toBe('2026 중2 상현중 1학기 중간 17번');
+  });
+
+  it('번호가 없으면 라벨만', () => {
+    expect(sourceLabelWithNumber(source(), null)).toBe('2026 중2 상현중 1학기 중간');
+    expect(sourceLabelWithNumber(source(), undefined)).toBe('2026 중2 상현중 1학기 중간');
+  });
+
+  it('라벨이 비어도 번호는 남는다', () => {
+    expect(sourceLabelWithNumber({
+      source_type: '내신기출', title: '', school_name: '', year: '', grade: '', semester: '', exam_type: '', publisher: '',
+    }, 3)).toBe('3번');
+  });
+
+  it('모의고사는 제목 뒤에 번호', () => {
+    expect(sourceLabelWithNumber({
+      source_type: '모의고사', title: '2026학년도 수능 (언어와 매체)', school_name: '', year: '2026', grade: '고3',
+      semester: '', exam_type: '수능', publisher: '평가원',
+    }, 35)).toBe('2026학년도 수능 (언어와 매체) 35번');
   });
 });

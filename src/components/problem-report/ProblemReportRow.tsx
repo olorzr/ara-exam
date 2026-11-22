@@ -5,7 +5,7 @@ import { ItemNo } from '@/components/magazine';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  REPORT_CATEGORY_LABELS, REPORT_STATUS_LABELS, reportExcerpt, reportPlaceLabel,
+  REPORT_CATEGORY_LABELS, REPORT_STATUS_LABELS, reportExcerpt, reportPlaceLabel, withOriginalNumber,
   type ProblemReport, type ReportStatus,
 } from '@/lib/problem-report/types';
 
@@ -45,8 +45,11 @@ export default function ProblemReportRow({ report, n, reporter, sourceId, onReso
             )}
             {!report.notified_at && <Badge variant="muted" className="ml-2 align-middle">알림 안 감</Badge>}
           </p>
+          {/* 문제지에서 신고한 건은 자리가 인쇄 번호라 원래 번호를 출처 줄에 붙인다(문제 은행 신고는 자리에 이미 있다) */}
           {report.source_label && (
-            <p className="text-xs break-keep [overflow-wrap:anywhere] text-gray-500">{report.source_label}</p>
+            <p className="text-xs break-keep [overflow-wrap:anywhere] text-gray-500">
+              {report.paper_title ? withOriginalNumber(report.source_label, report.snapshot?.number) : report.source_label}
+            </p>
           )}
           {excerpt && <p className="text-xs break-keep [overflow-wrap:anywhere] text-gray-500">{excerpt}</p>}
           {report.note && (

@@ -7,7 +7,7 @@ import { countUnadded } from '@/lib/problem-paper/bulk-add';
 import type { ArchiveRow } from '@/hooks/useProblemArchive';
 import type { Problem, ProblemSource } from '@/types/problem-bank';
 import ProblemReportButton from '@/components/problem-report/ProblemReportButton';
-import { sourceLabel } from '@/lib/problem-bank/source-label';
+import { sourceLabelWithNumber } from '@/lib/problem-bank/source-label';
 
 interface ProblemDetailActionsProps {
   /** 지금 보고 있는 문항 (형제를 눌러 옮겨 다닐 수 있다) */
@@ -54,7 +54,7 @@ export default function ProblemDetailActions({
       </Link>
       <ProblemReportButton
         look="link"
-        target={{ kind: 'problem', problemId: shown.id, label: `${sourceLabel(source)}${shown.number ? ` ${shown.number}번` : ''}` }}
+        target={{ kind: 'problem', problemId: shown.id, label: sourceLabelWithNumber(source, shown.number) }}
       />
 
       {onAdd && (

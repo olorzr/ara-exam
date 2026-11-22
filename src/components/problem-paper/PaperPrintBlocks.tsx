@@ -5,7 +5,7 @@ import { renderFiguresInHtml } from '@/lib/problem-bank/figure-render';
 import type { PaperBlock } from '@/lib/problem-paper/blocks';
 import type { PaperSettings } from '@/types/problem-bank';
 import PaperBoxFrame from './PaperBoxFrame';
-import { PrintImage, SourceLine, TeacherAnswer } from './PaperPrintParts';
+import { PrintImage, QuestionSource, TeacherAnswer } from './PaperPrintParts';
 import { withOmrSheetBreak } from './PaperOmrMarks';
 import PaperQuestion, { problemClassName } from './PaperQuestion';
 
@@ -91,7 +91,7 @@ export function renderPaperBlocks({
         return wrap(
           <div key={block.key} className={problemClassName(block.snapshot, showAnswers)}>
             {/* 출처 표시는 글 문항과 같아야 한다 — 그림 문항만 빠지면 표기가 들쭉날쭉해진다 */}
-            {settings.showSource && <SourceLine source={block.snapshot.source} />}
+            <QuestionSource snapshot={block.snapshot} settings={settings} showAnswers={showAnswers} />
             <div className="pb-q__head">
               <span className="q-num q-num--mint">{String(block.number).padStart(2, '0')}</span>
             </div>

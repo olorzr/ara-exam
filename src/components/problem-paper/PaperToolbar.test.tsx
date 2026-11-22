@@ -119,3 +119,12 @@ describe('PaperToolbar 담는 중', () => {
   });
 });
 
+
+describe('PaperToolbar 출처 숨기기 안내', () => {
+  it('숨겨도 교사용에는 보인다는 안내가 체크박스 설명으로 이어진다', () => {
+    const { checkbox } = renderToolbar({ showSource: false });
+
+    const hint = document.getElementById(checkbox.getAttribute('aria-describedby') ?? '');
+    expect(hint?.textContent).toBe('(교사용에는 늘 보여요)');
+  });
+});

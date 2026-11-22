@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { PaperItemSnapshot } from '@/types/problem-bank';
 import {
   REPORT_CATEGORIES, REPORT_CATEGORY_LABELS, REPORT_NOTE_MAX, isReportCategory, reportExcerpt, reportPlaceLabel,
+  withOriginalNumber,
 } from './types';
 
 const snap = (over: Partial<PaperItemSnapshot> = {}) => ({ stem_html: '<p>물음</p>', number: 17, ...over }) as PaperItemSnapshot;
@@ -36,5 +37,21 @@ describe('reportPlaceLabel', () => {
     expect(reportPlaceLabel({ paper_title: '춘향전', printed_no: 20, snapshot: snap() })).toBe('춘향전 20번');
     expect(reportPlaceLabel({ paper_title: null, printed_no: null, snapshot: snap() })).toBe('문제 은행 · 원래 17번');
     expect(reportPlaceLabel({ paper_title: null, printed_no: null, snapshot: snap({ number: null }) })).toBe('문제 은행');
+  });
+});
+
+describe('withOriginalNumber — 출처 줄에 원래 번호 (2026-11-22)', () => {
+  it('번호가 있으면 · 원래 N번 을 붙인다', () => {
+    expect(withOriginalNumber('2025 고1 휘경여고 2학기 기말', 12)).toBe('2025 고1 휘경여고 2학기 기말 · 원래 12번');
+  });
+  it('번호가 없거나 이상하면 출처 줄 그대로', () => {
+    expect(withOriginalNumber('출처', null)).toBe('출처');
+    expect(withOriginalNumber('출처', '12')).toBe('출처');
+    expect(withOriginalNumber('출처', 0)).toBe('출처');
+    expect(withOriginalNumber('출처', 1.5)).toBe('출처');
+  });
+  it('출처 줄이 비면 번호만', () => {
+    expect(withOriginalNumber(null, 3)).toBe('원래 3번');
+    expect(withOriginalNumber('', null)).toBe('');
   });
 });

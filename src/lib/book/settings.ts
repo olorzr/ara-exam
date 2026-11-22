@@ -246,8 +246,9 @@ export interface BookLayoutInput {
  *  - 5: 2026-11-06 옛한글 글꼴을 문단·선지에만 걸고, 긴 글자열·빈칸·표 선지가 단 안에서 꺾인다(0.9.68·0.9.69, 코덱스 1R)
  *  - 6: 2026-11-15 발문 속 긴 줄바꿈 문단(〈보기〉 속 시·대화)도 줄 묶음 사이에서 다음 단으로 이어진다(stem-line-units.ts)
  *  - 7: 2026-11-22 겹친 상자(구역 안의 [A], 〈보기〉 안의 (가))도 문단마다 흘러간다(box-parts.ts 의 `inner`)
+ *  - 8: 2026-11-22 교사용은 출처를 숨긴 문제지에도 출처 + 원래 번호를 찍는다(PaperPrintParts 의 `QuestionSource`)
  */
-export const BOOK_RENDER_REVISION = 7;
+export const BOOK_RENDER_REVISION = 8;
 
 /**
  * 내지 구성 지문 — 장 차례·제목·단 수 등 쪽 수를 바꾸는 값을 FNV-1a 로 줄인 글자.

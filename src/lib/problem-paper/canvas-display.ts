@@ -9,7 +9,7 @@ import type { PaperItemSnapshot } from '@/types/problem-bank';
  */
 export interface CanvasItemDisplay {
   stemHtml: string;
-  /** 학교(없으면 출판사) · 연도 */
+  /** 학교(없으면 출판사) · 연도 · 원래 번호 */
   sourceLabel: string;
   workTitle: string;
   areaPath: string[];
@@ -23,9 +23,13 @@ export interface CanvasItemDisplay {
   orphan?: boolean;
 }
 
-/** 출처 한 줄 — 카드에서 예전부터 쓰던 '학교(없으면 출판사) 연도' 그대로 */
-function sourceLine(source: { school_name: string; publisher: string; year: string }): string {
-  return [source.school_name || source.publisher, source.year].filter(Boolean).join(' ');
+/**
+ * 출처 한 줄 — 카드에서 예전부터 쓰던 '학교(없으면 출판사) 연도' 에 원래 번호를 붙인다('상현중 2026 17번').
+ * 원래 번호는 원본 시험지에서 바로 짚게 하려는 것이다(2026-11-22 원장 요청).
+ */
+function sourceLine(source: { school_name: string; publisher: string; year: string }, number: number | null | undefined): string {
+  const no = typeof number === 'number' && Number.isFinite(number) ? `${number}번` : '';
+  return [source.school_name || source.publisher, source.year, no].filter(Boolean).join(' ');
 }
 
 /**
@@ -37,7 +41,7 @@ function sourceLine(source: { school_name: string; publisher: string; year: stri
 export function displayOfArchiveRow(row: ArchiveRow, origin?: 'new'): CanvasItemDisplay {
   return {
     stemHtml: row.stem_html,
-    sourceLabel: sourceLine(row.source),
+    sourceLabel: sourceLine(row.source, row.number),
     workTitle: row.work_title,
     areaPath: row.area_path,
     hasAnswer: Boolean(row.answer),
@@ -57,7 +61,7 @@ export function displayOfSnapshot(
 ): CanvasItemDisplay {
   return {
     stemHtml: snapshot.stem_html ?? '',
-    sourceLabel: snapshot.source ? sourceLine(snapshot.source) : '',
+    sourceLabel: snapshot.source ? sourceLine(snapshot.source, snapshot.number) : '',
     workTitle: snapshot.work_title ?? '',
     areaPath: Array.isArray(snapshot.area_path) ? snapshot.area_path : [],
     hasAnswer: Boolean(snapshot.answer),

@@ -11,7 +11,7 @@ import type { PaperItemSnapshot, PaperSettings } from '@/types/problem-bank';
 import MatrixChoiceTable from '@/components/problem-bank/MatrixChoiceTable';
 import PairedChoiceTable from '@/components/problem-bank/PairedChoiceTable';
 import PaperBoxFrame from './PaperBoxFrame';
-import { PrintImage, SourceLine, TeacherAnswer } from './PaperPrintParts';
+import { PrintImage, QuestionSource, TeacherAnswer } from './PaperPrintParts';
 
 /**
  * 문항의 클래스 — 글 문항과 그림 문항이 **같은 함수**를 쓴다.
@@ -104,7 +104,7 @@ export default function PaperQuestion({ block, settings, imageUrls, showAnswers 
 
   return (
     <div className={className}>
-      {first && settings.showSource && <SourceLine source={snapshot.source} />}
+      {first && <QuestionSource snapshot={snapshot} settings={settings} showAnswers={showAnswers} />}
 
       {stem.length > 0 && (
         <div className="pb-q__head">

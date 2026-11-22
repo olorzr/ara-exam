@@ -86,6 +86,20 @@ export function reportExcerpt(snapshot: Pick<PaperItemSnapshot, 'stem_html'> | n
 }
 
 /**
+ * 출처 줄에 원래 번호를 붙인다 — '2025 고1 휘경여자고등학교 2학기 기말 · 원래 12번'.
+ * 문제지에서 신고한 건은 자리가 인쇄 번호('춘향전 20번')라 원본 시험지의 번호를 따로 알려야 원본에서 바로 짚는다(2026-11-22).
+ * 신고 목록과 원장 웍스 카드의 '출처' 줄이 같이 쓴다.
+ * @param label - 출처 줄(신고 때 굳힌 `source_label`)
+ * @param number - 원본 시험지에서의 번호
+ * @returns 붙인 글. 번호가 없으면 출처 줄 그대로, 출처 줄이 비면 '원래 N번'
+ */
+export function withOriginalNumber(label: string | null | undefined, number: unknown): string {
+  const base = (label ?? '').trim();
+  if (typeof number !== 'number' || !Number.isInteger(number) || number < 1) return base;
+  return base ? `${base} · 원래 ${number}번` : `원래 ${number}번`;
+}
+
+/**
  * 신고한 자리 — 문제지에서 했으면 '문제지 제목 17번', 문제 은행에서 했으면 '문제 은행 · 원래 17번'.
  * @param report - 신고
  * @returns 사람이 읽는 자리

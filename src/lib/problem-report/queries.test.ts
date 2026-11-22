@@ -26,7 +26,7 @@ vi.mock('@/lib/supabase', () => ({
 }));
 
 const {
-  countOpenReports, fetchPaperItemRefs, fetchProblemReports, resolveProblemReport, submitProblemReport,
+  countOpenReports, fetchPaperItemRefs, fetchProblemOrigin, fetchProblemReports, resolveProblemReport, submitProblemReport,
 } = await import('./queries');
 
 beforeEach(() => {
@@ -92,5 +92,29 @@ describe('fetchPaperItemRefs', () => {
     expect((await fetchPaperItemRefs('paper1', 'rev-1')).stale).toBe(true);
     m.queue = [{ data: items, error: null }, { data: null, error: null }];
     expect((await fetchPaperItemRefs('paper1', 'rev-1')).stale).toBe(true);
+  });
+});
+
+describe('fetchProblemOrigin — 신고 창의 원본 쪽', () => {
+  it('문항의 쪽과 출처의 쪽 수를 한 번에 읽는다', async () => {
+    m.result = { data: { page_no: 3, source: { id: 's1', page_count: 8, source_type: '내신기출' } }, error: null, count: 0 };
+    expect(await fetchProblemOrigin('p1')).toEqual({ sourceId: 's1', pageNo: 3, pageCount: 8, sourceType: '내신기출' });
+    expect(m.calls).toContainEqual(['from', 'problems']);
+    expect(m.calls).toContainEqual(['select', 'page_no, source:problem_sources!inner(id, page_count, source_type)']);
+    expect(m.calls).toContainEqual(['eq', 'id', 'p1']);
+  });
+
+  it('문항이 없거나 쪽이 범위 밖이면 null', async () => {
+    m.result = { data: null, error: null, count: 0 };
+    expect(await fetchProblemOrigin('p1')).toBeNull();
+    m.result = { data: { page_no: 9, source: { id: 's1', page_count: 8, source_type: '' } }, error: null, count: 0 };
+    expect(await fetchProblemOrigin('p1')).toBeNull();
+    m.result = { data: { page_no: 0, source: { id: 's1', page_count: 8, source_type: '' } }, error: null, count: 0 };
+    expect(await fetchProblemOrigin('p1')).toBeNull();
+  });
+
+  it('조회가 실패하면 던진다', async () => {
+    m.result = { data: null, error: { message: 'x' }, count: 0 };
+    await expect(fetchProblemOrigin('p1')).rejects.toBeTruthy();
   });
 });

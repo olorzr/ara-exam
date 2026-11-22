@@ -19,6 +19,8 @@ describe('ProblemReportRow', () => {
     draw({ reporter: '최지은', sourceId: 's1' });
     expect(screen.getByText('정답 오류')).toBeTruthy();
     expect(screen.getByText(/춘향전 20번/)).toBeTruthy();
+    // 문제지에서 신고한 건은 출처 줄에 원본 시험지의 번호를 붙인다
+    expect(screen.getByText('2025 고1 휘경여자고등학교 2학기 기말 · 원래 12번')).toBeTruthy();
     expect(screen.getByText('정답이 ④예요')).toBeTruthy();
     expect(screen.getByText(/최지은 선생님/)).toBeTruthy();
     expect(screen.getByText('알림 안 감')).toBeTruthy();
@@ -47,6 +49,12 @@ describe('ProblemReportRow', () => {
     expect(screen.queryByText('알림 안 감')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '다시 열기' }));
     expect(onResolve).toHaveBeenCalledWith('open');
+  });
+
+  it('문제 은행에서 신고한 건은 자리에 원래 번호가 있어 출처 줄에 또 붙이지 않는다', () => {
+    render(<ul><ProblemReportRow report={{ ...report, paper_title: null, printed_no: null }} n={1} /></ul>);
+    expect(screen.getByText('문제 은행 · 원래 12번')).toBeTruthy();
+    expect(screen.getByText('2025 고1 휘경여자고등학교 2학기 기말')).toBeTruthy();
   });
 
   it('문항이 지워졌으면 링크 대신 그 사실을 적는다', () => {
