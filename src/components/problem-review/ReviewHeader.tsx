@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { toast } from 'sonner';
 import { Eye, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -40,7 +41,15 @@ interface ReviewHeaderProps {
   unsavedCount?: number;
   /** 다음 쪽 이어 읽기가 도는 중인가 — 화면을 옮기면 읽기가 멈춘다(코덱스 3R) */
   reading?: boolean;
+  /**
+   * 저장·지우기·합치기가 도는 중인가 — 끝나기 전에 옮기면 읽기 전용 화면이 옛 내용을 읽는다(코덱스 4R).
+   * 그동안은 옮기지 않고 끝난 뒤 다시 누르게 한다
+   */
+  saving?: boolean;
 }
+
+/** 쓰기가 도는 중에 누르면 띄우는 말 */
+export const SAVING_WAIT_MESSAGE = '저장하는 중이에요. 끝난 뒤 다시 눌러 주세요.';
 
 /**
  * 떠나기 전 확인 문구 — 물을 것이 없으면 null.
@@ -57,7 +66,7 @@ export function leaveViewPrompt(unsaved: number, reading: boolean): string | nul
 }
 
 export default function ReviewHeader({
-  source, problemCount, onTextbook, onDelete, deleting = false, unsavedCount = 0, reading = false,
+  source, problemCount, onTextbook, onDelete, deleting = false, unsavedCount = 0, reading = false, saving = false,
 }: ReviewHeaderProps) {
   const textSource = source.ocr_meta?.textSource;
   const viewable = sourceSetOf(source) !== null;
@@ -84,14 +93,19 @@ export default function ReviewHeader({
             href={examViewHref(source.id)}
             prefetch={false}
             onClick={(e) => {
-              const prompt = leaveViewPrompt(unsavedCount, reading);
-              if (!prompt) return;
-              // 새 탭·새 창(보조키)은 이 화면이 남는다 — 묻지 않는다(코덱스 2R, 이탈 확인과 같은 판정 `leavesCurrentPage`)
+              // 새 탭·새 창(보조키)은 이 화면이 남는다 — 막지도 묻지도 않는다(코덱스 2R, 이탈 확인과 같은 판정 `leavesCurrentPage`)
               const a = e.currentTarget;
               const leaving = leavesCurrentPage(
                 { href: a.href, target: a.target, download: a.hasAttribute('download') }, e, window.location.href,
               );
-              if (leaving && !window.confirm(prompt)) e.preventDefault();
+              if (!leaving) return;
+              if (saving) {
+                e.preventDefault();
+                toast.info(SAVING_WAIT_MESSAGE);
+                return;
+              }
+              const prompt = leaveViewPrompt(unsavedCount, reading);
+              if (prompt && !window.confirm(prompt)) e.preventDefault();
             }}
             className="inline-flex h-9 items-center gap-1.5 rounded-full border border-ink bg-card px-4 text-sm font-semibold text-ink hover:bg-muted"
           >

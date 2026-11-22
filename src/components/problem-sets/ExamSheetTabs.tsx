@@ -1,9 +1,14 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useSyncExternalStore, type ReactNode } from 'react';
 import Link from 'next/link';
 import { PageTitle } from '@/components/magazine';
-import { EXAM_SHEET_TABS, examSheetHref, type ExamSheetView } from '@/lib/problem-bank/exam-sheet-tabs';
+import {
+  EXAM_SHEET_TABS, examSheetHref, examSheetPath, type ExamSheetView,
+} from '@/lib/problem-bank/exam-sheet-tabs';
+
+/** 기억은 바뀜을 알리지 않는다 — 화면을 열 때 한 번 읽으면 된다 */
+const noSubscribe = () => () => undefined;
 
 interface ExamSheetTabsProps {
   /** 지금 화면 */
@@ -20,6 +25,9 @@ interface ExamSheetTabsProps {
  * 조건으로 간다(`examSheetHref`).
  */
 export default function ExamSheetTabs({ current, children }: ExamSheetTabsProps) {
+  const other: ExamSheetView = current === 'sets' ? 'sources' : 'sets';
+  // 기억은 그 탭의 sessionStorage 다 — 서버 그림(맨 주소)과 어긋나지 않게 하이드레이션 뒤에 읽는다
+  const otherHref = useSyncExternalStore(noSubscribe, () => examSheetHref(other), () => examSheetPath(other));
   return (
     <div className="space-y-2">
       <div className="space-y-3 border-b-2 border-ink">
@@ -38,7 +46,7 @@ export default function ExamSheetTabs({ current, children }: ExamSheetTabsProps)
             ) : (
               <Link
                 key={tab.view}
-                href={examSheetHref(tab.view)}
+                href={otherHref}
                 prefetch={false}
                 className="relative pb-2 text-sm font-medium text-gray-500 transition-colors hover:text-ink"
               >

@@ -34,17 +34,16 @@ export default function SetSourceList({ rows }: SetSourceListProps) {
             <span aria-hidden="true" className="w-8 shrink-0 font-label text-xs font-bold text-gray-400">
               {String(index + 1).padStart(2, '0')}
             </span>
-            {/* 문항 수·꼬리표는 이름 아래 줄 — 오른쪽에 두면 휴대폰에서 학교 이름이 한 글자씩 꺾인다 */}
-            <span className="min-w-0 flex-1">
-              {/* 시험 제목도 링크 안 — 같은 학교 이름(학교 미지정 등)의 시험이 화면 읽기 프로그램에서 갈린다(코덱스 2R) */}
-              <Link
-                href={examViewHref(row.id)}
-                prefetch={false}
-                className="block after:absolute after:inset-0"
-              >
-                <span className="block font-display text-[15px] font-bold group-hover:text-primary">{rowName(row)}</span>
-                <span className="block truncate text-xs text-gray-500">{row.title}</span>
-              </Link>
+            {/* 문항 수·꼬리표는 이름 아래 줄 — 오른쪽에 두면 휴대폰에서 학교 이름이 한 글자씩 꺾인다.
+                시험 제목·꼬리표까지 보기 링크 안이다: 같은 학교 이름의 시험이 화면 읽기 프로그램에서 갈리고(코덱스 2R),
+                꼬리표를 눌러도 시험지가 열린다(코덱스 4R) */}
+            <Link
+              href={examViewHref(row.id)}
+              prefetch={false}
+              className="min-w-0 flex-1 after:absolute after:inset-0"
+            >
+              <span className="block font-display text-[15px] font-bold group-hover:text-primary">{rowName(row)}</span>
+              <span className="block truncate text-xs text-gray-500">{row.title}</span>
               <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-gray-600">
                 {row.problem_count > 0 ? (
                   <span>{row.problem_count}문항</span>
@@ -52,15 +51,15 @@ export default function SetSourceList({ rows }: SetSourceListProps) {
                   // 문항이 없는 시험지는 적재가 덜 끝난 것이다 — 목록 표와 같은 꼬리표
                   <Badge variant="warn">문항 없음</Badge>
                 )}
-                {/* 줄을 덮는 보기 링크 위로 올려 풍선 글이 뜨게 한다(코덱스 2R) */}
-                {/* 꼬리표는 모양을 덮을 수 없어(0.9.88) 감싼 상자가 올라간다 */}
+                {/* 줄을 덮는 링크 그림(::after) 위로 올려 풍선 글이 뜨게 — 링크 안이라 눌러도 열린다.
+                    꼬리표는 모양을 덮을 수 없어(0.9.88) 감싼 상자가 올라간다 */}
                 {warnings > 0 && (
                   <span className="relative z-10 cursor-help" title="적재할 때 남긴 확인거리 — 고치기 화면 위쪽에 모여 있어요">
                     <Badge variant="warn">확인 필요 {warnings}</Badge>
                   </span>
                 )}
               </span>
-            </span>
+            </Link>
             <Link
               href={sourceEditHref(row.id)}
               prefetch={false}

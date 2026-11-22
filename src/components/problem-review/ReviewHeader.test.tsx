@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import ReviewHeader, { leaveViewPrompt } from './ReviewHeader';
+import ReviewHeader, { leaveViewPrompt, SAVING_WAIT_MESSAGE } from './ReviewHeader';
 import type { ProblemSource } from '@/types/problem-bank';
 
 // 교과서 칸은 출판사·내신 범위를 조회한다 — 머리의 삭제 단추만 보려고 비워 둔다
 vi.mock('./SourceTextbookPicker', () => ({ default: () => null }));
+const toastInfo = vi.hoisted(() => vi.fn());
+vi.mock('sonner', () => ({ toast: { info: toastInfo } }));
 
 const source = {
   id: 's1', source_type: '내신기출', title: '2026 상현중 중2 1학기 중간', school_name: '상현중',
@@ -92,5 +94,21 @@ describe('ReviewHeader', () => {
     expect(leaveViewPrompt(3, false)).not.toContain('읽는 중');
     expect(leaveViewPrompt(2, true)).toContain('2개');
     expect(leaveViewPrompt(2, true)).toContain('읽는 중');
+  });
+
+  it('저장이 도는 중이면 옮기지 않고 끝난 뒤 다시 누르라고 알린다 — 새 탭은 그대로 연다(코덱스 4R)', () => {
+    const confirm = vi.spyOn(window, 'confirm');
+    toastInfo.mockClear();
+    render(<ReviewHeader source={source} problemCount={23} onTextbook={vi.fn()} unsavedCount={1} saving />);
+    const link = screen.getByRole('link', { name: '읽기 전용으로 보기' });
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+    link.dispatchEvent(click);
+    expect(click.defaultPrevented).toBe(true);
+    expect(toastInfo).toHaveBeenCalledWith(SAVING_WAIT_MESSAGE);
+    expect(confirm).not.toHaveBeenCalled();
+    const newTab = new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true });
+    link.dispatchEvent(newTab);
+    expect(newTab.defaultPrevented).toBe(false);
+    confirm.mockRestore();
   });
 });

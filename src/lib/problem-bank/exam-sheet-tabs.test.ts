@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { examSheetHref, rememberExamSheetQuery, resetExamSheetQueries } from './exam-sheet-tabs';
 
+const STORAGE_KEY = 'ara-exam-sheet-query';
+
 beforeEach(() => resetExamSheetQueries());
 
 describe('기출 시험지 탭 — 보던 조건 이어 가기', () => {
@@ -24,5 +26,16 @@ describe('기출 시험지 탭 — 보던 조건 이어 가기', () => {
     expect(examSheetHref('sources')).toBe('/problems/sources');
     rememberExamSheetQuery('sources', '?');
     expect(examSheetHref('sources')).toBe('/problems/sources');
+  });
+
+  it('기억은 그 탭의 sessionStorage 에도 남는다 — 새로 고쳐(자동 새로 고침 포함) 모듈이 다시 올라와도 산다(코덱스 4R)', () => {
+    rememberExamSheetQuery('sets', '?year=2025');
+    expect(JSON.parse(window.sessionStorage.getItem(STORAGE_KEY) ?? '{}')).toEqual({ sets: '?year=2025', sources: '' });
+    // 저장소 값만 남은 상태(새로 고친 뒤)를 흉내 — 이상한 값은 버린다
+    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ sets: '?kind=mock', sources: 'javascript:x' }));
+    expect(examSheetHref('sets')).toBe('/problems/sets?kind=mock');
+    expect(examSheetHref('sources')).toBe('/problems/sources');
+    window.sessionStorage.setItem(STORAGE_KEY, '{망가진');
+    expect(examSheetHref('sets')).toBe('/problems/sets?year=2025');
   });
 });

@@ -32,6 +32,8 @@ describe('SetSourceList', () => {
     const wrap = screen.getByText('확인 필요 2').closest('[title]');
     expect(wrap?.getAttribute('title')).toContain('고치기 화면 위쪽');
     expect(wrap?.className).toContain('z-10');
+    // 링크 안이라 꼬리표를 눌러도 시험지가 열린다(코덱스 4R)
+    expect(wrap?.closest('a')?.getAttribute('href')).toBe('/problems/sets/exam/s1');
   });
 
   it('학교 이름이 같아도 시험 제목으로 링크 이름이 갈린다', () => {
