@@ -1,7 +1,7 @@
 import { act, render } from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useVisualViewportAnchor, type ViewportAnchor } from './useVisualViewportAnchor';
+import { useVisualViewportAnchor } from './useVisualViewportAnchor';
 
 /** 가짜 비주얼 뷰포트 — 값을 바꾸고 이벤트를 보낸다 */
 function fakeViewport(init: { offsetLeft: number; offsetTop: number; width: number; height: number; scale?: number }) {
@@ -10,9 +10,9 @@ function fakeViewport(init: { offsetLeft: number; offsetTop: number; width: numb
   return vv;
 }
 
-function Probe({ enabled = true, anchor = 'corner' }: { enabled?: boolean; anchor?: ViewportAnchor }) {
+function Probe({ enabled = true }: { enabled?: boolean }) {
   const [el, setEl] = useState<HTMLButtonElement | null>(null);
-  useVisualViewportAnchor(el, enabled, anchor);
+  useVisualViewportAnchor(el, enabled);
   return <button ref={setEl} type="button" style={{ position: 'fixed', right: 16, bottom: 16 }}>오류 신고</button>;
 }
 
@@ -37,28 +37,6 @@ describe('useVisualViewportAnchor — 확대한 화면에서도 보이는 곳에
     // 확대를 풀면 되돌린다
     act(() => { Object.assign(vv, { offsetTop: 0, offsetLeft: 0, width: 412, height: 800, scale: 1 }); vv.dispatchEvent(new Event('resize')); });
     expect(button.style.transform).toBe('');
-  });
-
-  it('가운데(창)는 보이는 곳의 가운데에 두고 1/배율로 줄인다', () => {
-    const vv = fakeViewport({ offsetLeft: 0, offsetTop: 0, width: 412, height: 800 });
-    const { getByRole } = render(<Probe anchor="center" />);
-    act(() => { Object.assign(vv, { offsetLeft: 100, offsetTop: 200, width: 137, height: 266, scale: 3 }); vv.dispatchEvent(new Event('resize')); });
-    const el = getByRole('button');
-    expect(el.style.left).toBe('168.5px');
-    expect(el.style.top).toBe('333px');
-    expect(el.style.transform).toBe(`scale(${1 / 3})`);
-    // 줄인 뒤에도 보이는 높이 안에 들게 — 266 × 3 − 32
-    expect(el.style.maxHeight).toBe('766px');
-  });
-
-  it('가운데(창)는 확대 없이 키보드만 올라와 보이는 곳이 줄었을 때는 손대지 않는다(코덱스 19R)', () => {
-    const vv = fakeViewport({ offsetLeft: 0, offsetTop: 0, width: 412, height: 800 });
-    const { getByRole } = render(<Probe anchor="center" />);
-    act(() => { Object.assign(vv, { height: 450 }); vv.dispatchEvent(new Event('resize')); });
-    const el = getByRole('button');
-    expect(el.style.left).toBe('');
-    expect(el.style.transform).toBe('');
-    expect(el.style.maxHeight).toBe('');
   });
 
   it('끄면 아무것도 하지 않고, visualViewport 가 없어도 그린다', () => {

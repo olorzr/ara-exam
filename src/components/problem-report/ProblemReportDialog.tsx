@@ -15,7 +15,6 @@ import {
 } from '@/lib/problem-report/types';
 import ReportNumberGrid from './ReportNumberGrid';
 import ReportOriginalPage from './ReportOriginalPage';
-import { useVisualViewportAnchor } from '@/hooks/useVisualViewportAnchor';
 
 /** 무엇을 신고하나 — 문제지(번호를 고른다) 또는 문제 은행 문항 하나 */
 export type ReportTarget =
@@ -47,9 +46,6 @@ export default function ProblemReportDialog({ open, onClose, target }: ProblemRe
   const [note, setNote] = useState('');
   const [openCount, setOpenCount] = useState(0);
   const [busy, setBusy] = useState(false);
-  // 손가락으로 확대한 채 열어도 보이는 곳 가운데에 확대 전 크기로 — 신고·닫기 단추가 화면 밖에 남지 않게(코덱스 18R)
-  const [popupEl, setPopupEl] = useState<HTMLDivElement | null>(null);
-  useVisualViewportAnchor(popupEl, open, 'center');
 
   const paperId = target.kind === 'paper' ? target.paperId : null;
   const revision = target.kind === 'paper' ? target.revision : null;
@@ -105,7 +101,7 @@ export default function ProblemReportDialog({ open, onClose, target }: ProblemRe
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next && !busy) onClose(); }}>
-      <DialogContent ref={setPopupEl} className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-4xl" noPrint>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-4xl" noPrint>
         <DialogTitle className="text-base">문제 오류 신고</DialogTitle>
         <DialogDescription className="text-sm text-gray-500">
           신고하면 원장님께 웍스로 바로 알려요. 고쳐지면 오류 신고 목록에서 확인할 수 있어요.
@@ -165,8 +161,7 @@ export default function ProblemReportDialog({ open, onClose, target }: ProblemRe
           <div className="min-w-0 space-y-3 sm:col-start-1">
             <div className="space-y-1 text-sm">
               <span className="text-gray-600">어떤 오류인가요?</span>
-              {/* 브라우저 기본 고르기 — 휴대폰에서는 운영체제 고르기 창이 떠 손가락으로 확대한 화면에서도 글자가 안 잘린다.
-                  앱 고르기 칸은 창 밖으로 포털돼 확대 맞춤(useVisualViewportAnchor)을 못 받는다(코덱스 19R) */}
+              {/* 브라우저 기본 고르기 — 휴대폰에서는 운영체제 고르기 창이 떠 손가락으로 확대한 화면에서도 글자가 안 잘린다(코덱스 19R) */}
               <select
                 value={category} aria-label="오류 종류" disabled={busy}
                 onChange={(e) => { if (isReportCategory(e.target.value)) setCategory(e.target.value); }}
