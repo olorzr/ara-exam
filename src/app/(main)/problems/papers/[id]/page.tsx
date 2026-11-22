@@ -246,6 +246,8 @@ export default function ProblemPaperViewPage() {
       {/* 문제지와 교사용은 같은 컴포넌트다 — `key` 로 모드마다 따로 마운트해 A4Document 가 새로 재고 쪽 수를
           반드시 알리게 한다(같은 인스턴스면 쪽 배정이 우연히 같을 때 알림이 안 와 뒷표지 안내가 빠진다) */}
       {/* 다른 곳에서 고쳐졌으면 문서 대신 위 안내만 — 중철 면 앞에 안내가 끼면 면 짝이 밀린다(코덱스 9R) */}
+      {/* 가로 넘침은 문서 상자 안에서만 — 페이지째 넓어지면 떠 있는 신고 단추가 화면 밖으로 밀린다(코덱스 13R, 인쇄에선 풀린다) */}
+      <div className="a4-scroll-x">
       {printsProblems && !revisionWatch.stale && (
         <ProblemPaperView
           key={mode}
@@ -266,6 +268,7 @@ export default function ProblemPaperViewPage() {
           onLayout={handleLayout}
         />
       )}
+      </div>
       {/* 화면 전용 빈자리 — 끝까지 내려도 마지막 쪽 아래 귀퉁이가 떠 있는 오류 신고 단추에 안 가려지게(코덱스 3R). 문서 밖이라 쪽 배치와 무관 */}
       <div aria-hidden="true" data-no-print className="h-24" />
 

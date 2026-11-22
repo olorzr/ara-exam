@@ -245,4 +245,11 @@ describe('문제지 보기 — 떠 있는 오류 신고 단추 (2026-11-22)', ()
     expect(spacer?.className).toContain('h-24');
     expect(spacer?.textContent).toBe('');
   });
+
+  it('문서는 가로 스크롤 상자 안이다 — 휴대폰에서 페이지째 넓어져 떠 있는 단추가 화면 밖으로 밀리지 않게(코덱스 13R)', () => {
+    const { container } = render(<ProblemPaperViewPage />);
+    const box = container.querySelector('.a4-scroll-x');
+    expect(box).not.toBeNull();
+    expect(box?.children.length).toBeGreaterThan(0);
+  });
 });
