@@ -124,6 +124,8 @@ describe('ProblemPaperView — 줄어 찍히는 곳 안내', () => {
     const notice = getByRole('status');
     expect(notice.textContent).toContain('글씨가 줄어 찍히는 곳이 있어요: 1번 지문');
     expect(notice.hasAttribute('data-no-print')).toBe(true);
+    // 안내는 가로 스크롤 상자 밖 — 낱장을 옆으로 넘겨도 제자리다(코덱스 18R)
+    expect(notice.closest('.a4-scroll-x')).toBeNull();
     // 바깥에서 받은 쪽 알림도 그대로 전한다
     expect((onLayout.mock.calls.at(-1)![0] as { shrunkBlocks?: number[] }).shrunkBlocks?.length).toBeGreaterThan(0);
   });
@@ -141,5 +143,12 @@ describe('ProblemPaperView — 쪽 수 알림', () => {
     expect(onLayout).toHaveBeenCalled();
     const { pageCount } = onLayout.mock.calls.at(-1)![0] as { pageCount: number };
     expect(pageCount).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('ProblemPaperView — 가로 스크롤 상자 (2026-11-22)', () => {
+  it('낱장은 가로 스크롤 상자 안이다 — 휴대폰에서 페이지째 넓어져 떠 있는 오류 신고 단추가 밀려나지 않게(코덱스 13R)', () => {
+    const stack = draw();
+    expect(stack.closest('.a4-scroll-x')).not.toBeNull();
   });
 });

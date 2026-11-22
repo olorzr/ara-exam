@@ -11,6 +11,7 @@ import { coverYearOf } from '@/lib/problem-paper/cover-text';
 import type { PaperItemSnapshot, ProblemPaper } from '@/types/problem-bank';
 import { renderAnswerKeyBlocks } from './AnswerKeyBlocks';
 import { renderCoverSlots, type CoverSlotImages } from './PaperCoverPage';
+import PaperPreviewScroll from './PaperPreviewScroll';
 
 interface ProblemAnswerKeyViewProps {
   paper: ProblemPaper;
@@ -60,6 +61,8 @@ export default function ProblemAnswerKeyView({
   });
 
   return (
+    // 터치 화면에서는 가로 넘침을 이 상자 안에 — 페이지째 넓어지면 떠 있는 오류 신고 단추가 화면 밖으로 밀린다(코덱스 13R)
+    <PaperPreviewScroll>
     <A4Document
       blocks={blocks}
       onLayout={onLayout}
@@ -79,5 +82,6 @@ export default function ProblemAnswerKeyView({
       }
       laterPageHeader={<CompactPageHeader title={title} />}
     />
+    </PaperPreviewScroll>
   );
 }

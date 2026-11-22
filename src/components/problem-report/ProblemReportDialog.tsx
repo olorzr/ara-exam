@@ -16,6 +16,7 @@ import {
 } from '@/lib/problem-report/types';
 import ReportNumberGrid from './ReportNumberGrid';
 import ReportOriginalPage from './ReportOriginalPage';
+import { useVisualViewportAnchor } from '@/hooks/useVisualViewportAnchor';
 
 /** 무엇을 신고하나 — 문제지(번호를 고른다) 또는 문제 은행 문항 하나 */
 export type ReportTarget =
@@ -47,6 +48,9 @@ export default function ProblemReportDialog({ open, onClose, target }: ProblemRe
   const [note, setNote] = useState('');
   const [openCount, setOpenCount] = useState(0);
   const [busy, setBusy] = useState(false);
+  // 손가락으로 확대한 채 열어도 보이는 곳 가운데에 확대 전 크기로 — 신고·닫기 단추가 화면 밖에 남지 않게(코덱스 18R)
+  const [popupEl, setPopupEl] = useState<HTMLDivElement | null>(null);
+  useVisualViewportAnchor(popupEl, open, 'center');
 
   const paperId = target.kind === 'paper' ? target.paperId : null;
   const revision = target.kind === 'paper' ? target.revision : null;
@@ -102,7 +106,7 @@ export default function ProblemReportDialog({ open, onClose, target }: ProblemRe
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next && !busy) onClose(); }}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-4xl" noPrint>
+      <DialogContent ref={setPopupEl} className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-4xl" noPrint>
         <DialogTitle className="text-base">문제 오류 신고</DialogTitle>
         <DialogDescription className="text-sm text-gray-500">
           신고하면 원장님께 웍스로 바로 알려요. 고쳐지면 오류 신고 목록에서 확인할 수 있어요.

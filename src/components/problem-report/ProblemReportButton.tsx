@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Flag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useVisualViewportAnchor } from '@/hooks/useVisualViewportAnchor';
@@ -26,14 +26,14 @@ export default function ProblemReportButton({ target, look = 'button' }: Problem
   const [round, setRound] = useState(0);
   const [open, setOpen] = useState(false);
   // 손가락으로 확대한 화면에서도 보이는 곳 오른쪽 아래에 둔다(코덱스 17R)
-  const floatingRef = useRef<HTMLButtonElement>(null);
-  useVisualViewportAnchor(floatingRef, look === 'floating');
+  const [floatingEl, setFloatingEl] = useState<HTMLButtonElement | null>(null);
+  useVisualViewportAnchor(floatingEl, look === 'floating');
   const show = () => { setRound((n) => n + 1); setOpen(true); };
   return (
     <>
       {look === 'floating' ? (
         <button
-          ref={floatingRef} type="button" onClick={show} data-no-print
+          ref={setFloatingEl} type="button" onClick={show} data-no-print
           className="fixed right-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 inline-flex items-center gap-1.5 rounded-full bg-ink px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-ink/25 transition-colors hover:bg-ink/85 focus-visible:ring-3 focus-visible:ring-ring/40 focus-visible:outline-none sm:right-6 sm:bottom-[calc(1.5rem+env(safe-area-inset-bottom))]"
         >
           <Flag className="h-4 w-4" aria-hidden="true" />

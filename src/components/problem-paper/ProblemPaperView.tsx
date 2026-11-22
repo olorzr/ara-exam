@@ -16,6 +16,7 @@ import type { PaperItemSnapshot, ProblemPaper } from '@/types/problem-bank';
 import { renderCoverSlots, type CoverSlotImages } from './PaperCoverPage';
 import { renderPaperBlocks } from './PaperPrintBlocks';
 import PaperShrunkNotice from './PaperShrunkNotice';
+import PaperPreviewScroll from './PaperPreviewScroll';
 
 interface ProblemPaperViewProps {
   paper: ProblemPaper;
@@ -108,6 +109,8 @@ export default function ProblemPaperView({
   return (
     <>
       <PaperShrunkNotice labels={shrunkLabels} />
+      {/* 낱장만 가로 스크롤 상자에 — 위 안내는 상자 밖이라 옆으로 넘겨도 제자리다(코덱스 18R). 상자는 터치 화면에서만 가둔다 */}
+      <PaperPreviewScroll>
       <A4Document
         blocks={blocks}
         splittable={split.splittable}
@@ -143,6 +146,7 @@ export default function ProblemPaperView({
         }
         laterPageHeader={<CompactPageHeader title={title} />}
       />
+      </PaperPreviewScroll>
     </>
   );
 }

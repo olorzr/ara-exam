@@ -246,17 +246,4 @@ describe('문제지 보기 — 떠 있는 오류 신고 단추 (2026-11-22)', ()
     expect(spacer?.textContent).toBe('');
   });
 
-  it('문서는 가로 스크롤 상자(터치 화면에서만 가둔다) 안이다 — 휴대폰에서 페이지째 넓어져 떠 있는 단추가 화면 밖으로 밀리지 않게(코덱스 13R)', () => {
-    const { container } = render(<ProblemPaperViewPage />);
-    const box = container.querySelector('.a4-scroll-x');
-    expect(box).not.toBeNull();
-    expect(box?.children.length).toBeGreaterThan(0);
-  });
-
-  it('다른 곳에서 고쳐져 문서가 빠지면 스크롤 상자도 없다 — 빈 구역을 남기지 않는다(코덱스 16R)', () => {
-    watch.stale = true;
-    const { container } = render(<ProblemPaperViewPage />);
-    expect(container.querySelector('.a4-scroll-x')).toBeNull();
-    watch.stale = false;
-  });
 });
