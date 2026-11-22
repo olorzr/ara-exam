@@ -27,17 +27,25 @@ const touched: Record<ExamSheetView, boolean> = { sets: false, sources: false };
 const validQuery = (value: unknown): string =>
   (typeof value === 'string' && value.startsWith('?') && value.length > 1 ? value : '');
 
-/** 저장소의 기억 — 못 읽거나 모양이 틀리면 빈 기억 */
+/**
+ * 저장소의 기억 — 저장소를 **쓸 수 없으면** null(모듈 변수로 물러선다), 글이 망가졌거나 모양이 틀리면 빈 기억이다.
+ * ⚠️ 망가진 글을 null 로 돌려주지 말 것 — 그러면 다음 쓰기도 건너뛰어 망가진 글이 영영 남는다(코덱스 6R).
+ */
 function readStore(): Record<ExamSheetView, string> | null {
+  let raw: string | null;
   try {
-    const raw = window.sessionStorage.getItem(STORAGE_KEY);
-    if (raw === null) return { sets: '', sources: '' };
-    const parsed: unknown = JSON.parse(raw);
-    const obj = parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : {};
-    return { sets: validQuery(obj.sets), sources: validQuery(obj.sources) };
+    raw = window.sessionStorage.getItem(STORAGE_KEY);
   } catch {
     return null;
   }
+  let parsed: unknown = null;
+  try {
+    parsed = raw === null ? null : JSON.parse(raw);
+  } catch {
+    parsed = null;
+  }
+  const obj = parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : {};
+  return { sets: validQuery(obj.sets), sources: validQuery(obj.sources) };
 }
 
 /**

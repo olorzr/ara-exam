@@ -3,6 +3,13 @@ import { examSheetHref, rememberExamSheetQuery, resetExamSheetQueries } from './
 
 const STORAGE_KEY = 'ara-exam-sheet-query';
 
+/** 모듈 기억만 비운다 — 저장소는 그대로(새로 고친 뒤를 흉내) */
+function resetMemoryOnly() {
+  const saved = window.sessionStorage.getItem(STORAGE_KEY);
+  resetExamSheetQueries();
+  if (saved !== null) window.sessionStorage.setItem(STORAGE_KEY, saved);
+}
+
 beforeEach(() => resetExamSheetQueries());
 
 describe('기출 시험지 탭 — 보던 조건 이어 가기', () => {
@@ -49,5 +56,14 @@ describe('기출 시험지 탭 — 보던 조건 이어 가기', () => {
     rememberExamSheetQuery('sets', '');
     expect(examSheetHref('sets')).toBe('/problems/sets');
     setItem.mockRestore();
+  });
+
+  it('망가진 저장 글은 다음 쓰기가 덮어 고친다 — 새로 고쳐도 조건이 산다(코덱스 6R)', () => {
+    window.sessionStorage.setItem(STORAGE_KEY, '{망가진');
+    rememberExamSheetQuery('sets', '?year=2025');
+    expect(JSON.parse(window.sessionStorage.getItem(STORAGE_KEY) ?? '{}')).toEqual({ sets: '?year=2025', sources: '' });
+    // 새로 고친 뒤(모듈 기억이 빈 상태)를 흉내
+    resetMemoryOnly();
+    expect(examSheetHref('sets')).toBe('/problems/sets?year=2025');
   });
 });
