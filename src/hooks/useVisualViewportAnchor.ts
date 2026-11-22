@@ -6,10 +6,10 @@ import { useEffect } from 'react';
 export type ViewportAnchor = 'corner' | 'center';
 
 /** 옮기기에 쓰는 인라인 스타일 칸 */
-type AnchorStyle = Partial<Record<'transform' | 'transformOrigin' | 'left' | 'top', string>>;
+type AnchorStyle = Partial<Record<'transform' | 'transformOrigin' | 'left' | 'top' | 'maxHeight', string>>;
 
 /** 비운 상태 — 확대하지 않았을 때·끝낼 때 */
-const CLEARED: Required<AnchorStyle> = { transform: '', transformOrigin: '', left: '', top: '' };
+const CLEARED: Required<AnchorStyle> = { transform: '', transformOrigin: '', left: '', top: '', maxHeight: '' };
 
 /**
  * 요소의 인라인 스타일을 고친다 — 훅 밖 함수라 React Compiler 가 '훅 인자를 고친다' 로 막지 않는다(DOM 쓰기는 효과 안에서만 부른다).
@@ -33,7 +33,9 @@ const px = (value: string): number => {
  * 남는다(코덱스 17R — 412px 폭 2배 확대에서 오류 신고 단추가 안 보였다). 그리고 옮기기만 하면 크기는 확대된 그대로라 높은
  * 배율에서는 단추 글자가 잘리고 창의 단추가 화면 밖으로 나간다(18R). 그래서 `1/배율` 로 줄여 확대 전과 같은 실제 크기로 두고,
  * - `corner`: 비주얼 뷰포트 오른쪽 아래에 붙인다(바깥 여백도 확대 전과 같은 실제 크기로)
- * - `center`: 비주얼 뷰포트 가운데에 둔다(창 — 창의 `translate(-50%,-50%)` 는 그대로 쓴다)
+ * - `center`: **확대했을 때만**(배율 > 1) 비주얼 뷰포트 가운데에 두고 높이도 보이는 높이 안으로 줄인다(창 — 창의
+ *   `translate(-50%,-50%)` 는 그대로 쓴다). 확대 없이 키보드만 올라와 보이는 곳이 줄었을 때는 손대지 않는다 — 브라우저가
+ *   초점 칸을 보이게 옮기는 보통 창 그대로가 낫다(코덱스 19R)
  * 확대하지 않았으면 아무것도 바꾸지 않는다. `visualViewport` 가 없는 브라우저에서는 아무것도 하지 않는다.
  * 요소는 콜백 ref 로 받은 값을 넘긴다 — 창처럼 늦게 붙는 요소도 붙는 순간 다시 돈다.
  * @param el - 옮길 요소(아직 없으면 null)
@@ -57,9 +59,15 @@ export function useVisualViewportAnchor(
         return;
       }
       if (anchor === 'center') {
+        if (scale === 1) {
+          reset();
+          return;
+        }
+        // 줄인 뒤 높이(레이아웃 px = 높이/배율)가 보이는 높이에서 위아래 실제 16px 씩을 뺀 만큼을 넘지 않게
         applyAnchorStyle(el, {
           left: `${vv.offsetLeft + vv.width / 2}px`, top: `${vv.offsetTop + vv.height / 2}px`,
           transformOrigin: 'center', transform: `scale(${1 / scale})`,
+          maxHeight: `${Math.max(vv.height * scale - 32, 0)}px`,
         });
         return;
       }

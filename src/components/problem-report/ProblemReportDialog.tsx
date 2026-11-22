@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '@/components/ui/dialog';
-import { OptionSelect } from '@/components/ui/option-select';
 import { Textarea } from '@/components/ui/textarea';
 import { sourceLabelWithNumber } from '@/lib/problem-bank/source-label';
 import { notifyProblemReport } from '@/lib/problem-report/notify-client';
@@ -166,11 +165,16 @@ export default function ProblemReportDialog({ open, onClose, target }: ProblemRe
           <div className="min-w-0 space-y-3 sm:col-start-1">
             <div className="space-y-1 text-sm">
               <span className="text-gray-600">어떤 오류인가요?</span>
-              <OptionSelect
-                value={category} options={REPORT_CATEGORIES}
-                onChange={(v) => { if (isReportCategory(v)) setCategory(v); }}
-                placeholder="종류 고르기" ariaLabel="오류 종류" disabled={busy} className="w-full"
-              />
+              {/* 브라우저 기본 고르기 — 휴대폰에서는 운영체제 고르기 창이 떠 손가락으로 확대한 화면에서도 글자가 안 잘린다.
+                  앱 고르기 칸은 창 밖으로 포털돼 확대 맞춤(useVisualViewportAnchor)을 못 받는다(코덱스 19R) */}
+              <select
+                value={category} aria-label="오류 종류" disabled={busy}
+                onChange={(e) => { if (isReportCategory(e.target.value)) setCategory(e.target.value); }}
+                className="h-9 w-full rounded-lg border border-input bg-card px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/25 disabled:opacity-50"
+              >
+                <option value="" disabled>종류 고르기</option>
+                {REPORT_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
             </div>
             <label className="block space-y-1 text-sm">
               <span className="text-gray-600">내용 {category === 'other' ? '(꼭 적어 주세요)' : '(있으면 좋아요)'}</span>

@@ -25,17 +25,6 @@ vi.mock('@/lib/problem-report/queries', () => ({
 vi.mock('./ReportOriginalPage', () => ({
   default: ({ problemId }: { problemId: string | null }) => <p data-testid="origin">원본:{problemId ?? '없음'}</p>,
 }));
-// 고르기 칸은 base-ui 팝업 대신 native select 로 바꿔 고른다 — 이 테스트는 창의 흐름을 본다
-vi.mock('@/components/ui/option-select', () => ({
-  OptionSelect: ({ value, options, onChange, ariaLabel }: {
-    value: string; options: { value: string; label: string }[]; onChange: (v: string) => void; ariaLabel: string;
-  }) => (
-    <select aria-label={ariaLabel} value={value} onChange={(e) => onChange(e.target.value)}>
-      <option value="">-</option>
-      {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
-  ),
-}));
 
 const { default: ProblemReportDialog } = await import('./ProblemReportDialog');
 

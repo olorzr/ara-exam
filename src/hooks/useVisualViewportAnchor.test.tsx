@@ -47,6 +47,18 @@ describe('useVisualViewportAnchor — 확대한 화면에서도 보이는 곳에
     expect(el.style.left).toBe('168.5px');
     expect(el.style.top).toBe('333px');
     expect(el.style.transform).toBe(`scale(${1 / 3})`);
+    // 줄인 뒤에도 보이는 높이 안에 들게 — 266 × 3 − 32
+    expect(el.style.maxHeight).toBe('766px');
+  });
+
+  it('가운데(창)는 확대 없이 키보드만 올라와 보이는 곳이 줄었을 때는 손대지 않는다(코덱스 19R)', () => {
+    const vv = fakeViewport({ offsetLeft: 0, offsetTop: 0, width: 412, height: 800 });
+    const { getByRole } = render(<Probe anchor="center" />);
+    act(() => { Object.assign(vv, { height: 450 }); vv.dispatchEvent(new Event('resize')); });
+    const el = getByRole('button');
+    expect(el.style.left).toBe('');
+    expect(el.style.transform).toBe('');
+    expect(el.style.maxHeight).toBe('');
   });
 
   it('끄면 아무것도 하지 않고, visualViewport 가 없어도 그린다', () => {
