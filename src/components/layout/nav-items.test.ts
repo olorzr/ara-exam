@@ -139,7 +139,7 @@ describe('buildNavSections', () => {
     // 그룹 이름은 '문제 은행' — 접힘 상태 저장 키(id)는 'problems' 그대로다
     expect(problems.kind === 'group' && problems.label).toBe('문제 은행');
     expect(problems.items.map((i) => i.label)).toEqual([
-      '문제 아카이브', '기출 세트', '올라간 기출', '문제지 조합', 'O,X·단답형',
+      '문제 아카이브', '기출 세트', '올라간 기출', '문제지 조합', '오류 신고', 'O,X·단답형',
     ]);
 
     const etc = sections.find((s) => s.id === 'etc')!;
@@ -154,7 +154,7 @@ describe('buildNavSections', () => {
     const admin = buildNavSections(true);
     expect(admin.map((s) => s.id)).toEqual(['home', 'concept', 'words', 'problems', 'books', 'etc', 'admin']);
     const adminProblems = admin.find((s) => s.id === 'problems')!;
-    expect(adminProblems.items.map((i) => i.label)).toEqual(['문제 아카이브', '기출 세트', '올라간 기출', '문제지 조합', 'O,X·단답형']);
+    expect(adminProblems.items.map((i) => i.label)).toEqual(['문제 아카이브', '기출 세트', '올라간 기출', '문제지 조합', '오류 신고', 'O,X·단답형']);
 
     const books = admin.find((s) => s.id === 'books')!;
     expect(books.kind).toBe('group');

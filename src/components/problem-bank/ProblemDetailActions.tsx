@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { countUnadded } from '@/lib/problem-paper/bulk-add';
 import type { ArchiveRow } from '@/hooks/useProblemArchive';
 import type { Problem, ProblemSource } from '@/types/problem-bank';
+import ProblemReportButton from '@/components/problem-report/ProblemReportButton';
+import { sourceLabel } from '@/lib/problem-bank/source-label';
 
 interface ProblemDetailActionsProps {
   /** 지금 보고 있는 문항 (형제를 눌러 옮겨 다닐 수 있다) */
@@ -22,7 +24,7 @@ interface ProblemDetailActionsProps {
 /**
  * 상세 창 아래의 조작 줄.
  *
- * 링크(편집·시험지)는 늘 있고, **담기 단추는 `onAdd` 를 받았을 때만** 나온다 — 아카이브에는
+ * 링크(편집·시험지·오류 신고)는 늘 있고, **담기 단추는 `onAdd` 를 받았을 때만** 나온다 — 아카이브에는
  * 담을 캔버스가 없으므로 그 화면에서는 단추가 보이지 않는다.
  *
  * 담기가 둘인 까닭: 지문에 딸린 문항은 **혼자 담아 봐야 쓸모가 적다.** `[22~23]` 지문의
@@ -50,6 +52,10 @@ export default function ProblemDetailActions({
       >
         시험지에서 보기
       </Link>
+      <ProblemReportButton
+        look="link"
+        target={{ kind: 'problem', problemId: shown.id, label: `${sourceLabel(source)}${shown.number ? ` ${shown.number}번` : ''}` }}
+      />
 
       {onAdd && (
         <div className="ml-auto flex flex-wrap items-center gap-2">

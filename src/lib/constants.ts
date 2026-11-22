@@ -36,7 +36,7 @@ export const EXTERNAL_LEVEL = '외부지문 및 프린트' as const;
  * ⚠️ DB 정책들이 같은 리터럴을 든다 — 바꾸면 함께 고칠 것:
  *    sql/03(감사 로그 읽기) · sql/57·65(올라간 기출 삭제) · sql/76(책 만들기 두 표) ·
  *    sql/84(작품 전문 · 개념 올리기·고치기·지우기) · sql/103(`exam.is_owner_email` — 문제지 고치기) ·
- *    sql/104(문제지 지우기 — 만든 선생님 또는 원장).
+ *    sql/104(문제지 지우기 — 만든 선생님 또는 원장) · sql/113(문제 은행 오류 신고 처리 — `exam.resolve_problem_report`).
  */
 export const ADMIN_EMAIL = 'ara0723@araeducation.co.kr';
 

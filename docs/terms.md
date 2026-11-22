@@ -908,3 +908,8 @@
 - 정의: 문항을 단 끝에서 자를 수 있는 가장 작은 덩어리. 머리(번호 + 발문 첫 조각)·발문 조각·그림·선지 하나·표 선지·빈칸·교사용 답이다. 자르는 자리는 단위 사이뿐이다
 - 코드에서의 사용: `QuestionUnit`, `PaperProblemBlock.units`·`range`·`tight`, `questionCuts`
 - 관련 파일: src/lib/problem-paper/question-units.ts, src/lib/problem-paper/split-target.ts, src/components/problem-paper/PaperQuestion.tsx
+
+## 오류 신고 (problem report)
+- 정의: 선생님이 문제지를 풀리다(또는 문제 은행에서) 찾은 문항 오류를 원장에게 알리는 기록. 신고 때의 문항 모습(스냅샷)·문제지 제목·문제지 안 번호를 복사해 두어 문항이 다시 올라와도 무엇을 신고했는지 남는다. 처리(고침·반려)는 원장만
+- 코드에서의 사용: `ProblemReport`, `ReportCategory`(answer·text·passage·figure·other), `ReportStatus`(open·fixed·rejected), `reportPlaceLabel`, `notified_at`
+- 관련 파일: sql/113_problem_reports.sql, src/lib/problem-report/, src/components/problem-report/, src/app/(main)/problems/reports/page.tsx, src/app/api/notify-problem-report/route.ts

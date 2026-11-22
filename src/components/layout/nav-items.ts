@@ -5,6 +5,7 @@ import {
   BookOpen,
   BookText,
   FilePlus2,
+  Flag,
   FileScan,
   FileStack,
   FileText,
@@ -167,6 +168,8 @@ export function buildNavSections(isAdmin: boolean): NavSection[] {
         { href: '/problems/sources', label: '올라간 기출', icon: FileStack },
         // 저장된 문제지 보기(/problems/papers/[id])도 이 항목 아래다
         { href: '/problems/papers', label: '문제지 조합', icon: Layers },
+        // 문제지를 풀리다 찾은 오류 신고 — 선생님 모두 보고 원장이 처리한다(sql/113, 2026-11-22)
+        { href: '/problems/reports', label: '오류 신고', icon: Flag },
         // 지문을 넣으면 AI 가 O,X·단답형을 만든다. 만든 문항은 저장하지 않아 하위 경로가 없다
         { href: '/problems/quiz', label: 'O,X·단답형', icon: ListChecks },
       ],

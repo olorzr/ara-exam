@@ -43,12 +43,21 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  noPrint = false,
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
+  /**
+   * 인쇄물에서 창과 뒤판을 함께 숨긴다(`data-no-print`). 인쇄할 문서가 있는 화면에서 연 창이 Cmd/Ctrl+P 에
+   * 찍히지 않게 — 창은 body 로 포털되어 부르는 쪽의 `data-no-print` 조상 밖에 있다(코덱스 2026-11-22).
+   * 표시는 **포털 상자**에 단다 — 창 안 고르기 칸의 펼친 목록(`SelectContent`)도 제 포털로 나가지만 그 상자는
+   * 창의 포털 상자 **안**에 생겨 함께 숨는다(창이나 뒤판에만 달면 펼친 목록이 인쇄물에 남는다, 코덱스 2R).
+   */
+  noPrint?: boolean
 }) {
+  const printProps = noPrint ? { "data-no-print": "" } : {}
   return (
-    <DialogPortal>
+    <DialogPortal {...printProps}>
       <DialogOverlay />
       <DialogPrimitive.Popup
         data-slot="dialog-content"

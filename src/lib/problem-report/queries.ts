@@ -1,0 +1,125 @@
+import { supabase } from '@/lib/supabase';
+import type { PaperItemSnapshot } from '@/types/problem-bank';
+import type { ProblemReport, ReportCategory, ReportStatus } from './types';
+
+/**
+ * 문제 은행 오류 신고 조회·쓰기(브라우저, 사용자 세션).
+ * 쓰기는 RPC 둘뿐이다 — 표에는 브라우저 INSERT·UPDATE 권한이 없다(sql/113).
+ */
+
+/** 한 번에 보여 줄 신고 수 */
+export const REPORT_LIST_LIMIT = 200;
+
+/** 신고 요청 — 문제지 항목이나 문항 중 하나 */
+export interface ReportInput {
+  category: ReportCategory;
+  note: string;
+  paperItemId?: string;
+  /** 문제지 항목이면 화면이 보고 있는 문제지 판(`updated_at`) — 다르면 RPC 가 거절한다(번호가 어긋난다) */
+  paperRevision?: string;
+  problemId?: string;
+}
+
+/**
+ * 신고한다.
+ * @param input - 종류·내용·대상
+ * @returns 새 신고 id
+ * @throws 저장 실패 시(RPC 오류 문구를 그대로)
+ */
+export async function submitProblemReport(input: ReportInput): Promise<string> {
+  const { data, error } = await supabase.rpc('report_problem', {
+    p_category: input.category,
+    p_note: input.note,
+    p_problem_id: input.problemId ?? null,
+    p_paper_item_id: input.paperItemId ?? null,
+    p_paper_revision: input.paperRevision ?? null,
+  });
+  if (error) throw new Error(error.message);
+  if (typeof data !== 'string') throw new Error('신고를 저장하지 못했어요.');
+  return data;
+}
+
+/**
+ * 신고 목록 — 접수 중(open) 또는 처리됨(고침·반려), 최근 것부터.
+ * @param tab - 'open' · 'closed'
+ * @returns 신고들
+ * @throws 조회 실패 시
+ */
+export async function fetchProblemReports(tab: 'open' | 'closed'): Promise<ProblemReport[]> {
+  const request = supabase.from('problem_reports').select('*');
+  const filtered = tab === 'open' ? request.eq('status', 'open') : request.in('status', ['fixed', 'rejected']);
+  const { data, error } = await filtered
+    .order('created_at', { ascending: false }).order('id', { ascending: false }).limit(REPORT_LIST_LIMIT);
+  if (error) throw error;
+  return (data ?? []) as unknown as ProblemReport[];
+}
+
+/**
+ * 처리한다(원장만 — DB 가 막는다).
+ * @param id - 신고 id
+ * @param status - 고침·반려, 되돌리면 접수 중
+ * @param note - 처리 메모
+ * @throws 처리 실패 시
+ */
+export async function resolveProblemReport(id: string, status: ReportStatus, note = ''): Promise<void> {
+  const { error } = await supabase.rpc('resolve_problem_report', { p_id: id, p_status: status, p_note: note });
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * 같은 문항에 접수 중인 신고 수 — 신고 창이 '이미 N건 신고돼 있어요' 를 알린다.
+ * @param problemId - 문항 id
+ * @returns 건수(못 읽으면 0 — 곁가지라 막지 않는다)
+ */
+export async function countOpenReports(problemId: string): Promise<number> {
+  const { count, error } = await supabase.from('problem_reports')
+    .select('id', { count: 'exact', head: true }).eq('problem_id', problemId).eq('status', 'open');
+  return error ? 0 : count ?? 0;
+}
+
+/** 문제지 항목 하나 — 신고 창이 번호를 고르게 한다 */
+export interface PaperItemRef {
+  id: string;
+  problem_id: string | null;
+  snapshot: PaperItemSnapshot;
+}
+
+/** 문제지 항목 읽기 결과 — `stale` 이면 화면이 보고 있는 판과 지금 판이 다르다 */
+export interface PaperItemRead {
+  items: PaperItemRef[];
+  stale: boolean;
+}
+
+/**
+ * 문제지 항목들 — 자리 차례대로(인쇄 번호 = 배열 차례 + 1). 항목을 읽은 **뒤** 문제지 판을 다시 읽어 화면의 판과 견준다
+ * (읽는 사이 고쳐졌으면 그 항목 차례는 화면과 다르다 — 보내기 라우트의 '항목 뒤 판 재확인' 과 같은 차례).
+ * @param paperId - 문제지 id
+ * @param revision - 화면이 보고 있는 문제지 판(`updated_at`, PostgREST 글자 그대로)
+ * @returns 항목들과 판이 달라졌는가
+ * @throws 조회 실패 시
+ */
+export async function fetchPaperItemRefs(paperId: string, revision: string): Promise<PaperItemRead> {
+  const { data, error } = await supabase.from('problem_paper_items')
+    .select('id, problem_id, snapshot').eq('paper_id', paperId).order('order_index', { ascending: true });
+  if (error) throw error;
+  const { data: paper, error: paperError } = await supabase.from('problem_papers')
+    .select('updated_at').eq('id', paperId).maybeSingle();
+  if (paperError) throw paperError;
+  const now = (paper as { updated_at?: string } | null)?.updated_at;
+  return { items: (data ?? []) as unknown as PaperItemRef[], stale: now !== revision };
+}
+
+/**
+ * 문항들의 출처 id — 신고 목록의 '시험지에서 보기' 링크가 쓴다.
+ * @param problemIds - 문항 id 들
+ * @returns 문항 id → 출처 id (못 읽으면 빈 지도)
+ */
+export async function fetchProblemSourceIds(problemIds: readonly string[]): Promise<Map<string, string>> {
+  const ids = [...new Set(problemIds)];
+  const map = new Map<string, string>();
+  if (ids.length === 0) return map;
+  const { data, error } = await supabase.from('problems').select('id, source_id').in('id', ids);
+  if (error) return map;
+  for (const row of (data ?? []) as { id: string; source_id: string }[]) map.set(row.id, row.source_id);
+  return map;
+}

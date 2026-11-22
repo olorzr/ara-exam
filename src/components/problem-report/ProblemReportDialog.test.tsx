@@ -1,0 +1,111 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const m = vi.hoisted(() => ({
+  submit: vi.fn<(...args: unknown[]) => Promise<string>>(async () => 'r1'),
+  notify: vi.fn<(...args: unknown[]) => Promise<'reached' | 'failed'>>(async () => 'reached'),
+  count: vi.fn<(...args: unknown[]) => Promise<number>>(async () => 0),
+  toast: { success: vi.fn(), warning: vi.fn(), error: vi.fn() },
+}));
+vi.mock('sonner', () => ({ toast: m.toast }));
+vi.mock('@/lib/problem-report/notify-client', () => ({ notifyProblemReport: m.notify }));
+vi.mock('@/lib/problem-report/queries', () => ({
+  submitProblemReport: m.submit,
+  countOpenReports: m.count,
+  fetchPaperItemRefs: async (_paperId: string, revision: string) => ({
+    stale: revision !== 'rev-now',
+    items: [
+      { id: 'i1', problem_id: 'p1', snapshot: { stem_html: '<p>첫 문항</p>', number: 3, source: { school_name: '압구정중학교', year: '2025', grade: '중1', exam_type: '기말' } } },
+      { id: 'i2', problem_id: 'p2', snapshot: { stem_html: '<p>둘째 문항</p>', number: 4, source: { school_name: '압구정중학교', year: '2025', grade: '중1', exam_type: '기말' } } },
+    ],
+  }),
+}));
+// 고르기 칸은 base-ui 팝업 대신 native select 로 바꿔 고른다 — 이 테스트는 창의 흐름을 본다
+vi.mock('@/components/ui/option-select', () => ({
+  OptionSelect: ({ value, options, onChange, ariaLabel }: {
+    value: string; options: { value: string; label: string }[]; onChange: (v: string) => void; ariaLabel: string;
+  }) => (
+    <select aria-label={ariaLabel} value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">-</option>
+      {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
+  ),
+}));
+
+const { default: ProblemReportDialog } = await import('./ProblemReportDialog');
+
+beforeEach(() => {
+  m.submit.mockClear();
+  m.notify.mockClear();
+  m.notify.mockResolvedValue('reached');
+  m.count.mockResolvedValue(0);
+  Object.values(m.toast).forEach((f) => f.mockClear());
+});
+
+describe('ProblemReportDialog', () => {
+  it('문제지에서는 번호를 골라 신고하고, 저장 뒤 원장 알림을 부른다', async () => {
+    const onClose = vi.fn();
+    render(<ProblemReportDialog open onClose={onClose} target={{ kind: 'paper', paperId: 'paper1', revision: 'rev-now' }} />);
+    const number = await screen.findByRole('combobox', { name: '신고할 문항 번호' });
+    expect(screen.getByRole('button', { name: '신고하기' })).toHaveProperty('disabled', true);
+    fireEvent.change(number, { target: { value: 'i2' } });
+    expect(screen.getByRole('option', { name: '2번 · 둘째 문항' })).toBeTruthy();
+    fireEvent.change(screen.getByRole('combobox', { name: '오류 종류' }), { target: { value: 'answer' } });
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: '  정답이 ④예요 ' } });
+    fireEvent.click(screen.getByRole('button', { name: '신고하기' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(m.submit).toHaveBeenCalledWith({ category: 'answer', note: '정답이 ④예요', paperItemId: 'i2', paperRevision: 'rev-now' });
+    expect(m.notify).toHaveBeenCalledWith('r1');
+    expect(m.toast.success).toHaveBeenCalled();
+  });
+
+  it("'기타' 는 내용을 적어야 신고할 수 있다", async () => {
+    render(<ProblemReportDialog open onClose={() => undefined} target={{ kind: 'problem', problemId: 'p9', label: '2025 압구정중 3번' }} />);
+    fireEvent.change(screen.getByRole('combobox', { name: '오류 종류' }), { target: { value: 'other' } });
+    expect(screen.getByRole('button', { name: '신고하기' })).toHaveProperty('disabled', true);
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: '그림이 없어요' } });
+    expect(screen.getByRole('button', { name: '신고하기' })).toHaveProperty('disabled', false);
+  });
+
+  it('알림이 못 가도 신고는 저장됐다고 알린다', async () => {
+    m.notify.mockResolvedValue('failed');
+    const onClose = vi.fn();
+    render(<ProblemReportDialog open onClose={onClose} target={{ kind: 'problem', problemId: 'p9', label: '문항' }} />);
+    fireEvent.change(screen.getByRole('combobox', { name: '오류 종류' }), { target: { value: 'text' } });
+    fireEvent.click(screen.getByRole('button', { name: '신고하기' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(m.submit).toHaveBeenCalledWith({ category: 'text', note: '', problemId: 'p9' });
+    expect(m.toast.warning).toHaveBeenCalled();
+  });
+
+  it('같은 문항에 접수 중인 신고가 있으면 알려 준다', async () => {
+    m.count.mockResolvedValue(2);
+    render(<ProblemReportDialog open onClose={() => undefined} target={{ kind: 'problem', problemId: 'p9', label: '문항' }} />);
+    expect(await screen.findByText(/이미 2건 신고돼 있어요/)).toBeTruthy();
+  });
+
+  it('저장이 실패하면 창을 닫지 않고 알린다', async () => {
+    m.submit.mockRejectedValueOnce(new Error('기타 신고는 내용을 적어 주세요'));
+    const onClose = vi.fn();
+    render(<ProblemReportDialog open onClose={onClose} target={{ kind: 'problem', problemId: 'p9', label: '문항' }} />);
+    fireEvent.change(screen.getByRole('combobox', { name: '오류 종류' }), { target: { value: 'answer' } });
+    fireEvent.click(screen.getByRole('button', { name: '신고하기' }));
+    await waitFor(() => expect(m.toast.error).toHaveBeenCalledWith('기타 신고는 내용을 적어 주세요'));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(m.notify).not.toHaveBeenCalled();
+  });
+
+  it('창과 뒤판은 인쇄물에 찍히지 않는다(body 로 포털돼 툴바의 data-no-print 밖이다)', async () => {
+    render(<ProblemReportDialog open onClose={() => undefined} target={{ kind: 'paper', paperId: 'paper1', revision: 'rev-now' }} />);
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog.closest('[data-no-print]')).not.toBeNull();
+  });
+
+  it('화면이 본 판과 지금 판이 다르면 번호를 고르지 못하게 하고 새로 고치라고 알린다', async () => {
+    render(<ProblemReportDialog open onClose={() => undefined} target={{ kind: 'paper', paperId: 'paper1', revision: 'rev-old' }} />);
+    expect(await screen.findByText(/다른 곳에서 바뀌었어요/)).toBeTruthy();
+    expect(screen.queryByRole('combobox', { name: '신고할 문항 번호' })).toBeNull();
+    fireEvent.change(screen.getByRole('combobox', { name: '오류 종류' }), { target: { value: 'answer' } });
+    expect(screen.getByRole('button', { name: '신고하기' })).toHaveProperty('disabled', true);
+  });
+});
