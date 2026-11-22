@@ -43,4 +43,27 @@ describe('ReviewHeader', () => {
     render(<ReviewHeader source={{ ...source, source_type: '평가문제집' } as ProblemSource} problemCount={3} onTextbook={vi.fn()} />);
     expect(screen.queryByRole('link', { name: '읽기 전용으로 보기' })).toBeNull();
   });
+
+  it('저장하지 않은 수정이 있으면 읽기 전용으로 가기 전에 묻고, 취소하면 머문다(코덱스 1R)', () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<ReviewHeader source={source} problemCount={23} onTextbook={vi.fn()} unsavedCount={2} />);
+    const link = screen.getByRole('link', { name: '읽기 전용으로 보기' });
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+    link.dispatchEvent(click);
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('저장하지 않은 수정이 2개'));
+    expect(click.defaultPrevented).toBe(true);
+    confirm.mockReturnValue(true);
+    const again = new MouseEvent('click', { bubbles: true, cancelable: true });
+    link.dispatchEvent(again);
+    expect(again.defaultPrevented).toBe(false);
+    confirm.mockRestore();
+  });
+
+  it('고치던 것이 없으면 묻지 않는다', () => {
+    const confirm = vi.spyOn(window, 'confirm');
+    draw();
+    screen.getByRole('link', { name: '읽기 전용으로 보기' }).dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    expect(confirm).not.toHaveBeenCalled();
+    confirm.mockRestore();
+  });
 });

@@ -32,10 +32,19 @@ interface ReviewHeaderProps {
    */
   onDelete?: () => void;
   deleting?: boolean;
+  /**
+   * 저장하지 않은 수정이 든 카드 수 — '읽기 전용으로 보기' 로 떠나기 전에 묻는다(코덱스 1R).
+   * 그 화면은 DB 의 내용을 읽어 고치던 글이 안 보이고, 돌아와도 되살아나지 않는다.
+   */
+  unsavedCount?: number;
 }
 
+/** 떠나기 전 확인 문구 */
+const LEAVE_PROMPT = (n: number) =>
+  `저장하지 않은 수정이 ${n}개 있어요.\n읽기 전용 화면으로 가면 그 수정이 사라집니다. 계속할까요?`;
+
 export default function ReviewHeader({
-  source, problemCount, onTextbook, onDelete, deleting = false,
+  source, problemCount, onTextbook, onDelete, deleting = false, unsavedCount = 0,
 }: ReviewHeaderProps) {
   const textSource = source.ocr_meta?.textSource;
   const viewable = sourceSetOf(source) !== null;
@@ -61,6 +70,7 @@ export default function ReviewHeader({
           <Link
             href={examViewHref(source.id)}
             prefetch={false}
+            onClick={(e) => { if (unsavedCount > 0 && !window.confirm(LEAVE_PROMPT(unsavedCount))) e.preventDefault(); }}
             className="inline-flex h-9 items-center gap-1.5 rounded-full border border-ink bg-card px-4 text-sm font-semibold text-ink hover:bg-muted"
           >
             <Eye className="h-4 w-4" aria-hidden="true" />
