@@ -40,24 +40,31 @@ export default function SetSourceList({ rows }: SetSourceListProps) {
             <Link
               href={examViewHref(row.id)}
               prefetch={false}
-              className="min-w-0 flex-1 after:absolute after:inset-0"
+              className="flex min-w-0 flex-1 items-center gap-3 after:absolute after:inset-0"
             >
-              <span className="block font-display text-[15px] font-bold group-hover:text-primary">{rowName(row)}</span>
-              <span className="block truncate text-xs text-gray-500">{row.title}</span>
-              <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-gray-600">
-                {row.problem_count > 0 ? (
-                  <span>{row.problem_count}문항</span>
-                ) : (
-                  // 문항이 없는 시험지는 적재가 덜 끝난 것이다 — 목록 표와 같은 꼬리표
-                  <Badge variant="warn">문항 없음</Badge>
-                )}
-                {/* 줄을 덮는 링크 그림(::after) 위로 올려 풍선 글이 뜨게 — 링크 안이라 눌러도 열린다.
-                    꼬리표는 모양을 덮을 수 없어(0.9.88) 감싼 상자가 올라간다 */}
-                {warnings > 0 && (
-                  <span className="relative z-10 cursor-help" title="적재할 때 남긴 확인거리 — 고치기 화면 위쪽에 모여 있어요">
-                    <Badge variant="warn">확인 필요 {warnings}</Badge>
-                  </span>
-                )}
+              <span className="min-w-0 flex-1">
+                <span className="block font-display text-[15px] font-bold group-hover:text-primary">{rowName(row)}</span>
+                <span className="block truncate text-xs text-gray-500">{row.title}</span>
+                <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-gray-600">
+                  {row.problem_count > 0 ? (
+                    <span>{row.problem_count}문항</span>
+                  ) : (
+                    // 문항이 없는 시험지는 적재가 덜 끝난 것이다 — 목록 표와 같은 꼬리표
+                    <Badge variant="warn">문항 없음</Badge>
+                  )}
+                  {/* 줄을 덮는 링크 그림(::after) 위로 올려 풍선 글이 뜨게 — 링크 안이라 눌러도 열린다.
+                      꼬리표는 모양을 덮을 수 없어(0.9.88) 감싼 상자가 올라간다 */}
+                  {warnings > 0 && (
+                    <span className="relative z-10 cursor-help" title="적재할 때 남긴 확인거리 — 고치기 화면 위쪽에 모여 있어요">
+                      <Badge variant="warn">확인 필요 {warnings}</Badge>
+                    </span>
+                  )}
+                </span>
+              </span>
+              {/* 보이는 '보기' 도 링크 안 — 음성 조작으로 '보기' 를 불러도 이 링크가 잡힌다(코덱스 7R). 휴대폰에서는 숨긴다 */}
+              <span className="hidden shrink-0 items-center text-sm font-semibold sm:flex">
+                보기
+                <ChevronRight className="h-4 w-4" aria-hidden="true" />
               </span>
             </Link>
             <Link
@@ -69,10 +76,6 @@ export default function SetSourceList({ rows }: SetSourceListProps) {
               <PencilLine className="h-3.5 w-3.5" aria-hidden="true" />
               고치기
             </Link>
-            <span aria-hidden="true" className="hidden shrink-0 items-center text-sm font-semibold sm:flex">
-              보기
-              <ChevronRight className="h-4 w-4" />
-            </span>
           </li>
         );
       })}

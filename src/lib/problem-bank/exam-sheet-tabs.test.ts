@@ -66,4 +66,14 @@ describe('기출 시험지 탭 — 보던 조건 이어 가기', () => {
     resetMemoryOnly();
     expect(examSheetHref('sets')).toBe('/problems/sets?year=2025');
   });
+
+  it('막혔던 쓰기 뒤 다음 쓰기가 되살아나면 두 화면의 마지막 조건을 함께 남긴다(코덱스 7R)', () => {
+    rememberExamSheetQuery('sets', '?year=2024');
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementationOnce(() => { throw new Error('quota'); });
+    rememberExamSheetQuery('sets', '?year=2026');
+    setItem.mockRestore();
+    rememberExamSheetQuery('sources', '?school=압구정중학교');
+    expect(JSON.parse(window.sessionStorage.getItem(STORAGE_KEY) ?? '{}'))
+      .toEqual({ sets: '?year=2026', sources: '?school=압구정중학교' });
+  });
 });

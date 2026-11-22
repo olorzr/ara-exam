@@ -59,8 +59,13 @@ export function rememberExamSheetQuery(view: ExamSheetView, query: string): void
   touched[view] = true;
   const stored = readStore();
   if (!stored) return;
+  // 이 페이지에서 적은 값이 저장소보다 새것이다 — 앞선 쓰기가 막혔던 반대편 조건도 함께 고쳐 쓴다(코덱스 7R)
+  const merged = {
+    sets: touched.sets ? memory.sets : stored.sets,
+    sources: touched.sources ? memory.sources : stored.sources,
+  };
   try {
-    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ ...stored, [view]: next }));
+    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
   } catch {
     // 저장소가 막혔으면 모듈 변수만 — 새로 고치면 빈다
   }

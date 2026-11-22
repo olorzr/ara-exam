@@ -23,6 +23,8 @@ describe('SetSourceList', () => {
     expect(screen.getByRole('link', { name: '무학중학교 · 2026 무학중 중2 1학기 중간 원본 대조로 고치기' }).getAttribute('href')).toBe('/problems/sources/s1');
     expect(screen.getByRole('link', { name: /^광희중학교 · .* 원본 대조로 고치기$/ }).getAttribute('href')).toBe('/problems/sources/s2');
     for (const link of screen.getAllByRole('link')) expect(link.querySelector('a')).toBeNull();
+    // 보이는 '보기' 도 보기 링크 이름에 든다(코덱스 7R)
+    expect(screen.getByRole('link', { name: viewName('무학중학교') }).textContent).toMatch(/보기$/);
     expect(screen.getByText('32문항')).toBeTruthy();
     expect(screen.getByText('문항 없음')).toBeTruthy();
   });
