@@ -72,11 +72,11 @@ describe('학교 프린트 시험지 메뉴', () => {
 describe('문제 은행 메뉴', () => {
   it('형제 경로가 서로를 켜지 않는다 — /problems 를 실제 경로로 두지 않은 이유', () => {
     const archive = findItem(sections, '/problems/archive');
-    const sources = findItem(sections, '/problems/sources');
+    const sheets = findItem(sections, '/problems/sets');
     const papers = findItem(sections, '/problems/papers');
 
     expect(isNavItemActive('/problems/sources', archive)).toBe(false);
-    expect(isNavItemActive('/problems/archive', sources)).toBe(false);
+    expect(isNavItemActive('/problems/archive', sheets)).toBe(false);
     expect(isNavItemActive('/problems/papers/abc-123', papers)).toBe(true);
     expect(isNavItemActive('/problems/papers/new', archive)).toBe(false);
   });
@@ -85,22 +85,18 @@ describe('문제 은행 메뉴', () => {
     const archive = findItem(sections, '/problems/archive');
     expect(isNavItemActive('/problems/edit/abc-123', archive)).toBe(true);
     // 다른 메뉴로는 새지 않는다
-    expect(isNavItemActive('/problems/edit/abc-123', findItem(sections, '/problems/sources'))).toBe(false);
+    expect(isNavItemActive('/problems/edit/abc-123', findItem(sections, '/problems/sets'))).toBe(false);
   });
 
-  it('기출 세트의 세 화면은 기출 세트만 켠다 — 아카이브·올라간 기출로 새지 않는다', () => {
-    const sets = findItem(sections, '/problems/sets');
-    for (const path of ['/problems/sets', '/problems/sets/view', '/problems/sets/exam/abc-123']) {
-      expect(isNavItemActive(path, sets)).toBe(true);
+  it('기출 시험지 한 메뉴가 세트·목록·시험 보기·원본 대조 고치기를 다 켠다 — 아카이브로 새지 않는다(2026-11-22)', () => {
+    const sheets = findItem(sections, '/problems/sets');
+    for (const path of [
+      '/problems/sets', '/problems/sets/view', '/problems/sets/exam/abc-123', '/problems/sources', '/problems/sources/abc-123',
+    ]) {
+      expect(isNavItemActive(path, sheets)).toBe(true);
       expect(isNavItemActive(path, findItem(sections, '/problems/archive'))).toBe(false);
-      expect(isNavItemActive(path, findItem(sections, '/problems/sources'))).toBe(false);
     }
-    expect(isNavItemActive('/problems/sources/abc-123', sets)).toBe(false);
-  });
-
-  it('시험지 한 건의 화면은 올라간 기출에 붙는다', () => {
-    const sources = findItem(sections, '/problems/sources');
-    expect(isNavItemActive('/problems/sources/abc-123', sources)).toBe(true);
+    expect(isNavItemActive('/problems/papers', sheets)).toBe(false);
   });
 
   it('O,X·단답형은 자기 경로에서만 켜진다 — 형제와 서로를 켜지 않는다', () => {
@@ -139,7 +135,7 @@ describe('buildNavSections', () => {
     // 그룹 이름은 '문제 은행' — 접힘 상태 저장 키(id)는 'problems' 그대로다
     expect(problems.kind === 'group' && problems.label).toBe('문제 은행');
     expect(problems.items.map((i) => i.label)).toEqual([
-      '문제 아카이브', '기출 세트', '올라간 기출', '문제지 조합', '오류 신고', 'O,X·단답형',
+      '문제 아카이브', '기출 시험지', '문제지 조합', '오류 신고', 'O,X·단답형',
     ]);
 
     const etc = sections.find((s) => s.id === 'etc')!;
@@ -154,7 +150,7 @@ describe('buildNavSections', () => {
     const admin = buildNavSections(true);
     expect(admin.map((s) => s.id)).toEqual(['home', 'concept', 'words', 'problems', 'books', 'etc', 'admin']);
     const adminProblems = admin.find((s) => s.id === 'problems')!;
-    expect(adminProblems.items.map((i) => i.label)).toEqual(['문제 아카이브', '기출 세트', '올라간 기출', '문제지 조합', '오류 신고', 'O,X·단답형']);
+    expect(adminProblems.items.map((i) => i.label)).toEqual(['문제 아카이브', '기출 시험지', '문제지 조합', '오류 신고', 'O,X·단답형']);
 
     const books = admin.find((s) => s.id === 'books')!;
     expect(books.kind).toBe('group');

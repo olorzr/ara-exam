@@ -7,7 +7,6 @@ import {
   FilePlus2,
   Flag,
   FileScan,
-  FileStack,
   FileText,
   FolderCog,
   FolderOpen,
@@ -160,12 +159,11 @@ export function buildNavSections(isAdmin: boolean): NavSection[] {
           icon: FolderOpen,
           extraPrefixes: ['/problems/edit'],
         },
-        // 기출 세트 — 학교만 다른 같은 시험을 카드로 묶어 본다(2026-11-13, 기출 공유 사이트의 세트 화면).
-        // 세트 한 장(/problems/sets/view)·읽기 전용 시험 보기(/problems/sets/exam/[id])도 이 항목 아래다
-        { href: '/problems/sets', label: '기출 세트', icon: LayoutGrid },
-        // 기출은 원장님이 적재 스크립트로 올린다 — 앱의 업로드 화면은 없앴다(2026-09-30).
-        // 시험지 한 건의 화면(/problems/sources/[id])에서 원본과 대조하며 고친다
-        { href: '/problems/sources', label: '올라간 기출', icon: FileStack },
+        // 기출 시험지 — '기출 세트'(2026-11-13)와 '올라간 기출'을 한 메뉴로 합쳤다(2026-11-22 원장님 "하나로 버무리").
+        // 화면 위 탭(ExamSheetTabs)으로 세트로 보기(/problems/sets) ↔ 목록으로 보기(/problems/sources)를 오간다.
+        // 세트 한 장(/problems/sets/view)·읽기 전용 시험 보기(/problems/sets/exam/[id])·원본 대조 고치기
+        // (/problems/sources/[id] — 기출은 원장님이 적재 스크립트로 올린다, 앱 업로드 화면은 2026-09-30 에 없앴다)가 다 이 항목 아래다
+        { href: '/problems/sets', label: '기출 시험지', icon: LayoutGrid, extraPrefixes: ['/problems/sources'] },
         // 저장된 문제지 보기(/problems/papers/[id])도 이 항목 아래다
         { href: '/problems/papers', label: '문제지 조합', icon: Layers },
         // 문제지를 풀리다 찾은 오류 신고 — 선생님 모두 보고 원장이 처리한다(sql/113, 2026-11-22)

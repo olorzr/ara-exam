@@ -66,3 +66,14 @@ describe('PaperViewToolbar — 표지 단추', () => {
     expect(screen.getByRole('button', { name: '표지 · 라인드로잉 · 뒷표지' })).toBeTruthy();
   });
 });
+
+describe('PaperViewToolbar — 오류 신고는 오른쪽 아래에 떠 있다 (2026-11-22)', () => {
+  it('신고 단추는 하나이고, 화면에 고정돼 있고, 인쇄물에 안 찍힌다', () => {
+    renderToolbar();
+    const buttons = screen.getAllByRole('button', { name: '오류 신고' });
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0].className).toContain('fixed');
+    expect(buttons[0].className).toContain('right-4');
+    expect(buttons[0].hasAttribute('data-no-print')).toBe(true);
+  });
+});

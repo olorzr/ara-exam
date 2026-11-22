@@ -2,8 +2,8 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { PageTitle, SectionLabel } from '@/components/magazine';
-import { SetCard, SetFilterBar } from '@/components/problem-sets';
+import { SectionLabel } from '@/components/magazine';
+import { ExamSheetTabs, SetCard, SetFilterBar } from '@/components/problem-sets';
 import { Button } from '@/components/ui/button';
 import { useSourceSets } from '@/hooks/useSourceSets';
 import { MOCK_EXAM_SOURCE_TYPE } from '@/lib/problem-bank/school-exam-tree';
@@ -11,6 +11,7 @@ import {
   EMPTY_SET_FILTERS, filterSourceSets, hasActiveSetFilters, setFiltersFromParams, setFiltersToQueryString,
   setNameMatcher, setYearOptions, type SourceSetFilters,
 } from '@/lib/problem-bank/source-set-filters';
+import { rememberExamSheetQuery } from '@/lib/problem-bank/exam-sheet-tabs';
 import { SETS_PATH } from '@/lib/problem-bank/source-set-link';
 import { sourceSetKey, type SourceSet } from '@/lib/problem-bank/source-sets';
 
@@ -18,7 +19,7 @@ import { sourceSetKey, type SourceSet } from '@/lib/problem-bank/source-sets';
 const GRID_CLASS = 'grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 sm:gap-x-6 sm:gap-y-7 lg:grid-cols-5';
 
 /**
- * 기출 세트 목록 (`/problems/sets`).
+ * 기출 시험지 — 세트로 보기 (`/problems/sets`). 2026-11-22 '올라간 기출'(목록으로 보기)과 한 메뉴가 됐다 — 머리 탭(`ExamSheetTabs`).
  *
  * 기출 공유 사이트의 세트 화면을 옮겼다(2026-11-13 원장님 요청 — "세트 별로 볼 수 있게 … 몇 학기 무슨 학교 나오게").
  * 세트 = 학년도·학년·학기·시험·교과서가 같고 학교만 다른 내신 시험들(모의고사는 같은 회차의 과목들).
@@ -35,7 +36,7 @@ function SetsContent() {
   );
   const { sets, loading, error, reload } = useSourceSets();
 
-  // 바깥에서 주소가 바뀌면(이 화면에서 사이드바 '기출 세트' 를 다시 누르는 등) 거르기를 주소에 맞춘다(코덱스 1R).
+  // 바깥에서 주소가 바뀌면(이 화면에서 사이드바 '기출 시험지' 를 다시 누르는 등) 거르기를 주소에 맞춘다(코덱스 1R).
   // App Router 는 같은 쪽이면 상태를 지켜, 그대로 두면 주소는 비었는데 목록은 옛 조건으로 남는다.
   // 이 화면이 직접 적은 주소(`replaceState`)는 지금 거르기와 같은 글자라 아무것도 안 바뀐다 — 렌더 중 파생 상태로 맞춘다
   const [seenQuery, setSeenQuery] = useState(urlQuery);
@@ -46,7 +47,10 @@ function SetsContent() {
   }
 
   useEffect(() => {
-    window.history.replaceState(null, '', `${SETS_PATH}${setFiltersToQueryString(filters)}`);
+    const query = setFiltersToQueryString(filters);
+    window.history.replaceState(null, '', `${SETS_PATH}${query}`);
+    // '목록으로 보기' 에서 돌아올 때 이 조건으로 오게(ExamSheetTabs)
+    rememberExamSheetQuery('sets', query);
   }, [filters]);
 
   const shown = useMemo(() => filterSourceSets(sets, filters), [sets, filters]);
@@ -61,13 +65,10 @@ function SetsContent() {
 
   return (
     <div className="mx-auto max-w-[1080px] space-y-6">
-      <div className="border-b-2 border-ink pb-3">
-        <PageTitle eyebrow="PROBLEM BANK · EXAM SETS">기출 세트</PageTitle>
-        <p className="mt-1 text-sm text-gray-500">
-          학년도·학년·학기·시험·교과서가 같은 기출을 학교별로 모았어요. 세트를 누르면 학교 목록이, 학교를 누르면 시험지가 열려요.
-          {sets.length > 0 && <span className="ml-1 text-gray-400">(세트 {sets.length}장 · 시험 {examCount}건)</span>}
-        </p>
-      </div>
+      <ExamSheetTabs current="sets">
+        학년도·학년·학기·시험·교과서가 같은 기출을 학교별로 모았어요. 세트를 누르면 학교 목록이, 학교를 누르면 시험지가 열려요.
+        {sets.length > 0 && <span className="ml-1 text-gray-400">(세트 {sets.length}장 · 시험 {examCount}건)</span>}
+      </ExamSheetTabs>
 
       <SetFilterBar filters={filters} yearOptions={yearOptions} shown={shown.length} onChange={patch} onReset={reset} />
 

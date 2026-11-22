@@ -51,7 +51,7 @@ function coverLabel(cover: PaperCover | null): string {
 }
 
 /**
- * 저장된 문제지 화면 위쪽 줄 — 목록으로 · 제목 · 수정 · 오류 신고 · 보기 모드 · 표지 · 인쇄 방식 · 인쇄.
+ * 저장된 문제지 화면 위쪽 줄 — 목록으로 · 제목 · 수정 · 보기 모드 · 표지 · 인쇄 방식 · 인쇄(오류 신고는 오른쪽 아래에 떠 있다).
  * 인쇄물에는 나가지 않는다(`data-no-print`). 수정 입구와 '성적 반영 대기' 경고는 `PaperEditEntry` 가 그린다 —
  * 학원 성적에 다시 등록하면 그 경고를 다시 묻는다(`syncRound`).
  */
@@ -76,8 +76,9 @@ export default function PaperViewToolbar({
       <PaperEditEntry paperId={paper.id} refreshKey={syncRound} omr={paper.settings.omr} />
 
       <div className="ml-auto flex flex-wrap items-center gap-1">
-        {/* 학생에게 풀리다 찾은 오류를 그 자리에서 신고한다 — 원장님께 웍스로 간다(sql/113) */}
-        <ProblemReportButton target={{ kind: 'paper', paperId: paper.id, revision: paper.updated_at }} />
+        {/* 학생에게 풀리다 찾은 오류를 그 자리에서 신고한다 — 원장님께 웍스로 간다(sql/113).
+            툴바 줄이 아니라 오른쪽 아래에 떠 있다(2026-11-22) — 문제지를 내려 보다가도 바로 누르게 */}
+        <ProblemReportButton look="floating" target={{ kind: 'paper', paperId: paper.id, revision: paper.updated_at }} />
         {paper.settings.omr && (
           <PaperGradeSyncButton
             paperId={paper.id} revision={paper.updated_at}

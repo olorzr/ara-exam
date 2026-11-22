@@ -3,14 +3,14 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, PencilLine } from 'lucide-react';
 import { PageTitle } from '@/components/magazine';
 import { ExamAnswerKeyTab, ExamItemsTab, ExamOriginalTab } from '@/components/problem-sets';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useExamView } from '@/hooks/useExamView';
 import { MOCK_EXAM_SOURCE_TYPE } from '@/lib/problem-bank/school-exam-tree';
-import { setViewHref, SETS_PATH } from '@/lib/problem-bank/source-set-link';
+import { setViewHref, SETS_PATH, sourceEditHref } from '@/lib/problem-bank/source-set-link';
 import { sourceMetaLabel } from '@/lib/problem-bank/source-label';
 import { mockSubject, sourceSetOf } from '@/lib/problem-bank/source-sets';
 
@@ -23,7 +23,8 @@ const TABS: readonly ExamTab[] = ['items', 'original', 'key'];
  * 읽기 전용 시험 보기 (`/problems/sets/exam/[id]`) — 세트 한 장에서 학교를 누르면 열린다.
  *
  * 탭 셋: 문항·지문(정답 강조 · 해설 접기) / 원본(쪽 이미지 + PDF 새 탭) / 답지(pdf.js 로 그린다).
- * 고치는 길은 없다 — 고치기는 '올라간 기출' 의 시험지 화면(원본 대조 편집)이 맡는다(사용자 결정, 2026-11-13).
+ * 이 화면에서 고치지는 않는다 — 고치기는 원본 대조 고치기 화면(`/problems/sources/[id]`)이 맡는다(사용자 결정, 2026-11-13).
+ * 머리의 '원본 대조로 고치기' 가 그리로 간다(2026-11-22, '기출 시험지' 한 메뉴로 합치며 — 문항 고치기는 선생님도 할 수 있다).
  * ⚠️ 내신기출·모의고사만 그린다 — 평가문제집은 문제 은행에서 숨긴다(0.9.65). 주소로 열어도 여기에 새 구멍을 내지 않는다.
  */
 export default function ProblemSetExamPage() {
@@ -65,7 +66,7 @@ export default function ProblemSetExamPage() {
     return (
       <div className="space-y-3 py-16 text-center text-sm text-gray-500">
         <p>{missing || !data ? '시험지를 찾지 못했어요. 지워졌을 수 있어요.' : '세트로 보는 시험지가 아니에요.'}</p>
-        <Link href={SETS_PATH} className="font-semibold text-ink underline underline-offset-2">기출 세트 목록으로</Link>
+        <Link href={SETS_PATH} className="font-semibold text-ink underline underline-offset-2">세트 목록으로</Link>
       </div>
     );
   }
@@ -85,13 +86,23 @@ export default function ProblemSetExamPage() {
         이 세트의 {mock ? '과목' : '학교'} 목록
       </Link>
 
-      <div className="border-b-2 border-ink pb-3">
-        <PageTitle eyebrow={`( EXAM ) · ${sourceMetaLabel(source)}`}>
-          {mock ? mockSubject(source.title) : source.school_name || '학교 미지정'}
-        </PageTitle>
-        <p className="mt-1 text-sm text-gray-500">
-          {source.title} · 문항 {problems.length} · 지문 {passages.length}
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b-2 border-ink pb-3">
+        <div className="min-w-0">
+          <PageTitle eyebrow={`( EXAM ) · ${sourceMetaLabel(source)}`}>
+            {mock ? mockSubject(source.title) : source.school_name || '학교 미지정'}
+          </PageTitle>
+          <p className="mt-1 text-sm text-gray-500">
+            {source.title} · 문항 {problems.length} · 지문 {passages.length}
+          </p>
+        </div>
+        <Link
+          href={sourceEditHref(source.id)}
+          prefetch={false}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-ink bg-card px-4 py-2 text-sm font-semibold text-ink hover:bg-muted"
+        >
+          <PencilLine className="h-4 w-4" aria-hidden="true" />
+          원본 대조로 고치기
+        </Link>
       </div>
 
       <Tabs value={tab} onValueChange={changeTab}>

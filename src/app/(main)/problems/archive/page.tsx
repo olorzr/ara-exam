@@ -68,10 +68,10 @@ function ArchiveContent() {
         </div>
         <div className="flex gap-2">
           <Link
-            href="/problems/sources"
+            href="/problems/sets"
             className="rounded-full border border-ink bg-card px-4 py-2 text-sm font-semibold text-ink hover:bg-muted"
           >
-            올라간 기출
+            기출 시험지
           </Link>
           <Link
             href="/problems/papers/new"

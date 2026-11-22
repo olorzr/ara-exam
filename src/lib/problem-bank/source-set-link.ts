@@ -114,3 +114,12 @@ export function setArchiveHref(set: SourceSetKey): string | null {
 export function examViewHref(id: string): string {
   return `${SETS_PATH}/exam/${encodeURIComponent(id)}`;
 }
+
+/**
+ * 원본 대조 고치기 주소 — 기출 시험지 '목록으로 보기' 의 시험지 한 건 화면(옛 '올라간 기출').
+ * @param id - 출처 id
+ * @returns '/problems/sources/<id>'
+ */
+export function sourceEditHref(id: string): string {
+  return `/problems/sources/${encodeURIComponent(id)}`;
+}

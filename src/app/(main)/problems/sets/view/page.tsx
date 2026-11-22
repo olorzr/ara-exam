@@ -29,7 +29,7 @@ function SetViewContent() {
     return (
       <div className="space-y-3 py-16 text-center text-sm text-gray-500">
         <p>세트를 찾지 못했어요. 주소가 잘렸을 수 있어요.</p>
-        <Link href={SETS_PATH} className="font-semibold text-ink underline underline-offset-2">기출 세트 목록으로</Link>
+        <Link href={SETS_PATH} className="font-semibold text-ink underline underline-offset-2">세트 목록으로</Link>
       </div>
     );
   }
@@ -45,7 +45,7 @@ function SetViewContent() {
     <div className="mx-auto max-w-[880px] space-y-4">
       <Link href={SETS_PATH} className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-ink">
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        기출 세트
+        세트 목록
       </Link>
 
       <div className="border-b-2 border-ink pb-3">

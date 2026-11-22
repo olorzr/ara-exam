@@ -35,4 +35,12 @@ describe('ReviewHeader', () => {
     const button = screen.getByRole('button', { name: '지우는 중…' }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
   });
+
+  it('세트로 보는 시험지(내신기출·모의고사)면 읽기 전용으로 보기 링크를 낸다 — 평가문제집은 안 낸다(2026-11-22)', () => {
+    const { unmount } = draw();
+    expect(screen.getByRole('link', { name: '읽기 전용으로 보기' }).getAttribute('href')).toBe('/problems/sets/exam/s1');
+    unmount();
+    render(<ReviewHeader source={{ ...source, source_type: '평가문제집' } as ProblemSource} problemCount={3} onTextbook={vi.fn()} />);
+    expect(screen.queryByRole('link', { name: '읽기 전용으로 보기' })).toBeNull();
+  });
 });

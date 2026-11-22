@@ -15,7 +15,7 @@ const QUICK_ACTIONS = [
   { href: '/exam/create', label: '단어 시험지 생성', desc: '시험지를 만들어요' },
   { href: '/exam/history', label: '단어 시험지', desc: '이전 시험지를 확인해요' },
   { href: '/problems/archive', label: '문제 아카이브', desc: '기출 문항을 찾아봐요' },
-  { href: '/problems/sources', label: '올라간 기출', desc: '올라간 시험지를 한눈에 봐요' },
+  { href: '/problems/sets', label: '기출 시험지', desc: '세트·목록으로 기출 시험지를 봐요' },
   { href: '/problems/papers/new', label: '문제지 조합', desc: '기출로 문제지를 만들어요' },
   { href: '/problems/quiz', label: 'O,X·단답형', desc: '지문으로 O,X·단답형을 만들어요' },
 ] as const;

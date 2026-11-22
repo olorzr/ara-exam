@@ -13,13 +13,14 @@ import {
   EMPTY_SOURCE_LIST_FILTERS, hasActiveSourceFilters, sourceListFiltersFromParams,
   sourceListFiltersToQueryString, toSourceListQuery, type SourceListFilters,
 } from '@/lib/problem-bank/source-list-filters';
-import { PageTitle } from '@/components/magazine';
+import ExamSheetTabs from '@/components/problem-sets/ExamSheetTabs';
+import { rememberExamSheetQuery } from '@/lib/problem-bank/exam-sheet-tabs';
 
 /** 제목을 치는 동안 글자마다 묻지 않도록 잠깐 기다린다 */
 const SEARCH_DEBOUNCE_MS = 300;
 
 /**
- * 올라간 기출 목록 (`/problems/sources`).
+ * 기출 시험지 — 목록으로 보기 (`/problems/sources`, 예전 '올라간 기출'). 2026-11-22 '기출 세트'(세트로 보기)와 한 메뉴가 됐다 — 머리 탭(`ExamSheetTabs`).
  *
  * 기출은 원장님이 적재 스크립트로 올린다 — 앱의 업로드 화면과 검수 절차는 2026-09-30 에 걷었다.
  * 여기는 올라간 시험지를 **한눈에 보고 드롭다운으로 좁혀 찾는** 자리이고, 제목을 누르면
@@ -40,7 +41,10 @@ function SourcesContent() {
   //    들어올 때와 제목을 칠 때마다 요청이 붙었다(2026-10-22, 아카이브의 2026-10-15 와 같은 판단). 이 화면은 주소를
   //    **처음 한 번만** 읽으므로(useState 초기화) 적기만 하면 되고, Next 16 은 네이티브 history 를 useSearchParams 와 맞춘다
   useEffect(() => {
-    window.history.replaceState(null, '', `/problems/sources${sourceListFiltersToQueryString(filters)}`);
+    const query = sourceListFiltersToQueryString(filters);
+    window.history.replaceState(null, '', `/problems/sources${query}`);
+    // '세트로 보기' 에서 돌아올 때 이 조건으로 오게(ExamSheetTabs)
+    rememberExamSheetQuery('sources', query);
   }, [filters]);
 
   // 제목은 치기를 멈춘 뒤에 묻는다
@@ -66,13 +70,11 @@ function SourcesContent() {
   const reset = () => setFilters((prev) => ({ ...EMPTY_SOURCE_LIST_FILTERS, sort: prev.sort }));
 
   return (
-    <div className="space-y-4">
-      <div className="border-b-2 border-ink pb-3">
-        <PageTitle eyebrow="PROBLEM BANK · UPLOADED EXAMS">올라간 기출</PageTitle>
-        <p className="mt-1 text-sm text-gray-500">
-          올라간 기출 시험지입니다. 제목을 누르면 원본과 나란히 보며 틀린 곳을 고칠 수 있어요.
-        </p>
-      </div>
+    // 폭은 '세트로 보기' 와 같게 — 탭을 오갈 때 머리가 제자리에 있다
+    <div className="mx-auto max-w-[1080px] space-y-4">
+      <ExamSheetTabs current="sources">
+        올라간 기출 시험지 전부예요. 제목을 누르면 원본과 나란히 보며 틀린 곳을 고칠 수 있어요.
+      </ExamSheetTabs>
 
       <SourceFilterBar
         filters={filters}

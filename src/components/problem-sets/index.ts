@@ -1,5 +1,6 @@
-// 기출 세트 화면(/problems/sets, 2026-11-13) — 세트 목록 · 세트 한 장 · 읽기 전용 시험 보기의 부품
+// 기출 시험지(세트로 보기 /problems/sets, 2026-11-13 · 2026-11-22 '올라간 기출' 과 한 메뉴) — 머리 탭 · 세트 목록 · 세트 한 장 · 읽기 전용 시험 보기의 부품
 // 답지 탭의 pdf.js 는 그릴 때 동적으로 불러온다(pdfRenderer.ts) — 이 배럴이 세트 목록 번들에 pdf.js 를 끌고 오지 않는다
+export { default as ExamSheetTabs } from './ExamSheetTabs';
 export { default as SetCard } from './SetCard';
 export { default as SetFilterBar } from './SetFilterBar';
 export { default as SetSourceList } from './SetSourceList';
