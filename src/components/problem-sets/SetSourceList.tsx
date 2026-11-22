@@ -61,8 +61,9 @@ export default function SetSourceList({ rows }: SetSourceListProps) {
                   )}
                 </span>
               </span>
-              {/* 보이는 '보기' 도 링크 안 — 음성 조작으로 '보기' 를 불러도 이 링크가 잡힌다(코덱스 7R). 휴대폰에서는 숨긴다 */}
-              <span className="hidden shrink-0 items-center text-sm font-semibold sm:flex">
+              {/* 보이는 '보기' 도 링크 안 — 음성 조작으로 '보기' 를 불러도 이 링크가 잡힌다(코덱스 7R).
+                  휴대폰에서도 보인다 — 숨기면 학교 이름이 그냥 글로 보여 '고치기' 만 누를 것처럼 보인다(코덱스 8R) */}
+              <span className="flex shrink-0 items-center text-sm font-semibold">
                 보기
                 <ChevronRight className="h-4 w-4" aria-hidden="true" />
               </span>
