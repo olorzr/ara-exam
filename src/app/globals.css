@@ -24,6 +24,7 @@
 @import "../styles/reference-attached.css";
 @import "../styles/print-qa.css";
 @import "../styles/print-booklet.css";
+@import "../styles/paper-preview-scroll.css";
 @import "../styles/paper-cover.css";
 @import "../styles/paper-covers/base.css";
 @import "../styles/paper-covers/editorial.css";
