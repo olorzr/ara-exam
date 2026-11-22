@@ -5,6 +5,21 @@ import { useEffect } from 'react';
 /** 어디에 붙이나 — 오른쪽 아래 모서리(떠 있는 단추) · 가운데(창) */
 export type ViewportAnchor = 'corner' | 'center';
 
+/** 옮기기에 쓰는 인라인 스타일 칸 */
+type AnchorStyle = Partial<Record<'transform' | 'transformOrigin' | 'left' | 'top', string>>;
+
+/** 비운 상태 — 확대하지 않았을 때·끝낼 때 */
+const CLEARED: Required<AnchorStyle> = { transform: '', transformOrigin: '', left: '', top: '' };
+
+/**
+ * 요소의 인라인 스타일을 고친다 — 훅 밖 함수라 React Compiler 가 '훅 인자를 고친다' 로 막지 않는다(DOM 쓰기는 효과 안에서만 부른다).
+ * @param node - 요소
+ * @param style - 바꿀 칸(빈 글이면 지운다)
+ */
+function applyAnchorStyle(node: HTMLElement, style: AnchorStyle): void {
+  Object.assign(node.style, { ...CLEARED, ...style });
+}
+
 /** 계산된 px 값 — 못 읽으면 0 */
 const px = (value: string): number => {
   const n = Number.parseFloat(value);
@@ -31,12 +46,7 @@ export function useVisualViewportAnchor(
   useEffect(() => {
     const vv = typeof window !== 'undefined' ? window.visualViewport : null;
     if (!enabled || !vv || !el) return undefined;
-    const reset = () => {
-      el.style.transform = '';
-      el.style.transformOrigin = '';
-      el.style.left = '';
-      el.style.top = '';
-    };
+    const reset = () => applyAnchorStyle(el, {});
     const update = () => {
       const scale = vv.scale > 0 ? vv.scale : 1;
       const root = document.documentElement;
@@ -47,18 +57,19 @@ export function useVisualViewportAnchor(
         return;
       }
       if (anchor === 'center') {
-        el.style.left = `${vv.offsetLeft + vv.width / 2}px`;
-        el.style.top = `${vv.offsetTop + vv.height / 2}px`;
-        el.style.transformOrigin = 'center';
-        el.style.transform = `scale(${1 / scale})`;
+        applyAnchorStyle(el, {
+          left: `${vv.offsetLeft + vv.width / 2}px`, top: `${vv.offsetTop + vv.height / 2}px`,
+          transformOrigin: 'center', transform: `scale(${1 / scale})`,
+        });
         return;
       }
       // 바깥 여백(right·bottom)도 실제 크기를 지키게 — 레이아웃 px 여백은 확대하면 그만큼 커진다
       const style = getComputedStyle(el);
       const gapX = px(style.right) - px(style.right) / scale;
       const gapY = px(style.bottom) - px(style.bottom) / scale;
-      el.style.transformOrigin = 'bottom right';
-      el.style.transform = `translate(${dx + gapX}px, ${dy + gapY}px) scale(${1 / scale})`;
+      applyAnchorStyle(el, {
+        transformOrigin: 'bottom right', transform: `translate(${dx + gapX}px, ${dy + gapY}px) scale(${1 / scale})`,
+      });
     };
     update();
     vv.addEventListener('resize', update);
