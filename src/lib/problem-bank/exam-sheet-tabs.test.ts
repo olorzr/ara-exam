@@ -76,4 +76,15 @@ describe('기출 시험지 탭 — 보던 조건 이어 가기', () => {
     expect(JSON.parse(window.sessionStorage.getItem(STORAGE_KEY) ?? '{}'))
       .toEqual({ sets: '?year=2026', sources: '?school=압구정중학교' });
   });
+
+  it('뒤로 가기로 되살아난 옛 페이지가 써도 다른 페이지가 저장한 새 조건을 덮지 않는다(코덱스 11R)', () => {
+    rememberExamSheetQuery('sets', '?year=2025');
+    rememberExamSheetQuery('sources', '?school=옛학교');
+    // 다른 페이지(같은 탭)가 목록 조건을 새로 저장했다
+    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ sets: '?year=2025', sources: '?school=새학교' }));
+    // 되살아난 옛 페이지가 세트 조건을 바꾼다
+    rememberExamSheetQuery('sets', '?year=2026');
+    expect(JSON.parse(window.sessionStorage.getItem(STORAGE_KEY) ?? '{}')).toEqual({ sets: '?year=2026', sources: '?school=새학교' });
+    expect(examSheetHref('sources')).toBe('/problems/sources?school=새학교');
+  });
 });

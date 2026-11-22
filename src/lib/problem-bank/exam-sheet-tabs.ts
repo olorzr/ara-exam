@@ -3,8 +3,10 @@
  *
  * 두 화면은 주소가 따로다(`/problems/sets`·`/problems/sources` — 옛 링크·북마크 그대로). 탭을 오가도 보던 조건이
  * 남게, 각 화면이 주소를 적을 때 그 조건을 기억해 두고 탭 링크가 반대편의 마지막 조건으로 간다.
- * 기억은 그 탭의 `sessionStorage` 다 — 모듈 변수만 두면 새 배포 뒤 자동 새로 고침(`useBuildWatch`, 목록 화면은 허용
- * 목록에 있다)이 반대편 조건을 지운다(코덱스 4R). 저장소를 못 쓰면 모듈 변수로 물러선다. 조건의 정본은 여전히 주소다.
+ * 기억은 그 탭의 `sessionStorage` **하나**다 — 모듈 변수만 두면 새 배포 뒤 자동 새로 고침(`useBuildWatch`, 목록 화면은 허용
+ * 목록에 있다)이 반대편 조건을 지운다(코덱스 4R). 읽을 때·쓸 때마다 저장소를 새로 읽는다 — 페이지마다 기억을 들고 있으면
+ * 뒤로 가기로 되살아난 옛 페이지가 다른 페이지의 새 조건을 덮는다(코덱스 11R). 모듈 변수는 **저장하지 못한 쓰기**만 든다
+ * (저장소가 막혔을 때 이 페이지에서라도 마지막 조건을 쓰게, 5·7R). 조건의 정본은 여전히 주소다.
  */
 
 /** 보기 방식 */
@@ -19,9 +21,8 @@ export const EXAM_SHEET_TABS: readonly { view: ExamSheetView; path: string; labe
 /** sessionStorage 열쇠 */
 const STORAGE_KEY = 'ara-exam-sheet-query';
 
-/** 이 페이지 수명 동안의 기억 — 여기서 적었으면 저장소보다 앞선다(저장소 쓰기가 막혀도 마지막 조건을 쓴다, 코덱스 5R) */
-const memory: Record<ExamSheetView, string> = { sets: '', sources: '' };
-const touched: Record<ExamSheetView, boolean> = { sets: false, sources: false };
+/** 저장하지 못한 쓰기 — 저장소가 막혔을 때만 든다. 다음 쓰기가 저장되면 함께 저장하고 비운다 */
+const unsaved: Partial<Record<ExamSheetView, string>> = {};
 
 /** `?…` 로 시작하는 조건만 받는다 */
 const validQuery = (value: unknown): string =>
@@ -55,19 +56,20 @@ function readStore(): Record<ExamSheetView, string> | null {
  */
 export function rememberExamSheetQuery(view: ExamSheetView, query: string): void {
   const next = validQuery(query);
-  memory[view] = next;
-  touched[view] = true;
   const stored = readStore();
-  if (!stored) return;
-  // 이 페이지에서 적은 값이 저장소보다 새것이다 — 앞선 쓰기가 막혔던 반대편 조건도 함께 고쳐 쓴다(코덱스 7R)
-  const merged = {
-    sets: touched.sets ? memory.sets : stored.sets,
-    sources: touched.sources ? memory.sources : stored.sources,
-  };
+  if (!stored) {
+    unsaved[view] = next;
+    return;
+  }
+  // 지금 저장소 위에 이 화면 조건만 바꾼다 — 앞서 저장하지 못한 쓰기가 있으면 함께(코덱스 7R)
+  const merged = { ...stored, ...unsaved, [view]: next };
   try {
     window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    delete unsaved.sets;
+    delete unsaved.sources;
   } catch {
-    // 저장소가 막혔으면 모듈 변수만 — 새로 고치면 빈다
+    // 저장소가 막혔으면 이 페이지에서만 — 새로 고치면 빈다
+    unsaved[view] = next;
   }
 }
 
@@ -86,17 +88,16 @@ export function examSheetPath(view: ExamSheetView): string {
  * @returns '/problems/sets?…' 같은 주소
  */
 export function examSheetHref(view: ExamSheetView): string {
-  if (touched[view]) return `${examSheetPath(view)}${memory[view]}`;
+  const failed = unsaved[view];
+  if (failed !== undefined) return `${examSheetPath(view)}${failed}`;
   const stored = readStore();
   return `${examSheetPath(view)}${stored ? stored[view] : ''}`;
 }
 
 /** 테스트용 — 기억을 비운다 */
 export function resetExamSheetQueries(): void {
-  memory.sets = '';
-  memory.sources = '';
-  touched.sets = false;
-  touched.sources = false;
+  delete unsaved.sets;
+  delete unsaved.sources;
   try {
     window.sessionStorage.removeItem(STORAGE_KEY);
   } catch {
