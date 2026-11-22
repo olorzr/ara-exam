@@ -236,3 +236,13 @@ describe('문제지 보기 — 다른 곳에서 고쳐짐(sql/103)', () => {
   });
 });
 
+
+describe('문제지 보기 — 떠 있는 오류 신고 단추 (2026-11-22)', () => {
+  it('끝까지 내려도 마지막 쪽이 단추에 안 가려지게 화면 전용 빈자리를 둔다(코덱스 3R) — 인쇄에서는 빠진다', () => {
+    const { container } = render(<ProblemPaperViewPage />);
+    const root = container.firstElementChild as HTMLElement;
+    const spacer = [...root.children].find((el) => el.getAttribute('aria-hidden') === 'true' && el.hasAttribute('data-no-print'));
+    expect(spacer?.className).toContain('h-24');
+    expect(spacer?.textContent).toBe('');
+  });
+});

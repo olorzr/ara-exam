@@ -38,14 +38,26 @@ interface ReviewHeaderProps {
    * 그 화면은 DB 의 내용을 읽어 고치던 글이 안 보이고, 돌아와도 되살아나지 않는다.
    */
   unsavedCount?: number;
+  /** 다음 쪽 이어 읽기가 도는 중인가 — 화면을 옮기면 읽기가 멈춘다(코덱스 3R) */
+  reading?: boolean;
 }
 
-/** 떠나기 전 확인 문구 */
-const LEAVE_PROMPT = (n: number) =>
-  `저장하지 않은 수정이 ${n}개 있어요.\n읽기 전용 화면으로 가면 그 수정이 사라집니다. 계속할까요?`;
+/**
+ * 떠나기 전 확인 문구 — 물을 것이 없으면 null.
+ * @param unsaved - 저장하지 않은 수정이 든 카드 수
+ * @param reading - 이어 읽기가 도는 중인가
+ * @returns 확인 창 글 또는 null
+ */
+export function leaveViewPrompt(unsaved: number, reading: boolean): string | null {
+  const lines = [
+    ...(unsaved > 0 ? [`저장하지 않은 수정이 ${unsaved}개 있어요 — 화면을 옮기면 그 수정이 사라집니다.`] : []),
+    ...(reading ? ['다음 쪽을 읽는 중이에요 — 화면을 옮기면 읽기가 멈춥니다.'] : []),
+  ];
+  return lines.length > 0 ? `${lines.join('\n')}\n읽기 전용 화면으로 갈까요?` : null;
+}
 
 export default function ReviewHeader({
-  source, problemCount, onTextbook, onDelete, deleting = false, unsavedCount = 0,
+  source, problemCount, onTextbook, onDelete, deleting = false, unsavedCount = 0, reading = false,
 }: ReviewHeaderProps) {
   const textSource = source.ocr_meta?.textSource;
   const viewable = sourceSetOf(source) !== null;
@@ -72,13 +84,14 @@ export default function ReviewHeader({
             href={examViewHref(source.id)}
             prefetch={false}
             onClick={(e) => {
-              if (unsavedCount === 0) return;
+              const prompt = leaveViewPrompt(unsavedCount, reading);
+              if (!prompt) return;
               // 새 탭·새 창(보조키)은 이 화면이 남는다 — 묻지 않는다(코덱스 2R, 이탈 확인과 같은 판정 `leavesCurrentPage`)
               const a = e.currentTarget;
               const leaving = leavesCurrentPage(
                 { href: a.href, target: a.target, download: a.hasAttribute('download') }, e, window.location.href,
               );
-              if (leaving && !window.confirm(LEAVE_PROMPT(unsavedCount))) e.preventDefault();
+              if (leaving && !window.confirm(prompt)) e.preventDefault();
             }}
             className="inline-flex h-9 items-center gap-1.5 rounded-full border border-ink bg-card px-4 text-sm font-semibold text-ink hover:bg-muted"
           >

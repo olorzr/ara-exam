@@ -266,6 +266,8 @@ export default function ProblemPaperViewPage() {
           onLayout={handleLayout}
         />
       )}
+      {/* 화면 전용 빈자리 — 끝까지 내려도 마지막 쪽 아래 귀퉁이가 떠 있는 오류 신고 단추에 안 가려지게(코덱스 3R). 문서 밖이라 쪽 배치와 무관 */}
+      <div aria-hidden="true" data-no-print className="h-24" />
 
       <PaperCoverDialog
         open={coverOpen}

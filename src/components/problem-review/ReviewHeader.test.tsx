@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import ReviewHeader from './ReviewHeader';
+import ReviewHeader, { leaveViewPrompt } from './ReviewHeader';
 import type { ProblemSource } from '@/types/problem-bank';
 
 // 교과서 칸은 출판사·내신 범위를 조회한다 — 머리의 삭제 단추만 보려고 비워 둔다
@@ -74,5 +74,23 @@ describe('ReviewHeader', () => {
     screen.getByRole('link', { name: '읽기 전용으로 보기' }).dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     expect(confirm).not.toHaveBeenCalled();
     confirm.mockRestore();
+  });
+
+  it('이어 읽기가 도는 중이면 수정이 없어도 묻는다(코덱스 3R)', () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<ReviewHeader source={source} problemCount={23} onTextbook={vi.fn()} reading />);
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+    screen.getByRole('link', { name: '읽기 전용으로 보기' }).dispatchEvent(click);
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('읽기가 멈춥니다'));
+    expect(click.defaultPrevented).toBe(true);
+    confirm.mockRestore();
+  });
+
+  it('확인 문구는 물을 것만 담고, 없으면 null', () => {
+    expect(leaveViewPrompt(0, false)).toBeNull();
+    expect(leaveViewPrompt(3, false)).toContain('3개');
+    expect(leaveViewPrompt(3, false)).not.toContain('읽는 중');
+    expect(leaveViewPrompt(2, true)).toContain('2개');
+    expect(leaveViewPrompt(2, true)).toContain('읽는 중');
   });
 });
