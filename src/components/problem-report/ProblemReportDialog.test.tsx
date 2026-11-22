@@ -119,4 +119,12 @@ describe('ProblemReportDialog', () => {
     fireEvent.click(screen.getByRole('radio', { name: '3번' }));
     expect(screen.getByTestId('origin').textContent).toBe('원본:없음');
   });
+
+  it('오류 종류는 브라우저 기본 고르기이고 휴대폰 글자는 16px — 아이폰이 초점에 확대하지 않게(코덱스 19·22R)', () => {
+    render(<ProblemReportDialog open onClose={() => undefined} target={{ kind: 'problem', problemId: 'p9', label: '문항' }} />);
+    const select = screen.getByRole('combobox', { name: '오류 종류' });
+    expect(select.tagName).toBe('SELECT');
+    expect(select.className).toContain('text-base');
+    expect(select.className).toContain('md:text-sm');
+  });
 });

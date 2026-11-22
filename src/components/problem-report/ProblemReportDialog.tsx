@@ -161,11 +161,12 @@ export default function ProblemReportDialog({ open, onClose, target }: ProblemRe
           <div className="min-w-0 space-y-3 sm:col-start-1">
             <div className="space-y-1 text-sm">
               <span className="text-gray-600">어떤 오류인가요?</span>
-              {/* 브라우저 기본 고르기 — 휴대폰에서는 운영체제 고르기 창이 떠 손가락으로 확대한 화면에서도 글자가 안 잘린다(코덱스 19R) */}
+              {/* 브라우저 기본 고르기 — 휴대폰에서는 운영체제 고르기 창이 떠 손가락으로 확대한 화면에서도 글자가 안 잘린다(코덱스 19R).
+                  휴대폰에서 글자 16px — 그보다 작으면 아이폰 사파리가 초점을 줄 때 화면을 확대한다(옆 Textarea 와 같다, 22R) */}
               <select
                 value={category} aria-label="오류 종류" disabled={busy}
                 onChange={(e) => { if (isReportCategory(e.target.value)) setCategory(e.target.value); }}
-                className="h-9 w-full rounded-lg border border-input bg-card px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/25 disabled:opacity-50"
+                className="h-9 w-full rounded-lg border border-input bg-card px-2.5 text-base outline-none md:text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/25 disabled:opacity-50"
               >
                 <option value="" disabled>종류 고르기</option>
                 {REPORT_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
