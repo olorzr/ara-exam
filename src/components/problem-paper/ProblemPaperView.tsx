@@ -1,19 +1,21 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { A4Document, CompactPageHeader } from '@/components/print';
 import ExamPrintHeader from '@/components/exam/ExamPrintHeader';
-import type { LayoutHandler } from '@/hooks/useA4Pagination';
+import type { A4LayoutInfo, LayoutHandler } from '@/hooks/useA4Pagination';
 import { PAPER_SPLIT_ADAPTER, usePaperSplit } from '@/hooks/usePaperSplit';
 import type { BookletDuplex } from '@/lib/print/booklet';
 import { buildPaperBlocks } from '@/lib/problem-paper/blocks';
 import type { PaperCover } from '@/lib/problem-paper/cover';
 import { OMR_SHEET_QUESTIONS } from '@/lib/omr-sheet';
 import { coverYearOf } from '@/lib/problem-paper/cover-text';
+import { shrunkLabelsOf } from '@/lib/problem-paper/shrunk-blocks';
 import { buildOmrAnswerKey, omrSheetCountOf } from '@/lib/problem-paper/omr-payload';
 import type { PaperItemSnapshot, ProblemPaper } from '@/types/problem-bank';
 import { renderCoverSlots, type CoverSlotImages } from './PaperCoverPage';
 import { renderPaperBlocks } from './PaperPrintBlocks';
+import PaperShrunkNotice from './PaperShrunkNotice';
 
 interface ProblemPaperViewProps {
   paper: ProblemPaper;
@@ -76,6 +78,15 @@ export default function ProblemPaperView({
     [items, showAnswers, trimWorks],
   );
   const split = usePaperSplit(paperBlocks, PAPER_SPLIT_ADAPTER, { resetKey: imageUrls });
+  // 줄여 찍히는 블록 — 엔진이 배치를 알릴 때 받는다. 같은 값이면 상태를 안 바꾼다(측정 패스와 얽혀 렌더가 돌지 않게)
+  const [shrunk, setShrunk] = useState<readonly number[]>([]);
+  const handleLayout = useCallback((info: A4LayoutInfo) => {
+    onLayout?.(info);
+    const next = info.shrunkBlocks ?? [];
+    setShrunk((prev) => (prev.length === next.length && prev.every((v, i) => v === next[i]) ? prev : next));
+  }, [onLayout]);
+  // 블록 번호는 엔진에 넘긴 차례 = 쪼갠 뒤 목록의 차례다(renderPaperBlocks 가 1:1 로 그린다)
+  const shrunkLabels = useMemo(() => shrunkLabelsOf(split.blocks, shrunk), [split.blocks, shrunk]);
   const blocks = useMemo(
     () => renderPaperBlocks({
       blocks: split.blocks,
@@ -95,40 +106,43 @@ export default function ProblemPaperView({
   });
 
   return (
-    <A4Document
-      blocks={blocks}
-      splittable={split.splittable}
-      breakBefore={split.breakBefore}
-      onSplitRequest={split.handleSplitRequest}
-      onLayout={onLayout}
-      booklet={booklet}
-      bookletDuplex={bookletDuplex}
-      {...coverSlots}
-      columns={paper.settings.columns}
-      // `--paper` 가 문항 사이를 넓힌다(다른 `.pb-sheet` 문서는 그대로). A4Document 가 이 클래스를
-      // 측정 컨테이너와 낱장 양쪽에 붙이므로 넓힌 만큼이 배정에도 들어간다
-      className="pb-sheet pb-sheet--paper"
-      firstPageHeader={
-        // 머리글에 출처를 모아 찍지 않는다 — 출처는 문항마다 그 자리에 있다(`showSource`)
-        // 이름·점수란은 학생 종이에만 — 교사용에 두면 채점표처럼 보인다
-        <>
-          <ExamPrintHeader
-            title={title}
-            showScoreRow={!showAnswers}
-            totalCount={items.length}
-            answerSheetCount={omrSheets}
-          />
-          {omrSheets > 0 && (
-            <div className="section-bar section-bar--mint mb-2">
-              <span>
-                객관식은 OMR 답안지(90A)에 표시하세요. 답이 여러 개인 문항은 해당 번호를 모두 표시해요.
-                {omrSheets > 1 && ` ${OMR_SHEET_QUESTIONS}문항마다 새 답안지의 1번 칸부터 표시하세요.`}
-              </span>
-            </div>
-          )}
-        </>
-      }
-      laterPageHeader={<CompactPageHeader title={title} />}
-    />
+    <>
+      <PaperShrunkNotice labels={shrunkLabels} />
+      <A4Document
+        blocks={blocks}
+        splittable={split.splittable}
+        breakBefore={split.breakBefore}
+        onSplitRequest={split.handleSplitRequest}
+        onLayout={handleLayout}
+        booklet={booklet}
+        bookletDuplex={bookletDuplex}
+        {...coverSlots}
+        columns={paper.settings.columns}
+        // `--paper` 가 문항 사이를 넓힌다(다른 `.pb-sheet` 문서는 그대로). A4Document 가 이 클래스를
+        // 측정 컨테이너와 낱장 양쪽에 붙이므로 넓힌 만큼이 배정에도 들어간다
+        className="pb-sheet pb-sheet--paper"
+        firstPageHeader={
+          // 머리글에 출처를 모아 찍지 않는다 — 출처는 문항마다 그 자리에 있다(`showSource`)
+          // 이름·점수란은 학생 종이에만 — 교사용에 두면 채점표처럼 보인다
+          <>
+            <ExamPrintHeader
+              title={title}
+              showScoreRow={!showAnswers}
+              totalCount={items.length}
+              answerSheetCount={omrSheets}
+            />
+            {omrSheets > 0 && (
+              <div className="section-bar section-bar--mint mb-2">
+                <span>
+                  객관식은 OMR 답안지(90A)에 표시하세요. 답이 여러 개인 문항은 해당 번호를 모두 표시해요.
+                  {omrSheets > 1 && ` ${OMR_SHEET_QUESTIONS}문항마다 새 답안지의 1번 칸부터 표시하세요.`}
+                </span>
+              </div>
+            )}
+          </>
+        }
+        laterPageHeader={<CompactPageHeader title={title} />}
+      />
+    </>
   );
 }

@@ -245,8 +245,9 @@ export interface BookLayoutInput {
  *  - 4: 2026-11-06 문항도 단위 사이에서 갈려 다음 단으로 이어진다(0.9.67)
  *  - 5: 2026-11-06 옛한글 글꼴을 문단·선지에만 걸고, 긴 글자열·빈칸·표 선지가 단 안에서 꺾인다(0.9.68·0.9.69, 코덱스 1R)
  *  - 6: 2026-11-15 발문 속 긴 줄바꿈 문단(〈보기〉 속 시·대화)도 줄 묶음 사이에서 다음 단으로 이어진다(stem-line-units.ts)
+ *  - 7: 2026-11-22 겹친 상자(구역 안의 [A], 〈보기〉 안의 (가))도 문단마다 흘러간다(box-parts.ts 의 `inner`)
  */
-export const BOOK_RENDER_REVISION = 6;
+export const BOOK_RENDER_REVISION = 7;
 
 /**
  * 내지 구성 지문 — 장 차례·제목·단 수 등 쪽 수를 바꾸는 값을 FNV-1a 로 줄인 글자.

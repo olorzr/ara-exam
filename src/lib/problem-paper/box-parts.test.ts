@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { boxPartClassName, splitPassagePieces } from './box-parts';
+import { boxPartClassName, narrowBoxPart, splitPassagePieces } from './box-parts';
 
 const htmls = (html: string, figures: string[] = []) =>
   splitPassagePieces(html, figures).map((p) => p.html);
@@ -70,11 +70,73 @@ describe('splitPassagePieces', () => {
     expect(pieces).toEqual([{ html }]);
   });
 
-  it('상자 안 상자는 더 터뜨리지 않는다 — 바깥 상자의 조각 하나로 통째로 간다', () => {
+  it('상자 안 상자도 문단마다 터뜨리고 안쪽 틀을 함께 싣는다(0.9.92)', () => {
     const inner = '<blockquote data-box="보기"><p>x</p><p>y</p></blockquote>';
     const pieces = splitPassagePieces(`<blockquote data-box="가"><p>a</p>${inner}</blockquote>`, []);
-    expect(pieces.map((p) => p.html)).toEqual(['<p>a</p>', inner]);
+    expect(pieces).toEqual([
+      { html: '<p>a</p>', box: { label: '가', first: true, last: false } },
+      { html: '<p>x</p>', box: { label: '가', first: false, last: false }, inner: { label: '보기', first: true, last: false } },
+      { html: '<p>y</p>', box: { label: '가', first: false, last: true }, inner: { label: '보기', first: false, last: true } },
+    ]);
+  });
+
+  it('「춘향전」 꼴 — (가) 안의 긴 [A] 구간도 문단마다 갈라 어느 조각도 크지 않다', () => {
+    const lines = Array.from({ length: 32 }, (_, i) => `<p>${'운봉 영장이 그 거동을 보고 '.repeat(2)}${i}</p>`);
+    const html = `<blockquote data-box="가"><blockquote data-box="A">${lines.join('')}</blockquote><p>뒤 문단</p></blockquote>`
+      + '<blockquote data-box="나"><p>말뚝이</p></blockquote>';
+    const pieces = splitPassagePieces(html, []);
+    expect(pieces).toHaveLength(34);
+    expect(Math.max(...pieces.map((p) => plain(p.html).length))).toBeLessThan(400);
+    expect(pieces[0]).toMatchObject({ box: { label: '가', first: true, last: false }, inner: { label: 'A', first: true, last: false } });
+    expect(pieces[31]).toMatchObject({ box: { label: '가', first: false, last: false }, inner: { label: 'A', first: false, last: true } });
+    expect(pieces[32]).toEqual({ html: '<p>뒤 문단</p>', box: { label: '가', first: false, last: true } });
+    expect(pieces[33].inner).toBeUndefined();
+  });
+
+  it('문단 하나뿐인 안쪽 상자는 그 조각이 안쪽의 처음이자 끝이다', () => {
+    const pieces = splitPassagePieces('<blockquote data-box="가"><blockquote data-box="A"><p>x</p></blockquote></blockquote>', []);
+    expect(pieces).toEqual([{
+      html: '<p>x</p>', box: { label: '가', first: true, last: true }, inner: { label: 'A', first: true, last: true },
+    }]);
+  });
+
+  it.each([
+    ['표가 낀 안쪽', '<blockquote data-box="A"><p>x</p><table><tbody><tr><td>칸</td></tr></tbody></table></blockquote>'],
+    ['목록이 낀 안쪽', '<blockquote data-box="A"><p>x</p><ul><li>y</li></ul></blockquote>'],
+    ['날글자가 낀 안쪽', '<blockquote data-box="A"><p>x</p>날글자</blockquote>'],
+    ['세 겹째 상자', '<blockquote data-box="A"><p>x</p><blockquote data-box="보기"><p>y</p></blockquote></blockquote>'],
+    ['다른 속성이 붙은 안쪽', '<blockquote data-box="A" style="text-align: center"><p>x</p><p>y</p></blockquote>'],
+    ['허용 밖 말머리', '<blockquote data-box="활동지"><p>x</p><p>y</p></blockquote>'],
+    ['빈 문단뿐인 안쪽', '<blockquote data-box="보기"><p></p><p><br></p></blockquote>'],
+    ['그림이 든 안쪽', `<blockquote data-box="A"><p>x</p>${fig(1)}</blockquote>`],
+  ])('%s는 예전처럼 통째로 둔다', (_, inner) => {
+    const pieces = splitPassagePieces(`<blockquote data-box="가"><p>a</p>${inner}</blockquote>`, ['g.jpg']);
+    expect(pieces).toHaveLength(2);
+    expect(pieces[1].html).toBe(inner);
+    expect(pieces[1].inner).toBeUndefined();
     expect(pieces[1].box).toEqual({ label: '가', first: false, last: true });
+  });
+
+  it('안쪽 가장자리의 빈 문단은 걷지 않는다 — 지문 맨 앞이어도 말머리(`first`)가 남는다', () => {
+    const pieces = splitPassagePieces(
+      '<blockquote data-box="가"><blockquote data-box="A"><p></p><p>x</p><p></p></blockquote></blockquote>', [],
+    );
+    expect(pieces.map((p) => p.html)).toEqual(['<p></p>', '<p>x</p>', '<p></p>']);
+    expect(pieces[0]).toMatchObject({ box: { first: true }, inner: { first: true } });
+    expect(pieces[2]).toMatchObject({ box: { last: true }, inner: { last: true } });
+  });
+
+  it('발문의 〈보기〉 안 (가)(나) 도 같은 규칙이다', () => {
+    const pieces = splitPassagePieces(
+      '<blockquote data-box="보기"><p>머리</p><blockquote data-box="가"><p>1</p><p>2</p></blockquote>'
+      + '<blockquote data-box="나"><p>3</p></blockquote></blockquote>', [], { keepMissingFigures: true },
+    );
+    expect(pieces.map((p) => [p.html, p.inner?.label ?? null, p.inner?.first ?? null, p.inner?.last ?? null])).toEqual([
+      ['<p>머리</p>', null, null, null],
+      ['<p>1</p>', '가', true, false],
+      ['<p>2</p>', '가', false, true],
+      ['<p>3</p>', '나', true, true],
+    ]);
   });
 
   it('그림만인 자식은 경로를 실은 그림 조각이 되고 상자 표시를 이어 받는다', () => {
@@ -165,5 +227,22 @@ describe('boxPartClassName', () => {
     expect(boxPartClassName({ label: '가', first: false, last: false })).toBe('pb-box-part');
     expect(boxPartClassName({ label: '가', first: true, last: true }))
       .toBe('pb-box-part pb-box-part--first pb-box-part--last');
+  });
+
+  it('안쪽 틀이 아직 안 끝났으면 바깥 틀에 `--holds` 를 단다 — 인자 하나일 때 글자는 그대로', () => {
+    const outer = { label: '가', first: false, last: false };
+    expect(boxPartClassName(outer, { label: 'A', first: true, last: false })).toBe('pb-box-part pb-box-part--holds');
+    expect(boxPartClassName(outer, { label: 'A', first: false, last: true })).toBe('pb-box-part');
+    expect(boxPartClassName(outer)).toBe('pb-box-part');
+  });
+});
+
+describe('narrowBoxPart', () => {
+  it('처음 표시는 첫 조각에만, 끝 표시는 끝 조각에만 남는다', () => {
+    const part = { label: 'A', first: true, last: true };
+    expect(narrowBoxPart(part, true, false)).toEqual({ label: 'A', first: true, last: false });
+    expect(narrowBoxPart(part, false, false)).toEqual({ label: 'A', first: false, last: false });
+    expect(narrowBoxPart(part, false, true)).toEqual({ label: 'A', first: false, last: true });
+    expect(narrowBoxPart({ label: null, first: false, last: false }, true, true)).toEqual({ label: null, first: false, last: false });
   });
 });

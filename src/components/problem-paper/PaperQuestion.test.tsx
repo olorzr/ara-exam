@@ -121,3 +121,31 @@ describe('문제지 문항의 줄 묶음', () => {
     expect(c.querySelector('.pb-q__unit--joined')).toBeNull();
   });
 });
+
+/** 〈보기〉 안의 (가)(나) 처럼 겹친 상자도 문단마다 단위가 된다(0.9.92) — 단위마다 두 겹 틀이다 */
+describe('문제지 문항의 겹친 상자', () => {
+  const stem = '<p>물음</p><blockquote data-box="보기"><p>머리</p>'
+    + '<blockquote data-box="가"><p>1</p><p>2</p></blockquote><blockquote data-box="나"><p>3</p></blockquote></blockquote>';
+
+  it('안쪽 문단마다 단위이고 두 겹 틀을 두른다', () => {
+    const c = draw(snapshot({ stem_html: stem }));
+    const units = [...c.querySelectorAll('.pb-q__stem > .pb-q__unit')];
+    expect(units).toHaveLength(5);
+    expect(c.querySelectorAll('.pb-q [data-q-unit]').length).toBeGreaterThanOrEqual(5);
+    expect(units.slice(2).map((el) => {
+      const outer = el.querySelector(':scope > blockquote');
+      const inner = outer?.querySelector(':scope > blockquote');
+      return [outer?.getAttribute('data-box'), outer?.className, inner?.getAttribute('data-box'), inner?.className, inner?.textContent];
+    })).toEqual([
+      ['보기', 'pb-box-part pb-box-part--holds', '가', 'pb-box-part pb-box-part--first', '1'],
+      ['보기', 'pb-box-part', '가', 'pb-box-part pb-box-part--last', '2'],
+      ['보기', 'pb-box-part pb-box-part--last', '나', 'pb-box-part pb-box-part--first pb-box-part--last', '3'],
+    ]);
+  });
+
+  it('안 겹친 단위에는 안쪽 틀이 없다', () => {
+    const c = draw(snapshot({ stem_html: stem }));
+    const second = c.querySelectorAll('.pb-q__stem > .pb-q__unit')[1];
+    expect(second.querySelector(':scope > blockquote > blockquote')).toBeNull();
+  });
+});

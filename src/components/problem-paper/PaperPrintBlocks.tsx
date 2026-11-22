@@ -3,8 +3,8 @@
 import type { ReactNode } from 'react';
 import { renderFiguresInHtml } from '@/lib/problem-bank/figure-render';
 import type { PaperBlock } from '@/lib/problem-paper/blocks';
-import { boxPartClassName } from '@/lib/problem-paper/box-parts';
 import type { PaperSettings } from '@/types/problem-bank';
+import PaperBoxFrame from './PaperBoxFrame';
 import { PrintImage, SourceLine, TeacherAnswer } from './PaperPrintParts';
 import { withOmrSheetBreak } from './PaperOmrMarks';
 import PaperQuestion, { problemClassName } from './PaperQuestion';
@@ -62,15 +62,10 @@ export function renderPaperBlocks({
         const body = { __html: renderFiguresInHtml(block.html, block.figures ?? [], imageUrls) };
         // 상자 밖 조각은 예전 DOM 그대로 — 틀을 더 두르면 잰 높이와 CSS 가 달라진다
         if (!block.box) return <div key={block.key} className={className} dangerouslySetInnerHTML={body} />;
-        // 터뜨린 상자의 조각 — 틀은 React 가 두른다. 말머리는 타입으로 온 값이고(box-labels 를
-        // 지났다) HTML 문자열을 잇지 않는다: 정화는 쪼개기 전에 끝났고 다시 하지 않는다
+        // 터뜨린 상자의 조각 — 틀은 React 가 두른다(겹친 상자면 두 겹, PaperBoxFrame)
         return (
           <div key={block.key} className={className}>
-            <blockquote
-              data-box={block.box.label ?? undefined}
-              className={boxPartClassName(block.box)}
-              dangerouslySetInnerHTML={body}
-            />
+            <PaperBoxFrame box={block.box} inner={block.inner} html={body.__html} />
           </div>
         );
       }
@@ -80,9 +75,7 @@ export function renderPaperBlocks({
         return (
           <div key={block.key} className={`pb-passage-part pb-figure${block.sourceAccurate ? ' pb-passage-part--unframed' : ''}${block.literalLabels ? ' pb-passage-part--literal-labels' : ''}`}>
             {/* 상자 안 그림도 같은 틀에 담는다 — 안 그러면 상자 윤곽이 그림 자리에서 끊긴다 */}
-            {block.box
-              ? <blockquote data-box={block.box.label ?? undefined} className={boxPartClassName(block.box)}>{image}</blockquote>
-              : image}
+            {block.box ? <PaperBoxFrame box={block.box}>{image}</PaperBoxFrame> : image}
           </div>
         );
       }

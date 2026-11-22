@@ -1,6 +1,6 @@
 {
   "name": "ara-exam",
-  "version": "0.9.91",
+  "version": "0.9.92",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -9,7 +9,8 @@
     "lint": "eslint",
     "predev": "node scripts/copy-pdfjs-wasm.js",
     "prebuild": "node scripts/copy-pdfjs-wasm.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "audit:unsplittable": "vitest run --config vitest.audit.config.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",

@@ -43,6 +43,16 @@ describe('splitLongLinePieces', () => {
     ]);
   });
 
+  it('겹친 상자 안의 긴 문단 — 안쪽 틀 표시도 양 끝 묶음에만 남는다', () => {
+    const out = splitLongLinePieces([{
+      html: poem(6), box: { label: '보기', first: false, last: false }, inner: { label: '가', first: true, last: true },
+    }]);
+    expect(out.map((x) => [x.inner?.first, x.inner?.last, x.joined ?? false])).toEqual([
+      [true, false, true], [false, false, true], [false, true, false],
+    ]);
+    expect(out.every((x) => x.box?.first === false && x.box?.last === false)).toBe(true);
+  });
+
   it('상자의 가운데 조각이면 처음·끝 표시를 새로 만들지 않는다', () => {
     const out = splitLongLinePieces([{ html: poem(6), box: { label: '보기', first: false, last: false } }]);
     expect(out.every((x) => x.box?.first === false && x.box?.last === false)).toBe(true);

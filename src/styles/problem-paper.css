@@ -263,6 +263,14 @@
 .pb-sheet .pb-passage-part--continues blockquote.pb-box-part:not(.pb-box-part--last) {
   padding-bottom: 0;
 }
+/*
+ * 겹친 상자(구역 안의 [A] 등, box-parts.ts 의 `inner`)의 바깥 틀 — 안쪽 틀이 이어지는 동안 문단 간격 3pt 는 **안쪽 틀만**
+ * 진다. 둘 다 지면 문단 사이가 6pt 로 벌어지고, 바깥만 지면 [A] 세로선·안쪽 테두리가 문단마다 3pt 씩 끊긴다.
+ * 안쪽 틀의 마지막 조각에서는 표시가 없어 바깥 틀이 예전처럼 3pt 를 진다(안쪽 상자 아래 여백 + 3pt = 쪼개기 전과 같다).
+ */
+.pb-sheet blockquote.pb-box-part.pb-box-part--holds:not(.pb-box-part--last) {
+  padding-bottom: 0;
+}
 
 /* ── 문항 ─────────────────────────────────────────── */
 
@@ -319,6 +327,15 @@
 }
 .pb-sheet .pb-q__stem .pb-q__unit:not(.pb-q__unit--joined):has(+ .pb-q__unit > blockquote > p:first-child)
   > blockquote.pb-box-part:has(> p:last-child):not(.pb-box-part--last) {
+  padding-bottom: 2pt;
+}
+/*
+ * 발문 속 겹친 상자(〈보기〉 안의 (가) 등)의 안쪽 틀 — 안쪽 문단 사이 2pt 를 되살린다(쪼개기 전 `.pb-q__stem p` 의 간격).
+ * 안쪽 틀은 문단뿐일 때만 풀리므로(box-parts.ts) 다음 단위는 늘 같은 틀의 다음 문단이다. 줄 묶음(같은 문단)과 조각의
+ * 끝 단위는 뺀다. 바로 위 `:has()` 규칙은 단위의 **직계** 틀만 보아 두 겹 조각에는 걸리지 않는다 — 덧얹지 않고 손자 틀을 겨냥한다.
+ */
+.pb-sheet .pb-q__stem .pb-q__unit:not(:last-child):not(.pb-q__unit--joined)
+  > blockquote.pb-box-part > blockquote.pb-box-part:not(.pb-box-part--last) {
   padding-bottom: 2pt;
 }
 

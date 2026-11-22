@@ -46,6 +46,24 @@ export interface A4LayoutInfo {
    * 어느 쪽에도 없는 블록은 -1.
    */
   blockPages: readonly number[];
+  /**
+   * 한 쪽(단)에 다 안 들어가 **줄여서 찍는** 블록들(0-based, 오름차순). 줄어든 블록이 있을 때만 키가 있다 —
+   * 보기 화면이 '글씨가 줄어 찍히는 곳' 을 알린다(PaperShrunkNotice). 없을 때 키를 두면 쪽 알림을 글자 그대로 견주는
+   * 소비처·테스트가 깨진다.
+   */
+  shrunkBlocks?: readonly number[];
+}
+
+/**
+ * 줄여 찍는 블록 번호들 — 배율이 1 보다 작은 것만, 오름차순.
+ * @param oversizedScale - 블록 번호 → 축소 배율
+ * @returns 블록 번호들
+ */
+export function shrunkBlocksOf(oversizedScale: Record<number, number>): number[] {
+  return Object.entries(oversizedScale)
+    .filter(([, scale]) => scale < 1)
+    .map(([index]) => Number(index))
+    .sort((a, b) => a - b);
 }
 
 /** 배치가 바뀔 때마다 불린다 — 안정적인 참조여야 한다(useCallback) */
@@ -161,7 +179,12 @@ export function useA4Pagination({
   // 실제로 배치가 바뀐 횟수만큼만 불린다(남의 콜백을 부를 뿐 이 훅의 state 는 건드리지 않는다)
   useEffect(() => {
     if (!layout.ready) return;
-    onLayout?.({ pageCount: layout.pages.length, blockPages: blockPagesOf(layout.pages, layout.blockCount) });
+    const shrunk = shrunkBlocksOf(layout.oversizedScale);
+    onLayout?.({
+      pageCount: layout.pages.length,
+      blockPages: blockPagesOf(layout.pages, layout.blockCount),
+      ...(shrunk.length > 0 ? { shrunkBlocks: shrunk } : {}),
+    });
   }, [layout, onLayout]);
 
   useEffect(() => {

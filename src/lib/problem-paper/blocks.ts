@@ -48,6 +48,8 @@ export type PaperBlock =
      * 상자를 통째로 한 블록에 두면 3,000자 (가) 지문이 한 쪽을 넘겨 깨알같이 줄어든다(box-parts.ts)
      */
     box?: BoxPart;
+    /** 겹친 상자(구역 안의 [A] 등)를 문단마다 풀었을 때 안쪽 틀 — 바깥 `box` 안에 한 겹 더 두른다(box-parts.ts) */
+    inner?: BoxPart;
     /** 자리에 맞춰 쪼갠 문단이 다음 블록으로 이어진다 — 조각 사이에 문단 간격을 두지 않는다(part-split-plan.ts) */
     continues?: true;
   }

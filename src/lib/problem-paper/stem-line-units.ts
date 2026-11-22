@@ -1,4 +1,4 @@
-import type { PassagePiece } from './box-parts';
+import { narrowBoxPart, type PassagePiece } from './box-parts';
 import { cutCandidatesOf, cutParagraph, paragraphOf } from './part-cuts';
 
 /**
@@ -140,7 +140,8 @@ export function splitLongLinePieces(pieces: readonly PassagePiece[]): StemLinePi
     const last = htmls.length - 1;
     return htmls.map((html, i) => ({
       html,
-      ...(piece.box ? { box: { label: piece.box.label, first: piece.box.first && i === 0, last: piece.box.last && i === last } } : {}),
+      ...(piece.box ? { box: narrowBoxPart(piece.box, i === 0, i === last) } : {}),
+      ...(piece.inner ? { inner: narrowBoxPart(piece.inner, i === 0, i === last) } : {}),
       ...(i < last ? { joined: true as const } : {}),
     }));
   });

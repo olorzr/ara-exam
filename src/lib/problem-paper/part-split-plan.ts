@@ -1,5 +1,6 @@
 import { paginate, type BreakBefore, type PaginateInput, type SplitRequest } from '@/lib/print/paginate';
 import type { PassagePartBlock } from './blocks';
+import { narrowBoxPart } from './box-parts';
 import type { PartMeasure } from './part-measure';
 
 /**
@@ -151,7 +152,8 @@ export function planSplitRound(
 export function chunkPartBlocks(part: PassagePartBlock, htmls: readonly string[]): PassagePartBlock[] {
   const end = htmls.length - 1;
   return htmls.map((html, i) => {
-    const { continues, box, ...rest } = part;
+    // ⚠️ 안쪽 틀(`inner`)도 여기서 빼서 좁혀야 한다 — `...rest` 로 새면 가운데 조각마다 [A] 말머리·윗선이 또 찍힌다
+    const { continues, box, inner, ...rest } = part;
     return {
       ...rest,
       key: `${part.key}-s${i}`,
@@ -159,7 +161,8 @@ export function chunkPartBlocks(part: PassagePartBlock, htmls: readonly string[]
       first: part.first && i === 0,
       last: part.last && i === end,
       ...(i < end || continues ? { continues: true as const } : {}),
-      ...(box ? { box: { ...box, first: box.first && i === 0, last: box.last && i === end } } : {}),
+      ...(box ? { box: narrowBoxPart(box, i === 0, i === end) } : {}),
+      ...(inner ? { inner: narrowBoxPart(inner, i === 0, i === end) } : {}),
     };
   });
 }

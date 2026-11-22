@@ -26,9 +26,9 @@ export type QuestionUnit =
    * 번호와 나란히 서는 발문 첫 조각 — 늘 0번. `joined` 는 같은 문단의 다음 줄 묶음이 바로 뒤에 온다는 표시다
    * (`splitLongLinePieces` — 묶음 사이에 간격이 없어야 쪼개지지 않은 모양이 예전 그대로다)
    */
-  | { kind: 'head'; html: string; box?: BoxPart; joined?: true }
+  | { kind: 'head'; html: string; box?: BoxPart; inner?: BoxPart; joined?: true }
   /** 발문의 나머지 조각. 〈보기〉 상자는 지문처럼 자식 단위로 터뜨리고, 긴 줄바꿈 문단은 줄 묶음으로 나눈다 */
-  | { kind: 'stem'; html: string; box?: BoxPart; joined?: true }
+  | { kind: 'stem'; html: string; box?: BoxPart; inner?: BoxPart; joined?: true }
   /** 자리표시자 없이 발문 끝에 붙는 그림 */
   | { kind: 'figure'; path: string }
   | { kind: 'choice'; index: number }
@@ -103,9 +103,10 @@ function stemPieces(html: string, figures: readonly string[]): PassagePiece[] {
 }
 
 /** 발문 조각의 상자·이어짐 표시 — 없는 칸은 싣지 않는다(단위 모양을 견주는 테스트가 키 유무를 본다) */
-function pieceMarks(piece: StemLinePiece | undefined): { box?: BoxPart; joined?: true } {
+function pieceMarks(piece: StemLinePiece | undefined): { box?: BoxPart; inner?: BoxPart; joined?: true } {
   return {
     ...(piece?.box ? { box: piece.box } : {}),
+    ...(piece?.inner ? { inner: piece.inner } : {}),
     ...(piece?.joined ? { joined: true as const } : {}),
   };
 }

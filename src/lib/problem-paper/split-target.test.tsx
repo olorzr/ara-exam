@@ -64,6 +64,22 @@ describe('문항 재기', () => {
       .toEqual([PRINT_QUESTION_TOP, PRINT_QUESTION_TOP, 0]);
   });
 
+  it('겹친 상자의 안쪽 틀 여백은 바깥 틀을 뚫고 접히므로 함께 잰다(둘 가운데 큰 쪽)', () => {
+    const style = document.createElement('style');
+    style.textContent = 'blockquote.pb-box-part > blockquote.pb-box-part--first { margin-top: 6px; }';
+    document.head.appendChild(style);
+    try {
+      const block = problemOf(snap({
+        stem_html: '<p>물음</p><blockquote data-box="보기"><p>머리</p><blockquote data-box="가"><p>1</p><p>2</p></blockquote></blockquote>',
+      }));
+      const top = splitTargetOf(block)?.measure(drawn(block))?.continuationTop ?? [];
+      // 단위 2 = 안쪽 첫 문단(안쪽 위 여백 6px), 단위 3 = 안쪽 가운데(여백 없음)
+      expect(top.slice(0, 2)).toEqual([PRINT_QUESTION_TOP + 6, PRINT_QUESTION_TOP]);
+    } finally {
+      style.remove();
+    }
+  });
+
   it('그려진 단위 수가 상태와 다르면 재지 않는다', () => {
     const block = problemOf(snap());
     const other = problemOf(snap({ choices: ['가', '나'] }));

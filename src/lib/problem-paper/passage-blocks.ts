@@ -75,11 +75,13 @@ export function passageBlocksOf(input: PassageBlockInput): PaperBlock[] {
   const parts = splitPassagePieces(markBlanks(markFootnotes(sanitizeProblemHTML(html))), figures)
     .map((piece, i): PaperBlock => {
       const box = piece.box ? { box: piece.box } : {};
+      // 안쪽 틀은 글 조각에만 온다 — 겹친 상자는 문단뿐일 때만 풀린다(box-parts.ts)
+      const inner = piece.inner ? { inner: piece.inner } : {};
       return piece.figurePath
         ? { kind: 'passage-figure', key: `pf-${start}-${i}`, path: piece.figurePath, label, ...box, ...layout }
         : {
           kind: 'passage-part', key: `pp-${start}-${i}`, html: piece.html,
-          serif, figures, first: false, last: false, ...box, ...layout,
+          serif, figures, first: false, last: false, ...box, ...inner, ...layout,
         };
     });
 

@@ -149,6 +149,18 @@ describe('A4Document', () => {
     expect(scaled!.textContent).toBe('아주 긴 지문');
   });
 
+  it('줄여 찍는 블록이 있으면 쪽 알림에 그 번호를 싣는다 — 없으면 키가 없다(위 책 알림 테스트)', () => {
+    const onLayout = vi.fn();
+    render(
+      <A4Document
+        blocks={[<div key="a" data-h={BLOCK_H}>짧은 것</div>, <div key="huge" data-h={5000}>아주 긴 지문</div>]}
+        firstPageHeader={<div data-h={FIRST_HEADER_H}>헤더</div>}
+        onLayout={onLayout}
+      />,
+    );
+    expect(onLayout.mock.calls.at(-1)![0]).toMatchObject({ shrunkBlocks: [1] });
+  });
+
   it('쪼갤 수 있는 블록은 onSplitRequest 로 알려 준다 — 앞 조각은 남은 자리, 뒤는 2페이지 용량', () => {
     const calls: SplitRequest[][] = [];
     render(

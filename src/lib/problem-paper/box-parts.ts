@@ -13,6 +13,11 @@ import { isEmptyParagraph } from './html-trim';
  * 인쇄 엔진이 `transform: scale()` 로 통째로 줄여 **깨알같이** 찍었다(2026-09-27 춘향전).
  *
  * ⚠️ **길이 문턱 없이 늘 터뜨린다.** 문턱을 두면 그 아래의 긴 (가) 상자는 여전히 줄어든다.
+ * ⚠️ **상자 안 상자도 한 겹 더 터뜨린다**(0.9.92). (가) 구역 안의 [A] 구간처럼 겹친 상자가 통째로 한 조각이면
+ *    1,145자 [A] 가 쪼갤 수 없는 덩어리가 되어 다음 단으로 밀리거나 줄어 찍혔다(2026-11-22 「춘향전」 20~23번).
+ *    안쪽 상자는 자식이 **전부 문단**일 때만 문단마다 한 조각으로 풀고, 조각에 안쪽 틀(`inner`)을 함께 싣는다.
+ *    문단 사이 간격이 곧 예전 문단 간격이라 안 잘리면 모양이 예전과 같다. 표·목록·그림·날글자가 끼었거나
+ *    세 겹째가 있으면 예전처럼 통째로 둔다.
  * ⚠️ 상자 틀은 여기서 HTML 로 잇지 않는다 — 조각마다 `box` 를 실어 보내고 그리는 쪽
  *    (`PaperPrintBlocks`)이 React 로 `<blockquote data-box>` 를 두른다. 정화는 쪼개기
  *    **전에** 끝나고 다시 하지 않으므로 문자열을 이어 붙이는 길을 만들지 않는다.
@@ -35,6 +40,11 @@ export interface PassagePiece {
   figurePath?: string;
   /** 터뜨린 상자의 조각일 때만 */
   box?: BoxPart;
+  /**
+   * 겹친 상자의 안쪽 틀 — (가) 구역 안의 [A] 구간처럼 상자 안 상자를 문단마다 풀었을 때만 있다.
+   * 있으면 `box`(바깥 틀)도 반드시 있다. 그리는 쪽이 바깥 틀 안에 이 틀을 한 겹 더 두른다(`PaperBoxFrame`).
+   */
+  inner?: BoxPart;
 }
 
 /** 쪼개는 선택 */
@@ -123,13 +133,48 @@ function withFigure(html: string, figures: readonly string[], options: PassagePi
   return options.keepMissingFigures ? [{ html }] : [];
 }
 
+/**
+ * 걷어도 되는 빈 조각인가 — 상자 조각은 걷지 않는다.
+ * 겹친 상자 안쪽 가장자리의 빈 문단은 상자 틀 안의 빈 줄이고, 걷으면 거기 실린 말머리·윗선(`first`)도 함께 사라진다.
+ */
+function isTrimmable(piece: PassagePiece): boolean {
+  return !piece.box && isEmptyParagraph(piece.html);
+}
+
 /** 앞뒤의 빈 문단을 걷어낸다 — 가운데 빈 줄은 원문이라 남긴다 */
 function trimEdges(pieces: PassagePiece[]): PassagePiece[] {
   let start = 0;
   let end = pieces.length;
-  while (start < end && isEmptyParagraph(pieces[start].html)) start += 1;
-  while (end > start && isEmptyParagraph(pieces[end - 1].html)) end -= 1;
+  while (start < end && isTrimmable(pieces[start])) start += 1;
+  while (end > start && isTrimmable(pieces[end - 1])) end -= 1;
   return pieces.slice(start, end);
+}
+
+/**
+ * 겹친 상자의 안쪽 상자를 문단마다 조각으로 — 못 풀면 null(예전처럼 통째로 한 조각).
+ *
+ * 푸는 것은 **자식이 전부 `<p>`** 인 상자뿐이다. 그러면 조각 사이 간격이 곧 예전 문단 간격이라(problem-paper.css 의
+ * `.pb-box-part--holds`) 안 잘리면 모양이 예전과 같다. 표·목록·그림·날글자·세 겹째 상자가 하나라도 있거나
+ * 말머리가 허용 목록 밖이거나 다른 속성이 붙었으면 풀지 않는다.
+ * ⚠️ 안쪽 가장자리의 빈 문단은 걷지 않는다 — 예전 그림에서 빈 줄로 보이던 것이다.
+ * ⚠️ 그림 자리표시자가 든 상자는 풀지 않는다 — 그림 조각에는 안쪽 틀을 실을 자리가 없다.
+ * @param html - 바깥 상자의 조각 하나(`<blockquote …>…</blockquote>` 이어야 한다)
+ * @returns 안쪽 틀을 단 조각들 또는 null
+ */
+function innerPieces(html: string): PassagePiece[] | null {
+  if (!html.startsWith('<blockquote') || html.includes('data-figure')) return null;
+  const el = createHost(html)?.firstElementChild;
+  if (!el || el.nextElementSibling) return null;
+  const label = explodableLabel(el);
+  if (label === undefined) return null;
+  const children: Element[] = [];
+  for (const node of Array.from(el.childNodes)) {
+    if (node instanceof Element && node.tagName === 'P') children.push(node);
+    else if (node.nodeType !== Node.TEXT_NODE || (node.textContent ?? '').trim() !== '') return null;
+  }
+  const htmls = children.map((p) => p.outerHTML);
+  if (htmls.length === 0 || htmls.every(isEmptyParagraph)) return null;
+  return htmls.map((piece, i) => ({ html: piece, inner: { label, first: i === 0, last: i === htmls.length - 1 } }));
 }
 
 /**
@@ -137,6 +182,7 @@ function trimEdges(pieces: PassagePiece[]): PassagePiece[] {
  *
  * ⚠️ 경로 없는 그림을 **먼저 버리고** 그다음 빈 문단을 걷는다. 반대면 버린 그림 뒤의
  *    빈 문단이 상자의 첫 조각으로 남아 상자 머리가 한 줄 뜬다.
+ * ⚠️ 안쪽 상자는 가장자리를 걷은 **뒤에** 편다 — 먼저 펴면 안쪽 가장자리의 빈 문단이 바깥 가장자리로 보여 걷힌다.
  * @param box - 상자 요소
  * @param label - 말머리
  * @param figures - 지문 그림 경로들
@@ -146,18 +192,19 @@ function trimEdges(pieces: PassagePiece[]): PassagePiece[] {
 function explodeBox(
   box: Element, label: string | null, figures: readonly string[], options: PassagePieceOptions,
 ): PassagePiece[] {
-  const inner = trimEdges(childPieces(box).flatMap((html) => withFigure(html, figures, options)));
-  return inner.map((piece, i) => ({
+  const pieces = trimEdges(childPieces(box).flatMap((html) => withFigure(html, figures, options)))
+    .flatMap((piece) => (piece.figurePath ? null : innerPieces(piece.html)) ?? [piece]);
+  return pieces.map((piece, i) => ({
     ...piece,
-    box: { label, first: i === 0, last: i === inner.length - 1 },
+    box: { label, first: i === 0, last: i === pieces.length - 1 },
   }));
 }
 
 /**
  * 지문 HTML 을 인쇄 조각으로 나눈다.
  *
- * 최상위 요소 하나가 한 조각이되 구역 상자는 자식 단위로 터뜨린다. 상자 안 상자는 더 터뜨리지
- * 않는다(바깥 상자의 조각 하나로 통째로 간다). 빈 문단뿐인 상자는 통째로 둔다 — 지우면
+ * 최상위 요소 하나가 한 조각이되 구역 상자는 자식 단위로 터뜨린다. 상자 안 상자는 문단뿐일 때만 한 겹 더
+ * 터뜨리고(`inner`), 그 밖이면 바깥 상자의 조각 하나로 통째로 간다. 빈 문단뿐인 상자는 통째로 둔다 — 지우면
  * 〈보기〉 말머리까지 사라진다.
  * @param html - **정화가 끝난** 지문 HTML
  * @param figures - 지문 그림 경로들 (1번이 index 0)
@@ -181,14 +228,31 @@ export function splitPassagePieces(
 }
 
 /**
+ * 조각을 다시 나눌 때 상자 표시를 좁힌다 — 처음 표시는 첫 조각에만, 끝 표시는 끝 조각에만 남는다.
+ * 지문 문단을 재서 자를 때(part-split-plan.ts)와 발문 줄 묶음(stem-line-units.ts)이 같이 쓴다.
+ * @param part - 원래 조각의 상자 표시
+ * @param isFirst - 나눈 조각 가운데 첫 조각인가
+ * @param isLast - 나눈 조각 가운데 끝 조각인가
+ * @returns 좁힌 표시
+ */
+export function narrowBoxPart(part: BoxPart, isFirst: boolean, isLast: boolean): BoxPart {
+  return { label: part.label, first: part.first && isFirst, last: part.last && isLast };
+}
+
+/**
  * 상자 조각 틀의 클래스 — 글 조각과 그림 조각이 **같은 함수**를 써야 한쪽만 말머리가
  * 두 번 찍히거나 선이 끊기지 않는다.
+ *
+ * 겹친 상자의 바깥 틀이고 안쪽 틀이 아직 끝나지 않았으면 `pb-box-part--holds` 를 단다 — 문단 사이 간격은 안쪽 틀이
+ * 지고 바깥 틀은 지지 않는다(problem-paper.css). 안 그러면 간격이 두 번 들어가고, 바깥이 지면 [A] 세로선이 끊긴다.
  * @param box - 상자 표시
+ * @param inner - 이 틀 안에 두르는 안쪽 틀(겹친 상자일 때만)
  * @returns 공백으로 이은 클래스 문자열
  */
-export function boxPartClassName(box: BoxPart): string {
+export function boxPartClassName(box: BoxPart, inner?: BoxPart): string {
   const classes = ['pb-box-part'];
   if (box.first) classes.push('pb-box-part--first');
   if (box.last) classes.push('pb-box-part--last');
+  if (inner && !inner.last) classes.push('pb-box-part--holds');
   return classes.join(' ');
 }

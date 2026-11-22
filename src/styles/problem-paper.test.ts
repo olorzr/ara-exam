@@ -68,6 +68,94 @@ describe('문제지 — 발문 줄 묶음 사이 간격', () => {
   });
 });
 
+/**
+ * 겹친 상자(구역 안의 [A], 〈보기〉 안의 (가))를 문단마다 풀면 조각이 두 겹 틀이다(box-parts.ts 의 `inner`, 0.9.92).
+ * 문단 사이 간격은 **안쪽 틀만** 져야 쪼개기 전과 같다 — 둘 다 지면 두 배, 바깥만 지면 [A] 세로선이 끊긴다.
+ */
+describe('문제지 — 겹친 상자 조각 사이 간격', () => {
+  let style: HTMLStyleElement;
+  let host: HTMLElement;
+
+  beforeEach(() => {
+    style = document.createElement('style');
+    style.textContent = readFileSync(join(process.cwd(), 'src/styles/problem-paper.css'), 'utf8');
+    document.head.appendChild(style);
+    host = document.createElement('div');
+    host.innerHTML = `
+      <div class="pb-sheet pb-sheet--paper">
+        <div class="pb-passage-part" id="p-mid"><blockquote data-box="가" class="pb-box-part pb-box-part--holds"><blockquote data-box="A" class="pb-box-part"><p>가운데</p></blockquote></blockquote></div>
+        <div class="pb-passage-part" id="p-end"><blockquote data-box="가" class="pb-box-part"><blockquote data-box="A" class="pb-box-part pb-box-part--last"><p>끝</p></blockquote></blockquote></div>
+        <div class="pb-passage-part pb-passage-part--continues" id="p-cont"><blockquote data-box="가" class="pb-box-part pb-box-part--holds"><blockquote data-box="A" class="pb-box-part"><p>이어짐</p></blockquote></blockquote></div>
+        <div class="pb-q"><div class="pb-q__head"><div class="pb-q__stem">
+          <div class="pb-q__unit"><p>물음</p></div>
+          <div class="pb-q__unit" id="s-mid"><blockquote data-box="보기" class="pb-box-part pb-box-part--holds"><blockquote data-box="가" class="pb-box-part pb-box-part--first"><p>1</p></blockquote></blockquote></div>
+          <div class="pb-q__unit pb-q__unit--joined" id="s-joined"><blockquote data-box="보기" class="pb-box-part pb-box-part--holds"><blockquote data-box="가" class="pb-box-part"><p>줄1<br>줄2</p></blockquote></blockquote></div>
+          <div class="pb-q__unit" id="s-inner-end"><blockquote data-box="보기" class="pb-box-part"><blockquote data-box="가" class="pb-box-part pb-box-part--last"><p>줄3<br>줄4</p></blockquote></blockquote></div>
+          <div class="pb-q__unit" id="s-last"><blockquote data-box="보기" class="pb-box-part pb-box-part--holds"><blockquote data-box="나" class="pb-box-part"><p>조각 끝</p></blockquote></blockquote></div>
+        </div></div></div>
+      </div>`;
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    style.remove();
+    host.remove();
+  });
+
+  /**
+   * 계산값으로 보지 않는다 — jsdom 은 줄임 속성(`padding: 0 0 0 8px`)과 낱 속성(`padding-bottom: 3pt`)을 특이도로
+   * 견주지 못하고, 같은 마크업이어도 요소 차례에 따라 다른 값을 낸다(2026-11-22 확인). 그래서 규칙이 **어느 틀에 걸리는가**를
+   * 본다. 실제 높이가 쪼개기 전과 같은지는 헤드리스 크롬으로 쟀다(CLAUDE.md 0.9.92).
+   */
+  const ruleWith = (needle: string, prop: 'paddingBottom', value: string) => {
+    const rule = Array.from((style.sheet as CSSStyleSheet).cssRules)
+      .filter((r): r is CSSStyleRule => 'selectorText' in r)
+      .find((r) => r.selectorText.includes(needle) && r.style[prop] === value);
+    if (!rule) throw new Error(`${needle} 규칙이 없다`);
+    return (selector: string) => host.querySelector(selector)?.matches(rule.selectorText) ?? null;
+  };
+
+  it('지문 — 안쪽 틀이 이어지는 동안 바깥 틀의 3pt 를 끈다(안쪽 틀은 원래 규칙의 3pt 를 그대로 진다)', () => {
+    const holds = ruleWith('.pb-box-part--holds', 'paddingBottom', '0px');
+    const gap = ruleWith('blockquote.pb-box-part:not(.pb-box-part--last)', 'paddingBottom', '3pt');
+    expect(holds('#p-mid > blockquote')).toBe(true);
+    expect(holds('#p-mid > blockquote > blockquote')).toBe(false);
+    expect(gap('#p-mid > blockquote > blockquote')).toBe(true);
+  });
+
+  it('지문 — 안쪽 틀이 끝나면 바깥 틀이 예전처럼 3pt 를 진다', () => {
+    const holds = ruleWith('.pb-box-part--holds', 'paddingBottom', '0px');
+    const gap = ruleWith('blockquote.pb-box-part:not(.pb-box-part--last)', 'paddingBottom', '3pt');
+    expect(holds('#p-end > blockquote')).toBe(false);
+    expect(gap('#p-end > blockquote')).toBe(true);
+  });
+
+  it('지문 — 재서 자른 같은 문단 안에서는 두 틀 다 간격이 없다', () => {
+    const cont = ruleWith('.pb-passage-part--continues', 'paddingBottom', '0px');
+    expect(cont('#p-cont > blockquote')).toBe(true);
+    expect(cont('#p-cont > blockquote > blockquote')).toBe(true);
+  });
+
+  it('발문 — 안쪽 문단 사이 2pt 는 안쪽 틀에만 걸린다', () => {
+    const inner = ruleWith('> blockquote.pb-box-part > blockquote.pb-box-part', 'paddingBottom', '2pt');
+    expect(inner('#s-mid > blockquote > blockquote')).toBe(true);
+    expect(inner('#s-mid > blockquote')).toBe(false);
+  });
+
+  it('발문 — 줄 묶음(같은 문단)과 조각의 끝 단위에는 2pt 를 주지 않는다', () => {
+    const inner = ruleWith('> blockquote.pb-box-part > blockquote.pb-box-part', 'paddingBottom', '2pt');
+    expect(inner('#s-joined > blockquote > blockquote')).toBe(false);
+    expect(inner('#s-last > blockquote > blockquote')).toBe(false);
+    expect(inner('#s-inner-end > blockquote > blockquote')).toBe(false);
+  });
+
+  it('발문 — 〈보기〉 쪽 `:has()` 2pt 규칙은 두 겹 조각의 바깥 틀에 걸리지 않는다', () => {
+    const has = ruleWith(':has(+ .pb-q__unit > blockquote > p:first-child)', 'paddingBottom', '2pt');
+    expect(has('#s-mid > blockquote')).toBe(false);
+    expect(has('#s-inner-end > blockquote')).toBe(false);
+  });
+});
+
 describe('문제지 — 글이 단 밖으로 나가지 않게', () => {
   let style: HTMLStyleElement;
   let host: HTMLElement;

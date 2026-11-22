@@ -43,19 +43,37 @@ function px(value: string): number {
 }
 
 /**
+ * 겹친 상자 조각의 안쪽 틀 — 바깥 틀(`.pb-box-part`)의 맨 앞/맨 뒤 자식이 또 상자 조각이면 그것.
+ * 바깥 틀이 처음·끝 조각이 아니면 그 쪽 테두리·안쪽 여백이 0 이라 안쪽 틀의 여백이 바깥 틀을 뚫고 접혀 나간다.
+ */
+function innerFrame(frame: Element | null, edge: 'first' | 'last'): Element | null {
+  // 바깥 틀의 처음(끝) 조각은 말머리·테두리·안쪽 여백이 있어 안쪽 여백이 그 안에 갇힌다
+  if (!frame?.classList.contains('pb-box-part') || frame.classList.contains(`pb-box-part--${edge}`)) return null;
+  const inner = edge === 'first' ? frame.firstElementChild : frame.lastElementChild;
+  return inner?.classList.contains('pb-box-part') ? inner : null;
+}
+
+/** 두 요소의 여백 가운데 큰 쪽 — 맞닿은 여백은 더해지지 않고 접힌다 */
+function collapsedMargin(outer: Element, inner: Element | null, side: 'marginTop' | 'marginBottom'): number {
+  const own = px(getComputedStyle(outer)[side]);
+  return inner ? Math.max(own, px(getComputedStyle(inner)[side])) : own;
+}
+
+/**
  * 단위 요소 아래로 조각 안에 남는 여백 — 상자 끝의 아래 여백은 단위 상자를 뚫고 나가 재는 값에 안 든다.
  * 문단의 2pt 는 조각 끝이 되면 사라져 더 재게 되는데, 넘치는 쪽이 아니라 그대로 둔다.
+ * 겹친 상자면 안쪽 틀의 아래 여백도 바깥 틀을 뚫고 나오므로 둘 가운데 큰 쪽이다(box-parts.ts 의 `inner`).
  */
 function marginBelow(el: Element): number {
   const child = el.lastElementChild;
-  return child ? px(getComputedStyle(child).marginBottom) : 0;
+  return child ? collapsedMargin(child, innerFrame(child, 'last'), 'marginBottom') : 0;
 }
 
-/** 이 단위로 조각이 시작할 때 맨 위에 생기는 여백 */
+/** 이 단위로 조각이 시작할 때 맨 위에 생기는 여백 — 겹친 상자면 안쪽 틀의 위 여백까지 접힌다 */
 function marginAbove(el: HTMLElement, unit: QuestionUnit): number {
   if (unit.kind === 'choice') return el.parentElement ? px(getComputedStyle(el.parentElement).marginTop) : 0;
   const child = el.firstElementChild;
-  return px(getComputedStyle(el).marginTop) + (child ? px(getComputedStyle(child).marginTop) : 0);
+  return px(getComputedStyle(el).marginTop) + (child ? collapsedMargin(child, innerFrame(child, 'first'), 'marginTop') : 0);
 }
 
 /** 문항을 잰다 — 후보마다 `단위[k−1]` 의 끝까지가 앞 조각이다 */

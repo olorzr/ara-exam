@@ -4,13 +4,13 @@ import { choiceGlyph } from '@/lib/problem-bank/choices';
 import { renderFiguresInHtml } from '@/lib/problem-bank/figure-render';
 import { correctChoiceIndices, splitsExplanation } from '@/lib/problem-paper/answers';
 import type { PaperProblemBlock } from '@/lib/problem-paper/blocks';
-import { boxPartClassName } from '@/lib/problem-paper/box-parts';
 import { questionChoiceLayout, type QuestionUnit } from '@/lib/problem-paper/question-units';
 import { sanitizeInlineHTML } from '@/lib/sanitize-problem';
 import { yetHangulClass } from '@/lib/yet-hangul';
 import type { PaperItemSnapshot, PaperSettings } from '@/types/problem-bank';
 import MatrixChoiceTable from '@/components/problem-bank/MatrixChoiceTable';
 import PairedChoiceTable from '@/components/problem-bank/PairedChoiceTable';
+import PaperBoxFrame from './PaperBoxFrame';
 import { PrintImage, SourceLine, TeacherAnswer } from './PaperPrintParts';
 
 /**
@@ -66,11 +66,7 @@ function StemPiece({
   if (!unit.box) return <div className={className} data-q-unit="" dangerouslySetInnerHTML={body} />;
   return (
     <div className={className} data-q-unit="">
-      <blockquote
-        data-box={unit.box.label ?? undefined}
-        className={boxPartClassName(unit.box)}
-        dangerouslySetInnerHTML={body}
-      />
+      <PaperBoxFrame box={unit.box} inner={unit.inner} html={body.__html} />
     </div>
   );
 }

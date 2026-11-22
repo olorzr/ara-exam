@@ -113,6 +113,27 @@ describe('ProblemPaperView — 문항이 단을 넘을 때', () => {
   });
 });
 
+describe('ProblemPaperView — 줄어 찍히는 곳 안내', () => {
+  it('쪼갤 수 없는 덩어리가 줄어 찍히면 그 지문을 화면에 알린다(인쇄되지 않는다)', () => {
+    // 문장 끝이 없는 긴 산문 문단 — 자를 자리가 없어 통째로 한 블록이고 한 쪽보다 길다
+    const huge: PaperPassageSnapshot = { ...passage, id: 'huge', html: `<p>${'가'.repeat(4000)}</p>` };
+    const onLayout = vi.fn();
+    const { getByRole } = render(
+      <ProblemPaperView paper={paper} items={[{ ...item(1), passage: huge }]} imageUrls={new Map()} onLayout={onLayout} />,
+    );
+    const notice = getByRole('status');
+    expect(notice.textContent).toContain('글씨가 줄어 찍히는 곳이 있어요: 1번 지문');
+    expect(notice.hasAttribute('data-no-print')).toBe(true);
+    // 바깥에서 받은 쪽 알림도 그대로 전한다
+    expect((onLayout.mock.calls.at(-1)![0] as { shrunkBlocks?: number[] }).shrunkBlocks?.length).toBeGreaterThan(0);
+  });
+
+  it('줄어 찍히는 곳이 없으면 안내를 그리지 않는다', () => {
+    const { queryByRole } = render(<ProblemPaperView paper={paper} items={[item(1), item(2)]} imageUrls={new Map()} />);
+    expect(queryByRole('status')).toBeNull();
+  });
+});
+
 describe('ProblemPaperView — 쪽 수 알림', () => {
   it('배치가 끝나면 onLayout 으로 본문 쪽 수(표지 제외)를 알린다 — 중철 뒷표지 안내가 쓴다', () => {
     const onLayout = vi.fn();

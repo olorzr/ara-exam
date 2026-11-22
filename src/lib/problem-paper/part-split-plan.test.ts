@@ -260,6 +260,15 @@ describe('chunkPartBlocks', () => {
 
   it('상자 밖 조각에는 상자 표시를 만들지 않는다', () => {
     const plain: PassagePartBlock = { kind: 'passage-part', key: 'k', html: '<p>x</p>', serif: false, first: false, last: false };
-    expect(chunkPartBlocks(plain, ['<p>a</p>', '<p>b</p>']).every((c) => !('box' in c))).toBe(true);
+    expect(chunkPartBlocks(plain, ['<p>a</p>', '<p>b</p>']).every((c) => !('box' in c) && !('inner' in c))).toBe(true);
+  });
+
+  it('겹친 상자의 안쪽 틀도 처음은 첫 조각에, 끝은 끝 조각에만 남는다 — 가운데에 [A] 말머리가 또 찍히지 않게', () => {
+    const nested: PassagePartBlock = {
+      ...part, box: { label: '가', first: false, last: false }, inner: { label: 'A', first: true, last: true },
+    };
+    const chunks = chunkPartBlocks(nested, ['<p>a</p>', '<p>b</p>', '<p>c</p>']);
+    expect(chunks.map((c) => [c.inner?.first, c.inner?.last])).toEqual([[true, false], [false, false], [false, true]]);
+    expect(chunks.every((c) => c.box?.first === false && c.box?.last === false)).toBe(true);
   });
 });

@@ -327,6 +327,31 @@ describe('구역 상자 조각', () => {
     expect(container.querySelector('.pb-figure > blockquote.pb-box-part[data-box="보기"] img')).not.toBeNull();
   });
 
+  it('겹친 상자는 두 겹 틀로 그리고 안쪽이 안 끝난 조각의 바깥 틀에만 `--holds` 를 단다', () => {
+    const container = draw(withPassage(
+      '<blockquote data-box="가"><blockquote data-box="A"><p>1</p><p>2</p></blockquote><p>3</p></blockquote>',
+    ), false);
+    const outers = Array.from(container.querySelectorAll('.pb-passage-part > blockquote[data-box="가"]'));
+    expect(outers.map((f) => f.className)).toEqual([
+      'pb-box-part pb-box-part--first pb-box-part--holds', 'pb-box-part', 'pb-box-part pb-box-part--last',
+    ]);
+    const inners = Array.from(container.querySelectorAll('.pb-passage-part > blockquote[data-box="가"] > blockquote[data-box="A"]'));
+    expect(inners.map((f) => [f.className, f.innerHTML])).toEqual([
+      ['pb-box-part pb-box-part--first', '<p>1</p>'],
+      ['pb-box-part pb-box-part--last', '<p>2</p>'],
+    ]);
+    expect(outers[2].querySelector('blockquote')).toBeNull();
+  });
+
+  it('문단이 아닌 것이 낀 안쪽 상자는 예전처럼 바깥 틀 안의 통째 상자다', () => {
+    const container = draw(withPassage(
+      '<blockquote data-box="가"><p>0</p><blockquote data-box="A"><p>1</p><ul><li>2</li></ul></blockquote></blockquote>',
+    ), false);
+    const inner = container.querySelector('blockquote[data-box="가"] > blockquote[data-box="A"]');
+    expect(inner?.classList.contains('pb-box-part')).toBe(false);
+    expect(inner?.querySelector('li')?.textContent).toBe('2');
+  });
+
   it('상자 밖 조각에는 틀을 두르지 않는다 — 예전 DOM 그대로다', () => {
     const container = draw(withPassage('<p>a</p><p>b</p>'), false);
 
