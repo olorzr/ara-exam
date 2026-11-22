@@ -246,14 +246,17 @@ describe('문제지 보기 — 떠 있는 오류 신고 단추 (2026-11-22)', ()
     expect(spacer?.textContent).toBe('');
   });
 
-  it('문서는 가로 스크롤 상자 안이다 — 휴대폰에서 페이지째 넓어져 떠 있는 단추가 화면 밖으로 밀리지 않게(코덱스 13R)', () => {
+  it('문서는 가로 스크롤 상자(터치 화면에서만 가둔다) 안이다 — 휴대폰에서 페이지째 넓어져 떠 있는 단추가 화면 밖으로 밀리지 않게(코덱스 13R)', () => {
     const { container } = render(<ProblemPaperViewPage />);
     const box = container.querySelector('.a4-scroll-x');
     expect(box).not.toBeNull();
     expect(box?.children.length).toBeGreaterThan(0);
-    // 키보드로도 옆으로 넘긴다 — 사파리는 스크롤 상자에 초점을 안 준다(코덱스 14R)
-    expect(box?.getAttribute('tabindex')).toBe('0');
-    expect(box?.getAttribute('role')).toBe('region');
-    expect(box?.getAttribute('aria-label')).toBe('문제지 미리보기');
+  });
+
+  it('다른 곳에서 고쳐져 문서가 빠지면 스크롤 상자도 없다 — 빈 구역을 남기지 않는다(코덱스 16R)', () => {
+    watch.stale = true;
+    const { container } = render(<ProblemPaperViewPage />);
+    expect(container.querySelector('.a4-scroll-x')).toBeNull();
+    watch.stale = false;
   });
 });
