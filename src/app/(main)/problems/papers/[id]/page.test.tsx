@@ -251,5 +251,9 @@ describe('문제지 보기 — 떠 있는 오류 신고 단추 (2026-11-22)', ()
     const box = container.querySelector('.a4-scroll-x');
     expect(box).not.toBeNull();
     expect(box?.children.length).toBeGreaterThan(0);
+    // 키보드로도 옆으로 넘긴다 — 사파리는 스크롤 상자에 초점을 안 준다(코덱스 14R)
+    expect(box?.getAttribute('tabindex')).toBe('0');
+    expect(box?.getAttribute('role')).toBe('region');
+    expect(box?.getAttribute('aria-label')).toBe('문제지 미리보기');
   });
 });

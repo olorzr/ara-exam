@@ -14,7 +14,7 @@ describe('print-a4.css', () => {
     const print = css.slice(css.indexOf('@media print'));
     const screen = css.slice(0, css.indexOf('@media print'));
     expect(screen).toMatch(/\.a4-scroll-x\s*\{\s*overflow-x:\s*auto;/);
-    expect(print).toMatch(/\.a4-scroll-x\s*\{\s*overflow:\s*visible !important;/);
+    expect(print).toMatch(/\.a4-scroll-x\s*\{\s*overflow:\s*visible !important;\s*outline:\s*none !important;/);
     // 넘친 낱장을 앞으로 붙이는 것(safe)은 화면 전용이다 — 인쇄 배치를 바꾸지 않는다
     expect(css).toMatch(/@media screen\s*\{\s*\.a4-scroll-x \.a4-stack,\s*\.a4-scroll-x \.booklet-leaf\s*\{\s*align-items:\s*safe center;/);
   });
