@@ -13,7 +13,6 @@ import { usePassageContinuation } from '@/hooks/usePassageContinuation';
 import { useReviewGuards } from '@/hooks/useReviewGuards';
 import { useSourceDelete } from '@/hooks/useSourceDelete';
 import { useFigureCapture } from '@/hooks/useFigureCapture';
-import { usePendingWrites } from '@/hooks/usePendingWrites';
 import PageImageWithBoxes, { type BoxOverlay } from '@/components/problem-review/PageImageWithBoxes';
 import ReviewCardList, { type ReviewRow } from '@/components/problem-review/ReviewCardList';
 import ReviewHeader from '@/components/problem-review/ReviewHeader';
@@ -143,16 +142,6 @@ function ProblemSourceReviewContent() {
 
   // 미저장 수정을 지키는 확인 절차는 한 곳에 모아 둔다 — 세 가지가 규칙이 서로 다르다
   const guards = useReviewGuards(review, dirtyIds);
-  // 고치던 카드 가운데 아직 화면에 있는 것만 — 지운 카드의 표시가 남아 '수정이 사라진다' 고 헛되이 묻지 않게(코덱스 2R)
-  const liveDirtyCount = useMemo(() => [...dirtyIds].filter((id) => (
-    review.problems.some((p) => p.id === id) || review.passages.some((p) => p.id === id)
-  )).length, [dirtyIds, review.problems, review.passages]);
-  // 도는 쓰기를 센다 — 끝나기 전에 '읽기 전용으로 보기' 로 옮기지 않게(코덱스 4R)
-  const { pending: pendingWrites, track } = usePendingWrites();
-  const writes = useMemo(() => ({
-    savePassage: track(guards.savePassage), saveProblem: track(review.saveProblem),
-    deletePassage: track(guards.removePassage), deleteProblem: track(review.removeProblem), mergePassage: track(guards.mergePassage),
-  }), [track, guards.savePassage, review.saveProblem, guards.removePassage, review.removeProblem, guards.mergePassage]);
   // 지운 뒤에는 돌아갈 화면이 없다(이 주소가 곧 사라진 출처다) — 목록으로 보낸다
   const del = useSourceDelete(() => router.push('/problems/sources'));
 
@@ -192,9 +181,6 @@ function ProblemSourceReviewContent() {
         source={source}
         problemCount={review.problems.length}
         onTextbook={(textbook) => review.changeTextbook(textbook, () => dirtyIds.size)}
-        unsavedCount={liveDirtyCount}
-        reading={continuation.busyId !== null}
-        saving={pendingWrites > 0}
         // 지우기는 원장만 — 아니면 단추가 없다(sql/57)
         onDelete={del.canDelete ? () => del.requestDelete(source) : undefined}
         deleting={del.deletingId !== null}
@@ -265,16 +251,16 @@ function ProblemSourceReviewContent() {
             issues={issues}
             onSelect={focus.selectCard}
             onDirtyChange={markDirty}
-            savePassage={writes.savePassage}
-            saveProblem={writes.saveProblem}
-            deletePassage={writes.deletePassage}
-            deleteProblem={writes.deleteProblem}
+            savePassage={guards.savePassage}
+            saveProblem={review.saveProblem}
+            deletePassage={guards.removePassage}
+            deleteProblem={review.removeProblem}
             continuePassage={ai.features.problem_ocr
               ? (id, page, soFarHtml) => continuation.read(id, page, soFarHtml)
               : undefined}
             continuingId={continuation.busyId}
             sourcePageCount={source.page_count}
-            mergePassage={writes.mergePassage}
+            mergePassage={guards.mergePassage}
             figureUrls={review.figureUrls}
             capturingId={capture.target?.id ?? null}
             capturingFigure={capture.target?.figureIndex ?? null}

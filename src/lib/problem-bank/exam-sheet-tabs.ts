@@ -19,8 +19,9 @@ export const EXAM_SHEET_TABS: readonly { view: ExamSheetView; path: string; labe
 /** sessionStorage 열쇠 */
 const STORAGE_KEY = 'ara-exam-sheet-query';
 
-/** 저장소를 못 쓸 때의 기억 */
+/** 이 페이지 수명 동안의 기억 — 여기서 적었으면 저장소보다 앞선다(저장소 쓰기가 막혀도 마지막 조건을 쓴다, 코덱스 5R) */
 const memory: Record<ExamSheetView, string> = { sets: '', sources: '' };
+const touched: Record<ExamSheetView, boolean> = { sets: false, sources: false };
 
 /** `?…` 로 시작하는 조건만 받는다 */
 const validQuery = (value: unknown): string =>
@@ -47,6 +48,7 @@ function readStore(): Record<ExamSheetView, string> | null {
 export function rememberExamSheetQuery(view: ExamSheetView, query: string): void {
   const next = validQuery(query);
   memory[view] = next;
+  touched[view] = true;
   const stored = readStore();
   if (!stored) return;
   try {
@@ -71,14 +73,17 @@ export function examSheetPath(view: ExamSheetView): string {
  * @returns '/problems/sets?…' 같은 주소
  */
 export function examSheetHref(view: ExamSheetView): string {
+  if (touched[view]) return `${examSheetPath(view)}${memory[view]}`;
   const stored = readStore();
-  return `${examSheetPath(view)}${stored ? stored[view] : memory[view]}`;
+  return `${examSheetPath(view)}${stored ? stored[view] : ''}`;
 }
 
 /** 테스트용 — 기억을 비운다 */
 export function resetExamSheetQueries(): void {
   memory.sets = '';
   memory.sources = '';
+  touched.sets = false;
+  touched.sources = false;
   try {
     window.sessionStorage.removeItem(STORAGE_KEY);
   } catch {
