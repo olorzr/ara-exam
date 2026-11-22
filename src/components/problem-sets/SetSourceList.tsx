@@ -30,7 +30,8 @@ export default function SetSourceList({ rows }: SetSourceListProps) {
       {rows.map((row, index) => {
         const warnings = row.ocr_meta?.warnings?.length ?? 0;
         return (
-          <li key={row.id} className="group relative flex items-center gap-3 px-4 py-3 text-ink hover:bg-accent-soft/40">
+          // 좁은 화면에서는 '고치기' 가 아래 줄로 내려간다(0.9.89 규약) — 시험 제목이 줄을 다 쓰고 줄바꿈으로 다 보인다(코덱스 9R)
+          <li key={row.id} className="group relative flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 text-ink hover:bg-accent-soft/40 sm:flex-nowrap">
             <span aria-hidden="true" className="w-8 shrink-0 font-label text-xs font-bold text-gray-400">
               {String(index + 1).padStart(2, '0')}
             </span>
@@ -44,7 +45,8 @@ export default function SetSourceList({ rows }: SetSourceListProps) {
             >
               <span className="min-w-0 flex-1">
                 <span className="block font-display text-[15px] font-bold group-hover:text-primary">{rowName(row)}</span>
-                <span className="block truncate text-xs text-gray-500">{row.title}</span>
+                {/* 말줄임 금지 — 같은 학교의 두 시험(예: …문학 / …독서)이 끝 글자로 갈린다(코덱스 9R) */}
+                <span className="block break-keep text-xs text-gray-500 [overflow-wrap:anywhere]">{row.title}</span>
                 <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-gray-600">
                   {row.problem_count > 0 ? (
                     <span>{row.problem_count}문항</span>
@@ -68,15 +70,17 @@ export default function SetSourceList({ rows }: SetSourceListProps) {
                 <ChevronRight className="h-4 w-4" aria-hidden="true" />
               </span>
             </Link>
-            <Link
-              href={sourceEditHref(row.id)}
-              prefetch={false}
-              aria-label={`${rowName(row)} · ${row.title} 원본 대조로 고치기`}
-              className="relative z-10 inline-flex shrink-0 items-center gap-1 rounded-full border border-gray-300 bg-card px-2.5 py-1 text-xs font-semibold text-gray-700 hover:border-ink hover:text-ink"
-            >
-              <PencilLine className="h-3.5 w-3.5" aria-hidden="true" />
-              고치기
-            </Link>
+            <span className="basis-full pl-11 sm:basis-auto sm:pl-0">
+              <Link
+                href={sourceEditHref(row.id)}
+                prefetch={false}
+                aria-label={`${rowName(row)} · ${row.title} 원본 대조로 고치기`}
+                className="relative z-10 inline-flex shrink-0 items-center gap-1 rounded-full border border-gray-300 bg-card px-2.5 py-1 text-xs font-semibold text-gray-700 hover:border-ink hover:text-ink"
+              >
+                <PencilLine className="h-3.5 w-3.5" aria-hidden="true" />
+                고치기
+              </Link>
+            </span>
           </li>
         );
       })}
