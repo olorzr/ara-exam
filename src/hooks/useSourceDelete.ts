@@ -63,7 +63,7 @@ export function useSourceDelete(onDeleted: OnSourceDeleted) {
 
   const requestDelete = useCallback(async (source: ProblemSource) => {
     if (!canDelete) {
-      toast.error('올라간 기출은 원장님만 지울 수 있어요.');
+      toast.error('기출 시험지는 원장님만 지울 수 있어요.');
       return;
     }
     if (busyRef.current) return;

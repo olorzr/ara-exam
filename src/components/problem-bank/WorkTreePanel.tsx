@@ -71,7 +71,7 @@ export default function WorkTreePanel({ filters, works, onChange }: WorkTreePane
         selectedId={selectedId}
         defaultExpandedDepth={WORK_EXPANDED_DEPTH}
         searchPlaceholder="작품·지은이 찾기"
-        emptyText="작품명이 붙은 문항이 아직 없어요. 올라간 기출에서 지문의 작품명을 적으면 여기 나와요."
+        emptyText="작품명이 붙은 문항이 아직 없어요. 기출 시험지 › 목록으로 보기에서 시험지를 열어 지문의 작품명을 적으면 여기 나와요."
       />
     </TreeFrame>
   );
