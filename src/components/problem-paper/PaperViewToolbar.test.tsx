@@ -76,4 +76,9 @@ describe('PaperViewToolbar — 오류 신고는 오른쪽 아래에 떠 있다 (
     expect(buttons[0].className).toContain('right-4');
     expect(buttons[0].hasAttribute('data-no-print')).toBe(true);
   });
+
+  it('띄어쓰기 없는 긴 제목도 꺾여 페이지를 넓히지 않는다(코덱스 15R)', () => {
+    renderToolbar();
+    expect(screen.getByText('서시 문제지').className).toContain('[overflow-wrap:anywhere]');
+  });
 });

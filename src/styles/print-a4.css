@@ -23,12 +23,17 @@
   overflow-x: auto;
 }
 
-/* 상자보다 넓은 낱장·중철 면을 가운데 두면 왼쪽으로 넘친 몫은 스크롤로도 닿지 않는다 — 넘칠 때만 앞으로 붙인다(safe).
+/* 상자보다 넓은 낱장·중철 면을 가운데 두면 왼쪽으로 넘친 몫은 스크롤로도 닿지 않는다 — 자리가 남을 때만 가운데, 넘치면 앞으로.
+   `align-items: safe center` 는 사파리 16.4~17.5 가 무시해(코덱스 15R) 자동 여백으로 한다(넘치면 자동 여백이 0 이 된다).
    화면 전용 — 인쇄 배치는 손대지 않는다 */
 @media screen {
   .a4-scroll-x .a4-stack,
   .a4-scroll-x .booklet-leaf {
-    align-items: safe center;
+    align-items: flex-start;
+  }
+  .a4-scroll-x .a4-stack > *,
+  .a4-scroll-x .booklet-leaf > * {
+    margin-inline: auto;
   }
 }
 

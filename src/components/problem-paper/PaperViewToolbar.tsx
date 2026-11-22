@@ -68,7 +68,8 @@ export default function PaperViewToolbar({
       >
         <ArrowLeft className="h-4 w-4" /> 목록
       </Link>
-      <span className="ml-2 font-semibold text-gray-900">{paper.title}</span>
+      {/* 띄어쓰기 없는 긴 제목도 꺾는다 — 페이지째 넓어지면 휴대폰에서 떠 있는 신고 단추가 화면 밖으로 밀린다(코덱스 15R) */}
+      <span className="ml-2 min-w-0 break-keep font-semibold text-gray-900 [overflow-wrap:anywhere]">{paper.title}</span>
       <span className="text-sm text-gray-500">{itemCount}문항</span>
       {paper.settings.omr && (
         <Badge title="학원 성적 시스템에 시험으로 등록되고 90A 답안지로 채점해요">OMR 채점</Badge>
