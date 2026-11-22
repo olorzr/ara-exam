@@ -16,9 +16,13 @@ function Probe({ enabled = true }: { enabled?: boolean }) {
   return <button ref={setEl} type="button" style={{ position: 'fixed', right: 16, bottom: 16 }}>오류 신고</button>;
 }
 
+/** 옮기지 않은 단추 자리 — 412×800 화면 오른쪽 아래에서 16px 안쪽 */
+let rect = { right: 396, bottom: 784 };
 beforeEach(() => {
-  vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(412);
-  vi.spyOn(document.documentElement, 'clientHeight', 'get').mockReturnValue(800);
+  rect = { right: 396, bottom: 784 };
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+    () => ({ ...rect, left: rect.right - 100, top: rect.bottom - 44, width: 100, height: 44, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect,
+  );
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
@@ -37,6 +41,14 @@ describe('useVisualViewportAnchor — 확대한 화면에서도 보이는 곳에
     // 확대를 풀면 되돌린다
     act(() => { Object.assign(vv, { offsetTop: 0, offsetLeft: 0, width: 412, height: 800, scale: 1 }); vv.dispatchEvent(new Event('resize')); });
     expect(button.style.transform).toBe('');
+  });
+
+  it('확대하지 않았어도 문서가 넘쳐 단추가 보이는 곳 밖이면 옮긴다 — 실제 자리를 잰다(코덱스 23R)', () => {
+    rect = { right: 587, bottom: 1460 };
+    const vv = fakeViewport({ offsetLeft: 0, offsetTop: 0, width: 412, height: 800 });
+    const { getByRole } = render(<Probe />);
+    act(() => { vv.dispatchEvent(new Event('resize')); });
+    expect(getByRole('button').style.transform).toBe('translate(-191px, -676px) scale(1)');
   });
 
   it('끄면 아무것도 하지 않고, visualViewport 가 없어도 그린다', () => {

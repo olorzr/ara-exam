@@ -120,11 +120,12 @@ describe('ProblemReportDialog', () => {
     expect(screen.getByTestId('origin').textContent).toBe('원본:없음');
   });
 
-  it('오류 종류는 브라우저 기본 고르기이고 휴대폰 글자는 16px — 아이폰이 초점에 확대하지 않게(코덱스 19·22R)', () => {
+  it('오류 종류는 브라우저 기본 고르기이고 터치 화면 글자는 16px — 아이폰이 초점에 확대하지 않게(코덱스 19·22·23R)', () => {
     render(<ProblemReportDialog open onClose={() => undefined} target={{ kind: 'problem', problemId: 'p9', label: '문항' }} />);
     const select = screen.getByRole('combobox', { name: '오류 종류' });
     expect(select.tagName).toBe('SELECT');
-    expect(select.className).toContain('text-base');
-    expect(select.className).toContain('md:text-sm');
+    // 터치 화면에서는 폭과 상관없이 16px(가로로 돌린 아이폰도, 23R)
+    expect(select.className).toContain('[@media(hover:none)]:text-base');
+    expect(select.className).not.toContain('md:text-sm');
   });
 });

@@ -17,6 +17,15 @@ function applyAnchorStyle(node: HTMLElement, style: AnchorStyle): void {
   Object.assign(node.style, { ...CLEARED, ...style });
 }
 
+/**
+ * 손가락으로 확대(핀치 줌)한 상태인가 — 신고 창이 열 때 종이를 옮기지 않게 초점 자리를 고르는 데 쓴다.
+ * @returns 비주얼 뷰포트 배율이 1 보다 크면 true(없으면 false)
+ */
+export function isPinchZoomed(): boolean {
+  const vv = typeof window !== 'undefined' ? window.visualViewport : null;
+  return Boolean(vv && vv.scale > 1);
+}
+
 /** 계산된 px 값 — 못 읽으면 0 */
 const px = (value: string): number => {
   const n = Number.parseFloat(value);
@@ -43,19 +52,16 @@ export function useVisualViewportAnchor(el: HTMLElement | null, enabled: boolean
     const reset = () => applyAnchorStyle(el, {});
     const update = () => {
       const scale = vv.scale > 0 ? vv.scale : 1;
-      const root = document.documentElement;
-      const dx = vv.offsetLeft + vv.width - root.clientWidth;
-      const dy = vv.offsetTop + vv.height - root.clientHeight;
-      if (scale === 1 && dx === 0 && dy === 0) {
-        reset();
-        return;
-      }
-      // 바깥 여백(right·bottom)도 실제 크기를 지키게 — 레이아웃 px 여백은 확대하면 그만큼 커진다
+      // 옮기지 않은 자리를 실제로 잰다 — 뿌리 요소 크기로 짐작하면 문서가 넘쳐 레이아웃 뷰포트가 커진 화면에서 틀린다(코덱스 23R)
+      reset();
+      const rect = el.getBoundingClientRect();
       const style = getComputedStyle(el);
-      const gapX = px(style.right) - px(style.right) / scale;
-      const gapY = px(style.bottom) - px(style.bottom) / scale;
+      // 목표: 보이는 곳 오른쪽 아래에서 바깥 여백(실제 크기 그대로 = 레이아웃 px 여백/배율)만큼 안쪽
+      const dx = vv.offsetLeft + vv.width - px(style.right) / scale - rect.right;
+      const dy = vv.offsetTop + vv.height - px(style.bottom) / scale - rect.bottom;
+      if (scale === 1 && Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
       applyAnchorStyle(el, {
-        transformOrigin: 'bottom right', transform: `translate(${dx + gapX}px, ${dy + gapY}px) scale(${1 / scale})`,
+        transformOrigin: 'bottom right', transform: `translate(${dx}px, ${dy}px) scale(${1 / scale})`,
       });
     };
     update();

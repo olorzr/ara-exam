@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '@/components/ui/dialog';
@@ -15,6 +15,7 @@ import {
 } from '@/lib/problem-report/types';
 import ReportNumberGrid from './ReportNumberGrid';
 import ReportOriginalPage from './ReportOriginalPage';
+import { isPinchZoomed } from '@/hooks/useVisualViewportAnchor';
 
 /** 무엇을 신고하나 — 문제지(번호를 고른다) 또는 문제 은행 문항 하나 */
 export type ReportTarget =
@@ -46,6 +47,10 @@ export default function ProblemReportDialog({ open, onClose, target }: ProblemRe
   const [note, setNote] = useState('');
   const [openCount, setOpenCount] = useState(0);
   const [busy, setBusy] = useState(false);
+  // 손가락으로 확대한 채 열면 첫 칸 대신 창 자신에 초점 — base-ui 가 창에 줄 때는 화면을 옮기지 않아(preventScroll)
+  // 읽던 자리가 그대로다(코덱스 20·23R). 확대하지 않았으면 보통대로 첫 칸에
+  const popupRef = useRef<HTMLDivElement>(null);
+  const initialFocus = () => (isPinchZoomed() ? popupRef.current : true);
 
   const paperId = target.kind === 'paper' ? target.paperId : null;
   const revision = target.kind === 'paper' ? target.revision : null;
@@ -101,7 +106,10 @@ export default function ProblemReportDialog({ open, onClose, target }: ProblemRe
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next && !busy) onClose(); }}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-4xl" noPrint>
+      <DialogContent
+        ref={popupRef} initialFocus={initialFocus}
+        className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-4xl" noPrint
+      >
         <DialogTitle className="text-base">문제 오류 신고</DialogTitle>
         <DialogDescription className="text-sm text-gray-500">
           신고하면 원장님께 웍스로 바로 알려요. 고쳐지면 오류 신고 목록에서 확인할 수 있어요.
@@ -162,11 +170,11 @@ export default function ProblemReportDialog({ open, onClose, target }: ProblemRe
             <div className="space-y-1 text-sm">
               <span className="text-gray-600">어떤 오류인가요?</span>
               {/* 브라우저 기본 고르기 — 휴대폰에서는 운영체제 고르기 창이 떠 손가락으로 확대한 화면에서도 글자가 안 잘린다(코덱스 19R).
-                  휴대폰에서 글자 16px — 그보다 작으면 아이폰 사파리가 초점을 줄 때 화면을 확대한다(옆 Textarea 와 같다, 22R) */}
+                  터치 화면에서는 폭과 상관없이 글자 16px — 그보다 작으면 아이폰 사파리가 초점을 줄 때 화면을 확대한다(22·23R) */}
               <select
                 value={category} aria-label="오류 종류" disabled={busy}
                 onChange={(e) => { if (isReportCategory(e.target.value)) setCategory(e.target.value); }}
-                className="h-9 w-full rounded-lg border border-input bg-card px-2.5 text-base outline-none md:text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/25 disabled:opacity-50"
+                className="h-9 w-full rounded-lg border border-input bg-card px-2.5 text-sm outline-none [@media(hover:none)]:text-base focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/25 disabled:opacity-50"
               >
                 <option value="" disabled>종류 고르기</option>
                 {REPORT_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
