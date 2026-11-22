@@ -1,6 +1,7 @@
 import { isAdminEmail } from '@/lib/constants';
 import { supabase } from '@/lib/supabase';
 import { applyOwnerScope, type OwnerScope } from '@/lib/owner-scope';
+import { PAPER_SEARCH_LIMIT, searchPapers } from './paper-search';
 import type { ProblemPaper } from '@/types/problem-bank';
 
 /**
@@ -39,17 +40,19 @@ export function canDeletePaper(paper: Pick<ProblemPaper, 'user_id'>, viewer: Pap
   return viewer.userId !== '' && paper.user_id === viewer.userId;
 }
 
-/** 한 번에 보여 줄 문제지 수 — 탭마다 따로 센다 */
-export const PAPER_LIST_LIMIT = 200;
+/** 한 번에 보여 줄 문제지 수 — 탭마다 따로 센다. 찾을 때도 같다(paper-search.ts) */
+export const PAPER_LIST_LIMIT = PAPER_SEARCH_LIMIT;
 
 /**
  * 문제지 목록 (최근 것부터).
  * @param scope - 내 것 / 다른 선생님 것
  * @param userId - 로그인한 사람의 id
+ * @param keyword - 찾는 말 — 있으면 제목·만든 선생님 이름으로 서버에서 찾는다(paper-search.ts)
  * @returns 문제지들
  * @throws 조회 실패 시
  */
-export async function fetchPapers(scope: OwnerScope, userId: string): Promise<ProblemPaper[]> {
+export async function fetchPapers(scope: OwnerScope, userId: string, keyword = ''): Promise<ProblemPaper[]> {
+  if (keyword.trim()) return searchPapers(scope, userId, keyword);
   const request = supabase.from('problem_papers').select('*');
   const { data, error } = await applyOwnerScope(request, scope, userId)
     .order('created_at', { ascending: false })

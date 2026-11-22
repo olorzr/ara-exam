@@ -11,6 +11,11 @@ interface OwnerScopeTabsProps {
   onChange: (scope: OwnerScope) => void;
   /** 고른 탭의 목록 */
   children: ReactNode;
+  /**
+   * 탭 이름 옆 숫자(찾는 동안 몇 개가 찾아졌는가) — 문제지 목록만 쓴다. 안 주면 탭 마크업·이름이 예전 그대로다
+   * (학교 프린트 목록과 공용이다).
+   */
+  counts?: Partial<Record<OwnerScope, string>>;
 }
 
 /**
@@ -20,7 +25,7 @@ interface OwnerScopeTabsProps {
  * `TabsContent` 로 둔다 — 탭과 패널이 ARIA 로 이어져야 스크린리더가 무엇을 여는지 안다
  * (ArchiveSidePanel 과 같은 규약). 목록은 고른 탭의 패널에만 그린다.
  */
-export function OwnerScopeTabs({ value, onChange, children }: OwnerScopeTabsProps) {
+export function OwnerScopeTabs({ value, onChange, children, counts }: OwnerScopeTabsProps) {
   return (
     <Tabs
       value={value}
@@ -33,6 +38,11 @@ export function OwnerScopeTabs({ value, onChange, children }: OwnerScopeTabsProp
         {OWNER_SCOPES.map((scope) => (
           <TabsTrigger key={scope} value={scope} className="px-3">
             {OWNER_SCOPE_LABELS[scope]}
+            {counts?.[scope] !== undefined && (
+              <span className="ml-1.5 font-label text-[11px] font-bold text-gray-400 tabular-nums">
+                {counts[scope]}<span className="sr-only">개</span>
+              </span>
+            )}
           </TabsTrigger>
         ))}
       </TabsList>

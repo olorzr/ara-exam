@@ -2,23 +2,34 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Pencil, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { OwnerScopeTabs } from '@/components/ui/owner-scope-tabs';
 import { useCreatorNames } from '@/hooks/useCreatorNames';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { usePaperEditStates } from '@/hooks/usePaperEditStates';
 import { usePaperList } from '@/hooks/usePaperList';
-import type { OwnerScope } from '@/lib/owner-scope';
-import { paperEditHref } from '@/lib/problem-paper/paper-edit';
-import { normalizePaperSettings } from '@/lib/problem-paper/settings';
-import { ItemNo, PageTitle, PaperList } from '@/components/magazine';
-import { Badge } from '@/components/ui/badge';
+import { usePaperTabCount } from '@/hooks/usePaperTabCount';
+import { OWNER_SCOPE_LABELS, type OwnerScope } from '@/lib/owner-scope';
+import { PAPER_LIST_LIMIT } from '@/lib/problem-paper/paper-list';
+import { PageTitle, PaperList } from '@/components/magazine';
+import { Button } from '@/components/ui/button';
+import PaperListRow from '@/components/problem-paper/PaperListRow';
+import PaperListSearch from '@/components/problem-paper/PaperListSearch';
 
 /** 탭마다 빈 목록 문구 */
 const EMPTY_TEXT: Record<OwnerScope, string> = {
   mine: '아직 만든 문제지가 없어요.',
   others: '다른 선생님이 만든 문제지가 없어요.',
 };
+
+/** 찾는 말을 칠 때 기다리는 시간 — 고르기 창(PaperExcludePickerDialog)과 같다 */
+const SEARCH_DEBOUNCE_MS = 300;
+
+/** 반대 탭 */
+const OTHER: Record<OwnerScope, OwnerScope> = { mine: 'others', others: 'mine' };
+
+/** 탭 이름 옆 숫자 — 상한에 닿았으면 '200+' */
+const countText = (count: number, capped: boolean) => (capped ? `${count}+` : String(count));
 
 /**
  * 만든 문제지 목록 (`/problems/papers`).
@@ -27,13 +38,25 @@ const EMPTY_TEXT: Record<OwnerScope, string> = {
  * 다른 선생님 것도 열어 보고 인쇄할 수 있다. **고치기**는 만든 선생님과 원장만이라 연필은 고칠 수 있는 문제지에만
  * 그린다(책에 담기면 원장만, OMR 은 채점 전까지만 — sql/103). **지우기**도 만든 선생님과 원장만이라(sql/104) 휴지통은
  * 그 사람에게만 그린다.
+ * 찾기 칸 하나가 두 탭에 걸린다(2026-11-22) — 제목·만든 선생님 이름으로 서버에서 찾고, 찾는 동안 탭마다 몇 개인지 보인다.
  */
 export default function ProblemPapersPage() {
   const [scope, setScope] = useState<OwnerScope>('mine');
-  const { papers, loading, canDelete, remove } = usePaperList(scope);
+  const [search, setSearch] = useState('');
+  const keyword = useDebouncedValue(search.trim(), SEARCH_DEBOUNCE_MS);
+  const { papers, loading, capped, canDelete, remove } = usePaperList(scope, keyword);
+  const other = usePaperTabCount(OTHER[scope], keyword);
   // 다른 선생님 탭에서만 누가 만들었는지 적는다 — 내 탭은 전부 나다
   const names = useCreatorNames(scope === 'others' ? papers.map((p) => p.user_id) : []);
   const { states: editStates } = usePaperEditStates(papers.map((p) => p.id));
+
+  const counts = keyword && !loading
+    ? {
+      [scope]: countText(papers.length, capped),
+      ...(other.count !== null ? { [OTHER[scope]]: countText(other.count, other.capped) } : {}),
+    }
+    : undefined;
+  const emptyText = keyword ? `'${keyword}'(으)로 찾은 문제지가 없어요.` : EMPTY_TEXT[scope];
 
   return (
     <div className="space-y-4">
@@ -53,61 +76,47 @@ export default function ProblemPapersPage() {
         </Link>
       </div>
 
-      <OwnerScopeTabs value={scope} onChange={setScope}>
+      <PaperListSearch value={search} onChange={setSearch} />
+
+      <OwnerScopeTabs value={scope} onChange={setScope} counts={counts}>
         {loading ? (
           <div className="flex justify-center py-12">
             <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
           </div>
         ) : papers.length === 0 ? (
           <Card>
-            <CardContent className="py-12 text-center text-sm text-gray-500">
-              {EMPTY_TEXT[scope]}
+            <CardContent className="space-y-3 py-12 text-center text-sm text-gray-500">
+              <p>{emptyText}</p>
+              {keyword && other.count !== null && other.count > 0 && (
+                <Button type="button" variant="outline" size="sm" onClick={() => setScope(OTHER[scope])}>
+                  {OWNER_SCOPE_LABELS[OTHER[scope]]}에서 {countText(other.count, other.capped)}개 보기
+                </Button>
+              )}
             </CardContent>
           </Card>
         ) : (
           // 종이 목록 한 장 — 예전엔 줄마다 따로 테두리 상자였다(2026-11-14, 학교 프린트 목록과 같은 결)
-          <PaperList>
-            {papers.map((paper, index) => (
-              <li key={paper.id} className="flex items-start gap-2 px-4 py-3">
-                <ItemNo n={index + 1} />
-                <Link href={`/problems/papers/${paper.id}`} className="group min-w-0 flex-1">
-                  <p className="text-[15px] leading-snug font-semibold break-keep [overflow-wrap:anywhere] text-ink group-hover:text-primary">
-                    {paper.title}
-                    {/* 옛 문제지는 키가 없다 — 정규화해서 읽는다(문자열 'true' 로 켜지지 않게) */}
-                    {normalizePaperSettings(paper.settings).omr && (
-                      <Badge className="ml-2 align-middle">OMR</Badge>
-                    )}
-                  </p>
-                  <p className="mt-0.5 text-xs text-gray-500">
-                    {names.get(paper.user_id) && `${names.get(paper.user_id)} 선생님 · `}
-                    {paper.total_questions}문항
-                    {paper.source_labels.length > 0 && ` · ${paper.source_labels.join(', ')}`}
-                    {' · '}
-                    {new Date(paper.created_at).toLocaleDateString('ko-KR')}
-                  </p>
-                </Link>
-                {editStates.get(paper.id)?.reason === null && (
-                  <Link
-                    href={paperEditHref(paper.id, editStates.get(paper.id) ?? { inBook: false, workbook: false })}
-                    className="shrink-0 rounded-full p-2 text-gray-400 hover:bg-accent-soft hover:text-ink"
-                    aria-label={`${paper.title} 고치기`}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Link>
-                )}
-                {canDelete(paper) && (
-                  <button
-                    type="button"
-                    onClick={() => remove(paper)}
-                    className="shrink-0 rounded-full p-2 text-gray-400 hover:bg-red-50 hover:text-red-500"
-                    aria-label={`${paper.title} 지우기`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                )}
-              </li>
-            ))}
-          </PaperList>
+          <>
+            <PaperList>
+              {papers.map((paper, index) => (
+                <PaperListRow
+                  key={paper.id}
+                  paper={paper}
+                  n={index + 1}
+                  creator={names.get(paper.user_id)}
+                  editState={editStates.get(paper.id)}
+                  onRemove={canDelete(paper) ? () => remove(paper) : undefined}
+                />
+              ))}
+            </PaperList>
+            {capped && (
+              <p className="mt-2 text-xs text-gray-400">
+                {keyword
+                  ? `찾은 것 가운데 최근 ${PAPER_LIST_LIMIT}개만 보여요 — 더 좁혀 찾아 주세요.`
+                  : `최근 ${PAPER_LIST_LIMIT}개만 보여요 — 제목이나 선생님 이름으로 찾아 주세요.`}
+              </p>
+            )}
+          </>
         )}
       </OwnerScopeTabs>
     </div>

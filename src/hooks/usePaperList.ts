@@ -4,10 +4,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
 import type { OwnerScope } from '@/lib/owner-scope';
-import { canDeletePaper, deletePaper, fetchPapers } from '@/lib/problem-paper/paper-list';
+import { PAPER_LIST_LIMIT, canDeletePaper, deletePaper, fetchPapers } from '@/lib/problem-paper/paper-list';
 import type { ProblemPaper } from '@/types/problem-bank';
 
-/** 읽어 둔 목록 — 어느 탭의 것인지와 함께 든다 */
+/** 읽어 둔 목록 — 어느 탭·어느 찾는 말의 것인지와 함께 든다 */
 interface LoadedPapers {
   key: string;
   papers: ProblemPaper[];
@@ -19,20 +19,23 @@ interface LoadedPapers {
  * 로딩은 **"어느 탭의 목록을 읽어 두었는가" 에서 파생**한다 — 탭을 바꾼 직후 옛 탭의
  * 목록이 새 탭 이름 아래 보이면 안 되고, 효과에서 동기로 비우면 lint 가 막는다.
  * 지우기는 만든 선생님과 원장만이다(sql/104) — `canDelete` 로 단추를 가리고 `remove` 도 첫 줄에서 한 번 더 막는다.
+ * 찾는 말이 있으면 제목·만든 선생님 이름으로 서버에서 찾는다(paper-search.ts). 찾는 말도 열쇠에 들어가 늦게 온 옛 검색의
+ * 응답이 새 목록을 덮지 않는다(`alive`) — 찾는 말을 바꾸면 다시 로딩이다.
  * @param scope - 내 것 / 다른 선생님 것
- * @returns 목록·로딩·지울 수 있는가·삭제
+ * @param keyword - 찾는 말(다듬어 디바운스한 값)
+ * @returns 목록·로딩·상한에 닿았는가·지울 수 있는가·삭제
  */
-export function usePaperList(scope: OwnerScope) {
+export function usePaperList(scope: OwnerScope, keyword = '') {
   const { user } = useAuth();
   const userId = user?.id ?? '';
   const email = user?.email;
-  const key = `${scope}:${userId}`;
+  const key = `${scope}:${userId}:${keyword}`;
   const [loaded, setLoaded] = useState<LoadedPapers | null>(null);
 
   useEffect(() => {
     if (!userId) return;
     let alive = true;
-    fetchPapers(scope, userId)
+    fetchPapers(scope, userId, keyword)
       .then((papers) => { if (alive) setLoaded({ key, papers }); })
       .catch((e) => {
         if (!alive) return;
@@ -40,7 +43,7 @@ export function usePaperList(scope: OwnerScope) {
         setLoaded({ key, papers: [] });
       });
     return () => { alive = false; };
-  }, [key, scope, userId]);
+  }, [key, scope, userId, keyword]);
 
   const canDelete = useCallback((paper: ProblemPaper) => canDeletePaper(paper, { userId, email }), [userId, email]);
 
@@ -59,5 +62,6 @@ export function usePaperList(scope: OwnerScope) {
   }, [canDelete]);
 
   const current = loaded?.key === key ? loaded : null;
-  return { papers: current?.papers ?? [], loading: current === null, userId, canDelete, remove };
+  const papers = current?.papers ?? [];
+  return { papers, loading: current === null, capped: papers.length >= PAPER_LIST_LIMIT, userId, canDelete, remove };
 }

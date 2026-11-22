@@ -25,4 +25,20 @@ describe('OwnerScopeTabs', () => {
     fireEvent.click(screen.getByRole('tab', { name: '다른 선생님이 만든 것' }));
     expect(onChange).toHaveBeenCalledWith('others');
   });
+
+  it('숫자를 주면 탭 이름 옆에 붙이고(화면 읽기는 ‘N개’), 안 주면 이름이 예전 그대로다', () => {
+    const { rerender } = render(
+      <OwnerScopeTabs value="mine" onChange={() => undefined} counts={{ mine: '3', others: '200+' }}>
+        <p>목록</p>
+      </OwnerScopeTabs>,
+    );
+    expect(screen.getByRole('tab', { name: '내가 만든 것3개' })).not.toBeNull();
+    expect(screen.getByRole('tab', { name: '다른 선생님이 만든 것200+개' })).not.toBeNull();
+    rerender(
+      <OwnerScopeTabs value="mine" onChange={() => undefined}>
+        <p>목록</p>
+      </OwnerScopeTabs>,
+    );
+    expect(screen.getByRole('tab', { name: '내가 만든 것' })).not.toBeNull();
+  });
 });

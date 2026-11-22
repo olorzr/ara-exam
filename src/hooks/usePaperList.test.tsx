@@ -5,12 +5,13 @@ import type { ProblemPaper } from '@/types/problem-bank';
 const m = vi.hoisted(() => ({
   user: { id: 'u1', email: 't@araeducation.co.kr' } as { id: string; email: string } | null,
   deletePaper: vi.fn(async () => {}),
+  fetchPapers: vi.fn<(...args: unknown[]) => Promise<unknown[]>>(async () => []),
 }));
 vi.mock('@/lib/auth-context', () => ({ useAuth: () => ({ user: m.user }) }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/lib/problem-paper/paper-list', async (orig) => ({
   ...(await orig<typeof import('@/lib/problem-paper/paper-list')>()),
-  fetchPapers: vi.fn(async () => [mine, theirs]),
+  fetchPapers: m.fetchPapers,
   deletePaper: m.deletePaper,
 }));
 
@@ -22,6 +23,8 @@ const { usePaperList } = await import('./usePaperList');
 beforeEach(() => {
   m.user = { id: 'u1', email: 't@araeducation.co.kr' };
   m.deletePaper.mockClear();
+  m.fetchPapers.mockReset();
+  m.fetchPapers.mockImplementation(async () => [mine, theirs]);
 });
 
 describe('usePaperList — 지우기는 만든 선생님과 원장만(sql/104)', () => {
@@ -46,5 +49,36 @@ describe('usePaperList — 지우기는 만든 선생님과 원장만(sql/104)',
     expect(m.deletePaper).toHaveBeenCalledWith('p2');
     expect(result.current.papers.map((p) => p.id)).toEqual(['p1']);
     confirm.mockRestore();
+  });
+});
+
+describe('usePaperList — 찾기(2026-11-22)', () => {
+  it('찾는 말을 넘기고, 바꾸면 다시 읽는 동안 로딩이다', async () => {
+    const { result, rerender } = renderHook(({ k }) => usePaperList('mine', k), { initialProps: { k: '' } });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(m.fetchPapers).toHaveBeenLastCalledWith('mine', 'u1', '');
+    rerender({ k: '음운' });
+    expect(result.current.loading).toBe(true);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(m.fetchPapers).toHaveBeenLastCalledWith('mine', 'u1', '음운');
+  });
+
+  it('늦게 온 옛 검색의 응답은 새 목록을 덮지 않는다', async () => {
+    let releaseOld: (v: unknown[]) => void = () => {};
+    m.fetchPapers.mockImplementation((_s: unknown, _u: unknown, k: unknown) => (k === '옛'
+      ? new Promise<unknown[]>((r) => { releaseOld = r; })
+      : Promise.resolve([theirs])));
+    const { result, rerender } = renderHook(({ k }) => usePaperList('mine', k), { initialProps: { k: '옛' } });
+    rerender({ k: '새' });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => { releaseOld([mine]); });
+    expect(result.current.papers.map((p) => p.id)).toEqual(['p2']);
+  });
+
+  it('상한(200개)에 닿으면 capped', async () => {
+    m.fetchPapers.mockImplementation(async () => Array.from({ length: 200 }, (_, i) => ({ ...mine, id: `p${i}` })));
+    const { result } = renderHook(() => usePaperList('mine', ''));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.capped).toBe(true);
   });
 });
