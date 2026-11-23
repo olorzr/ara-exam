@@ -3,8 +3,8 @@
 -- 실행: node /Users/ara/Projects/Ara-system/scripts/run-sql.js /Users/ara/Projects/ara-exam/sql/113_problem_reports.sql
 -- =============================================
 -- ⚠️⚠️ 2026-11-23 부터 신고 종류 CHECK 와 `exam.report_problem` 의 정식 정의는 sql/114(태그 오류 · 출처·번호 오류 · 신고 때 태그).
---   이 파일은 sql/114 가 적용된 DB(`problem_reports.tags` 칸이 있다)에서 아래 report_problem 정의를 **건너뛴다** — 다시 돌려도 새 RPC 가
---   옛 다섯 종류로 되돌아가지 않는다(코덱스 2R). 표의 CHECK 는 CREATE TABLE IF NOT EXISTS 라 원래 그대로다.
+--   이 파일은 sql/114 가 적용된 DB(`problem_reports.tags` 칸이 있다)에서 아래 report_problem 정의·권한을 **건너뛴다** — 다시 돌려도
+--   새 RPC(인자 여섯)가 옛 다섯 종류로 되돌아가지 않는다(코덱스 2R). 표의 CHECK 는 CREATE TABLE IF NOT EXISTS 라 원래 그대로다.
 -- 배경 (원장님 "문제은행에서 오류가 있는 문제들을 선생님들이 체킹할 수 있는 기능 … 대부분 애들 문제은행에서 문제지로
 --   만든 다음에 그걸 풀리다가 찾거든? 그래서 그걸 신고하는 부분이 있으면 좋겠어. 신고하면 나한테 연락오게끔")
 --   · 신고 자리는 둘 — 문제지 보기 화면(몇 번 문항인지 고른다)과 문제 은행 문항 상세 창. 원장 연락(웍스 DM)은 앱이 저장
@@ -34,6 +34,10 @@ BEGIN
   END IF;
 END
 $guard$;
+
+-- 정의(표·트리거·권한·RPC)는 한 트랜잭션으로 커밋한 **뒤에** 검증한다 — 검증이 실제 문제지 행을 잡는 동안 표 잠금(DDL)을 들고 있으면
+-- 선생님의 문제지 고치기(항목 삭제 → 신고 참조 SET NULL)와 교착할 수 있다(sql/114 코덱스 3R 과 같은 판단)
+BEGIN;
 
 -- ---------------------------------------------
 -- 1. 표
@@ -202,11 +206,11 @@ BEGIN
 END;
 $$
 $fn113$;
+  -- 권한도 이 판에만 — sql/114 는 서명을 바꿔(인자 여섯) 이 서명이 없다
+  EXECUTE 'REVOKE ALL ON FUNCTION exam.report_problem(TEXT, TEXT, UUID, UUID, TIMESTAMPTZ) FROM PUBLIC, anon';
+  EXECUTE 'GRANT EXECUTE ON FUNCTION exam.report_problem(TEXT, TEXT, UUID, UUID, TIMESTAMPTZ) TO authenticated, service_role';
 END
 $guard114$;
-
-REVOKE ALL ON FUNCTION exam.report_problem(TEXT, TEXT, UUID, UUID, TIMESTAMPTZ) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION exam.report_problem(TEXT, TEXT, UUID, UUID, TIMESTAMPTZ) TO authenticated, service_role;
 
 -- ---------------------------------------------
 -- 5. 처리 — 원장만. open 으로 되돌리면 처리 기록을 비운다
@@ -250,6 +254,8 @@ REVOKE ALL ON FUNCTION exam.resolve_problem_report(UUID, TEXT, TEXT) FROM PUBLIC
 GRANT EXECUTE ON FUNCTION exam.resolve_problem_report(UUID, TEXT, TEXT) TO authenticated, service_role;
 
 NOTIFY pgrst, 'reload schema';
+
+COMMIT;
 
 -- ---------------------------------------------
 -- 검증 ① 모양 — 트리거·정책·권한·참조 동작

@@ -99,6 +99,12 @@ export function reportSourceLabel(source: unknown, stored: string | null | undef
 /** 관리자센터 인테이크가 출처 글을 자르는 길이 — Ara-system `lib/problemReportIntake` 의 `LIMITS.sourceLabel` 과 같은 값 */
 export const INTAKE_SOURCE_LABEL_MAX = 80;
 
+/** 출처 끝의 괄호 꼬리(과목·형) — 앞 공백까지 함께 */
+const SECTION_TAIL = /\s*\([^()]*\)$/;
+
+/** 괄호 꼬리를 지키고도 앞에 남겨야 할 최소 글자 수 — 이보다 좁으면 꼬리를 포기한다(앞이 안 보이면 무슨 시험인지 모른다) */
+const MIN_HEAD_CHARS = 12;
+
 /**
  * 원장 웍스 알림에 보낼 출처 글 — 원래 번호 꼬리(' · 원래 35번')는 지키고 앞의 출처만 줄인다.
  * 인테이크는 넘치면 끝을 자르는데, 모의고사·평가문제집 제목(120자까지)이면 원래 번호가 잘려 문제지 신고에 인쇄 번호만 남는다(코덱스 2R).
@@ -112,6 +118,12 @@ export function intakeSourceLabel(label: string, number: unknown, max: number = 
   const full = withOriginalNumber(base, number);
   if (full.length <= max) return full;
   const tail = full.slice(base.length);
+  // 끝의 괄호 꼬리('(언어와 매체)')는 같은 시험의 과목을 가른다 — 가운데를 줄이고 꼬리를 지킨다(코덱스 3R).
+  // 꼬리를 남기면 앞에 둘 자리가 너무 좁을 때만 꼬리를 포기한다
+  const section = SECTION_TAIL.exec(base)?.[0] ?? '';
+  const head = base.slice(0, base.length - section.length).trimEnd();
+  const room = max - tail.length - section.length - 1;
+  if (section && room >= MIN_HEAD_CHARS) return `${head.slice(0, room)}…${section}${tail}`;
   return `${base.slice(0, Math.max(max - tail.length - 1, 0))}…${tail}`;
 }
 

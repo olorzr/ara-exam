@@ -70,6 +70,15 @@ describe('intakeSourceLabel', () => {
     const out = intakeSourceLabel(title, 35);
     expect(out.length).toBe(INTAKE_SOURCE_LABEL_MAX);
     expect(out.endsWith('… · 원래 35번')).toBe(true);
+    // 끝의 과목 꼬리는 지킨다 — 같은 시험의 화작·언매가 같은 글이 되지 않게
+    const mockTitle = `${'2026학년도 대학수학능력시험 국어영역 '.repeat(3)}(언어와 매체)`;
+    const withSection = intakeSourceLabel(mockTitle, 35);
+    expect(withSection.length).toBeLessThanOrEqual(INTAKE_SOURCE_LABEL_MAX);
+    expect(withSection.endsWith('… (언어와 매체) · 원래 35번')).toBe(true);
+    expect(intakeSourceLabel(mockTitle.replace('언어와 매체', '화법과 작문'), 35)).not.toBe(withSection);
+    // 꼬리가 너무 길어 앞이 안 남으면 꼬리를 포기한다
+    const longSection = `시험 (${'가'.repeat(80)})`;
+    expect(intakeSourceLabel(longSection, 3).startsWith('시험 (')).toBe(true);
     const noNumber = intakeSourceLabel(title, null);
     expect(noNumber.length).toBe(INTAKE_SOURCE_LABEL_MAX);
     expect(noNumber.endsWith('…')).toBe(true);

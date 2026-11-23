@@ -59,7 +59,7 @@ describe('ProblemReportDialog', () => {
   });
 
   it("'기타' 는 내용을 적어야 신고할 수 있다", async () => {
-    render(<ProblemReportDialog open onClose={() => undefined} target={{ kind: 'problem', problemId: 'p9', label: '2025 압구정중 3번' }} />);
+    render(<ProblemReportDialog open onClose={() => undefined} target={{ kind: 'problem', problemId: 'p9', label: '2025 압구정중 3번', revision: 'prev' }} />);
     fireEvent.change(screen.getByRole('combobox', { name: '오류 종류' }), { target: { value: 'other' } });
     expect(screen.getByRole('button', { name: '신고하기' })).toHaveProperty('disabled', true);
     fireEvent.change(screen.getByRole('textbox'), { target: { value: '그림이 없어요' } });
@@ -68,7 +68,7 @@ describe('ProblemReportDialog', () => {
 
   it('태그 오류는 내용 없이도 신고되고, 내용 칸 예시가 태그 쪽으로 바뀐다', async () => {
     const onClose = vi.fn();
-    render(<ProblemReportDialog open onClose={onClose} target={{ kind: 'problem', problemId: 'p9', label: '문항' }} />);
+    render(<ProblemReportDialog open onClose={onClose} target={{ kind: 'problem', problemId: 'p9', label: '문항', revision: 'prev' }} />);
     const select = screen.getByRole('combobox', { name: '오류 종류' });
     expect(screen.getByRole('option', { name: '태그 오류 (작품·단원·영역)' })).toBeTruthy();
     expect(screen.getByRole('option', { name: '출처·번호 오류' })).toBeTruthy();
@@ -76,30 +76,30 @@ describe('ProblemReportDialog', () => {
     expect(screen.getByRole('textbox').getAttribute('placeholder')).toContain('문법 태그');
     fireEvent.click(screen.getByRole('button', { name: '신고하기' }));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
-    expect(m.submit).toHaveBeenCalledWith({ category: 'tag', note: '', problemId: 'p9' });
+    expect(m.submit).toHaveBeenCalledWith({ category: 'tag', note: '', problemId: 'p9', problemRevision: 'prev' });
   });
 
   it('알림이 못 가도 신고는 저장됐다고 알린다', async () => {
     m.notify.mockResolvedValue('failed');
     const onClose = vi.fn();
-    render(<ProblemReportDialog open onClose={onClose} target={{ kind: 'problem', problemId: 'p9', label: '문항' }} />);
+    render(<ProblemReportDialog open onClose={onClose} target={{ kind: 'problem', problemId: 'p9', label: '문항', revision: 'prev' }} />);
     fireEvent.change(screen.getByRole('combobox', { name: '오류 종류' }), { target: { value: 'text' } });
     fireEvent.click(screen.getByRole('button', { name: '신고하기' }));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
-    expect(m.submit).toHaveBeenCalledWith({ category: 'text', note: '', problemId: 'p9' });
+    expect(m.submit).toHaveBeenCalledWith({ category: 'text', note: '', problemId: 'p9', problemRevision: 'prev' });
     expect(m.toast.warning).toHaveBeenCalled();
   });
 
   it('같은 문항에 접수 중인 신고가 있으면 알려 준다', async () => {
     m.count.mockResolvedValue(2);
-    render(<ProblemReportDialog open onClose={() => undefined} target={{ kind: 'problem', problemId: 'p9', label: '문항' }} />);
+    render(<ProblemReportDialog open onClose={() => undefined} target={{ kind: 'problem', problemId: 'p9', label: '문항', revision: 'prev' }} />);
     expect(await screen.findByText(/이미 2건 신고돼 있어요/)).toBeTruthy();
   });
 
   it('저장이 실패하면 창을 닫지 않고 알린다', async () => {
     m.submit.mockRejectedValueOnce(new Error('기타 신고는 내용을 적어 주세요'));
     const onClose = vi.fn();
-    render(<ProblemReportDialog open onClose={onClose} target={{ kind: 'problem', problemId: 'p9', label: '문항' }} />);
+    render(<ProblemReportDialog open onClose={onClose} target={{ kind: 'problem', problemId: 'p9', label: '문항', revision: 'prev' }} />);
     fireEvent.change(screen.getByRole('combobox', { name: '오류 종류' }), { target: { value: 'answer' } });
     fireEvent.click(screen.getByRole('button', { name: '신고하기' }));
     await waitFor(() => expect(m.toast.error).toHaveBeenCalledWith('기타 신고는 내용을 적어 주세요'));
@@ -122,7 +122,7 @@ describe('ProblemReportDialog', () => {
   });
 
   it('문제 은행 문항이면 처음부터 그 문항의 원본을 연다', async () => {
-    render(<ProblemReportDialog open onClose={() => undefined} target={{ kind: 'problem', problemId: 'p9', label: '2025 압구정중 3번' }} />);
+    render(<ProblemReportDialog open onClose={() => undefined} target={{ kind: 'problem', problemId: 'p9', label: '2025 압구정중 3번', revision: 'prev' }} />);
     expect(screen.getByTestId('origin').textContent).toBe('원본:p9');
   });
 
@@ -134,7 +134,7 @@ describe('ProblemReportDialog', () => {
   });
 
   it('오류 종류는 브라우저 기본 고르기이고 터치 화면 글자는 16px — 아이폰이 초점에 확대하지 않게(코덱스 19·22·23R)', () => {
-    render(<ProblemReportDialog open onClose={() => undefined} target={{ kind: 'problem', problemId: 'p9', label: '문항' }} />);
+    render(<ProblemReportDialog open onClose={() => undefined} target={{ kind: 'problem', problemId: 'p9', label: '문항', revision: 'prev' }} />);
     const select = screen.getByRole('combobox', { name: '오류 종류' });
     expect(select.tagName).toBe('SELECT');
     // 터치 화면에서는 폭과 상관없이 16px(가로로 돌린 아이폰도, 23R)

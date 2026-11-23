@@ -54,7 +54,7 @@ export default function ProblemDetailActions({
       </Link>
       <ProblemReportButton
         look="link"
-        target={{ kind: 'problem', problemId: shown.id, label: sourceLabelWithNumber(source, shown.number) }}
+        target={{ kind: 'problem', problemId: shown.id, label: sourceLabelWithNumber(source, shown.number), revision: shown.updated_at }}
       />
 
       {onAdd && (

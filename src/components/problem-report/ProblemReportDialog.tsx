@@ -21,7 +21,8 @@ import { isPinchZoomed } from '@/hooks/useVisualViewportAnchor';
 export type ReportTarget =
   /** `revision` = 화면이 보고 있는 문제지 판(`updated_at`) — 다른 곳에서 순서를 바꿨으면 번호가 어긋나 신고를 막는다 */
   | { kind: 'paper'; paperId: string; revision: string }
-  | { kind: 'problem'; problemId: string; label: string };
+  /** `revision` = 창이 보여 주는 문항의 판(`updated_at`) — 다른 곳에서 태그·출처를 고쳤으면 신고 때 굳힐 값이 화면과 달라 막는다(sql/114) */
+  | { kind: 'problem'; problemId: string; label: string; revision: string };
 
 interface ProblemReportDialogProps {
   open: boolean;
@@ -90,7 +91,7 @@ export default function ProblemReportDialog({ open, onClose, target }: ProblemRe
       const id = await submitProblemReport({
         category, note: note.trim(),
         ...(target.kind === 'problem'
-          ? { problemId: target.problemId }
+          ? { problemId: target.problemId, problemRevision: target.revision }
           : { paperItemId: itemId, paperRevision: target.revision }),
       });
       const notified = await notifyProblemReport(id);

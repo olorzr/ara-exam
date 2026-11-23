@@ -18,6 +18,8 @@ export interface ReportInput {
   /** 문제지 항목이면 화면이 보고 있는 문제지 판(`updated_at`) — 다르면 RPC 가 거절한다(번호가 어긋난다) */
   paperRevision?: string;
   problemId?: string;
+  /** 문항 신고면 창이 보여 주는 문항 판(`updated_at`) — 다르면 RPC 가 거절한다(신고 때 태그가 화면과 달라진다, sql/114) */
+  problemRevision?: string;
 }
 
 /**
@@ -33,6 +35,7 @@ export async function submitProblemReport(input: ReportInput): Promise<string> {
     p_problem_id: input.problemId ?? null,
     p_paper_item_id: input.paperItemId ?? null,
     p_paper_revision: input.paperRevision ?? null,
+    p_problem_revision: input.problemRevision ?? null,
   });
   if (error) throw new Error(error.message);
   if (typeof data !== 'string') throw new Error('신고를 저장하지 못했어요.');

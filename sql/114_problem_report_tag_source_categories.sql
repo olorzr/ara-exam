@@ -7,6 +7,10 @@
 --   · 'source' 출처·번호 오류 — 교사용·문제 은행에 찍히는 출처('2026 중2 상현중 1학기 중간 17번')가 틀렸다(0.9.95 부터
 --     교사용에 늘 찍혀 선생님이 원본과 맞춰 본다).
 --   · 처리 흐름은 그대로다(원장 웍스 DM · 원장 처리). '기타' 만 내용을 꼭 적는다.
+--   · **문제 은행 신고는 화면이 본 문항 판(`p_problem_revision` = 문항 `updated_at`)을 싣는다**(코덱스 3R) — 상세 창을 열어 둔 사이
+--     다른 선생님이 태그를 고치면, 창은 옛 태그를 보여 주는데 RPC 는 고친 값을 '신고 때 태그' 로 굳힌다. 판이 다르면 40001 로
+--     거절하고 창을 다시 열게 한다(문제지 신고의 `p_paper_revision` 과 같은 수). 인자를 더해 서명이 여섯이 됐다 — 옛 다섯 서명은
+--     지운다(오버로드가 남으면 PostgREST 가 못 고른다). 배포 전 탭은 이 인자를 안 보내 대조를 건너뛴다(DEFAULT NULL).
 --   · **신고 때의 태그를 남긴다**(`tags` 칸, 코덱스 1R) — 태그 신고는 내용 없이도 되는데, 신고 스냅샷(문제지 항목 모양)에는
 --     단원·문법 태그가 없다. 원장이 보기 전에 태그를 고치거나 다시 적재하면 선생님이 짚은 값이 사라진다. 그래서 RPC 가
 --     신고하는 순간 원본 문항의 작품·단원·영역·문법 태그를 굳혀 둔다(종류와 상관없이 — 원본이 지워진 문제지 항목이면 NULL).
@@ -16,8 +20,12 @@
 -- ⚠️⚠️ 이제 신고 종류 CHECK 와 `exam.report_problem` 의 **정식 정의는 이 파일**이다.
 --   함수 본문은 sql/113 판에서 종류 목록 한 줄과 `tags` 를 굳히는 칸(두 SELECT 에 하나씩)만 다르다(적용 전에 운영 정의 = sql/113 파일임을 확인했다).
 --   sql/113 은 이 파일이 적용된 DB(`tags` 칸이 있다)에서 옛 report_problem 정의를 건너뛴다(코덱스 2R) — 다시 돌려도 안전하다.
--- 멱등: 칸은 IF NOT EXISTS, 제약은 지우고 다시 만들고, 함수는 CREATE OR REPLACE(서명 그대로 — 오버로드가 생기지 않는다).
+-- 멱등: 칸은 IF NOT EXISTS, 제약은 지우고 다시 만들고, 함수는 옛 다섯 서명을 지운 뒤 여섯 서명을 CREATE OR REPLACE.
 -- =============================================
+
+-- 정의는 한 트랜잭션으로 커밋한 **뒤에** 검증한다(코덱스 3R) — 검증이 실제 문제지 행을 FOR SHARE 로 잡는 동안 표 잠금(ALTER TABLE)을
+-- 들고 있으면, 그 문제지에서 항목을 지우는 선생님(문제지 행 잠금 → 신고 참조 SET NULL 로 이 표를 기다림)과 교착해 한쪽이 죽는다.
+BEGIN;
 
 -- ---------------------------------------------
 -- 1. 표의 종류 CHECK — 이름은 sql/113 의 인라인 CHECK 가 받은 기본 이름 그대로
@@ -49,6 +57,7 @@ REVOKE ALL ON FUNCTION exam.problem_report_tags(exam.problems) FROM PUBLIC, anon
 -- ---------------------------------------------
 -- 3. 신고 RPC — sql/113 판에서 종류 목록을 넓히고 태그를 굳힌다
 -- ---------------------------------------------
+DROP FUNCTION IF EXISTS exam.report_problem(TEXT, TEXT, UUID, UUID, TIMESTAMPTZ);
 -- ⚠️ 태그는 스냅샷과 **같은 문장**에서 읽는다(코덱스 2R) — 따로 읽으면 READ COMMITTED 에서 그 사이 커밋된 태그 수정이 끼어
 --   스냅샷(옛 작품·영역)과 '신고 때 태그'(새 값)가 다른 판이 된다. 문제지 항목은 스냅샷이 인쇄 때 모습이라 태그만 지금 원본이다.
 CREATE OR REPLACE FUNCTION exam.report_problem(
@@ -56,7 +65,8 @@ CREATE OR REPLACE FUNCTION exam.report_problem(
   p_note           TEXT DEFAULT '',
   p_problem_id     UUID DEFAULT NULL,
   p_paper_item_id  UUID DEFAULT NULL,
-  p_paper_revision TIMESTAMPTZ DEFAULT NULL
+  p_paper_revision TIMESTAMPTZ DEFAULT NULL,
+  p_problem_revision TIMESTAMPTZ DEFAULT NULL
 ) RETURNS UUID
   LANGUAGE plpgsql SECURITY DEFINER
   SET search_path = exam, pg_temp
@@ -70,6 +80,7 @@ DECLARE
   v_printed_no  INT;
   v_revision    TIMESTAMPTZ;
   v_tags        JSONB;
+  v_problem_rev TIMESTAMPTZ;
   v_id          UUID;
 BEGIN
   IF auth.uid() IS NULL OR NOT exam.is_allowed_domain() THEN
@@ -120,14 +131,19 @@ BEGIN
     END IF;
   ELSE
     -- 문제 은행에서 — 지금 원본을 문제지와 같은 모양으로 굳힌다
-    SELECT exam.paper_item_snapshot(p, ps, s), p.id, exam.problem_report_tags(p)
-      INTO v_snapshot, v_problem_id, v_tags
+    SELECT exam.paper_item_snapshot(p, ps, s), p.id, exam.problem_report_tags(p), p.updated_at
+      INTO v_snapshot, v_problem_id, v_tags, v_problem_rev
       FROM exam.problems p
       LEFT JOIN exam.passages ps ON ps.id = p.passage_id
       LEFT JOIN exam.problem_sources s ON s.id = p.source_id
      WHERE p.id = p_problem_id;
     IF v_snapshot IS NULL THEN
       RAISE EXCEPTION '문항을 찾지 못했어요 — 지워졌거나 다시 올라왔을 수 있어요' USING ERRCODE = 'no_data_found';
+    END IF;
+    -- 화면이 본 문항 판과 다르면 거절 — 창의 태그·출처와 굳힐 값이 달라진다(sql/114, 코덱스 3R). 같은 문장에서 읽은 판이라 굳힌 값과 짝이 맞다
+    IF p_problem_revision IS NOT NULL AND v_problem_rev <> p_problem_revision THEN
+      RAISE EXCEPTION '문항이 다른 곳에서 바뀌었어요. 창을 닫고 다시 연 뒤 신고해 주세요'
+        USING ERRCODE = 'serialization_failure';
     END IF;
   END IF;
 
@@ -141,10 +157,12 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION exam.report_problem(TEXT, TEXT, UUID, UUID, TIMESTAMPTZ) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION exam.report_problem(TEXT, TEXT, UUID, UUID, TIMESTAMPTZ) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION exam.report_problem(TEXT, TEXT, UUID, UUID, TIMESTAMPTZ, TIMESTAMPTZ) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION exam.report_problem(TEXT, TEXT, UUID, UUID, TIMESTAMPTZ, TIMESTAMPTZ) TO authenticated, service_role;
 
 NOTIFY pgrst, 'reload schema';
+
+COMMIT;
 
 -- ---------------------------------------------
 -- 검증 ① 모양 — 제약 하나 · 함수 하나 · 목록이 같은가
@@ -166,12 +184,12 @@ BEGIN
   IF (SELECT count(*) FROM pg_proc WHERE proname = 'report_problem' AND pronamespace = 'exam'::regnamespace) <> 1 THEN
     RAISE EXCEPTION 'sql/114: exam.report_problem 이 하나가 아니다';
   END IF;
-  SELECT pg_get_functiondef('exam.report_problem(text,text,uuid,uuid,timestamptz)'::regprocedure) INTO v_def;
+  SELECT pg_get_functiondef('exam.report_problem(text,text,uuid,uuid,timestamptz,timestamptz)'::regprocedure) INTO v_def;
   IF v_def NOT LIKE '%''figure'', ''tag'', ''source'', ''other''%' THEN
     RAISE EXCEPTION 'sql/114: report_problem 의 종류 목록이 넓혀지지 않았다';
   END IF;
-  IF NOT has_function_privilege('authenticated', 'exam.report_problem(text,text,uuid,uuid,timestamptz)', 'EXECUTE')
-     OR has_function_privilege('anon', 'exam.report_problem(text,text,uuid,uuid,timestamptz)', 'EXECUTE') THEN
+  IF NOT has_function_privilege('authenticated', 'exam.report_problem(text,text,uuid,uuid,timestamptz,timestamptz)', 'EXECUTE')
+     OR has_function_privilege('anon', 'exam.report_problem(text,text,uuid,uuid,timestamptz,timestamptz)', 'EXECUTE') THEN
     RAISE EXCEPTION 'sql/114: report_problem 실행 권한이 authenticated 만이 아니다';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
@@ -203,9 +221,10 @@ DECLARE
   v_id3     UUID;
   v_cat     TEXT;
   v_tags    JSONB;
+  v_prev    TIMESTAMPTZ;
 BEGIN
   -- 단원이 붙은 문항 — 태그가 원본 그대로 굳는지 본다
-  SELECT p.id, to_jsonb(p.unit_path) INTO v_problem, v_units
+  SELECT p.id, to_jsonb(p.unit_path), p.updated_at INTO v_problem, v_units, v_prev
     FROM exam.problems p WHERE cardinality(p.unit_path) > 0 ORDER BY p.created_at LIMIT 1;
   -- 원본 문항이 남은 문제지 항목
   SELECT i.id, p.updated_at INTO v_item, v_rev
@@ -221,7 +240,8 @@ BEGIN
     PERFORM set_config('request.jwt.claims', json_build_object(
       'sub', gen_random_uuid()::text, 'role', 'authenticated', 'email', 'verify-a@araeducation.co.kr')::text, true);
 
-    v_id1 := exam.report_problem('tag', '', v_problem, NULL, NULL);
+    -- 화면이 본 판을 실어 신고 — 같은 판이면 된다
+    v_id1 := exam.report_problem('tag', '', v_problem, NULL, NULL, v_prev);
     SELECT category, tags INTO v_cat, v_tags FROM exam.problem_reports WHERE id = v_id1;
     IF v_cat IS DISTINCT FROM 'tag' THEN RAISE EXCEPTION '태그 오류 신고가 이상하다 (%)', v_cat; END IF;
     IF v_tags -> 'unit_path' IS DISTINCT FROM v_units
@@ -242,6 +262,13 @@ BEGIN
     SELECT category INTO v_cat FROM exam.problem_reports WHERE id = v_id2;
     IF v_cat IS DISTINCT FROM 'source' THEN RAISE EXCEPTION '출처 오류 신고가 이상하다 (%)', v_cat; END IF;
 
+    -- 다른 판(창을 연 뒤 다른 곳에서 고쳐짐)이면 거절
+    BEGIN
+      PERFORM exam.report_problem('tag', '', v_problem, NULL, NULL, v_prev - interval '1 second');
+      RAISE EXCEPTION 'sql114_stale_problem_passed';
+    EXCEPTION WHEN serialization_failure THEN NULL;
+    END;
+
     BEGIN
       PERFORM exam.report_problem('evil', '', v_problem, NULL, NULL);
       RAISE EXCEPTION 'sql114_unknown_passed';
@@ -259,6 +286,6 @@ BEGIN
   IF EXISTS (SELECT 1 FROM exam.problem_reports WHERE id IN (v_id1, v_id2, v_id3)) THEN
     RAISE EXCEPTION 'sql/114: 검증용 신고가 되돌아가지 않았다';
   END IF;
-  RAISE NOTICE 'sql/114 실제 검증 통과 — 태그 오류(내용 없이, 원본 태그 굳힘 · 문제지 항목도) · 출처·번호 오류 신고 · 모르는 종류 거절 (전부 되돌림)';
+  RAISE NOTICE 'sql/114 실제 검증 통과 — 태그 오류(내용 없이, 원본 태그 굳힘 · 문제지 항목도) · 문항 옛 판 거절 · 출처·번호 오류 신고 · 모르는 종류 거절 (전부 되돌림)';
 END
 $verify_probe$;
