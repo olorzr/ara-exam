@@ -1,9 +1,10 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { reportSourceDetail, reportTagLines, type ReportState } from '@/lib/problem-report/display';
+import { reportSourceInput } from '@/lib/problem-report/display';
 import { sourceLabelWithNumber } from '@/lib/problem-bank/source-label';
 import type { ReportStateView } from '@/hooks/useReportState';
+import { ReportSourceFieldsView, ReportTagGroupsView } from './ReportValueParts';
 
 interface ReportCurrentStateProps {
   /** 고른 종류 — 그 종류의 값을 먼저 보여 준다 */
@@ -12,18 +13,9 @@ interface ReportCurrentStateProps {
 }
 
 /**
- * 태그 줄 — 원본 문항이 지워진 문제지 항목이면 null(태그 없음).
- * @param state - 굳힐 상태
- * @returns 줄 글 목록 또는 null
- */
-function tagLinesOf(state: ReportState): string[] | null {
-  return state.tags ? reportTagLines(state.tags).map((l) => `${l.label} ${l.value}`) : null;
-}
-
-/**
  * 태그·출처 신고 창의 '신고에 남을 값' — 지금 붙은 태그와 신고될 출처(원래 번호까지)를 **둘 다** 보여 준다(sql/114).
- * 둘 다 신고에 저장되고 서버가 둘 다 대조하므로(코덱스 6R — 출처 신고가 화면에 없는 태그 변경으로 거절되면 무엇이 바뀌었는지
- * 못 본다) 고른 종류의 값을 먼저 둔다. 문제 은행 상세 창은 문법 태그를 보여 주지 않아 여기서 확인한다(코덱스 4R).
+ * 둘 다 신고에 저장되고 서버가 둘 다 대조하므로(코덱스 6R) 고른 종류의 값을 먼저 둔다. 값은 서버가 정규화한 그대로이고
+ * 칸마다 따로 그린다 — 지문이 다르면 화면도 다르다(Stop 게이트). 문제 은행 상세 창은 문법 태그를 보여 주지 않아 여기서 확인한다(4R).
  * 읽지 못해도 신고는 막지 않는다(그때는 저장 순간의 값이 남는다).
  */
 export default function ReportCurrentState({ kind, view }: ReportCurrentStateProps) {
@@ -36,27 +28,25 @@ export default function ReportCurrentState({ kind, view }: ReportCurrentStatePro
       </p>
     );
   }
-  const tags = tagLinesOf(view.state);
-  const source = view.state.source ? sourceLabelWithNumber(view.state.source, view.state.number) : '';
-  const detail = view.state.source ? reportSourceDetail(view.state.source) : '';
+  const { tags, source, number } = view.state;
+  const input = reportSourceInput(source);
+  const label = input ? sourceLabelWithNumber(input, number) : '';
   const tagBlock = (
     <div key="tag">
       <p className="font-semibold">지금 붙은 태그</p>
       {tags === null ? (
         <p className="text-gray-500">원본 문항이 지워져 지금 붙은 태그가 없어요. 무엇이 틀렸는지 내용에 적어 주세요.</p>
-      ) : tags.length === 0 ? (
-        <p className="text-gray-500">붙은 태그가 없어요.</p>
       ) : (
-        tags.map((line) => <p key={line}>{line}</p>)
+        <ReportTagGroupsView tags={tags} />
       )}
     </div>
   );
   const sourceBlock = (
     <div key="source">
       <p className="font-semibold">신고될 출처</p>
-      <p className={source ? undefined : 'text-gray-500'}>{source || '출처가 비어 있어요.'}</p>
-      {/* 서버는 출처의 모든 칸을 대조한다 — 줄에 안 드러나는 칸(유형·학년·제목 …)도 보이게(7R) */}
-      {detail && detail !== source && <p className="text-[11px] text-gray-500">{detail}</p>}
+      {label && <p>{label}</p>}
+      {/* 서버는 출처의 모든 칸을 대조한다 — 줄에 안 드러나는 칸(유형·학년·제목 …)도 칸마다(7·8R) */}
+      <div className="text-[11px]"><ReportSourceFieldsView source={source} number={number} /></div>
     </div>
   );
   return (

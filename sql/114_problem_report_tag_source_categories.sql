@@ -60,13 +60,55 @@ REVOKE ALL ON FUNCTION exam.problem_report_tags(exam.problems) FROM PUBLIC, anon
 DROP FUNCTION IF EXISTS exam.problem_report_state(UUID);
 DROP FUNCTION IF EXISTS exam.problem_report_state_of(exam.problems, exam.problem_sources);
 
--- 신고 창이 보여 주는 '굳힐 상태' — 태그 넷(원본이 없으면 null) + 굳힐 출처 + 원래 번호.
--- 지문은 이 jsonb 글의 md5(jsonb 글은 키 차례가 정해져 있다). 만드는 곳은 이 함수 하나 — 창이 읽는 쪽과 신고가 견주는 쪽이 같은 식이다
+-- 글 한 칸 정규화 — 탭·줄바꿈을 포함한 연속 공백을 한 칸으로 접은 **뒤에** 앞뒤를 걷는다, 비면 null.
+-- 화면이 보여 주는 모양과 같게(HTML 은 공백을 접는다). ⚠️ 차례를 바꾸지 말 것 — btrim 은 띄어쓰기만 걷어, 먼저 걷으면 앞뒤
+-- 탭·줄바꿈이 남아 공백 한 칸이 되고 화면은 같은데 지문이 달라졌다(Stop 게이트)
+CREATE OR REPLACE FUNCTION exam.problem_report_norm_text(v TEXT)
+RETURNS TEXT LANGUAGE sql IMMUTABLE
+SET search_path = exam, pg_temp
+AS $$
+  SELECT NULLIF(btrim(regexp_replace(COALESCE(v, ''), '\s+', ' ', 'g')), '');
+$$;
+REVOKE ALL ON FUNCTION exam.problem_report_norm_text(TEXT) FROM PUBLIC, anon, authenticated;
+
+-- 글 목록 정규화 — 칸마다 위처럼, 빈 칸은 뺀다(차례는 그대로). 배열이 아니면 빈 배열
+CREATE OR REPLACE FUNCTION exam.problem_report_norm_list(v JSONB)
+RETURNS JSONB LANGUAGE sql IMMUTABLE
+SET search_path = exam, pg_temp
+AS $$
+  SELECT COALESCE(jsonb_agg(to_jsonb(t.x) ORDER BY t.ord), '[]'::jsonb)
+    FROM (SELECT exam.problem_report_norm_text(e) AS x, ord
+            FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(v) = 'array' THEN v ELSE '[]'::jsonb END)
+                 WITH ORDINALITY AS a(e, ord)) t
+   WHERE t.x IS NOT NULL;
+$$;
+REVOKE ALL ON FUNCTION exam.problem_report_norm_list(JSONB) FROM PUBLIC, anon, authenticated;
+
+-- 신고 창이 보여 주는 '굳힐 상태' — 태그 넷(원본이 없으면 null) + 굳힐 출처 여덟 칸 + 원래 번호, **정규화한 모양**.
+-- 지문은 이 jsonb 글의 md5(jsonb 글은 키 차례가 정해져 있다). 만드는 곳은 이 함수 하나 — 창이 읽는 쪽과 신고가 견주는 쪽이 같은 식이다.
+-- ⚠️ 정규화하는 까닭(Stop 게이트): 날값으로 지문을 만들면 빈 글·null·키 없음·공백만 다른 두 상태가 화면에선 똑같이 보이는데 신고는
+--   '바뀌었어요' 로 거절된다. 창은 이 정규화된 값을 그대로 그린다 — 지문이 다르면 화면도 다르다(목록 칸은 칸마다 따로 그린다)
 CREATE OR REPLACE FUNCTION exam.problem_report_state_build(p_tags JSONB, p_source JSONB, p_number JSONB)
 RETURNS JSONB LANGUAGE sql IMMUTABLE
 SET search_path = exam, pg_temp
 AS $$
-  SELECT jsonb_build_object('tags', p_tags, 'source', p_source, 'number', p_number);
+  SELECT jsonb_build_object(
+    'tags', CASE WHEN jsonb_typeof(p_tags) = 'object' THEN jsonb_build_object(
+              'work_titles',   exam.problem_report_norm_list(p_tags -> 'work_titles'),
+              'unit_path',     exam.problem_report_norm_list(p_tags -> 'unit_path'),
+              'area_path',     exam.problem_report_norm_list(p_tags -> 'area_path'),
+              'grammar_paths', exam.problem_report_norm_list(p_tags -> 'grammar_paths')) END,
+    'source', CASE WHEN jsonb_typeof(p_source) = 'object' THEN jsonb_build_object(
+              'source_type', exam.problem_report_norm_text(p_source ->> 'source_type'),
+              'title',       exam.problem_report_norm_text(p_source ->> 'title'),
+              'year',        exam.problem_report_norm_text(p_source ->> 'year'),
+              'grade',       exam.problem_report_norm_text(p_source ->> 'grade'),
+              'school_name', exam.problem_report_norm_text(p_source ->> 'school_name'),
+              'publisher',   exam.problem_report_norm_text(p_source ->> 'publisher'),
+              'semester',    exam.problem_report_norm_text(p_source ->> 'semester'),
+              'exam_type',   exam.problem_report_norm_text(p_source ->> 'exam_type')) END,
+    -- 번호는 정수만(화면이 정수만 'N번' 으로 그린다)
+    'number', CASE WHEN jsonb_typeof(p_number) = 'number' AND p_number::text ~ '^-?[0-9]+$' THEN p_number END);
 $$;
 REVOKE ALL ON FUNCTION exam.problem_report_state_build(JSONB, JSONB, JSONB) FROM PUBLIC, anon, authenticated;
 
@@ -259,7 +301,9 @@ BEGIN
     RAISE EXCEPTION 'sql/114: problem_reports.tags 칸이 없다';
   END IF;
   IF has_function_privilege('authenticated', 'exam.problem_report_tags(exam.problems)', 'EXECUTE')
-     OR has_function_privilege('authenticated', 'exam.problem_report_state_build(jsonb,jsonb,jsonb)', 'EXECUTE') THEN
+     OR has_function_privilege('authenticated', 'exam.problem_report_state_build(jsonb,jsonb,jsonb)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'exam.problem_report_norm_text(text)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'exam.problem_report_norm_list(jsonb)', 'EXECUTE') THEN
     RAISE EXCEPTION 'sql/114: 태그·상태 헬퍼가 브라우저에 열려 있다';
   END IF;
   IF NOT has_function_privilege('authenticated', 'exam.problem_report_state(uuid,uuid)', 'EXECUTE')
@@ -271,7 +315,20 @@ BEGIN
      OR NOT has_column_privilege('authenticated', 'exam.problem_reports', 'tags', 'SELECT') THEN
     RAISE EXCEPTION 'sql/114: tags 칸 권한이 읽기 하나가 아니다';
   END IF;
-  RAISE NOTICE 'sql/114 모양 통과 — 종류 CHECK 1 · 신고 RPC 1 · 목록 일곱 · 권한 그대로 · tags 칸(읽기만)';
+  -- 정규화 — 빈 글·null·키 없음·공백만 다른 상태는 같은 지문, 칸을 옮기면 다른 지문
+  IF exam.problem_report_state_build(NULL, '{"title":"수능  ", "grade":""}', '3')
+     IS DISTINCT FROM exam.problem_report_state_build(NULL, '{"title":" 수능", "grade":null, "semester":"   "}', '3')
+     -- 탭·줄바꿈만 다른 값도 같은 지문(앞뒤든 안쪽이든)
+     OR exam.problem_report_state_build('{"work_titles":["\t동백꽃\n", "봄\t\n봄"]}', '{"title":"\n수능\t", "grade":"\t"}', NULL)
+        IS DISTINCT FROM exam.problem_report_state_build('{"work_titles":["동백꽃", "봄 봄"]}', '{"title":"수능"}', NULL)
+     OR exam.problem_report_state_build('{"work_titles":["가", " ", "나  다"]}', NULL, NULL) -> 'tags' -> 'work_titles'
+        IS DISTINCT FROM '["가", "나 다"]'::jsonb
+     OR exam.problem_report_state_build(NULL, '{"school_name":"서울시교육청"}', NULL)
+        = exam.problem_report_state_build(NULL, '{"publisher":"서울시교육청"}', NULL)
+     OR exam.problem_report_state_build(NULL, NULL, '"3"') -> 'number' <> 'null'::jsonb THEN
+    RAISE EXCEPTION 'sql/114: 상태 정규화가 이상하다';
+  END IF;
+  RAISE NOTICE 'sql/114 모양 통과 — 종류 CHECK 1 · 신고 RPC 1 · 목록 일곱 · 권한 그대로 · tags 칸(읽기만) · 상태 정규화';
 END
 $verify_shape$;
 
@@ -291,6 +348,11 @@ DECLARE
   v_tags    JSONB;
   v_state   JSONB;
   v_istate  JSONB;
+  -- 기대값(정규화한 모양) — 헬퍼는 브라우저 역할에 안 열려 있어 역할을 바꾸기 **전에** 만든다
+  v_exp_tags    JSONB;
+  v_exp_number  JSONB;
+  v_exp_isource JSONB;
+  v_exp_inumber JSONB;
 BEGIN
   -- 단원이 붙은 문항을 먼저(태그가 원본 그대로 굳는지 본다) — 없으면 아무 문항으로라도 동작은 다 돌린다(코덱스 8R)
   SELECT p.id, to_jsonb(p.unit_path) INTO v_problem, v_units
@@ -303,6 +365,16 @@ BEGIN
     RAISE NOTICE 'sql/114: 문항이 없어 실제 검증은 건너뛴다 (신규 환경)';
     RETURN;
   END IF;
+  SELECT exam.problem_report_state_build(exam.problem_report_tags(p), NULL, NULL) -> 'tags',
+         COALESCE(exam.problem_report_state_build(NULL, NULL, to_jsonb(p.number)) -> 'number', 'null'::jsonb)
+    INTO v_exp_tags, v_exp_number
+    FROM exam.problems p WHERE p.id = v_problem;
+  IF v_item IS NOT NULL THEN
+    SELECT COALESCE(exam.problem_report_state_build(NULL, i.snapshot -> 'source', NULL) -> 'source', 'null'::jsonb),
+           COALESCE(exam.problem_report_state_build(NULL, NULL, i.snapshot -> 'number') -> 'number', 'null'::jsonb)
+      INTO v_exp_isource, v_exp_inumber
+      FROM exam.problem_paper_items i WHERE i.id = v_item;
+  END IF;
 
   BEGIN
     EXECUTE 'SET LOCAL ROLE authenticated';
@@ -311,11 +383,11 @@ BEGIN
 
     -- 창이 읽는 지금 상태 — 태그가 원본 그대로이고 지문이 붙는다
     v_state := exam.problem_report_state(v_problem);
-    IF v_state -> 'tags' -> 'unit_path' IS DISTINCT FROM v_units OR length(v_state ->> 'token') <> 32
+    -- 상태는 정규화한 모양이다 — 같은 정규화를 거친 원본과 견준다(번호 없는 문항이면 JSON null, 코덱스 7R)
+    IF v_state -> 'tags' IS DISTINCT FROM v_exp_tags
+       OR length(v_state ->> 'token') <> 32
        OR jsonb_typeof(v_state -> 'source') <> 'object'
-       -- 번호 없는 문항이면 상태엔 JSON null, to_jsonb 는 SQL NULL 이다 — 같은 표현으로 견준다(코덱스 7R)
-       OR v_state -> 'number' IS DISTINCT FROM
-          (SELECT COALESCE(to_jsonb(p.number), 'null'::jsonb) FROM exam.problems p WHERE p.id = v_problem) THEN
+       OR v_state -> 'number' IS DISTINCT FROM v_exp_number THEN
       RAISE EXCEPTION '지금 상태가 이상하다: %', v_state;
     END IF;
     -- 그 지문을 실어 신고 — 같으면 된다
@@ -331,10 +403,8 @@ BEGIN
     IF v_item IS NOT NULL THEN
       -- 문제지 항목은 항목 기준 — 출처·번호가 항목 스냅샷(신고가 굳힐 값)과 같아야 한다
       v_istate := exam.problem_report_state(NULL, v_item);
-      IF v_istate -> 'source' IS DISTINCT FROM
-           (SELECT COALESCE(i.snapshot -> 'source', 'null'::jsonb) FROM exam.problem_paper_items i WHERE i.id = v_item)
-         OR v_istate -> 'number' IS DISTINCT FROM
-           (SELECT COALESCE(i.snapshot -> 'number', 'null'::jsonb) FROM exam.problem_paper_items i WHERE i.id = v_item) THEN
+      IF v_istate -> 'source' IS DISTINCT FROM v_exp_isource
+         OR v_istate -> 'number' IS DISTINCT FROM v_exp_inumber THEN
         RAISE EXCEPTION '문제지 항목의 상태가 항목 스냅샷과 다르다: %', v_istate;
       END IF;
       v_id3 := exam.report_problem('tag', '', NULL, v_item, v_rev, v_istate ->> 'token');

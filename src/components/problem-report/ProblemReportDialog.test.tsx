@@ -86,8 +86,8 @@ describe('ProblemReportDialog', () => {
     // 읽는 동안은 신고를 못 누른다(보여 준 값과 지문이 짝이어야 한다)
     expect(screen.getByRole('button', { name: '신고하기' })).toHaveProperty('disabled', true);
     expect(await screen.findByText('지금 붙은 태그')).toBeTruthy();
-    expect(screen.getByText('작품 동백꽃')).toBeTruthy();
-    expect(screen.getByText('문법 단어 > 품사')).toBeTruthy();
+    expect(screen.getByText('동백꽃')).toBeTruthy();
+    expect(screen.getByText('단어 > 품사')).toBeTruthy();
     expect(m.state).toHaveBeenCalledWith({ problemId: 'p9' });
     fireEvent.click(screen.getByRole('button', { name: '신고하기' }));
     await waitFor(() => expect(onClose).toHaveBeenCalled());

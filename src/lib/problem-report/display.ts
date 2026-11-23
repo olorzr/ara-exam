@@ -1,4 +1,3 @@
-import { areaPathLabel } from '@/lib/problem-bank/area-tree';
 import { sourceLabel, type SourceLabelInput } from '@/lib/problem-bank/source-label';
 import type { ProblemSourceType } from '@/types/problem-bank';
 import { withOriginalNumber, type ReportCategory } from './types';
@@ -22,8 +21,15 @@ export interface ReportTags {
   grammar_paths: string[];
 }
 
-/** 태그 한 줄 — 이름표와 값 */
-export interface ReportTagLine {
+/** 태그 한 갈래 — 이름표와 값 목록. `path` 면 값이 경로 마디(대단원 › 소단원)다 */
+export interface ReportTagGroup {
+  label: string;
+  values: string[];
+  path: boolean;
+}
+
+/** 출처 칸 하나 — 이름표와 값 */
+export interface ReportSourceField {
   label: string;
   value: string;
 }
@@ -159,18 +165,19 @@ export function parseReportTags(value: unknown): ReportTags | null {
 }
 
 /**
- * 태그 줄 — 값이 있는 것만, 작품 · 단원 · 영역 · 문법 차례. 문법은 전체 경로(카드는 끝 마디만 칩으로 낸다 — 원장이 고칠 자리를 바로 짚게).
- * @param tags - 신고 때의 태그
- * @returns 줄 목록(다 비었으면 빈 배열)
+ * 태그 갈래 — 값이 있는 것만, 작품 · 단원 · 영역 · 문법 차례. 화면은 **값마다 칸 하나**로 그린다 — 글로 이으면
+ * ['가, 나'] 와 ['가', '나'] 가, 마디 하나 'A > B' 와 마디 둘이 똑같이 보인다(Stop 게이트). 문법은 전체 경로 한 칸.
+ * @param tags - 태그
+ * @returns 갈래 목록(다 비었으면 빈 배열)
  */
-export function reportTagLines(tags: ReportTags): ReportTagLine[] {
-  const lines: ReportTagLine[] = [
-    { label: '작품', value: tags.work_titles.join(', ') },
-    { label: '단원', value: areaPathLabel(tags.unit_path) },
-    { label: '영역', value: areaPathLabel(tags.area_path) },
-    { label: '문법', value: tags.grammar_paths.join(', ') },
+export function reportTagGroups(tags: ReportTags): ReportTagGroup[] {
+  const groups: ReportTagGroup[] = [
+    { label: '작품', values: tags.work_titles, path: false },
+    { label: '단원', values: tags.unit_path, path: true },
+    { label: '영역', values: tags.area_path, path: true },
+    { label: '문법', values: tags.grammar_paths, path: false },
   ];
-  return lines.filter((line) => line.value !== '');
+  return groups.filter((g) => g.values.length > 0);
 }
 
 /**
@@ -180,7 +187,8 @@ export function reportTagLines(tags: ReportTags): ReportTagLine[] {
 export interface ReportState {
   /** 지금 원본의 태그 — 원본 문항이 지워진 문제지 항목이면 null */
   tags: ReportTags | null;
-  source: SourceLabelInput | null;
+  /** 굳힐 출처(서버가 정규화한 jsonb 그대로 — 그릴 때 `reportSourceInput`·`reportSourceFields` 로 읽는다). 없으면 null */
+  source: unknown;
   /** 원래 번호 */
   number: number | null;
   /** 이 상태의 지문 — 신고에 실어 보내면 RPC 가 굳힐 값과 견준다(브라우저는 견주지 않는다) */
@@ -201,7 +209,7 @@ export function parseReportState(value: unknown): ReportState | null {
   const number = fieldOf(value, 'number');
   return {
     tags: parseReportTags(fieldOf(value, 'tags')),
-    source: reportSourceInput(fieldOf(value, 'source')),
+    source: fieldOf(value, 'source') ?? null,
     number: typeof number === 'number' && Number.isInteger(number) ? number : null,
     token,
   };
@@ -230,16 +238,15 @@ const SOURCE_FIELDS: readonly { key: keyof SourceLabelInput; label: string }[] =
 ];
 
 /**
- * 출처의 모든 칸을 이름표와 함께 한 줄로 — 신고 창(출처 줄 아래)과 출처 신고의 목록 줄이 쓴다.
+ * 출처의 모든 칸 — 이름표와 값, 빈 칸은 뺀다. 신고 창(출처 줄 아래)과 출처 신고의 목록 줄이 칸마다 따로 그린다.
  * 지문은 출처의 칸을 전부 담으므로 출처 줄(모의고사는 제목만, 내신은 제목이 없다)만 보이면 바뀐 칸이 안 보인 채 거절될 수 있고(7R),
- * 이름표가 없으면 값이 다른 칸으로 옮겨 가도(학교 → 출판사) 같은 줄로 보인다(8R). 빈 칸은 뺀다.
- * @param source - 출처
- * @returns '유형 모의고사 · 제목 2026학년도 수능 (언어와 매체) · 학년도 2026 · 학년 고3 · 시험 수능' 같은 줄
+ * 이름표가 없으면 값이 다른 칸으로 옮겨 가도(학교 → 출판사) 같아 보인다(8R). 유형을 모르는 출처도 칸은 다 읽는다.
+ * @param source - 출처(jsonb)
+ * @returns 칸 목록(객체가 아니면 null — '출처 없음' 과 '칸이 모두 빔'(빈 배열)을 가른다)
  */
-export function reportSourceDetail(source: SourceLabelInput): string {
+export function reportSourceFields(source: unknown): ReportSourceField[] | null {
+  if (typeof source !== 'object' || source === null || Array.isArray(source)) return null;
   return SOURCE_FIELDS
-    .map(({ key, label }) => ({ label, value: (source[key] ?? '').trim() }))
-    .filter((f) => f.value !== '')
-    .map((f) => `${f.label} ${f.value}`)
-    .join(' · ');
+    .map(({ key, label }) => ({ label, value: textOf(source, key).trim() }))
+    .filter((f) => f.value !== '');
 }

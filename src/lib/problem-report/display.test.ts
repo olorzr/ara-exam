@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  INTAKE_SOURCE_LABEL_MAX, categoryShowsState, intakeSourceLabel, reportSourceDetail, sliceUnits, parseReportState, parseReportTags, reportSourceInput, reportSourceLabel, reportTagLines,
+  INTAKE_SOURCE_LABEL_MAX, categoryShowsState, intakeSourceLabel, reportSourceFields, sliceUnits, parseReportState, parseReportTags, reportSourceInput, reportSourceLabel, reportTagGroups,
 } from './display';
 
 const mock = {
@@ -45,16 +45,16 @@ describe('신고 때의 태그', () => {
     });
   });
 
-  it('줄은 값이 있는 것만, 작품 · 단원 · 영역 · 문법 차례', () => {
-    expect(reportTagLines({
+  it('갈래는 값이 있는 것만, 작품 · 단원 · 영역 · 문법 차례 — 값은 낱낱이(이어 붙이지 않는다)', () => {
+    expect(reportTagGroups({
       work_titles: ['동백꽃', '봄봄'], unit_path: ['1. 문학', '(1) 동백꽃'], area_path: [],
-      grammar_paths: ['단어 > 품사 > 명사', '문장 > 문장 성분'],
+      grammar_paths: ['단어 > 품사 > 명사'],
     })).toEqual([
-      { label: '작품', value: '동백꽃, 봄봄' },
-      { label: '단원', value: '1. 문학 > (1) 동백꽃' },
-      { label: '문법', value: '단어 > 품사 > 명사, 문장 > 문장 성분' },
+      { label: '작품', values: ['동백꽃', '봄봄'], path: false },
+      { label: '단원', values: ['1. 문학', '(1) 동백꽃'], path: true },
+      { label: '문법', values: ['단어 > 품사 > 명사'], path: false },
     ]);
-    expect(reportTagLines({ work_titles: [], unit_path: [], area_path: [], grammar_paths: [] })).toEqual([]);
+    expect(reportTagGroups({ work_titles: [], unit_path: [], area_path: [], grammar_paths: [] })).toEqual([]);
   });
 });
 
@@ -91,7 +91,7 @@ describe('지금 상태', () => {
     expect(state?.token).toBe('abc');
     expect(state?.number).toBe(17);
     expect(state?.tags?.work_titles).toEqual(['동백꽃']);
-    expect(state?.source?.school_name).toBe('상현중');
+    expect(reportSourceInput(state?.source)?.school_name).toBe('상현중');
     expect(parseReportState({ tags: {}, token: '' })).toBeNull();
     // 원본이 지워진 문제지 항목 — 태그는 없고 출처·번호는 있다
     expect(parseReportState({ tags: null, source: school, number: '3', token: 'abc' })).toMatchObject({ tags: null, number: null });
@@ -116,13 +116,15 @@ describe('글자 경계 자르기', () => {
   });
 });
 
-describe('reportSourceDetail', () => {
-  it('출처의 칸을 이름표와 함께 전부 잇는다(빈 칸은 뺀다)', () => {
-    expect(reportSourceDetail(reportSourceInput(mock)!)).toBe('유형 모의고사 · 제목 2026학년도 수능 (언어와 매체) · 학년도 2026 · 학년 고3 · 시험 수능');
-    expect(reportSourceDetail(reportSourceInput(school)!)).toBe('유형 내신기출 · 제목 상현중 기출 · 학년도 2026 · 학년 중2 · 학교 상현중 · 학기 1학기 · 시험 중간');
-    // 값이 다른 칸으로 옮겨 가면 줄이 달라진다(이름표가 없으면 같아 보였다)
-    const asSchool = reportSourceDetail({ ...reportSourceInput(mock)!, school_name: '서울시교육청' });
-    const asPublisher = reportSourceDetail({ ...reportSourceInput(mock)!, publisher: '서울시교육청' });
-    expect(asSchool).not.toBe(asPublisher);
+describe('reportSourceFields', () => {
+  it('출처의 칸을 이름표와 함께 낱낱이(빈 칸은 뺀다), 객체가 아니면 null', () => {
+    expect(reportSourceFields(mock)).toEqual([
+      { label: '유형', value: '모의고사' }, { label: '제목', value: '2026학년도 수능 (언어와 매체)' },
+      { label: '학년도', value: '2026' }, { label: '학년', value: '고3' }, { label: '시험', value: '수능' },
+    ]);
+    expect(reportSourceFields({ ...mock, school_name: '서울시교육청' })).not.toEqual(reportSourceFields({ ...mock, publisher: '서울시교육청' }));
+    expect(reportSourceFields({ source_type: '엉뚱', title: '제목' })).toEqual([{ label: '유형', value: '엉뚱' }, { label: '제목', value: '제목' }]);
+    expect(reportSourceFields({})).toEqual([]);
+    expect(reportSourceFields(null)).toBeNull();
   });
 });

@@ -4,9 +4,8 @@ import Link from 'next/link';
 import { ItemNo } from '@/components/magazine';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  parseReportTags, reportSourceDetail, reportSourceInput, reportSourceLabel, reportTagLines,
-} from '@/lib/problem-report/display';
+import { parseReportTags, reportSourceLabel } from '@/lib/problem-report/display';
+import { ReportSourceFieldsView, ReportTagGroupsView } from './ReportValueParts';
 import {
   REPORT_CATEGORY_LABELS, REPORT_STATUS_LABELS, reportExcerpt, reportPlaceLabel, withOriginalNumber,
   type ProblemReport, type ReportStatus,
@@ -57,7 +56,7 @@ export default function ProblemReportRow({ report, n, reporter, sourceId, onReso
           )}
           {excerpt && <p className="text-xs break-keep [overflow-wrap:anywhere] text-gray-500">{excerpt}</p>}
           {report.category === 'tag' && <ReportTagsLine tags={report.tags} />}
-          {report.category === 'source' && <ReportSourceFields source={report.snapshot?.source} />}
+          {report.category === 'source' && <ReportSourceFields source={report.snapshot?.source} number={report.snapshot?.number} />}
           {report.note && (
             <p className="text-sm whitespace-pre-wrap break-keep [overflow-wrap:anywhere] text-gray-800">{report.note}</p>
           )}
@@ -108,13 +107,11 @@ function ReportTagsLine({ tags }: { tags: unknown }) {
   if (!parsed) {
     return <p className="text-xs text-gray-500">신고 때 태그는 남지 않았어요 — 원본 문항이 없었거나 예전 신고예요.</p>;
   }
-  const lines = reportTagLines(parsed);
-  if (lines.length === 0) return <p className="text-xs text-gray-500">신고 때 붙은 태그가 없었어요.</p>;
   return (
-    <p className="text-xs break-keep [overflow-wrap:anywhere] text-gray-600">
-      <span className="font-semibold text-gray-700">신고 때 태그</span>
-      {lines.map((line) => <span key={line.label}> · {line.label} {line.value}</span>)}
-    </p>
+    <div className="text-xs break-keep [overflow-wrap:anywhere] text-gray-600">
+      <p className="font-semibold text-gray-700">신고 때 태그</p>
+      <ReportTagGroupsView tags={parsed} />
+    </div>
   );
 }
 
@@ -122,14 +119,13 @@ function ReportTagsLine({ tags }: { tags: unknown }) {
  * 출처 신고의 '신고 때 출처' 줄 — 신고 창이 보여 준 칸 전부(이름표와 함께, 스냅샷 출처). 위의 출처 줄은 모의고사면 제목뿐이라
  * 선생님이 짚은 학년·시험 칸이 안 보인다(코덱스 8R).
  * @param props.source - 신고 스냅샷의 출처
+ * @param props.number - 신고 스냅샷의 원래 번호
  */
-function ReportSourceFields({ source }: { source: unknown }) {
-  const input = reportSourceInput(source);
-  const detail = input ? reportSourceDetail(input) : '';
-  if (!detail) return <p className="text-xs text-gray-500">신고 때 출처 칸이 비어 있었어요.</p>;
+function ReportSourceFields({ source, number }: { source: unknown; number: unknown }) {
   return (
-    <p className="text-xs break-keep [overflow-wrap:anywhere] text-gray-600">
-      <span className="font-semibold text-gray-700">신고 때 출처</span> · {detail}
-    </p>
+    <div className="text-xs break-keep [overflow-wrap:anywhere] text-gray-600">
+      <p className="font-semibold text-gray-700">신고 때 출처</p>
+      <ReportSourceFieldsView source={source} number={typeof number === 'number' && Number.isInteger(number) ? number : null} />
+    </div>
   );
 }

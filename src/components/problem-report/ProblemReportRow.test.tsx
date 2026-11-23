@@ -46,9 +46,9 @@ describe('ProblemReportRow', () => {
     const { rerender } = render(<ul><ProblemReportRow report={tagReport} n={1} /></ul>);
     expect(screen.getByText('태그 오류 (작품·단원·영역)')).toBeTruthy();
     expect(screen.getByText('신고 때 태그')).toBeTruthy();
-    expect(screen.getByText('· 작품 춘향전')).toBeTruthy();
-    expect(screen.getByText('· 단원 2. 고전')).toBeTruthy();
-    expect(screen.queryByText(/· 문법/)).toBeNull();
+    expect(screen.getByText('춘향전')).toBeTruthy();
+    expect(screen.getByText('2. 고전')).toBeTruthy();
+    expect(screen.queryByText('문법')).toBeNull();
     rerender(<ul><ProblemReportRow report={{ ...tagReport, tags: null }} n={1} /></ul>);
     expect(screen.getByText(/신고 때 태그는 남지 않았어요/)).toBeTruthy();
     // 다른 종류에는 태그 줄이 없다
@@ -63,7 +63,9 @@ describe('ProblemReportRow', () => {
     } as unknown as ProblemReport;
     render(<ul><ProblemReportRow report={sourceReport} n={1} /></ul>);
     expect(screen.getByText('신고 때 출처')).toBeTruthy();
-    expect(screen.getByText(/학년 고3 · 시험 수능/)).toBeTruthy();
+    expect(screen.getByText('고3')).toBeTruthy();
+    expect(screen.getByText('수능')).toBeTruthy();
+    expect(screen.getByText('원래 번호')).toBeTruthy();
   });
 
   it('처리 단추는 원장(onResolve)에게만 그린다', () => {
