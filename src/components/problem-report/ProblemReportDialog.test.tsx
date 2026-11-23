@@ -99,6 +99,8 @@ describe('ProblemReportDialog', () => {
     const select = screen.getByRole('combobox', { name: '오류 종류' });
     fireEvent.change(select, { target: { value: 'source' } });
     expect(await screen.findByText('2026 중2 상현중 1학기 중간 7번')).toBeTruthy();
+    // 출처 신고도 태그를 함께 보여 준다(둘 다 신고에 남고 둘 다 대조된다)
+    expect(screen.getByText('지금 붙은 태그')).toBeTruthy();
     fireEvent.change(select, { target: { value: 'answer' } });
     expect(screen.queryByText('신고될 출처')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '신고하기' }));
@@ -122,7 +124,7 @@ describe('ProblemReportDialog', () => {
     m.state.mockRejectedValueOnce(new Error('x'));
     render(<ProblemReportDialog open onClose={() => undefined} target={{ kind: 'problem', problemId: 'p9', label: '문항' }} />);
     fireEvent.change(screen.getByRole('combobox', { name: '오류 종류' }), { target: { value: 'tag' } });
-    expect(await screen.findByText(/지금 붙은 태그를 불러오지 못했어요/)).toBeTruthy();
+    expect(await screen.findByText(/신고에 남을 태그·출처를 불러오지 못했어요/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '신고하기' }));
     await waitFor(() => expect(m.submit).toHaveBeenCalledWith({ category: 'tag', note: '', problemId: 'p9' }));
   });

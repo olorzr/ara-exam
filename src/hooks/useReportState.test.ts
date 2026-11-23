@@ -59,6 +59,22 @@ describe('useReportState', () => {
     await waitFor(() => expect(result.current.state?.token).toBe('c'));
   });
 
+  it('A → B → A 로 돌아오면 새 요청 — A 의 옛 실패를 내주지 않는다', async () => {
+    m.fetch.mockRejectedValueOnce(new Error('A 실패'));
+    m.fetch.mockImplementationOnce(() => new Promise(() => undefined));
+    let release: (v: unknown) => void = () => undefined;
+    m.fetch.mockImplementationOnce(() => new Promise((r) => { release = r; }));
+    const A = { paperItemId: 'a' };
+    const B = { paperItemId: 'b' };
+    const { result, rerender } = renderHook(({ subject }) => useReportState(subject, true), { initialProps: { subject: A } });
+    await waitFor(() => expect(result.current.failed).toBe(true));
+    rerender({ subject: B });
+    rerender({ subject: A });
+    expect(result.current).toMatchObject({ loading: true, failed: false });
+    act(() => release(stateOf('a2')));
+    await waitFor(() => expect(result.current.state?.token).toBe('a2'));
+  });
+
   it('문제지 항목은 항목으로 읽는다', async () => {
     m.fetch.mockResolvedValue(stateOf('i'));
     const { result } = renderHook(() => useReportState({ paperItemId: 'i1' }, true));
