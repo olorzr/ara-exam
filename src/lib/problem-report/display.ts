@@ -1,6 +1,6 @@
 import { sourceLabel, type SourceLabelInput } from '@/lib/problem-bank/source-label';
 import type { ProblemSourceType } from '@/types/problem-bank';
-import { withOriginalNumber, type ReportCategory } from './types';
+import type { ReportCategory } from './types';
 
 /**
  * 오류 신고 목록·원장 알림에 찍는 글 — 출처 줄과 신고 때의 태그(순수, 서버 라우트도 쓴다).
@@ -50,8 +50,8 @@ export function normalizeReportText(value: string): string {
   return value.normalize('NFC').replace(REPORT_HTML_SPACE_RUNS, ' ').replace(/^ +| +$/g, '');
 }
 
-/** 화면에서 안 보이거나 공백처럼 보여 드러내 그릴 글자 — 제어·서식(방향 제어·폭 없는 공백·BOM …)·띄어쓰기 아닌 공백·줄/문단 구분 */
-const REPORT_HIDDEN_CHAR = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Zs}]/u;
+/** 화면에서 안 보이거나 공백처럼 보여 드러내 그릴 글자 — 제어·서식(방향 제어·폭 없는 공백·BOM …)·띄어쓰기 아닌 공백·줄/문단 구분·기본 무시 글자(결합 글자 잇기·이체자 선택자·채움 글자 …, 코덱스 11R) */
+const REPORT_HIDDEN_CHAR = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Zs}\p{Default_Ignorable_Code_Point}]/u;
 
 /** 글 조각 — 보통 글 또는 드러낸 글자 표시 */
 export interface ReportTextSegment {
@@ -61,23 +61,37 @@ export interface ReportTextSegment {
 }
 
 /**
- * 화면에 그릴 조각 — 안 보이거나 공백처럼 보이는 글자(띄어쓰기 빼고)를 'U+XXXX' 표시로 드러낸다. 신고 창·목록의 값 칸이 쓴다.
+ * 드러내지 않고 그대로 둘 글자인가 — 옛한글 채움 글자(U+115F·U+1160)만. 첫가끝 조합의 빈 자리를 채워 넣고 빼면 글자 모양이 달라지고,
+ * 드러내면 옛한글이 깨진다(Stop 게이트). ⚠️ 이모지 잇기(ZWJ)·이체자 선택자·깃발 태그는 **늘 드러낸다** — 글꼴이 그 조합을 지원하지 않으면
+ * 넣든 빼든 같아 보여 지문만 갈린다(Stop 게이트). 출처·태그에 이모지가 들 일은 거의 없고, 들어도 확인 칸에서는 표시가 더 안전하다.
+ * @param cp - 코드 포인트
+ * @returns 그대로 둘 글자면 true
+ */
+function keepsShape(cp: number): boolean {
+  return cp === 0x115f || cp === 0x1160;
+}
+
+/**
+ * 화면에 그릴 조각 — 안 보이거나 공백처럼 보이는 글자(띄어쓰기 빼고)를 'U+XXXX' 표시로 드러낸다. 신고 창의 확인 칸·머리 줄과 목록의 출처 줄이 쓴다.
  * 지문은 이런 글자를 걷지 않으므로(방향 제어를 걷으면 'BA' 로 보이던 제목이 'AB' 와 같아진다) 화면이 드러내야 지문이 다르면 화면도 다르다.
+ * 옛한글 채움 글자만 그대로 둔다(`keepsShape`). 지문과 상관없는 긴 글(발문 앞부분)에는 쓰지 않는다.
  * @param value - 정규화한 글
  * @returns 조각 목록
  */
 export function reportVisibleSegments(value: string): ReportTextSegment[] {
   const out: ReportTextSegment[] = [];
+  const cps = Array.from(value, (c) => c.codePointAt(0) ?? 0);
   let run = '';
-  for (const ch of value) {
-    if (ch !== ' ' && REPORT_HIDDEN_CHAR.test(ch)) {
+  cps.forEach((cp) => {
+    const ch = String.fromCodePoint(cp);
+    if (ch !== ' ' && REPORT_HIDDEN_CHAR.test(ch) && !keepsShape(cp)) {
       if (run) out.push({ text: run, hidden: false });
       run = '';
-      out.push({ text: `U+${(ch.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, '0')}`, hidden: true });
+      out.push({ text: `U+${cp.toString(16).toUpperCase().padStart(4, '0')}`, hidden: true });
     } else {
       run += ch;
     }
-  }
+  });
   if (run) out.push({ text: run, hidden: false });
   return out;
 }
@@ -148,71 +162,6 @@ export function reportSourceLabel(source: unknown, stored: string | null | undef
   const input = reportSourceInput(source);
   const label = input ? sourceLabel(input).trim() : '';
   return label || (stored ?? '');
-}
-
-/** 관리자센터 인테이크가 출처 글을 자르는 길이 — Ara-system `lib/problemReportIntake` 의 `LIMITS.sourceLabel` 과 같은 값 */
-export const INTAKE_SOURCE_LABEL_MAX = 80;
-
-/**
- * 출처 끝의 괄호 꼬리(과목·형) — 앞 공백까지 함께. 겹괄호('(국어 영역 (A형))')도 짝을 세어 통째로 잡는다(코덱스 10R —
- * 안쪽 괄호 없는 꼴만 잡으면 A형·B형이 같은 글로 잘렸다). 짝이 안 맞으면 빈 글.
- * @param base - 출처 글
- * @returns 꼬리(없으면 빈 글)
- */
-function sectionTail(base: string): string {
-  if (!base.endsWith(')')) return '';
-  let depth = 0;
-  for (let i = base.length - 1; i >= 0; i -= 1) {
-    if (base[i] === ')') depth += 1;
-    else if (base[i] === '(') depth -= 1;
-    if (depth === 0) {
-      let start = i;
-      while (start > 0 && base[start - 1] === ' ') start -= 1;
-      return start > 0 ? base.slice(start) : '';
-    }
-  }
-  return '';
-}
-
-/** 괄호 꼬리를 지키고도 앞에 남겨야 할 최소 글자 수 — 이보다 좁으면 꼬리를 포기한다(앞이 안 보이면 무슨 시험인지 모른다) */
-const MIN_HEAD_CHARS = 12;
-
-/**
- * 원장 웍스 알림에 보낼 출처 글 — 원래 번호 꼬리(' · 원래 35번')는 지키고 앞의 출처만 줄인다.
- * 인테이크는 넘치면 끝을 자르는데, 모의고사·평가문제집 제목(120자까지)이면 원래 번호가 잘려 문제지 신고에 인쇄 번호만 남는다(코덱스 2R).
- * @param label - 출처 줄(`reportSourceLabel`)
- * @param number - 원래 번호(`snapshot->number`)
- * @param max - 상한(기본 인테이크 상한)
- * @returns 상한 안의 출처 글
- */
-/**
- * UTF-16 단위 상한 안에서 글자(코드 포인트) 경계로 자른다 — 이모지 같은 보충 평면 글자를 반으로 가르면 외짝 대리 글자가 남아
- * 관리자센터의 밤 보관함(jsonb)이 거절한다(코덱스 7R). 상한은 인테이크와 같은 단위(`length`)로 잰다.
- * @param text - 글
- * @param maxUnits - UTF-16 단위 상한
- * @returns 상한 안의 앞부분
- */
-export function sliceUnits(text: string, maxUnits: number): string {
-  let out = '';
-  for (const ch of text) {
-    if (out.length + ch.length > maxUnits) break;
-    out += ch;
-  }
-  return out;
-}
-
-export function intakeSourceLabel(label: string, number: unknown, max: number = INTAKE_SOURCE_LABEL_MAX): string {
-  const base = label.trim();
-  const full = withOriginalNumber(base, number);
-  if (full.length <= max) return full;
-  const tail = full.slice(base.length);
-  // 끝의 괄호 꼬리('(언어와 매체)')는 같은 시험의 과목을 가른다 — 가운데를 줄이고 꼬리를 지킨다(코덱스 3R).
-  // 꼬리를 남기면 앞에 둘 자리가 너무 좁을 때만 꼬리를 포기한다
-  const section = sectionTail(base);
-  const head = base.slice(0, base.length - section.length).trimEnd();
-  const room = max - tail.length - section.length - 1;
-  if (section && room >= MIN_HEAD_CHARS) return `${sliceUnits(head, room)}…${section}${tail}`;
-  return `${sliceUnits(base, Math.max(max - tail.length - 1, 0))}…${tail}`;
 }
 
 /**

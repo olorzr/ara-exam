@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireSession } from '@/lib/require-session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { intakeSourceLabel, reportSourceLabel } from '@/lib/problem-report/display';
+import { reportSourceLabel } from '@/lib/problem-report/display';
+import { intakeSourceLabel } from '@/lib/problem-report/intake-label';
 import { REPORT_CATEGORY_LABELS, isReportCategory } from '@/lib/problem-report/types';
 
 /**

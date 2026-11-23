@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { reportSourceInput } from '@/lib/problem-report/display';
 import { sourceLabelWithNumber } from '@/lib/problem-bank/source-label';
 import type { ReportStateView } from '@/hooks/useReportState';
-import { ReportSourceFieldsView, ReportTagGroupsView } from './ReportValueParts';
+import { ReportSourceFieldsView, ReportTagGroupsView, VisibleText } from './ReportValueParts';
 
 interface ReportCurrentStateProps {
   /** 고른 종류 — 그 종류의 값을 먼저 보여 준다 */
@@ -58,7 +58,7 @@ function ReportCurrentStateBody({ kind, view }: ReportCurrentStateProps) {
   const sourceBlock = (
     <div key="source">
       <p className="font-semibold">신고될 출처</p>
-      {label && <p>{label}</p>}
+      {label && <p><VisibleText value={label} /></p>}
       {/* 서버는 출처의 모든 칸을 대조한다 — 줄에 안 드러나는 칸(유형·학년·제목 …)도 칸마다(7·8R) */}
       <div className="text-[11px]"><ReportSourceFieldsView source={source} number={number} /></div>
     </div>

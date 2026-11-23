@@ -18,6 +18,7 @@ import {
 import ReportCurrentState from './ReportCurrentState';
 import ReportNumberGrid from './ReportNumberGrid';
 import ReportOriginalPage from './ReportOriginalPage';
+import { VisibleText } from './ReportValueParts';
 import { isPinchZoomed } from '@/hooks/useVisualViewportAnchor';
 
 /** 무엇을 신고하나 — 문제지(번호를 고른다) 또는 문제 은행 문항 하나 */
@@ -87,6 +88,11 @@ export default function ProblemReportDialog({ open, onClose, target }: ProblemRe
   const showsState = categoryShowsState(category);
   const stateSubject = target.kind === 'problem' ? { problemId: target.problemId } : picked ? { paperItemId: picked.id } : null;
   const stateView = useReportState(stateSubject, showsState ? category : null);
+  // 문제지에서 고른 항목의 원본 출처 — 스냅샷 출처를 신고 지문과 같은 정규화로 읽는다
+  const pickedSource = picked ? reportSourceInput(picked.snapshot.source) : null;
+  const pickedOriginLabel = picked
+    ? sourceLabelWithNumber(pickedSource ?? picked.snapshot.source, picked.snapshot.number)
+    : '';
   // 머리 줄도 확인한 상태를 따른다 — 다시 읽어 번호가 바뀌었는데 머리만 옛 번호면 그 번호로 믿고 신고한다(코덱스 10R)
   const confirmedSource = stateView.state ? reportSourceInput(stateView.state.source) : null;
   const headerLabel = target.kind === 'problem' && stateView.state && confirmedSource
@@ -156,15 +162,17 @@ export default function ProblemReportDialog({ open, onClose, target }: ProblemRe
                   {picked && (
                     <>
                       <p className="font-semibold text-gray-700">
-                        {pickedNo}번{reportExcerpt(picked.snapshot) ? ` · ${reportExcerpt(picked.snapshot)}` : ''}
+                        {/* 발문 앞부분은 그대로(드러내면 옛한글·이모지 조합이 깨진다), 방향 제어는 <bdi> 안에 가둔다 */}
+                        {pickedNo}번{reportExcerpt(picked.snapshot) ? <> · <bdi>{reportExcerpt(picked.snapshot)}</bdi></> : null}
                       </p>
-                      <p>원본: {sourceLabelWithNumber(picked.snapshot.source, picked.snapshot.number)}</p>
+                      {/* 출처 줄도 드러내 그린다 — 방향 제어 글자가 남으면 뒤의 번호가 뒤집혀 보인다(Stop 게이트) */}
+                      <p>원본: <VisibleText value={pickedOriginLabel} /></p>
                     </>
                   )}
                 </div>
               </div>
             ) : (
-              <p className="text-sm break-keep [overflow-wrap:anywhere] text-gray-700">{headerLabel}</p>
+              <p className="text-sm break-keep [overflow-wrap:anywhere] text-gray-700"><VisibleText value={headerLabel} /></p>
             )}
             {shownCount > 0 && (
               <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">

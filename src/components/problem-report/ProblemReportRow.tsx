@@ -5,7 +5,7 @@ import { ItemNo } from '@/components/magazine';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { parseReportTags, reportSourceLabel } from '@/lib/problem-report/display';
-import { ReportSourceFieldsView, ReportTagGroupsView } from './ReportValueParts';
+import { ReportSourceFieldsView, ReportTagGroupsView, VisibleText } from './ReportValueParts';
 import {
   REPORT_CATEGORY_LABELS, REPORT_STATUS_LABELS, reportExcerpt, reportPlaceLabel, withOriginalNumber,
   type ProblemReport, type ReportStatus,
@@ -40,7 +40,7 @@ export default function ProblemReportRow({ report, n, reporter, sourceId, onReso
         <div className="min-w-0 flex-1 space-y-1">
           <p className="text-[15px] leading-snug font-semibold break-keep [overflow-wrap:anywhere] text-ink">
             <Badge variant="warn" className="mr-2 align-middle">{REPORT_CATEGORY_LABELS[report.category] ?? report.category}</Badge>
-            {reportPlaceLabel(report)}
+            <VisibleText value={reportPlaceLabel(report)} />
             {closed && (
               <Badge variant={report.status === 'fixed' ? 'ok' : 'muted'} className="ml-2 align-middle">
                 {REPORT_STATUS_LABELS[report.status]}
@@ -51,10 +51,12 @@ export default function ProblemReportRow({ report, n, reporter, sourceId, onReso
           {/* 문제지에서 신고한 건은 자리가 인쇄 번호라 원래 번호를 출처 줄에 붙인다(문제 은행 신고는 자리에 이미 있다) */}
           {source && (
             <p className="text-xs break-keep [overflow-wrap:anywhere] text-gray-500">
-              {report.paper_title ? withOriginalNumber(source, report.snapshot?.number) : source}
+              {/* 드러내 그린다 — 출처 제목의 방향 제어 글자가 남으면 '원래 12번' 이 뒤집혀 보인다(Stop 게이트) */}
+              <VisibleText value={report.paper_title ? withOriginalNumber(source, report.snapshot?.number) : source} />
             </p>
           )}
-          {excerpt && <p className="text-xs break-keep [overflow-wrap:anywhere] text-gray-500">{excerpt}</p>}
+          {/* 발문 앞부분은 지문과 상관없어 그대로 그린다(드러내면 옛한글·이모지 조합이 깨진다) — 방향 제어가 바깥으로 번지지 않게 가둔다 */}
+          {excerpt && <p className="text-xs break-keep [overflow-wrap:anywhere] text-gray-500"><bdi>{excerpt}</bdi></p>}
           {report.category === 'tag' && <ReportTagsLine tags={report.tags} />}
           {report.category === 'source' && <ReportSourceFields source={report.snapshot?.source} number={report.snapshot?.number} />}
           {report.note && (

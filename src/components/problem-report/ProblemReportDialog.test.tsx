@@ -19,9 +19,12 @@ vi.mock('@/lib/problem-report/queries', () => ({
   submitProblemReport: m.submit,
   countOpenReports: m.count,
   fetchReportState: m.state,
-  fetchPaperItemRefs: async (_paperId: string, revision: string) => ({
+  fetchPaperItemRefs: async (paperId: string, revision: string) => ({
     stale: revision !== 'rev-now',
-    items: [
+    items: paperId === 'paperRlo' ? [
+      { id: 'r1', problem_id: 'p1', snapshot: { stem_html: '<p>가</p>', number: 3, source: { source_type: '모의고사', title: '가', school_name: '', year: '', grade: '', exam_type: '', publisher: '' } } },
+      { id: 'r2', problem_id: 'p2', snapshot: { stem_html: '<p>나</p>', number: 8, source: { source_type: '모의고사', title: `시험${String.fromCodePoint(0x202e)}`, school_name: '', year: '', grade: '', exam_type: '', publisher: '' } } },
+    ] : [
       { id: 'i1', problem_id: 'p1', snapshot: { stem_html: '<p>첫 문항</p>', number: 3, source: { school_name: '압구정중학교', year: '2025', grade: '중1', exam_type: '기말' } } },
       { id: 'i2', problem_id: 'p2', snapshot: { stem_html: '<p>둘째 문항</p>', number: 4, source: { school_name: '압구정중학교', year: '2025', grade: '중1', exam_type: '기말' } } },
       { id: 'i3', problem_id: null, snapshot: { stem_html: '<p>지워진 문항</p>', number: 5, source: { school_name: '압구정중학교', year: '2025', grade: '중1', exam_type: '기말' } } },
@@ -54,7 +57,9 @@ describe('ProblemReportDialog', () => {
     fireEvent.click(screen.getByRole('radio', { name: '2번' }));
     expect(screen.getByRole('radio', { name: '2번' }).getAttribute('aria-checked')).toBe('true');
     // 고른 문항을 글로 확인하고, 그 문항의 원본을 연다
-    expect(screen.getByText('2번 · 둘째 문항')).toBeTruthy();
+    // 발문 앞부분은 <bdi> 안에(방향 제어를 가둔다) — 줄 전체 글은 '2번 · 둘째 문항'
+    expect(screen.getByText('둘째 문항').tagName).toBe('BDI');
+    expect(screen.getByText('둘째 문항').parentElement?.textContent).toBe('2번 · 둘째 문항');
     expect(screen.getByText('원본: 2025 중1 압구정중학교 기말 4번')).toBeTruthy();
     expect(screen.getByTestId('origin').textContent).toBe('원본:p2');
     fireEvent.change(screen.getByRole('combobox', { name: '오류 종류' }), { target: { value: 'answer' } });
@@ -128,6 +133,29 @@ describe('ProblemReportDialog', () => {
     // 머리와 '신고될 출처' 둘 다 확인한 상태(7번)
     await waitFor(() => expect(screen.getAllByText('2026 중2 상현중 1학기 중간 7번')).toHaveLength(2));
     expect(screen.queryByText('2026 중2 상현중 1학기 중간 6번')).toBeNull();
+  });
+
+  it('출처 제목의 방향 제어 글자는 드러내 그려 뒤의 번호가 뒤집히지 않는다', async () => {
+    const rlo = String.fromCodePoint(0x202e);
+    m.state.mockResolvedValueOnce({
+      tags: null, number: 17, token: 't',
+      source: { source_type: '모의고사', title: `시험${rlo}`, year: '', grade: '', school_name: '', publisher: '', semester: '', exam_type: '' },
+    });
+    const { container } = render(<ProblemReportDialog open onClose={() => undefined} target={{ kind: 'problem', problemId: 'p9', label: '문항' }} />);
+    fireEvent.change(screen.getByRole('combobox', { name: '오류 종류' }), { target: { value: 'source' } });
+    await screen.findAllByText('⟨U+202E⟩');
+    // 실제 방향 제어 글자는 화면 글에 남지 않는다
+    expect(container.ownerDocument.body.textContent?.includes(rlo)).toBe(false);
+    expect(container.ownerDocument.body.textContent).toContain('17번');
+  });
+
+  it('문제지에서 고른 항목의 원본 출처 줄도 방향 제어 글자를 드러내 그린다', async () => {
+    const rlo = String.fromCodePoint(0x202e);
+    const { container } = render(<ProblemReportDialog open onClose={() => undefined} target={{ kind: 'paper', paperId: 'paperRlo', revision: 'rev-now' }} />);
+    await screen.findByRole('radiogroup', { name: '신고할 문항 번호' });
+    fireEvent.click(screen.getByRole('radio', { name: '2번' }));
+    expect(await screen.findByText('⟨U+202E⟩')).toBeTruthy();
+    expect(container.ownerDocument.body.textContent?.includes(rlo)).toBe(false);
   });
 
   it('지금 상태를 못 읽어도 신고는 막지 않는다(지문 없이 보낸다)', async () => {
