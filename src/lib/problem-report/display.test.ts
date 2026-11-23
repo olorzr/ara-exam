@@ -117,8 +117,12 @@ describe('글자 경계 자르기', () => {
 });
 
 describe('reportSourceDetail', () => {
-  it('출처의 칸을 전부 잇는다(빈 칸은 뺀다)', () => {
-    expect(reportSourceDetail(reportSourceInput(mock)!)).toBe('모의고사 · 2026학년도 수능 (언어와 매체) · 2026 · 고3 · 수능');
-    expect(reportSourceDetail(reportSourceInput(school)!)).toBe('내신기출 · 상현중 기출 · 2026 · 중2 · 상현중 · 1학기 · 중간');
+  it('출처의 칸을 이름표와 함께 전부 잇는다(빈 칸은 뺀다)', () => {
+    expect(reportSourceDetail(reportSourceInput(mock)!)).toBe('유형 모의고사 · 제목 2026학년도 수능 (언어와 매체) · 학년도 2026 · 학년 고3 · 시험 수능');
+    expect(reportSourceDetail(reportSourceInput(school)!)).toBe('유형 내신기출 · 제목 상현중 기출 · 학년도 2026 · 학년 중2 · 학교 상현중 · 학기 1학기 · 시험 중간');
+    // 값이 다른 칸으로 옮겨 가면 줄이 달라진다(이름표가 없으면 같아 보였다)
+    const asSchool = reportSourceDetail({ ...reportSourceInput(mock)!, school_name: '서울시교육청' });
+    const asPublisher = reportSourceDetail({ ...reportSourceInput(mock)!, publisher: '서울시교육청' });
+    expect(asSchool).not.toBe(asPublisher);
   });
 });

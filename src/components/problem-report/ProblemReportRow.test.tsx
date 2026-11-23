@@ -56,6 +56,16 @@ describe('ProblemReportRow', () => {
     expect(screen.queryByText(/신고 때 태그/)).toBeNull();
   });
 
+  it('출처 신고에는 신고 때 출처의 칸을 이름표와 함께 보여 준다', () => {
+    const sourceReport = {
+      ...report, category: 'source', note: '',
+      snapshot: { ...report.snapshot, source: { source_type: '모의고사', title: '2026학년도 수능 (언어와 매체)', school_name: '', year: '2026', grade: '고3', exam_type: '수능', publisher: '' } },
+    } as unknown as ProblemReport;
+    render(<ul><ProblemReportRow report={sourceReport} n={1} /></ul>);
+    expect(screen.getByText('신고 때 출처')).toBeTruthy();
+    expect(screen.getByText(/학년 고3 · 시험 수능/)).toBeTruthy();
+  });
+
   it('처리 단추는 원장(onResolve)에게만 그린다', () => {
     const onResolve = vi.fn();
     const { rerender } = draw();

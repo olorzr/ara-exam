@@ -292,9 +292,9 @@ DECLARE
   v_state   JSONB;
   v_istate  JSONB;
 BEGIN
-  -- 단원이 붙은 문항 — 태그가 원본 그대로 굳는지 본다
+  -- 단원이 붙은 문항을 먼저(태그가 원본 그대로 굳는지 본다) — 없으면 아무 문항으로라도 동작은 다 돌린다(코덱스 8R)
   SELECT p.id, to_jsonb(p.unit_path) INTO v_problem, v_units
-    FROM exam.problems p WHERE cardinality(p.unit_path) > 0 ORDER BY p.created_at LIMIT 1;
+    FROM exam.problems p ORDER BY (cardinality(p.unit_path) > 0) DESC, p.created_at LIMIT 1;
   -- 원본 문항이 남은 문제지 항목
   SELECT i.id, p.updated_at INTO v_item, v_rev
     FROM exam.problem_paper_items i JOIN exam.problem_papers p ON p.id = i.paper_id

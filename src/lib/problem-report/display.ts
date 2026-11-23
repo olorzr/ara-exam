@@ -217,15 +217,29 @@ export function categoryShowsState(category: ReportCategory | ''): category is '
   return category === 'tag' || category === 'source';
 }
 
+/** 출처 칸의 이름표와 차례 — 신고 창·신고 목록이 같은 줄을 쓴다 */
+const SOURCE_FIELDS: readonly { key: keyof SourceLabelInput; label: string }[] = [
+  { key: 'source_type', label: '유형' },
+  { key: 'title', label: '제목' },
+  { key: 'year', label: '학년도' },
+  { key: 'grade', label: '학년' },
+  { key: 'school_name', label: '학교' },
+  { key: 'publisher', label: '출판사' },
+  { key: 'semester', label: '학기' },
+  { key: 'exam_type', label: '시험' },
+];
+
 /**
- * 출처의 모든 칸을 한 줄로 — 신고 창이 출처 줄 아래에 작게 보여 준다. 지문은 출처의 칸을 전부 담으므로(제목·유형·학년·시험·출판사 …)
- * 출처 줄(모의고사는 제목만, 내신은 제목이 없다)만 보이면 바뀐 칸이 안 보인 채 거절될 수 있다(코덱스 7R).
+ * 출처의 모든 칸을 이름표와 함께 한 줄로 — 신고 창(출처 줄 아래)과 출처 신고의 목록 줄이 쓴다.
+ * 지문은 출처의 칸을 전부 담으므로 출처 줄(모의고사는 제목만, 내신은 제목이 없다)만 보이면 바뀐 칸이 안 보인 채 거절될 수 있고(7R),
+ * 이름표가 없으면 값이 다른 칸으로 옮겨 가도(학교 → 출판사) 같은 줄로 보인다(8R). 빈 칸은 뺀다.
  * @param source - 출처
- * @returns '모의고사 · 2026학년도 수능 (언어와 매체) · 2026 · 고3 · 수능' 같은 줄
+ * @returns '유형 모의고사 · 제목 2026학년도 수능 (언어와 매체) · 학년도 2026 · 학년 고3 · 시험 수능' 같은 줄
  */
 export function reportSourceDetail(source: SourceLabelInput): string {
-  return [
-    source.source_type, source.title, source.year, source.grade, source.school_name, source.publisher,
-    source.semester ?? '', source.exam_type,
-  ].map((v) => v.trim()).filter(Boolean).join(' · ');
+  return SOURCE_FIELDS
+    .map(({ key, label }) => ({ label, value: (source[key] ?? '').trim() }))
+    .filter((f) => f.value !== '')
+    .map((f) => `${f.label} ${f.value}`)
+    .join(' · ');
 }

@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { ItemNo } from '@/components/magazine';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { parseReportTags, reportSourceLabel, reportTagLines } from '@/lib/problem-report/display';
+import {
+  parseReportTags, reportSourceDetail, reportSourceInput, reportSourceLabel, reportTagLines,
+} from '@/lib/problem-report/display';
 import {
   REPORT_CATEGORY_LABELS, REPORT_STATUS_LABELS, reportExcerpt, reportPlaceLabel, withOriginalNumber,
   type ProblemReport, type ReportStatus,
@@ -55,6 +57,7 @@ export default function ProblemReportRow({ report, n, reporter, sourceId, onReso
           )}
           {excerpt && <p className="text-xs break-keep [overflow-wrap:anywhere] text-gray-500">{excerpt}</p>}
           {report.category === 'tag' && <ReportTagsLine tags={report.tags} />}
+          {report.category === 'source' && <ReportSourceFields source={report.snapshot?.source} />}
           {report.note && (
             <p className="text-sm whitespace-pre-wrap break-keep [overflow-wrap:anywhere] text-gray-800">{report.note}</p>
           )}
@@ -111,6 +114,22 @@ function ReportTagsLine({ tags }: { tags: unknown }) {
     <p className="text-xs break-keep [overflow-wrap:anywhere] text-gray-600">
       <span className="font-semibold text-gray-700">신고 때 태그</span>
       {lines.map((line) => <span key={line.label}> · {line.label} {line.value}</span>)}
+    </p>
+  );
+}
+
+/**
+ * 출처 신고의 '신고 때 출처' 줄 — 신고 창이 보여 준 칸 전부(이름표와 함께, 스냅샷 출처). 위의 출처 줄은 모의고사면 제목뿐이라
+ * 선생님이 짚은 학년·시험 칸이 안 보인다(코덱스 8R).
+ * @param props.source - 신고 스냅샷의 출처
+ */
+function ReportSourceFields({ source }: { source: unknown }) {
+  const input = reportSourceInput(source);
+  const detail = input ? reportSourceDetail(input) : '';
+  if (!detail) return <p className="text-xs text-gray-500">신고 때 출처 칸이 비어 있었어요.</p>;
+  return (
+    <p className="text-xs break-keep [overflow-wrap:anywhere] text-gray-600">
+      <span className="font-semibold text-gray-700">신고 때 출처</span> · {detail}
     </p>
   );
 }
