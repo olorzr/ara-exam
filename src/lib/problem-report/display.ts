@@ -36,6 +36,22 @@ export interface ReportSourceField {
 
 const SOURCE_TYPES = ['내신기출', '모의고사', '문제집', '프린트', '평가문제집'] as const satisfies readonly ProblemSourceType[];
 
+/** 보이지 않는 글자 — sql/114 `problem_report_norm_text` ①과 같은 목록(display.test 가 대조) */
+export const REPORT_INVISIBLE_CHARS = /[\u00AD\u034F\u180E\u200B\u200E\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF]/g;
+/** 공백 무리 — sql/114 `problem_report_norm_text` ③과 같은 목록 */
+export const REPORT_SPACE_RUNS = /[\s\u0085\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]+/g;
+
+/**
+ * 글 한 칸 정규화 — 화면에서 같아 보이는 글은 같은 값으로. sql/114 `problem_report_norm_text` 와 같은 규칙·차례다
+ * (보이지 않는 글자 걷기 → NFC → 공백 무리를 한 칸으로 → 앞뒤 걷기). 신고 지문은 서버가 이 규칙으로 만들고 창은 이 규칙으로 그린다 —
+ * 둘이 다르면 화면은 같은데 '바뀌었어요' 로 거절된다(Stop 게이트: 빈 출판사와 BOM 하나만 든 출판사).
+ * @param value - 글
+ * @returns 정규화한 글(비면 빈 글)
+ */
+export function normalizeReportText(value: string): string {
+  return value.replace(REPORT_INVISIBLE_CHARS, '').normalize('NFC').replace(REPORT_SPACE_RUNS, ' ').trim();
+}
+
 /**
  * 객체의 한 칸을 읽는다(모양을 모르는 jsonb).
  * @param value - 받은 값
@@ -55,7 +71,7 @@ function fieldOf(value: unknown, key: string): unknown {
  */
 function textOf(value: unknown, key: string): string {
   const field = fieldOf(value, key);
-  return typeof field === 'string' ? field : '';
+  return typeof field === 'string' ? normalizeReportText(field) : '';
 }
 
 /**
@@ -66,7 +82,9 @@ function textOf(value: unknown, key: string): string {
  */
 function listOf(value: unknown, key: string): string[] {
   const field = fieldOf(value, key);
-  return Array.isArray(field) ? field.filter((v): v is string => typeof v === 'string' && v.trim() !== '') : [];
+  return Array.isArray(field)
+    ? field.filter((v): v is string => typeof v === 'string').map(normalizeReportText).filter((v) => v !== '')
+    : [];
 }
 
 /**
@@ -247,6 +265,6 @@ const SOURCE_FIELDS: readonly { key: keyof SourceLabelInput; label: string }[] =
 export function reportSourceFields(source: unknown): ReportSourceField[] | null {
   if (typeof source !== 'object' || source === null || Array.isArray(source)) return null;
   return SOURCE_FIELDS
-    .map(({ key, label }) => ({ label, value: textOf(source, key).trim() }))
+    .map(({ key, label }) => ({ label, value: textOf(source, key) }))
     .filter((f) => f.value !== '');
 }

@@ -1,6 +1,8 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  INTAKE_SOURCE_LABEL_MAX, categoryShowsState, intakeSourceLabel, reportSourceFields, sliceUnits, parseReportState, parseReportTags, reportSourceInput, reportSourceLabel, reportTagGroups,
+  INTAKE_SOURCE_LABEL_MAX, REPORT_INVISIBLE_CHARS, REPORT_SPACE_RUNS, categoryShowsState, normalizeReportText, intakeSourceLabel, reportSourceFields, sliceUnits, parseReportState, parseReportTags, reportSourceInput, reportSourceLabel, reportTagGroups,
 } from './display';
 
 const mock = {
@@ -126,5 +128,31 @@ describe('reportSourceFields', () => {
     expect(reportSourceFields({ source_type: '엉뚱', title: '제목' })).toEqual([{ label: '유형', value: '엉뚱' }, { label: '제목', value: '제목' }]);
     expect(reportSourceFields({})).toEqual([]);
     expect(reportSourceFields(null)).toBeNull();
+  });
+});
+
+describe('normalizeReportText — sql/114 와 같은 규칙', () => {
+  it('보이지 않는 글자·NBSP·풀어 쓴 한글·탭/줄바꿈을 화면과 같게 접는다', () => {
+    expect(normalizeReportText('\uFEFF')).toBe('');
+    expect(normalizeReportText('가\u200B나')).toBe('가나');
+    expect(normalizeReportText('수\u00A0능')).toBe('수 능');
+    expect(normalizeReportText('\t수\n\n능\u3000')).toBe('수 능');
+    expect(normalizeReportText('한글'.normalize('NFD'))).toBe('한글');
+    // 이모지 잇기(ZWJ)는 남긴다 — 보이는 모양을 바꾼다
+    expect(normalizeReportText('👨\u200D👩')).toBe('👨\u200D👩');
+  });
+
+  it('출처 칸·태그 목록이 이 규칙으로 읽힌다(빈 출판사 = BOM 만 든 출판사)', () => {
+    expect(reportSourceFields({ publisher: '\uFEFF', title: '수\u00A0능' })).toEqual([{ label: '제목', value: '수 능' }]);
+    expect(parseReportTags({ work_titles: ['\uFEFF', '동백꽃\u200B'] })?.work_titles).toEqual(['동백꽃']);
+  });
+
+  it('두 정규식은 sql/114 의 problem_report_norm_text 와 글자 그대로 같다', () => {
+    const sql = readFileSync(join(process.cwd(), 'sql/114_problem_report_tag_source_categories.sql'), 'utf8');
+    const fn = sql.slice(sql.indexOf('CREATE OR REPLACE FUNCTION exam.problem_report_norm_text'));
+    const body = fn.slice(0, fn.indexOf('$$;'));
+    expect(body).toContain(`'${REPORT_INVISIBLE_CHARS.source}', ''`);
+    expect(body).toContain(`'${REPORT_SPACE_RUNS.source}', ' '`);
+    expect(body).toContain('NFC');
   });
 });

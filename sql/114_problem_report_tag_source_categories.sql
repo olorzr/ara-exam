@@ -60,14 +60,20 @@ REVOKE ALL ON FUNCTION exam.problem_report_tags(exam.problems) FROM PUBLIC, anon
 DROP FUNCTION IF EXISTS exam.problem_report_state(UUID);
 DROP FUNCTION IF EXISTS exam.problem_report_state_of(exam.problems, exam.problem_sources);
 
--- 글 한 칸 정규화 — 탭·줄바꿈을 포함한 연속 공백을 한 칸으로 접은 **뒤에** 앞뒤를 걷는다, 비면 null.
--- 화면이 보여 주는 모양과 같게(HTML 은 공백을 접는다). ⚠️ 차례를 바꾸지 말 것 — btrim 은 띄어쓰기만 걷어, 먼저 걷으면 앞뒤
--- 탭·줄바꿈이 남아 공백 한 칸이 되고 화면은 같은데 지문이 달라졌다(Stop 게이트)
+-- 글 한 칸 정규화 — 화면에서 같아 보이는 글은 같은 값으로(Stop 게이트). 앱 `normalizeReportText`(display.ts)와 **글자 하나까지 같은 규칙**이다
+-- (두 목록을 바꾸면 둘 다 — display.test 가 이 파일의 두 정규식을 읽어 대조한다):
+--   ① 보이지 않는 글자(폭 없는 공백·BOM·단어 잇기·방향 제어·줄 바꿈 가능 하이픈 …)를 걷는다 — 빈 칸과 BOM 하나만 든 칸이 같아 보였다
+--   ② NFC 로 합친다(풀어 쓴 한글과 합친 한글은 같아 보인다) — ①이 먼저여야 멱등이다(category-name 규칙과 같은 차례)
+--   ③ 탭·줄바꿈·유니코드 공백(NBSP·전각 공백 …)의 연속을 한 칸으로 접고 ④ 앞뒤를 걷는다, 비면 null.
+--   ⚠️ ③을 ④보다 먼저 — btrim 은 띄어쓰기만 걷어, 먼저 걷으면 앞뒤 탭이 남아 공백 한 칸이 됐다.
+--   이모지 잇기(ZWJ)·이체자 선택자·옛한글 채움 글자는 걷지 않는다 — 보이는 모양을 바꾼다
 CREATE OR REPLACE FUNCTION exam.problem_report_norm_text(v TEXT)
 RETURNS TEXT LANGUAGE sql IMMUTABLE
 SET search_path = exam, pg_temp
 AS $$
-  SELECT NULLIF(btrim(regexp_replace(COALESCE(v, ''), '\s+', ' ', 'g')), '');
+  SELECT NULLIF(btrim(regexp_replace(
+           normalize(regexp_replace(COALESCE(v, ''), '[\u00AD\u034F\u180E\u200B\u200E\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF]', '', 'g'), NFC),
+           '[\s\u0085\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]+', ' ', 'g')), '');
 $$;
 REVOKE ALL ON FUNCTION exam.problem_report_norm_text(TEXT) FROM PUBLIC, anon, authenticated;
 
@@ -318,6 +324,11 @@ BEGIN
   -- 정규화 — 빈 글·null·키 없음·공백만 다른 상태는 같은 지문, 칸을 옮기면 다른 지문
   IF exam.problem_report_state_build(NULL, '{"title":"수능  ", "grade":""}', '3')
      IS DISTINCT FROM exam.problem_report_state_build(NULL, '{"title":" 수능", "grade":null, "semester":"   "}', '3')
+     -- 보이지 않는 글자(BOM)만 든 칸 = 빈 칸, NBSP = 공백, 풀어 쓴 한글 = 합친 한글
+     OR exam.problem_report_state_build(NULL, jsonb_build_object('publisher', chr(65279), 'title', '수' || chr(160) || '능'), NULL)
+        IS DISTINCT FROM exam.problem_report_state_build(NULL, '{"title":"수 능"}', NULL)
+     OR exam.problem_report_norm_text(normalize('한글', NFD)) <> '한글'
+     OR exam.problem_report_norm_text('가' || chr(8203) || '나') <> '가나'
      -- 탭·줄바꿈만 다른 값도 같은 지문(앞뒤든 안쪽이든)
      OR exam.problem_report_state_build('{"work_titles":["\t동백꽃\n", "봄\t\n봄"]}', '{"title":"\n수능\t", "grade":"\t"}', NULL)
         IS DISTINCT FROM exam.problem_report_state_build('{"work_titles":["동백꽃", "봄 봄"]}', '{"title":"수능"}', NULL)
@@ -333,12 +344,14 @@ END
 $verify_shape$;
 
 -- ---------------------------------------------
--- 검증 ② 실제로 — 선생님 JWT 로 새 두 종류를 신고해 보고(내용 없이도 된다), 모르는 종류는 거절(전부 되돌린다)
+-- 검증 ② 실제로 — 검증용 출처·문항·문제지를 만들어 선생님 JWT 로 새 두 종류를 신고해 보고(내용 없이도 된다), 모르는 종류는 거절(전부 되돌린다)
 -- ---------------------------------------------
 DO $verify_probe$
 DECLARE
+  v_uid     UUID;
+  v_src     UUID;
   v_problem UUID;
-  v_units   JSONB;
+  v_paper   UUID;
   v_item    UUID;
   v_rev     TIMESTAMPTZ;
   v_id1     UUID;
@@ -348,75 +361,64 @@ DECLARE
   v_tags    JSONB;
   v_state   JSONB;
   v_istate  JSONB;
-  -- 기대값(정규화한 모양) — 헬퍼는 브라우저 역할에 안 열려 있어 역할을 바꾸기 **전에** 만든다
-  v_exp_tags    JSONB;
-  v_exp_number  JSONB;
-  v_exp_isource JSONB;
-  v_exp_inumber JSONB;
 BEGIN
-  -- 단원이 붙은 문항을 먼저(태그가 원본 그대로 굳는지 본다) — 없으면 아무 문항으로라도 동작은 다 돌린다(코덱스 8R)
-  SELECT p.id, to_jsonb(p.unit_path) INTO v_problem, v_units
-    FROM exam.problems p ORDER BY (cardinality(p.unit_path) > 0) DESC, p.created_at LIMIT 1;
-  -- 원본 문항이 남은 문제지 항목
-  SELECT i.id, p.updated_at INTO v_item, v_rev
-    FROM exam.problem_paper_items i JOIN exam.problem_papers p ON p.id = i.paper_id
-   WHERE i.problem_id IS NOT NULL ORDER BY i.paper_id, i.order_index LIMIT 1;
-  IF v_problem IS NULL THEN
-    RAISE NOTICE 'sql/114: 문항이 없어 실제 검증은 건너뛴다 (신규 환경)';
+  -- ⚠️ 운영 행을 읽지도 잠그지도 않는다 — 검증용 출처·문항·문제지·항목을 이 블록 안에서 만들고 되돌린다(코덱스 9R · Stop 게이트).
+  --   운영 행으로 재면 그 사이 선생님이 고쳐 헛실패하고(9R), 잠그면 문제지 저장과 차례가 엇갈려 교착한다(문항 → 문제지 대 문제지 → 항목).
+  --   빌려 오는 것은 실제 계정 id 하나뿐이다(user_id 참조·강제 트리거)
+  SELECT s.user_id INTO v_uid FROM exam.problem_sources s LIMIT 1;
+  IF v_uid IS NULL THEN
+    RAISE NOTICE 'sql/114: 계정이 없어 실제 검증은 건너뛴다 (신규 환경)';
     RETURN;
-  END IF;
-  SELECT exam.problem_report_state_build(exam.problem_report_tags(p), NULL, NULL) -> 'tags',
-         COALESCE(exam.problem_report_state_build(NULL, NULL, to_jsonb(p.number)) -> 'number', 'null'::jsonb)
-    INTO v_exp_tags, v_exp_number
-    FROM exam.problems p WHERE p.id = v_problem;
-  IF v_item IS NOT NULL THEN
-    SELECT COALESCE(exam.problem_report_state_build(NULL, i.snapshot -> 'source', NULL) -> 'source', 'null'::jsonb),
-           COALESCE(exam.problem_report_state_build(NULL, NULL, i.snapshot -> 'number') -> 'number', 'null'::jsonb)
-      INTO v_exp_isource, v_exp_inumber
-      FROM exam.problem_paper_items i WHERE i.id = v_item;
   END IF;
 
   BEGIN
-    EXECUTE 'SET LOCAL ROLE authenticated';
     PERFORM set_config('request.jwt.claims', json_build_object(
-      'sub', gen_random_uuid()::text, 'role', 'authenticated', 'email', 'verify-a@araeducation.co.kr')::text, true);
+      'sub', v_uid::text, 'role', 'authenticated', 'email', 'verify-a@araeducation.co.kr')::text, true);
+    INSERT INTO exam.problem_sources (source_type, title, user_id, school_name, year, grade, semester, exam_type)
+    VALUES ('내신기출', 'sql114 검증용', v_uid, '검증중', '2026', '중2', '1학기', '중간')
+    RETURNING id INTO v_src;
+    INSERT INTO exam.problems (source_id, user_id, number, question_type, stem_html, unit_path, area_path, grammar_paths)
+    VALUES (v_src, v_uid, 7, '객관식', '<p>sql114 검증 문항</p>', ARRAY['1. 검증 단원'], ARRAY['문학'], ARRAY['단어 > 품사'])
+    RETURNING id INTO v_problem;
+    INSERT INTO exam.problem_papers (title, user_id) VALUES ('sql114 검증용', v_uid) RETURNING id INTO v_paper;
+    INSERT INTO exam.problem_paper_items (paper_id, problem_id, order_index, snapshot)
+    SELECT v_paper, p.id, 0, exam.paper_item_snapshot(p, NULL::exam.passages, s)
+      FROM exam.problems p JOIN exam.problem_sources s ON s.id = p.source_id
+     WHERE p.id = v_problem
+    RETURNING id INTO v_item;
+    SELECT updated_at INTO v_rev FROM exam.problem_papers WHERE id = v_paper;
 
-    -- 창이 읽는 지금 상태 — 태그가 원본 그대로이고 지문이 붙는다
+    EXECUTE 'SET LOCAL ROLE authenticated';
+
+    -- 창이 읽는 굳힐 상태 — 정규화한 태그·출처·원래 번호와 지문
     v_state := exam.problem_report_state(v_problem);
-    -- 상태는 정규화한 모양이다 — 같은 정규화를 거친 원본과 견준다(번호 없는 문항이면 JSON null, 코덱스 7R)
-    IF v_state -> 'tags' IS DISTINCT FROM v_exp_tags
-       OR length(v_state ->> 'token') <> 32
-       OR jsonb_typeof(v_state -> 'source') <> 'object'
-       OR v_state -> 'number' IS DISTINCT FROM v_exp_number THEN
+    IF v_state -> 'tags' IS DISTINCT FROM
+         '{"work_titles": [], "unit_path": ["1. 검증 단원"], "area_path": ["문학"], "grammar_paths": ["단어 > 품사"]}'::jsonb
+       OR v_state -> 'source' ->> 'school_name' IS DISTINCT FROM '검증중'
+       OR v_state -> 'source' ->> 'publisher' IS NOT NULL
+       OR v_state -> 'number' IS DISTINCT FROM '7'::jsonb
+       OR length(v_state ->> 'token') <> 32 THEN
       RAISE EXCEPTION '지금 상태가 이상하다: %', v_state;
     END IF;
-    -- 그 지문을 실어 신고 — 같으면 된다
+    -- 그 지문을 실어 신고 — 같으면 된다(내용 없이도)
     v_id1 := exam.report_problem('tag', '', v_problem, NULL, NULL, v_state ->> 'token');
     SELECT category, tags INTO v_cat, v_tags FROM exam.problem_reports WHERE id = v_id1;
-    IF v_cat IS DISTINCT FROM 'tag' THEN RAISE EXCEPTION '태그 오류 신고가 이상하다 (%)', v_cat; END IF;
-    IF v_tags -> 'unit_path' IS DISTINCT FROM v_units
-       OR jsonb_typeof(v_tags -> 'work_titles') <> 'array' OR jsonb_typeof(v_tags -> 'area_path') <> 'array'
-       OR jsonb_typeof(v_tags -> 'grammar_paths') <> 'array' THEN
-      RAISE EXCEPTION '신고 때의 태그가 원본과 다르다: %', v_tags;
+    IF v_cat IS DISTINCT FROM 'tag' OR v_tags -> 'unit_path' IS DISTINCT FROM '["1. 검증 단원"]'::jsonb
+       OR v_tags -> 'grammar_paths' IS DISTINCT FROM '["단어 > 품사"]'::jsonb THEN
+      RAISE EXCEPTION '태그 오류 신고가 이상하다: % %', v_cat, v_tags;
     END IF;
 
-    IF v_item IS NOT NULL THEN
-      -- 문제지 항목은 항목 기준 — 출처·번호가 항목 스냅샷(신고가 굳힐 값)과 같아야 한다
-      v_istate := exam.problem_report_state(NULL, v_item);
-      IF v_istate -> 'source' IS DISTINCT FROM v_exp_isource
-         OR v_istate -> 'number' IS DISTINCT FROM v_exp_inumber THEN
-        RAISE EXCEPTION '문제지 항목의 상태가 항목 스냅샷과 다르다: %', v_istate;
-      END IF;
-      v_id3 := exam.report_problem('tag', '', NULL, v_item, v_rev, v_istate ->> 'token');
-      SELECT tags INTO v_tags FROM exam.problem_reports WHERE id = v_id3;
-      IF v_tags IS NULL OR jsonb_typeof(v_tags -> 'unit_path') <> 'array' THEN
-        RAISE EXCEPTION '문제지 항목 신고에 원본 태그가 안 굳었다: %', v_tags;
-      END IF;
+    -- 문제지 항목은 항목 기준 — 출처·번호는 항목 스냅샷, 태그는 지금 원본
+    v_istate := exam.problem_report_state(NULL, v_item);
+    IF v_istate -> 'source' ->> 'school_name' IS DISTINCT FROM '검증중' OR v_istate -> 'number' IS DISTINCT FROM '7'::jsonb
+       OR v_istate -> 'tags' -> 'unit_path' IS DISTINCT FROM '["1. 검증 단원"]'::jsonb THEN
+      RAISE EXCEPTION '문제지 항목의 상태가 이상하다: %', v_istate;
     END IF;
-
-    v_id2 := exam.report_problem('source', '원래 18번이에요', v_problem, NULL, NULL);
-    SELECT category INTO v_cat FROM exam.problem_reports WHERE id = v_id2;
-    IF v_cat IS DISTINCT FROM 'source' THEN RAISE EXCEPTION '출처 오류 신고가 이상하다 (%)', v_cat; END IF;
+    v_id3 := exam.report_problem('tag', '', NULL, v_item, v_rev, v_istate ->> 'token');
+    SELECT tags INTO v_tags FROM exam.problem_reports WHERE id = v_id3;
+    IF v_tags -> 'unit_path' IS DISTINCT FROM '["1. 검증 단원"]'::jsonb THEN
+      RAISE EXCEPTION '문제지 항목 신고에 원본 태그가 안 굳었다: %', v_tags;
+    END IF;
 
     -- 창이 본 상태와 다르면(창을 연 뒤 다른 곳에서 고쳐짐) 거절 — 문항 신고도 문제지 항목 신고도
     BEGIN
@@ -424,28 +426,29 @@ BEGIN
       RAISE EXCEPTION 'sql114_stale_problem_passed';
     EXCEPTION WHEN serialization_failure THEN NULL;
     END;
-    IF v_item IS NOT NULL THEN
-      BEGIN
-        PERFORM exam.report_problem('tag', '', NULL, v_item, v_rev, md5('엉뚱한 상태'));
-        RAISE EXCEPTION 'sql114_stale_item_passed';
-      EXCEPTION WHEN serialization_failure THEN NULL;
-      END;
-    END IF;
-    -- 바깥 도메인은 지금 상태를 못 읽는다
+    BEGIN
+      PERFORM exam.report_problem('tag', '', NULL, v_item, v_rev, md5('엉뚱한 상태'));
+      RAISE EXCEPTION 'sql114_stale_item_passed';
+    EXCEPTION WHEN serialization_failure THEN NULL;
+    END;
+
+    v_id2 := exam.report_problem('source', '원래 8번이에요', v_problem, NULL, NULL);
+    SELECT category INTO v_cat FROM exam.problem_reports WHERE id = v_id2;
+    IF v_cat IS DISTINCT FROM 'source' THEN RAISE EXCEPTION '출처 오류 신고가 이상하다 (%)', v_cat; END IF;
+
+    BEGIN
+      PERFORM exam.report_problem('evil', '', v_problem, NULL, NULL);
+      RAISE EXCEPTION 'sql114_unknown_passed';
+    EXCEPTION WHEN check_violation THEN NULL;
+    END;
+
+    -- 바깥 도메인은 굳힐 상태를 못 읽는다
     PERFORM set_config('request.jwt.claims', json_build_object(
       'sub', gen_random_uuid()::text, 'role', 'authenticated', 'email', 'verify@example.com')::text, true);
     BEGIN
       PERFORM exam.problem_report_state(v_problem);
       RAISE EXCEPTION 'sql114_outside_state';
     EXCEPTION WHEN insufficient_privilege THEN NULL;
-    END;
-    PERFORM set_config('request.jwt.claims', json_build_object(
-      'sub', gen_random_uuid()::text, 'role', 'authenticated', 'email', 'verify-a@araeducation.co.kr')::text, true);
-
-    BEGIN
-      PERFORM exam.report_problem('evil', '', v_problem, NULL, NULL);
-      RAISE EXCEPTION 'sql114_unknown_passed';
-    EXCEPTION WHEN check_violation THEN NULL;
     END;
 
     RAISE EXCEPTION 'sql114_rollback';
@@ -456,9 +459,11 @@ BEGIN
   IF current_user <> session_user THEN
     RAISE EXCEPTION 'sql/114: 검증 뒤 역할이 돌아오지 않았다 (%)', current_user;
   END IF;
-  IF EXISTS (SELECT 1 FROM exam.problem_reports WHERE id IN (v_id1, v_id2, v_id3)) THEN
-    RAISE EXCEPTION 'sql/114: 검증용 신고가 되돌아가지 않았다';
+  IF EXISTS (SELECT 1 FROM exam.problem_sources WHERE id = v_src)
+     OR EXISTS (SELECT 1 FROM exam.problem_papers WHERE id = v_paper)
+     OR EXISTS (SELECT 1 FROM exam.problem_reports WHERE id IN (v_id1, v_id2, v_id3)) THEN
+    RAISE EXCEPTION 'sql/114: 검증용 행이 되돌아가지 않았다';
   END IF;
-  RAISE NOTICE 'sql/114 실제 검증 통과 — 태그 오류(내용 없이, 원본 태그 굳힘 · 문제지 항목도) · 창이 본 상태(태그·굳힐 출처·원래 번호)와 다르면 거절(문항·문제지 항목) · 바깥 도메인 상태 못 읽음 · 출처·번호 오류 신고 · 모르는 종류 거절 (전부 되돌림)';
+  RAISE NOTICE 'sql/114 실제 검증 통과(검증용 행 — 운영 행은 안 건드림) — 태그 오류(내용 없이, 원본 태그 굳힘 · 문제지 항목도) · 창이 본 상태와 다르면 거절(문항·문제지 항목) · 출처·번호 오류 신고 · 모르는 종류 거절 · 바깥 도메인 상태 못 읽음 (전부 되돌림)';
 END
 $verify_probe$;
