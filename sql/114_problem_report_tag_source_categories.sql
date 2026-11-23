@@ -13,9 +13,9 @@
 --     신고 목록이 태그 신고에 그 값을 보여 준다. sql/114 전 신고는 NULL 이다.
 --
 -- ⚠️ 종류 값은 앱 `src/lib/problem-report/types.ts` 의 REPORT_CATEGORIES 와 1:1 이다 — 하나를 바꾸면 둘 다(types.test 가 이 파일을 읽어 대조).
--- ⚠️⚠️ 이제 신고 종류 CHECK 와 `exam.report_problem` 의 **정식 정의는 이 파일**이다. sql/113 을 다시 돌리면 RPC 가 옛 다섯 종류로
---   되돌아가 '태그 오류' 신고가 거절된다 — 그 뒤에는 이 파일을 다시 돌릴 것(sql/113 머리에도 적었다).
---   함수 본문은 sql/113 판에서 종류 목록 한 줄과 `tags` 를 굳히는 몇 줄만 다르다(적용 전에 운영 정의 = sql/113 파일임을 확인했다).
+-- ⚠️⚠️ 이제 신고 종류 CHECK 와 `exam.report_problem` 의 **정식 정의는 이 파일**이다.
+--   함수 본문은 sql/113 판에서 종류 목록 한 줄과 `tags` 를 굳히는 칸(두 SELECT 에 하나씩)만 다르다(적용 전에 운영 정의 = sql/113 파일임을 확인했다).
+--   sql/113 은 이 파일이 적용된 DB(`tags` 칸이 있다)에서 옛 report_problem 정의를 건너뛴다(코덱스 2R) — 다시 돌려도 안전하다.
 -- 멱등: 칸은 IF NOT EXISTS, 제약은 지우고 다시 만들고, 함수는 CREATE OR REPLACE(서명 그대로 — 오버로드가 생기지 않는다).
 -- =============================================
 
@@ -33,9 +33,24 @@ ALTER TABLE exam.problem_reports ADD COLUMN IF NOT EXISTS tags JSONB;
 COMMENT ON COLUMN exam.problem_reports.tags IS
   '신고 때 원본 문항의 태그 {work_titles, unit_path, area_path, grammar_paths}(sql/114). 원본이 없었거나 sql/114 전 신고면 NULL.';
 
+-- 태그 넷을 굳히는 식 — 신고 RPC 만 부른다(DEFINER 안에서 소유자 권한으로 돈다, 브라우저에 안 연다)
+CREATE OR REPLACE FUNCTION exam.problem_report_tags(p exam.problems)
+RETURNS JSONB LANGUAGE sql STABLE
+SET search_path = exam, pg_temp
+AS $$
+  SELECT jsonb_build_object(
+    'work_titles',   to_jsonb((p).work_titles),
+    'unit_path',     to_jsonb((p).unit_path),
+    'area_path',     to_jsonb((p).area_path),
+    'grammar_paths', to_jsonb((p).grammar_paths));
+$$;
+REVOKE ALL ON FUNCTION exam.problem_report_tags(exam.problems) FROM PUBLIC, anon, authenticated;
+
 -- ---------------------------------------------
 -- 3. 신고 RPC — sql/113 판에서 종류 목록을 넓히고 태그를 굳힌다
 -- ---------------------------------------------
+-- ⚠️ 태그는 스냅샷과 **같은 문장**에서 읽는다(코덱스 2R) — 따로 읽으면 READ COMMITTED 에서 그 사이 커밋된 태그 수정이 끼어
+--   스냅샷(옛 작품·영역)과 '신고 때 태그'(새 값)가 다른 판이 된다. 문제지 항목은 스냅샷이 인쇄 때 모습이라 태그만 지금 원본이다.
 CREATE OR REPLACE FUNCTION exam.report_problem(
   p_category       TEXT,
   p_note           TEXT DEFAULT '',
@@ -90,20 +105,23 @@ BEGIN
         USING ERRCODE = 'serialization_failure';
     END IF;
     -- 문제지에서 — 그 항목의 스냅샷(인쇄된 모습)과 문제지 안 번호를 남긴다. 번호는 자리 차례(인쇄 번호와 같다)
+    -- 신고 때의 태그(sql/114) — 원본 문항이 남아 있으면 지금 원본의 태그(선생님이 문제 은행에서 보는 값)
     SELECT i.snapshot, i.problem_id, i.paper_id, p.title,
            (SELECT count(*) + 1 FROM exam.problem_paper_items o
-             WHERE o.paper_id = i.paper_id AND o.order_index < i.order_index)::int
-      INTO v_snapshot, v_problem_id, v_paper_id, v_paper_title, v_printed_no
+             WHERE o.paper_id = i.paper_id AND o.order_index < i.order_index)::int,
+           CASE WHEN pr.id IS NULL THEN NULL ELSE exam.problem_report_tags(pr) END
+      INTO v_snapshot, v_problem_id, v_paper_id, v_paper_title, v_printed_no, v_tags
       FROM exam.problem_paper_items i
       JOIN exam.problem_papers p ON p.id = i.paper_id
+      LEFT JOIN exam.problems pr ON pr.id = i.problem_id
      WHERE i.id = p_paper_item_id;
     IF v_snapshot IS NULL THEN
       RAISE EXCEPTION '문제지 문항을 찾지 못했어요 — 문제지가 바뀌었을 수 있어요' USING ERRCODE = 'no_data_found';
     END IF;
   ELSE
     -- 문제 은행에서 — 지금 원본을 문제지와 같은 모양으로 굳힌다
-    SELECT exam.paper_item_snapshot(p, ps, s), p.id
-      INTO v_snapshot, v_problem_id
+    SELECT exam.paper_item_snapshot(p, ps, s), p.id, exam.problem_report_tags(p)
+      INTO v_snapshot, v_problem_id, v_tags
       FROM exam.problems p
       LEFT JOIN exam.passages ps ON ps.id = p.passage_id
       LEFT JOIN exam.problem_sources s ON s.id = p.source_id
@@ -111,17 +129,6 @@ BEGIN
     IF v_snapshot IS NULL THEN
       RAISE EXCEPTION '문항을 찾지 못했어요 — 지워졌거나 다시 올라왔을 수 있어요' USING ERRCODE = 'no_data_found';
     END IF;
-  END IF;
-
-  -- 신고 때의 태그(sql/114) — 문제지 항목이어도 원본 문항이 남아 있으면 지금 원본의 태그다(선생님이 문제 은행에서 보는 값)
-  IF v_problem_id IS NOT NULL THEN
-    SELECT jsonb_build_object(
-             'work_titles',   to_jsonb(p.work_titles),
-             'unit_path',     to_jsonb(p.unit_path),
-             'area_path',     to_jsonb(p.area_path),
-             'grammar_paths', to_jsonb(p.grammar_paths))
-      INTO v_tags
-      FROM exam.problems p WHERE p.id = v_problem_id;
   END IF;
 
   INSERT INTO exam.problem_reports
@@ -170,6 +177,9 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
                   WHERE table_schema = 'exam' AND table_name = 'problem_reports' AND column_name = 'tags' AND data_type = 'jsonb') THEN
     RAISE EXCEPTION 'sql/114: problem_reports.tags 칸이 없다';
+  END IF;
+  IF has_function_privilege('authenticated', 'exam.problem_report_tags(exam.problems)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'sql/114: problem_report_tags 가 브라우저에 열려 있다';
   END IF;
   IF has_column_privilege('authenticated', 'exam.problem_reports', 'tags', 'UPDATE')
      OR NOT has_column_privilege('authenticated', 'exam.problem_reports', 'tags', 'SELECT') THEN

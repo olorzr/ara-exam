@@ -96,6 +96,17 @@ describe('POST /api/notify-problem-report', () => {
     expect(JSON.parse(String(init.body)).sourceLabel).toBe('2026학년도 수능 (언어와 매체) · 원래 35번');
   });
 
+  it('제목이 길어도 인테이크 상한 안에서 원래 번호 꼬리를 지킨다', async () => {
+    row = { ...baseRow, original_no: 35, source: { source_type: '모의고사', title: '모'.repeat(120), school_name: '', year: '2026', grade: '고3', exam_type: '수능', publisher: '' } };
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true, reached: true })));
+    vi.stubGlobal('fetch', fetchMock);
+    await call();
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const label = String(JSON.parse(String(init.body)).sourceLabel);
+    expect(label.length).toBe(80);
+    expect(label.endsWith(' · 원래 35번')).toBe(true);
+  });
+
   it('다른 요청이 먼저 잡았으면 보내지 않는다(겹친 두 요청이 DM 을 두 번 보내지 않게)', async () => {
     claimData = [];
     const fetchMock = vi.fn();

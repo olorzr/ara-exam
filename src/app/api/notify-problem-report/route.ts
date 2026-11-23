@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireSession } from '@/lib/require-session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { reportSourceLabel } from '@/lib/problem-report/display';
-import { REPORT_CATEGORY_LABELS, isReportCategory, withOriginalNumber } from '@/lib/problem-report/types';
+import { intakeSourceLabel, reportSourceLabel } from '@/lib/problem-report/display';
+import { REPORT_CATEGORY_LABELS, isReportCategory } from '@/lib/problem-report/types';
 
 /**
  * 문제 은행 오류 신고 → 원장 웍스 DM (sql/113, 2026-11-22).
@@ -85,8 +85,9 @@ export async function POST(request: NextRequest) {
         paperTitle: row.paper_title ?? undefined,
         printedNo: row.printed_no ?? undefined,
         // 원본 시험지의 번호까지 — 원장이 원본에서 바로 짚게(2026-11-22). 인테이크는 80자에서 자른다
-        // 출처 줄은 신고 스냅샷의 출처로 카드·교사용과 같은 규칙(모의고사는 제목 — 저장된 줄은 과목이 뭉개진다, sql/114 코덱스 1R)
-        sourceLabel: withOriginalNumber(reportSourceLabel(row.source, row.source_label), row.original_no) || undefined,
+        // 출처 줄은 신고 스냅샷의 출처로 카드·교사용과 같은 규칙(모의고사는 제목 — 저장된 줄은 과목이 뭉개진다, sql/114 코덱스 1R).
+        // 인테이크가 80자에서 자르므로 원래 번호 꼬리를 지키며 앞만 줄인다(2R)
+        sourceLabel: intakeSourceLabel(reportSourceLabel(row.source, row.source_label), row.original_no) || undefined,
         category: isReportCategory(row.category) ? REPORT_CATEGORY_LABELS[row.category] : row.category,
         note: row.note || undefined,
       }),

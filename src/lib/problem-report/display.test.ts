@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { parseReportTags, reportSourceInput, reportSourceLabel, reportTagLines } from './display';
+import {
+  INTAKE_SOURCE_LABEL_MAX, intakeSourceLabel, parseReportTags, reportSourceInput, reportSourceLabel, reportTagLines,
+} from './display';
 
 const mock = {
   source_type: '모의고사', title: '2026학년도 수능 (언어와 매체)', school_name: '', year: '2026', grade: '고3',
@@ -53,5 +55,23 @@ describe('신고 때의 태그', () => {
       { label: '문법', value: '단어 > 품사 > 명사, 문장 > 문장 성분' },
     ]);
     expect(reportTagLines({ work_titles: [], unit_path: [], area_path: [], grammar_paths: [] })).toEqual([]);
+  });
+});
+
+describe('intakeSourceLabel', () => {
+  it('짧으면 원래 번호를 붙인 그대로', () => {
+    expect(intakeSourceLabel('2026 중2 상현중 1학기 중간', 17)).toBe('2026 중2 상현중 1학기 중간 · 원래 17번');
+    expect(intakeSourceLabel('', 3)).toBe('원래 3번');
+    expect(intakeSourceLabel('제목', null)).toBe('제목');
+  });
+
+  it('길면 앞 출처만 줄이고 원래 번호 꼬리는 지킨다(인테이크 상한 안)', () => {
+    const title = '가'.repeat(120);
+    const out = intakeSourceLabel(title, 35);
+    expect(out.length).toBe(INTAKE_SOURCE_LABEL_MAX);
+    expect(out.endsWith('… · 원래 35번')).toBe(true);
+    const noNumber = intakeSourceLabel(title, null);
+    expect(noNumber.length).toBe(INTAKE_SOURCE_LABEL_MAX);
+    expect(noNumber.endsWith('…')).toBe(true);
   });
 });

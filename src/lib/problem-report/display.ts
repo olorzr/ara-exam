@@ -1,6 +1,7 @@
 import { areaPathLabel } from '@/lib/problem-bank/area-tree';
 import { sourceLabel, type SourceLabelInput } from '@/lib/problem-bank/source-label';
 import type { ProblemSourceType } from '@/types/problem-bank';
+import { withOriginalNumber } from './types';
 
 /**
  * 오류 신고 목록·원장 알림에 찍는 글 — 출처 줄과 신고 때의 태그(순수, 서버 라우트도 쓴다).
@@ -93,6 +94,25 @@ export function reportSourceLabel(source: unknown, stored: string | null | undef
   const input = reportSourceInput(source);
   const label = input ? sourceLabel(input).trim() : '';
   return label || (stored ?? '');
+}
+
+/** 관리자센터 인테이크가 출처 글을 자르는 길이 — Ara-system `lib/problemReportIntake` 의 `LIMITS.sourceLabel` 과 같은 값 */
+export const INTAKE_SOURCE_LABEL_MAX = 80;
+
+/**
+ * 원장 웍스 알림에 보낼 출처 글 — 원래 번호 꼬리(' · 원래 35번')는 지키고 앞의 출처만 줄인다.
+ * 인테이크는 넘치면 끝을 자르는데, 모의고사·평가문제집 제목(120자까지)이면 원래 번호가 잘려 문제지 신고에 인쇄 번호만 남는다(코덱스 2R).
+ * @param label - 출처 줄(`reportSourceLabel`)
+ * @param number - 원래 번호(`snapshot->number`)
+ * @param max - 상한(기본 인테이크 상한)
+ * @returns 상한 안의 출처 글
+ */
+export function intakeSourceLabel(label: string, number: unknown, max: number = INTAKE_SOURCE_LABEL_MAX): string {
+  const base = label.trim();
+  const full = withOriginalNumber(base, number);
+  if (full.length <= max) return full;
+  const tail = full.slice(base.length);
+  return `${base.slice(0, Math.max(max - tail.length - 1, 0))}…${tail}`;
 }
 
 /**

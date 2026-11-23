@@ -2,9 +2,9 @@
 -- 113. 문제 은행 오류 신고 — 선생님이 신고하고 원장이 처리한다 (2026-11-22)
 -- 실행: node /Users/ara/Projects/Ara-system/scripts/run-sql.js /Users/ara/Projects/ara-exam/sql/113_problem_reports.sql
 -- =============================================
--- ⚠️⚠️ 2026-11-23 부터 신고 종류 CHECK 와 `exam.report_problem` 의 정식 정의는 sql/114(태그 오류 · 출처·번호 오류를 더했다).
---   이 파일을 다시 돌리면 RPC 가 옛 다섯 종류로 되돌아가니 **곧바로 sql/114 를 다시 돌릴 것**(표의 CHECK 는 CREATE TABLE IF NOT
---   EXISTS 라 그대로다).
+-- ⚠️⚠️ 2026-11-23 부터 신고 종류 CHECK 와 `exam.report_problem` 의 정식 정의는 sql/114(태그 오류 · 출처·번호 오류 · 신고 때 태그).
+--   이 파일은 sql/114 가 적용된 DB(`problem_reports.tags` 칸이 있다)에서 아래 report_problem 정의를 **건너뛴다** — 다시 돌려도 새 RPC 가
+--   옛 다섯 종류로 되돌아가지 않는다(코덱스 2R). 표의 CHECK 는 CREATE TABLE IF NOT EXISTS 라 원래 그대로다.
 -- 배경 (원장님 "문제은행에서 오류가 있는 문제들을 선생님들이 체킹할 수 있는 기능 … 대부분 애들 문제은행에서 문제지로
 --   만든 다음에 그걸 풀리다가 찾거든? 그래서 그걸 신고하는 부분이 있으면 좋겠어. 신고하면 나한테 연락오게끔")
 --   · 신고 자리는 둘 — 문제지 보기 화면(몇 번 문항인지 고른다)과 문제 은행 문항 상세 창. 원장 연락(웍스 DM)은 앱이 저장
@@ -107,6 +107,15 @@ CREATE POLICY "Domain users can read problem_reports" ON exam.problem_reports
 -- 고치기(sql/103 update_problem_paper — 같은 행을 UPDATE)와 겹치면 그쪽 커밋 뒤의 판으로 견준다.
 -- 첫 적용 판(인자 넷)은 판 대조가 없었다 — 지우고 새 서명으로 만든다(오버로드가 남으면 PostgREST 가 못 고른다).
 DROP FUNCTION IF EXISTS exam.report_problem(TEXT, TEXT, UUID, UUID);
+-- sql/114 가 적용된 DB 면 건너뛴다(그쪽이 정식 정의 — 위 머리말). 첫 적용·sql/114 전 DB 에서만 이 판을 만든다
+DO $guard114$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+              WHERE table_schema = 'exam' AND table_name = 'problem_reports' AND column_name = 'tags') THEN
+    RAISE NOTICE 'sql/113: sql/114 가 적용된 DB — exam.report_problem 은 sql/114 정의를 그대로 둔다(건너뜀)';
+    RETURN;
+  END IF;
+  EXECUTE $fn113$
 CREATE OR REPLACE FUNCTION exam.report_problem(
   p_category       TEXT,
   p_note           TEXT DEFAULT '',
@@ -191,7 +200,10 @@ BEGIN
   RETURNING id INTO v_id;
   RETURN v_id;
 END;
-$$;
+$$
+$fn113$;
+END
+$guard114$;
 
 REVOKE ALL ON FUNCTION exam.report_problem(TEXT, TEXT, UUID, UUID, TIMESTAMPTZ) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION exam.report_problem(TEXT, TEXT, UUID, UUID, TIMESTAMPTZ) TO authenticated, service_role;
