@@ -36,20 +36,50 @@ export interface ReportSourceField {
 
 const SOURCE_TYPES = ['내신기출', '모의고사', '문제집', '프린트', '평가문제집'] as const satisfies readonly ProblemSourceType[];
 
-/** 보이지 않는 글자 — sql/114 `problem_report_norm_text` ①과 같은 목록(display.test 가 대조) */
-export const REPORT_INVISIBLE_CHARS = /[\u00AD\u034F\u180E\u200B\u200E\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF]/g;
-/** 공백 무리 — sql/114 `problem_report_norm_text` ③과 같은 목록 */
-export const REPORT_SPACE_RUNS = /[\s\u0085\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]+/g;
+/** HTML 이 접는 공백 무리(띄어쓰기·탭·줄바꿈·폼 피드·CR) — sql/114 `problem_report_norm_text` ②와 같은 정규식(display.test 가 대조) */
+export const REPORT_HTML_SPACE_RUNS = /[\t\n\f\r ]+/g;
 
 /**
- * 글 한 칸 정규화 — 화면에서 같아 보이는 글은 같은 값으로. sql/114 `problem_report_norm_text` 와 같은 규칙·차례다
- * (보이지 않는 글자 걷기 → NFC → 공백 무리를 한 칸으로 → 앞뒤 걷기). 신고 지문은 서버가 이 규칙으로 만들고 창은 이 규칙으로 그린다 —
- * 둘이 다르면 화면은 같은데 '바뀌었어요' 로 거절된다(Stop 게이트: 빈 출판사와 BOM 하나만 든 출판사).
+ * 글 한 칸 정규화 — **화면(HTML)이 똑같이 그리는 것만** 같게 본다. sql/114 `problem_report_norm_text` 와 같은 규칙·차례다
+ * (NFC → HTML 이 접는 공백 무리를 한 칸으로 → 앞뒤 띄어쓰기 걷기). 그 밖의 글자는 걷지 않는다 — 보이지 않는 글자·방향 제어 글자는
+ * 창이 ⟨U+XXXX⟩ 로 드러낸다(`reportVisibleSegments`). ⚠️ `trim()` 을 쓰지 말 것 — NBSP·BOM 까지 걷어 서버 지문과 갈린다(Stop 게이트).
  * @param value - 글
  * @returns 정규화한 글(비면 빈 글)
  */
 export function normalizeReportText(value: string): string {
-  return value.replace(REPORT_INVISIBLE_CHARS, '').normalize('NFC').replace(REPORT_SPACE_RUNS, ' ').trim();
+  return value.normalize('NFC').replace(REPORT_HTML_SPACE_RUNS, ' ').replace(/^ +| +$/g, '');
+}
+
+/** 화면에서 안 보이거나 공백처럼 보여 드러내 그릴 글자 — 제어·서식(방향 제어·폭 없는 공백·BOM …)·띄어쓰기 아닌 공백·줄/문단 구분 */
+const REPORT_HIDDEN_CHAR = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Zs}]/u;
+
+/** 글 조각 — 보통 글 또는 드러낸 글자 표시 */
+export interface ReportTextSegment {
+  text: string;
+  /** 드러낸 글자면 true(`text` 는 'U+202E' 꼴) */
+  hidden: boolean;
+}
+
+/**
+ * 화면에 그릴 조각 — 안 보이거나 공백처럼 보이는 글자(띄어쓰기 빼고)를 'U+XXXX' 표시로 드러낸다. 신고 창·목록의 값 칸이 쓴다.
+ * 지문은 이런 글자를 걷지 않으므로(방향 제어를 걷으면 'BA' 로 보이던 제목이 'AB' 와 같아진다) 화면이 드러내야 지문이 다르면 화면도 다르다.
+ * @param value - 정규화한 글
+ * @returns 조각 목록
+ */
+export function reportVisibleSegments(value: string): ReportTextSegment[] {
+  const out: ReportTextSegment[] = [];
+  let run = '';
+  for (const ch of value) {
+    if (ch !== ' ' && REPORT_HIDDEN_CHAR.test(ch)) {
+      if (run) out.push({ text: run, hidden: false });
+      run = '';
+      out.push({ text: `U+${(ch.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, '0')}`, hidden: true });
+    } else {
+      run += ch;
+    }
+  }
+  if (run) out.push({ text: run, hidden: false });
+  return out;
 }
 
 /**
@@ -123,8 +153,26 @@ export function reportSourceLabel(source: unknown, stored: string | null | undef
 /** 관리자센터 인테이크가 출처 글을 자르는 길이 — Ara-system `lib/problemReportIntake` 의 `LIMITS.sourceLabel` 과 같은 값 */
 export const INTAKE_SOURCE_LABEL_MAX = 80;
 
-/** 출처 끝의 괄호 꼬리(과목·형) — 앞 공백까지 함께 */
-const SECTION_TAIL = /\s*\([^()]*\)$/;
+/**
+ * 출처 끝의 괄호 꼬리(과목·형) — 앞 공백까지 함께. 겹괄호('(국어 영역 (A형))')도 짝을 세어 통째로 잡는다(코덱스 10R —
+ * 안쪽 괄호 없는 꼴만 잡으면 A형·B형이 같은 글로 잘렸다). 짝이 안 맞으면 빈 글.
+ * @param base - 출처 글
+ * @returns 꼬리(없으면 빈 글)
+ */
+function sectionTail(base: string): string {
+  if (!base.endsWith(')')) return '';
+  let depth = 0;
+  for (let i = base.length - 1; i >= 0; i -= 1) {
+    if (base[i] === ')') depth += 1;
+    else if (base[i] === '(') depth -= 1;
+    if (depth === 0) {
+      let start = i;
+      while (start > 0 && base[start - 1] === ' ') start -= 1;
+      return start > 0 ? base.slice(start) : '';
+    }
+  }
+  return '';
+}
 
 /** 괄호 꼬리를 지키고도 앞에 남겨야 할 최소 글자 수 — 이보다 좁으면 꼬리를 포기한다(앞이 안 보이면 무슨 시험인지 모른다) */
 const MIN_HEAD_CHARS = 12;
@@ -160,7 +208,7 @@ export function intakeSourceLabel(label: string, number: unknown, max: number = 
   const tail = full.slice(base.length);
   // 끝의 괄호 꼬리('(언어와 매체)')는 같은 시험의 과목을 가른다 — 가운데를 줄이고 꼬리를 지킨다(코덱스 3R).
   // 꼬리를 남기면 앞에 둘 자리가 너무 좁을 때만 꼬리를 포기한다
-  const section = SECTION_TAIL.exec(base)?.[0] ?? '';
+  const section = sectionTail(base);
   const head = base.slice(0, base.length - section.length).trimEnd();
   const room = max - tail.length - section.length - 1;
   if (section && room >= MIN_HEAD_CHARS) return `${sliceUnits(head, room)}…${section}${tail}`;

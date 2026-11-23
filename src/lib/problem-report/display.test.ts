@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  INTAKE_SOURCE_LABEL_MAX, REPORT_INVISIBLE_CHARS, REPORT_SPACE_RUNS, categoryShowsState, normalizeReportText, intakeSourceLabel, reportSourceFields, sliceUnits, parseReportState, parseReportTags, reportSourceInput, reportSourceLabel, reportTagGroups,
+  INTAKE_SOURCE_LABEL_MAX, REPORT_HTML_SPACE_RUNS, categoryShowsState, normalizeReportText, reportVisibleSegments, intakeSourceLabel, reportSourceFields, sliceUnits, parseReportState, parseReportTags, reportSourceInput, reportSourceLabel, reportTagGroups,
 } from './display';
 
 const mock = {
@@ -78,6 +78,12 @@ describe('intakeSourceLabel', () => {
     expect(withSection.length).toBeLessThanOrEqual(INTAKE_SOURCE_LABEL_MAX);
     expect(withSection.endsWith('… (언어와 매체) · 원래 35번')).toBe(true);
     expect(intakeSourceLabel(mockTitle.replace('언어와 매체', '화법과 작문'), 35)).not.toBe(withSection);
+    // 겹괄호 꼬리도 통째로 지킨다(A형·B형이 같은 글이 되지 않게)
+    const nested = `${'2014학년도 대학수학능력시험 '.repeat(4)}(국어 영역 (A형))`;
+    const nestedA = intakeSourceLabel(nested, 12);
+    expect(nestedA.endsWith('… (국어 영역 (A형)) · 원래 12번')).toBe(true);
+    expect(nestedA.length).toBeLessThanOrEqual(INTAKE_SOURCE_LABEL_MAX);
+    expect(intakeSourceLabel(nested.replace('A형', 'B형'), 12)).not.toBe(nestedA);
     // 꼬리가 너무 길어 앞이 안 남으면 꼬리를 포기한다
     const longSection = `시험 (${'가'.repeat(80)})`;
     expect(intakeSourceLabel(longSection, 3).startsWith('시험 (')).toBe(true);
@@ -132,27 +138,45 @@ describe('reportSourceFields', () => {
 });
 
 describe('normalizeReportText — sql/114 와 같은 규칙', () => {
-  it('보이지 않는 글자·NBSP·풀어 쓴 한글·탭/줄바꿈을 화면과 같게 접는다', () => {
-    expect(normalizeReportText('\uFEFF')).toBe('');
-    expect(normalizeReportText('가\u200B나')).toBe('가나');
-    expect(normalizeReportText('수\u00A0능')).toBe('수 능');
-    expect(normalizeReportText('\t수\n\n능\u3000')).toBe('수 능');
+  const ch = (cp: number) => String.fromCodePoint(cp);
+
+  it('HTML 이 접는 공백만 접고, NFC 로 합친다', () => {
+    expect(normalizeReportText(`${ch(9)}수${ch(10)}${ch(10)}능${ch(13)}  `)).toBe('수 능');
     expect(normalizeReportText('한글'.normalize('NFD'))).toBe('한글');
-    // 이모지 잇기(ZWJ)는 남긴다 — 보이는 모양을 바꾼다
-    expect(normalizeReportText('👨\u200D👩')).toBe('👨\u200D👩');
   });
 
-  it('출처 칸·태그 목록이 이 규칙으로 읽힌다(빈 출판사 = BOM 만 든 출판사)', () => {
-    expect(reportSourceFields({ publisher: '\uFEFF', title: '수\u00A0능' })).toEqual([{ label: '제목', value: '수 능' }]);
-    expect(parseReportTags({ work_titles: ['\uFEFF', '동백꽃\u200B'] })?.work_titles).toEqual(['동백꽃']);
+  it('화면이 다르게 그리는 글자는 걷지 않는다 — BOM·NBSP·전각 공백·방향 제어', () => {
+    expect(normalizeReportText(ch(0xfeff))).toBe(ch(0xfeff));
+    expect(normalizeReportText(`수${ch(0xa0)}능`)).toBe(`수${ch(0xa0)}능`);
+    expect(normalizeReportText(`수${ch(0x3000)}`)).toBe(`수${ch(0x3000)}`);
+    const rtl = `2026 시험 ${ch(0x202e)}AB${ch(0x202c)}`;
+    expect(normalizeReportText(rtl)).toBe(rtl);
   });
 
-  it('두 정규식은 sql/114 의 problem_report_norm_text 와 글자 그대로 같다', () => {
+  it('창은 그런 글자를 U+XXXX 로 드러낸다(띄어쓰기는 그대로)', () => {
+    expect(reportVisibleSegments(`2026 시험 ${ch(0x202e)}AB${ch(0x202c)}`)).toEqual([
+      { text: '2026 시험 ', hidden: false }, { text: 'U+202E', hidden: true },
+      { text: 'AB', hidden: false }, { text: 'U+202C', hidden: true },
+    ]);
+    expect(reportVisibleSegments(ch(0xfeff))).toEqual([{ text: 'U+FEFF', hidden: true }]);
+    expect(reportVisibleSegments(`수${ch(0xa0)}능`)).toEqual([
+      { text: '수', hidden: false }, { text: 'U+00A0', hidden: true }, { text: '능', hidden: false },
+    ]);
+    expect(reportVisibleSegments('보통 글')).toEqual([{ text: '보통 글', hidden: false }]);
+  });
+
+  it('출처 칸·태그 목록이 이 규칙으로 읽힌다(BOM 만 든 출판사는 빈 칸이 아니다)', () => {
+    expect(reportSourceFields({ publisher: ch(0xfeff), title: ` 수능${ch(9)}` })).toEqual([
+      { label: '제목', value: '수능' }, { label: '출판사', value: ch(0xfeff) },
+    ]);
+    expect(parseReportTags({ work_titles: ['  ', `동백꽃${ch(10)}`] })?.work_titles).toEqual(['동백꽃']);
+  });
+
+  it('공백 정규식은 sql/114 의 problem_report_norm_text 와 글자 그대로 같다', () => {
     const sql = readFileSync(join(process.cwd(), 'sql/114_problem_report_tag_source_categories.sql'), 'utf8');
     const fn = sql.slice(sql.indexOf('CREATE OR REPLACE FUNCTION exam.problem_report_norm_text'));
     const body = fn.slice(0, fn.indexOf('$$;'));
-    expect(body).toContain(`'${REPORT_INVISIBLE_CHARS.source}', ''`);
-    expect(body).toContain(`'${REPORT_SPACE_RUNS.source}', ' '`);
+    expect(body).toContain(`'${REPORT_HTML_SPACE_RUNS.source}', ' '`);
     expect(body).toContain('NFC');
   });
 });

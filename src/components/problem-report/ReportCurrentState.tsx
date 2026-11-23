@@ -19,10 +19,24 @@ interface ReportCurrentStateProps {
  * 읽지 못해도 신고는 막지 않는다(그때는 저장 순간의 값이 남는다).
  */
 export default function ReportCurrentState({ kind, view }: ReportCurrentStateProps) {
-  if (view.loading) return <p className="text-xs text-gray-400">신고에 남을 태그·출처를 불러오는 중…</p>;
+  // 알림 구역(aria-live)은 읽는 동안에도 붙여 둔다 — 다 읽은 뒤 내용째 새로 붙으면 화면 읽기 프로그램이 읽어 주지 않는다(코덱스 10R)
+  return (
+    <div aria-live="polite" className="text-xs">
+      <ReportCurrentStateBody kind={kind} view={view} />
+    </div>
+  );
+}
+
+/**
+ * 알림 구역 안의 내용 — 읽는 중 · 못 읽음 · 신고에 남을 값.
+ * @param props.kind - 고른 종류
+ * @param props.view - 상태
+ */
+function ReportCurrentStateBody({ kind, view }: ReportCurrentStateProps) {
+  if (view.loading) return <p className="text-gray-400">신고에 남을 태그·출처를 불러오는 중…</p>;
   if (view.failed || !view.state) {
     return (
-      <p className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+      <p className="flex flex-wrap items-center gap-2 text-gray-500">
         신고에 남을 태그·출처를 불러오지 못했어요. 신고는 할 수 있어요.
         <Button type="button" variant="outline" size="sm" onClick={view.reload}>다시 불러오기</Button>
       </p>
@@ -50,7 +64,7 @@ export default function ReportCurrentState({ kind, view }: ReportCurrentStatePro
     </div>
   );
   return (
-    <div className="space-y-1.5 rounded-md bg-gray-50 px-3 py-2 text-xs break-keep [overflow-wrap:anywhere] text-gray-700" aria-live="polite">
+    <div className="space-y-1.5 rounded-md bg-gray-50 px-3 py-2 break-keep [overflow-wrap:anywhere] text-gray-700">
       {kind === 'tag' ? [tagBlock, sourceBlock] : [sourceBlock, tagBlock]}
     </div>
   );

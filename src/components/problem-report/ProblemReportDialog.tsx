@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } f
 import { Textarea } from '@/components/ui/textarea';
 import { sourceLabelWithNumber } from '@/lib/problem-bank/source-label';
 import { useReportState } from '@/hooks/useReportState';
-import { categoryShowsState } from '@/lib/problem-report/display';
+import { categoryShowsState, reportSourceInput } from '@/lib/problem-report/display';
 import { notifyProblemReport } from '@/lib/problem-report/notify-client';
 import {
   countOpenReports, fetchPaperItemRefs, submitProblemReport, type PaperItemRef,
@@ -87,6 +87,11 @@ export default function ProblemReportDialog({ open, onClose, target }: ProblemRe
   const showsState = categoryShowsState(category);
   const stateSubject = target.kind === 'problem' ? { problemId: target.problemId } : picked ? { paperItemId: picked.id } : null;
   const stateView = useReportState(stateSubject, showsState ? category : null);
+  // 머리 줄도 확인한 상태를 따른다 — 다시 읽어 번호가 바뀌었는데 머리만 옛 번호면 그 번호로 믿고 신고한다(코덱스 10R)
+  const confirmedSource = stateView.state ? reportSourceInput(stateView.state.source) : null;
+  const headerLabel = target.kind === 'problem' && stateView.state && confirmedSource
+    ? sourceLabelWithNumber(confirmedSource, stateView.state.number)
+    : target.kind === 'problem' ? target.label : '';
 
   // 지금 상태를 읽는 동안은 기다린다 — 보여 준 값과 실어 보낼 지문이 짝이어야 한다(못 읽었으면 지문 없이 보낸다)
   const ready = category !== '' && !stale && (target.kind === 'problem' || picked !== null)
@@ -159,7 +164,7 @@ export default function ProblemReportDialog({ open, onClose, target }: ProblemRe
                 </div>
               </div>
             ) : (
-              <p className="text-sm break-keep [overflow-wrap:anywhere] text-gray-700">{target.label}</p>
+              <p className="text-sm break-keep [overflow-wrap:anywhere] text-gray-700">{headerLabel}</p>
             )}
             {shownCount > 0 && (
               <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">

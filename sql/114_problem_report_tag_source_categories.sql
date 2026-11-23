@@ -60,20 +60,18 @@ REVOKE ALL ON FUNCTION exam.problem_report_tags(exam.problems) FROM PUBLIC, anon
 DROP FUNCTION IF EXISTS exam.problem_report_state(UUID);
 DROP FUNCTION IF EXISTS exam.problem_report_state_of(exam.problems, exam.problem_sources);
 
--- 글 한 칸 정규화 — 화면에서 같아 보이는 글은 같은 값으로(Stop 게이트). 앱 `normalizeReportText`(display.ts)와 **글자 하나까지 같은 규칙**이다
--- (두 목록을 바꾸면 둘 다 — display.test 가 이 파일의 두 정규식을 읽어 대조한다):
---   ① 보이지 않는 글자(폭 없는 공백·BOM·단어 잇기·방향 제어·줄 바꿈 가능 하이픈 …)를 걷는다 — 빈 칸과 BOM 하나만 든 칸이 같아 보였다
---   ② NFC 로 합친다(풀어 쓴 한글과 합친 한글은 같아 보인다) — ①이 먼저여야 멱등이다(category-name 규칙과 같은 차례)
---   ③ 탭·줄바꿈·유니코드 공백(NBSP·전각 공백 …)의 연속을 한 칸으로 접고 ④ 앞뒤를 걷는다, 비면 null.
---   ⚠️ ③을 ④보다 먼저 — btrim 은 띄어쓰기만 걷어, 먼저 걷으면 앞뒤 탭이 남아 공백 한 칸이 됐다.
---   이모지 잇기(ZWJ)·이체자 선택자·옛한글 채움 글자는 걷지 않는다 — 보이는 모양을 바꾼다
+-- 글 한 칸 정규화 — **화면(HTML)이 실제로 똑같이 그리는 것만** 같게 본다(Stop 게이트 ×4). 앱 `normalizeReportText`(display.ts)와 같은 규칙이다
+-- (display.test 가 이 본문의 정규식을 읽어 대조한다):
+--   ① NFC — 풀어 쓴 한글과 합친 한글은 정의상 같게 그려진다
+--   ② HTML 이 접는 공백(띄어쓰기·탭·줄바꿈·폼 피드·CR)의 무리를 한 칸으로, ③ 앞뒤를 걷는다(HTML 은 앞뒤 공백을 안 그린다), 비면 null.
+--   ⚠️ 그 밖의 글자는 **하나도 걷지 않는다** — 보이지 않는 글자(BOM·폭 없는 공백)를 걷으면 빈 칸과 같은 지문이 되는데, 방향 제어
+--   글자(U+202E)를 걷으면 화면에서 'BA' 로 보이던 제목이 'AB' 와 같은 지문이 됐다. 대신 창이 그런 글자(제어·서식·유니코드 공백 문자)를
+--   ⟨U+XXXX⟩ 로 드러내 그린다(`reportVisibleSegments`) — 지문이 다르면 화면도 다르다
 CREATE OR REPLACE FUNCTION exam.problem_report_norm_text(v TEXT)
 RETURNS TEXT LANGUAGE sql IMMUTABLE
 SET search_path = exam, pg_temp
 AS $$
-  SELECT NULLIF(btrim(regexp_replace(
-           normalize(regexp_replace(COALESCE(v, ''), '[\u00AD\u034F\u180E\u200B\u200E\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF]', '', 'g'), NFC),
-           '[\s\u0085\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]+', ' ', 'g')), '');
+  SELECT NULLIF(btrim(regexp_replace(normalize(COALESCE(v, ''), NFC), '[\t\n\f\r ]+', ' ', 'g')), '');
 $$;
 REVOKE ALL ON FUNCTION exam.problem_report_norm_text(TEXT) FROM PUBLIC, anon, authenticated;
 
@@ -324,11 +322,12 @@ BEGIN
   -- 정규화 — 빈 글·null·키 없음·공백만 다른 상태는 같은 지문, 칸을 옮기면 다른 지문
   IF exam.problem_report_state_build(NULL, '{"title":"수능  ", "grade":""}', '3')
      IS DISTINCT FROM exam.problem_report_state_build(NULL, '{"title":" 수능", "grade":null, "semester":"   "}', '3')
-     -- 보이지 않는 글자(BOM)만 든 칸 = 빈 칸, NBSP = 공백, 풀어 쓴 한글 = 합친 한글
-     OR exam.problem_report_state_build(NULL, jsonb_build_object('publisher', chr(65279), 'title', '수' || chr(160) || '능'), NULL)
-        IS DISTINCT FROM exam.problem_report_state_build(NULL, '{"title":"수 능"}', NULL)
+     -- 화면이 다르게 그리는 글자는 걷지 않는다 — BOM·NBSP·방향 제어는 그대로(창이 ⟨U+XXXX⟩ 로 드러낸다)
+     OR exam.problem_report_norm_text(chr(65279)) IS NULL
+     OR exam.problem_report_norm_text('수' || chr(160) || '능') = '수 능'
+     OR exam.problem_report_norm_text('2026 시험 ' || chr(8238) || 'AB' || chr(8236)) = '2026 시험 AB'
+     -- 풀어 쓴 한글 = 합친 한글
      OR exam.problem_report_norm_text(normalize('한글', NFD)) <> '한글'
-     OR exam.problem_report_norm_text('가' || chr(8203) || '나') <> '가나'
      -- 탭·줄바꿈만 다른 값도 같은 지문(앞뒤든 안쪽이든)
      OR exam.problem_report_state_build('{"work_titles":["\t동백꽃\n", "봄\t\n봄"]}', '{"title":"\n수능\t", "grade":"\t"}', NULL)
         IS DISTINCT FROM exam.problem_report_state_build('{"work_titles":["동백꽃", "봄 봄"]}', '{"title":"수능"}', NULL)

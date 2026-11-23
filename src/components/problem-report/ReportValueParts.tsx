@@ -1,16 +1,20 @@
 'use client';
 
-import { Fragment, type ReactNode } from 'react';
-import { reportSourceFields, reportTagGroups, type ReportTags } from '@/lib/problem-report/display';
+import { Fragment } from 'react';
+import { reportSourceFields, reportTagGroups, reportVisibleSegments, type ReportTags } from '@/lib/problem-report/display';
 
 /**
- * 값 한 칸 — 테두리로 경계를 보인다. 글로 이으면 서로 다른 값 묶음이 같은 글로 보인다(Stop 게이트).
- * @param props.children - 값
+ * 값 한 칸 — 테두리로 경계를 보이고, 안 보이거나 공백처럼 보이는 글자는 ⟨U+XXXX⟩ 로 드러낸다(Stop 게이트 — 지문이 다르면 화면도 다르게).
+ * @param props.value - 값(정규화한 글)
  */
-function ValueCell({ children }: { children: ReactNode }) {
+function ValueCell({ value }: { value: string }) {
   return (
     <span className="mx-0.5 my-0.5 inline-block rounded border border-gray-300 bg-white px-1 leading-snug break-keep [overflow-wrap:anywhere]">
-      {children}
+      {reportVisibleSegments(value).map((seg, i) => (seg.hidden ? (
+        <span key={i} title="화면에 안 보이는 글자" className="mx-px rounded bg-amber-100 px-0.5 text-[10px] text-amber-900">⟨{seg.text}⟩</span>
+      ) : (
+        <Fragment key={i}>{seg.text}</Fragment>
+      )))}
     </span>
   );
 }
@@ -30,7 +34,7 @@ export function ReportTagGroupsView({ tags }: { tags: ReportTags }) {
           {g.values.map((value, i) => (
             <Fragment key={i}>
               {g.path && i > 0 && <span aria-hidden="true" className="text-gray-400">›</span>}
-              <ValueCell>{value}</ValueCell>
+              <ValueCell value={value} />
             </Fragment>
           ))}
         </p>
@@ -56,7 +60,7 @@ export function ReportSourceFieldsView({ source, number }: { source: unknown; nu
       {cells.map((f) => (
         <span key={f.label} className="mr-1 inline-block">
           <span className="text-gray-500">{f.label}</span>
-          <ValueCell>{f.value}</ValueCell>
+          <ValueCell value={f.value} />
         </span>
       ))}
       {fields === null && <span className="text-gray-500">(출처 없음)</span>}

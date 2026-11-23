@@ -98,7 +98,8 @@ describe('ProblemReportDialog', () => {
     render(<ProblemReportDialog open onClose={() => undefined} target={{ kind: 'problem', problemId: 'p9', label: '문항' }} />);
     const select = screen.getByRole('combobox', { name: '오류 종류' });
     fireEvent.change(select, { target: { value: 'source' } });
-    expect(await screen.findByText('2026 중2 상현중 1학기 중간 7번')).toBeTruthy();
+    // 머리 줄과 '신고될 출처' 둘 다 확인한 상태로 그린다
+    expect(await screen.findAllByText('2026 중2 상현중 1학기 중간 7번')).toHaveLength(2);
     // 출처 신고도 태그를 함께 보여 준다(둘 다 신고에 남고 둘 다 대조된다)
     expect(screen.getByText('지금 붙은 태그')).toBeTruthy();
     fireEvent.change(select, { target: { value: 'answer' } });
@@ -118,6 +119,15 @@ describe('ProblemReportDialog', () => {
     await waitFor(() => expect(m.toast.error).toHaveBeenCalled());
     await waitFor(() => expect(m.state).toHaveBeenCalledTimes(2));
     expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('단원이 틀려요');
+  });
+
+  it('머리 줄도 확인한 상태를 따른다 — 다시 읽어 번호가 바뀌면 머리도 바뀐다', async () => {
+    render(<ProblemReportDialog open onClose={() => undefined} target={{ kind: 'problem', problemId: 'p9', label: '2026 중2 상현중 1학기 중간 6번' }} />);
+    expect(screen.getByText('2026 중2 상현중 1학기 중간 6번')).toBeTruthy();
+    fireEvent.change(screen.getByRole('combobox', { name: '오류 종류' }), { target: { value: 'source' } });
+    // 머리와 '신고될 출처' 둘 다 확인한 상태(7번)
+    await waitFor(() => expect(screen.getAllByText('2026 중2 상현중 1학기 중간 7번')).toHaveLength(2));
+    expect(screen.queryByText('2026 중2 상현중 1학기 중간 6번')).toBeNull();
   });
 
   it('지금 상태를 못 읽어도 신고는 막지 않는다(지문 없이 보낸다)', async () => {
