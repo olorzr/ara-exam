@@ -82,9 +82,11 @@ export default function ProblemReportDialog({ open, onClose, target }: ProblemRe
     return () => { alive = false; };
   }, [problemId]);
   const shownCount = problemId ? openCount : 0;
-  // 태그·출처 신고는 지금 붙은 값을 보여 주고 그 지문을 실어 보낸다 — 굳힐 값과 다르면 RPC 가 거절한다(sql/114, 코덱스 4R)
+  // 태그·출처 신고는 굳힐 값을 보여 주고 그 지문을 실어 보낸다 — 굳힐 값과 다르면 RPC 가 거절한다(sql/114, 코덱스 4·5R).
+  // 문제지는 항목 기준이다(출처·번호가 문제지를 만들 때의 스냅샷 — 신고가 굳히는 값). 원본이 지워진 항목도 출처·번호는 읽는다
   const showsState = categoryShowsState(category);
-  const stateView = useReportState(problemId, showsState);
+  const stateSubject = target.kind === 'problem' ? { problemId: target.problemId } : picked ? { paperItemId: picked.id } : null;
+  const stateView = useReportState(stateSubject, showsState);
 
   // 지금 상태를 읽는 동안은 기다린다 — 보여 준 값과 실어 보낼 지문이 짝이어야 한다(못 읽었으면 지문 없이 보낸다)
   const ready = category !== '' && !stale && (target.kind === 'problem' || picked !== null)
@@ -190,7 +192,7 @@ export default function ProblemReportDialog({ open, onClose, target }: ProblemRe
                 {REPORT_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
             </div>
-            {categoryShowsState(category) && problemId && <ReportCurrentState kind={category} view={stateView} />}
+            {categoryShowsState(category) && stateSubject && <ReportCurrentState kind={category} view={stateView} />}
             <label className="block space-y-1 text-sm">
               <span className="text-gray-600">내용 {category === 'other' ? '(꼭 적어 주세요)' : '(있으면 좋아요)'}</span>
               <Textarea

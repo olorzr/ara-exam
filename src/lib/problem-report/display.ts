@@ -157,24 +157,38 @@ export function reportTagLines(tags: ReportTags): ReportTagLine[] {
   return lines.filter((line) => line.value !== '');
 }
 
-/** 신고 창이 읽은 '지금 상태' — 태그 넷 + 출처 + 서버가 만든 지문(`exam.problem_report_state`, sql/114) */
+/**
+ * 신고 창이 읽은 '굳힐 상태' — 서버가 만든 지문과 함께(`exam.problem_report_state`, sql/114).
+ * 출처·번호는 신고가 굳힐 그 값이다(문제 은행 문항이면 지금 원본, 문제지 항목이면 문제지를 만들 때의 스냅샷 — 코덱스 5R).
+ */
 export interface ReportState {
-  tags: ReportTags;
+  /** 지금 원본의 태그 — 원본 문항이 지워진 문제지 항목이면 null */
+  tags: ReportTags | null;
   source: SourceLabelInput | null;
+  /** 원래 번호 */
+  number: number | null;
   /** 이 상태의 지문 — 신고에 실어 보내면 RPC 가 굳힐 값과 견준다(브라우저는 견주지 않는다) */
   token: string;
 }
 
+/** 상태를 읽을 대상 — 문제 은행 문항 또는 문제지 항목 */
+export type ReportStateSubject = { problemId: string } | { paperItemId: string };
+
 /**
- * `problem_report_state` 응답을 읽는다 — 태그·지문이 없으면 null(지문 없이 보내면 대조 없이 지금 값이 굳는다).
+ * `problem_report_state` 응답을 읽는다 — 지문이 없으면 null(지문 없이 보내면 대조 없이 지금 값이 굳는다).
  * @param value - RPC 응답
- * @returns 지금 상태 또는 null
+ * @returns 굳힐 상태 또는 null
  */
 export function parseReportState(value: unknown): ReportState | null {
-  const tags = parseReportTags(fieldOf(value, 'tags'));
   const token = textOf(value, 'token');
-  if (!tags || !token) return null;
-  return { tags, source: reportSourceInput(fieldOf(value, 'source')), token };
+  if (!token) return null;
+  const number = fieldOf(value, 'number');
+  return {
+    tags: parseReportTags(fieldOf(value, 'tags')),
+    source: reportSourceInput(fieldOf(value, 'source')),
+    number: typeof number === 'number' && Number.isInteger(number) ? number : null,
+    token,
+  };
 }
 
 /**

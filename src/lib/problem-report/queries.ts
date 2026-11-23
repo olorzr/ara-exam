@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { PaperItemSnapshot } from '@/types/problem-bank';
-import { parseReportState, type ReportState } from './display';
+import { parseReportState, type ReportState, type ReportStateSubject } from './display';
 import type { ProblemReport, ReportCategory, ReportStatus } from './types';
 
 /**
@@ -44,13 +44,16 @@ export async function submitProblemReport(input: ReportInput): Promise<string> {
 }
 
 /**
- * 문항의 지금 상태(태그 넷 + 출처 + 지문) — 태그·출처 신고 창이 보여 주고 지문을 실어 보낸다(sql/114).
- * @param problemId - 문항 id
- * @returns 지금 상태
+ * 굳힐 상태(태그 넷 + 굳힐 출처 + 원래 번호 + 지문) — 태그·출처 신고 창이 보여 주고 지문을 실어 보낸다(sql/114).
+ * @param subject - 문제 은행 문항 또는 문제지 항목(항목이면 출처·번호가 항목 스냅샷이다)
+ * @returns 굳힐 상태
  * @throws 읽기 실패·모양이 다를 때
  */
-export async function fetchReportState(problemId: string): Promise<ReportState> {
-  const { data, error } = await supabase.rpc('problem_report_state', { p_problem_id: problemId });
+export async function fetchReportState(subject: ReportStateSubject): Promise<ReportState> {
+  const { data, error } = await supabase.rpc('problem_report_state', {
+    p_problem_id: 'problemId' in subject ? subject.problemId : null,
+    p_paper_item_id: 'paperItemId' in subject ? subject.paperItemId : null,
+  });
   if (error) throw new Error(error.message);
   const state = parseReportState(data);
   if (!state) throw new Error('문항의 지금 태그를 읽지 못했어요.');

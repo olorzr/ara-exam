@@ -87,12 +87,14 @@ describe('intakeSourceLabel', () => {
 
 describe('지금 상태', () => {
   it('태그·지문이 있어야 읽는다', () => {
-    const state = parseReportState({ tags: { work_titles: ['동백꽃'] }, source: school, token: 'abc' });
+    const state = parseReportState({ tags: { work_titles: ['동백꽃'] }, source: school, number: 17, token: 'abc' });
     expect(state?.token).toBe('abc');
-    expect(state?.tags.work_titles).toEqual(['동백꽃']);
+    expect(state?.number).toBe(17);
+    expect(state?.tags?.work_titles).toEqual(['동백꽃']);
     expect(state?.source?.school_name).toBe('상현중');
     expect(parseReportState({ tags: {}, token: '' })).toBeNull();
-    expect(parseReportState({ token: 'abc' })).toBeNull();
+    // 원본이 지워진 문제지 항목 — 태그는 없고 출처·번호는 있다
+    expect(parseReportState({ tags: null, source: school, number: '3', token: 'abc' })).toMatchObject({ tags: null, number: null });
     expect(parseReportState(null)).toBeNull();
   });
 

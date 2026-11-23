@@ -8,6 +8,7 @@ const m = vi.hoisted(() => ({
   state: vi.fn<(...args: unknown[]) => Promise<unknown>>(async () => ({
     tags: { work_titles: ['동백꽃'], unit_path: ['1. 문학'], area_path: [], grammar_paths: ['단어 > 품사'] },
     source: { source_type: '내신기출', title: '', school_name: '상현중', year: '2026', grade: '중2', semester: '1학기', exam_type: '중간', publisher: '' },
+    number: 7,
     token: 'tok-1',
   })),
   toast: { success: vi.fn(), warning: vi.fn(), error: vi.fn() },
@@ -87,7 +88,7 @@ describe('ProblemReportDialog', () => {
     expect(await screen.findByText('지금 붙은 태그')).toBeTruthy();
     expect(screen.getByText('작품 동백꽃')).toBeTruthy();
     expect(screen.getByText('문법 단어 > 품사')).toBeTruthy();
-    expect(m.state).toHaveBeenCalledWith('p9');
+    expect(m.state).toHaveBeenCalledWith({ problemId: 'p9' });
     fireEvent.click(screen.getByRole('button', { name: '신고하기' }));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(m.submit).toHaveBeenCalledWith({ category: 'tag', note: '', problemId: 'p9', stateToken: 'tok-1' });
@@ -97,9 +98,9 @@ describe('ProblemReportDialog', () => {
     render(<ProblemReportDialog open onClose={() => undefined} target={{ kind: 'problem', problemId: 'p9', label: '문항' }} />);
     const select = screen.getByRole('combobox', { name: '오류 종류' });
     fireEvent.change(select, { target: { value: 'source' } });
-    expect(await screen.findByText('2026 중2 상현중 1학기 중간')).toBeTruthy();
+    expect(await screen.findByText('2026 중2 상현중 1학기 중간 7번')).toBeTruthy();
     fireEvent.change(select, { target: { value: 'answer' } });
-    expect(screen.queryByText('지금 출처')).toBeNull();
+    expect(screen.queryByText('신고될 출처')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '신고하기' }));
     await waitFor(() => expect(m.submit).toHaveBeenCalled());
     expect(m.submit).toHaveBeenCalledWith({ category: 'answer', note: '', problemId: 'p9' });
@@ -124,6 +125,19 @@ describe('ProblemReportDialog', () => {
     expect(await screen.findByText(/지금 붙은 태그를 불러오지 못했어요/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '신고하기' }));
     await waitFor(() => expect(m.submit).toHaveBeenCalledWith({ category: 'tag', note: '', problemId: 'p9' }));
+  });
+
+  it('문제지 신고는 고른 항목 기준으로 굳힐 상태를 읽는다(원본이 지워진 항목도)', async () => {
+    render(<ProblemReportDialog open onClose={() => undefined} target={{ kind: 'paper', paperId: 'paper1', revision: 'rev-now' }} />);
+    await screen.findByRole('radiogroup', { name: '신고할 문항 번호' });
+    fireEvent.change(screen.getByRole('combobox', { name: '오류 종류' }), { target: { value: 'source' } });
+    expect(m.state).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('radio', { name: '3번' }));
+    await waitFor(() => expect(m.state).toHaveBeenCalledWith({ paperItemId: 'i3' }));
+    m.state.mockResolvedValueOnce({ tags: null, source: null, number: 5, token: 'tok-i' });
+    fireEvent.change(screen.getByRole('combobox', { name: '오류 종류' }), { target: { value: 'answer' } });
+    fireEvent.change(screen.getByRole('combobox', { name: '오류 종류' }), { target: { value: 'tag' } });
+    expect(await screen.findByText(/원본 문항이 지워져 지금 붙은 태그가 없어요/)).toBeTruthy();
   });
 
   it('알림이 못 가도 신고는 저장됐다고 알린다', async () => {

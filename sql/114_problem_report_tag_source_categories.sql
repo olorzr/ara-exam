@@ -7,8 +7,9 @@
 --   · 'source' 출처·번호 오류 — 교사용·문제 은행에 찍히는 출처('2026 중2 상현중 1학기 중간 17번')가 틀렸다(0.9.95 부터
 --     교사용에 늘 찍혀 선생님이 원본과 맞춰 본다).
 --   · 처리 흐름은 그대로다(원장 웍스 DM · 원장 처리). '기타' 만 내용을 꼭 적는다.
---   · **신고 창은 '지금 상태'(태그 넷 + 출처)를 스스로 읽어 보여 주고, 그 상태의 지문(md5)을 실어 보낸다**(`problem_report_state`,
---     코덱스 3·4R). RPC 는 굳힐 값(같은 SELECT 에서 읽은 태그·출처)의 지문과 다르면 40001 로 거절한다 — 창을 연 사이 다른
+--   · **신고 창은 '굳힐 상태'(태그 넷 + 굳힐 출처 + 원래 번호)를 스스로 읽어 보여 주고, 그 상태의 지문(md5)을 실어 보낸다**
+--     (`problem_report_state`, 코덱스 3·4·5R). 출처·번호는 **신고가 굳힐 그 값**이다 — 문제 은행 문항이면 지금 원본, 문제지 항목이면
+--     문제지를 만들 때 굳힌 스냅샷(신고 목록·알림이 그 값을 보여 준다). 태그는 둘 다 지금 원본(문제지 스냅샷엔 단원·문법이 없다). RPC 는 굳힐 값(같은 SELECT 에서 읽은 태그·출처)의 지문과 다르면 40001 로 거절한다 — 창을 연 사이 다른
 --     선생님이 태그나 출처를 고치면, 창이 보여 준 값과 '신고 때 태그'·스냅샷 출처가 갈렸다(문항 `updated_at` 판만으로는 출처 수정이
 --     안 잡힌다 — 출처는 다른 표다). 지문은 서버가 만들고 서버가 견준다(브라우저가 같은 식을 흉내 내지 않는다). 인자를 더해 서명이
 --     여섯이 됐다 — 옛 서명은 지운다(오버로드가 남으면 PostgREST 가 못 고른다). 배포 전 탭은 지문을 안 보내 대조를 건너뛴다.
@@ -55,17 +56,22 @@ AS $$
 $$;
 REVOKE ALL ON FUNCTION exam.problem_report_tags(exam.problems) FROM PUBLIC, anon, authenticated;
 
--- 신고 창이 보여 주는 '지금 상태' — 태그 넷 + 출처 스냅샷. 지문은 이 jsonb 글의 md5(jsonb 글은 키 차례가 정해져 있다)
-CREATE OR REPLACE FUNCTION exam.problem_report_state_of(p exam.problems, s exam.problem_sources)
-RETURNS JSONB LANGUAGE sql STABLE
+-- 같은 날 잠깐 있던 판(태그 + 지금 출처만 — 문제지 항목의 굳힌 출처·원래 번호를 못 담았다, 코덱스 5R)
+DROP FUNCTION IF EXISTS exam.problem_report_state(UUID);
+DROP FUNCTION IF EXISTS exam.problem_report_state_of(exam.problems, exam.problem_sources);
+
+-- 신고 창이 보여 주는 '굳힐 상태' — 태그 넷(원본이 없으면 null) + 굳힐 출처 + 원래 번호.
+-- 지문은 이 jsonb 글의 md5(jsonb 글은 키 차례가 정해져 있다). 만드는 곳은 이 함수 하나 — 창이 읽는 쪽과 신고가 견주는 쪽이 같은 식이다
+CREATE OR REPLACE FUNCTION exam.problem_report_state_build(p_tags JSONB, p_source JSONB, p_number JSONB)
+RETURNS JSONB LANGUAGE sql IMMUTABLE
 SET search_path = exam, pg_temp
 AS $$
-  SELECT jsonb_build_object('tags', exam.problem_report_tags(p), 'source', exam.paper_source_snapshot(s));
+  SELECT jsonb_build_object('tags', p_tags, 'source', p_source, 'number', p_number);
 $$;
-REVOKE ALL ON FUNCTION exam.problem_report_state_of(exam.problems, exam.problem_sources) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION exam.problem_report_state_build(JSONB, JSONB, JSONB) FROM PUBLIC, anon, authenticated;
 
--- 신고 창이 부른다 — 문항 하나의 지금 상태 + 지문(token). 도메인 전원(문항은 원래 도메인 전원이 읽는다)
-CREATE OR REPLACE FUNCTION exam.problem_report_state(p_problem_id UUID)
+-- 신고 창이 부른다 — 문항(문제 은행) 또는 문제지 항목 하나의 굳힐 상태 + 지문(token). 도메인 전원
+CREATE OR REPLACE FUNCTION exam.problem_report_state(p_problem_id UUID DEFAULT NULL, p_paper_item_id UUID DEFAULT NULL)
 RETURNS JSONB LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path = exam, pg_temp
 AS $$
@@ -75,18 +81,33 @@ BEGIN
   IF auth.uid() IS NULL OR NOT exam.is_allowed_domain() THEN
     RAISE EXCEPTION '허용되지 않은 계정입니다' USING ERRCODE = 'insufficient_privilege';
   END IF;
-  SELECT exam.problem_report_state_of(p, s) INTO v_state
-    FROM exam.problems p
-    LEFT JOIN exam.problem_sources s ON s.id = p.source_id
-   WHERE p.id = p_problem_id;
+  IF (p_problem_id IS NULL) = (p_paper_item_id IS NULL) THEN
+    RAISE EXCEPTION '문제지 항목이나 문항 중 하나만 골라 주세요' USING ERRCODE = 'check_violation';
+  END IF;
+  IF p_paper_item_id IS NOT NULL THEN
+    -- 문제지 항목 — 출처·번호는 항목 스냅샷(신고가 굳힐 값), 태그는 지금 원본(지워졌으면 null)
+    SELECT exam.problem_report_state_build(
+             CASE WHEN pr.id IS NULL THEN NULL ELSE exam.problem_report_tags(pr) END,
+             i.snapshot -> 'source', i.snapshot -> 'number')
+      INTO v_state
+      FROM exam.problem_paper_items i
+      LEFT JOIN exam.problems pr ON pr.id = i.problem_id
+     WHERE i.id = p_paper_item_id;
+  ELSE
+    SELECT exam.problem_report_state_build(exam.problem_report_tags(p), exam.paper_source_snapshot(s), to_jsonb(p.number))
+      INTO v_state
+      FROM exam.problems p
+      LEFT JOIN exam.problem_sources s ON s.id = p.source_id
+     WHERE p.id = p_problem_id;
+  END IF;
   IF v_state IS NULL THEN
     RAISE EXCEPTION '문항을 찾지 못했어요 — 지워졌거나 다시 올라왔을 수 있어요' USING ERRCODE = 'no_data_found';
   END IF;
   RETURN v_state || jsonb_build_object('token', md5(v_state::text));
 END;
 $$;
-REVOKE ALL ON FUNCTION exam.problem_report_state(UUID) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION exam.problem_report_state(UUID) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION exam.problem_report_state(UUID, UUID) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION exam.problem_report_state(UUID, UUID) TO authenticated, service_role;
 
 -- ---------------------------------------------
 -- 3. 신고 RPC — sql/113 판에서 종류 목록을 넓히고 태그를 굳힌다
@@ -156,12 +177,13 @@ BEGIN
            (SELECT count(*) + 1 FROM exam.problem_paper_items o
              WHERE o.paper_id = i.paper_id AND o.order_index < i.order_index)::int,
            CASE WHEN pr.id IS NULL THEN NULL ELSE exam.problem_report_tags(pr) END,
-           CASE WHEN pr.id IS NULL THEN NULL ELSE md5(exam.problem_report_state_of(pr, prs)::text) END
+           md5(exam.problem_report_state_build(
+             CASE WHEN pr.id IS NULL THEN NULL ELSE exam.problem_report_tags(pr) END,
+             i.snapshot -> 'source', i.snapshot -> 'number')::text)
       INTO v_snapshot, v_problem_id, v_paper_id, v_paper_title, v_printed_no, v_tags, v_token
       FROM exam.problem_paper_items i
       JOIN exam.problem_papers p ON p.id = i.paper_id
       LEFT JOIN exam.problems pr ON pr.id = i.problem_id
-      LEFT JOIN exam.problem_sources prs ON prs.id = pr.source_id
      WHERE i.id = p_paper_item_id;
     IF v_snapshot IS NULL THEN
       RAISE EXCEPTION '문제지 문항을 찾지 못했어요 — 문제지가 바뀌었을 수 있어요' USING ERRCODE = 'no_data_found';
@@ -169,7 +191,7 @@ BEGIN
   ELSE
     -- 문제 은행에서 — 지금 원본을 문제지와 같은 모양으로 굳힌다
     SELECT exam.paper_item_snapshot(p, ps, s), p.id, exam.problem_report_tags(p),
-           md5(exam.problem_report_state_of(p, s)::text)
+           md5(exam.problem_report_state_build(exam.problem_report_tags(p), exam.paper_source_snapshot(s), to_jsonb(p.number))::text)
       INTO v_snapshot, v_problem_id, v_tags, v_token
       FROM exam.problems p
       LEFT JOIN exam.passages ps ON ps.id = p.passage_id
@@ -237,11 +259,12 @@ BEGIN
     RAISE EXCEPTION 'sql/114: problem_reports.tags 칸이 없다';
   END IF;
   IF has_function_privilege('authenticated', 'exam.problem_report_tags(exam.problems)', 'EXECUTE')
-     OR has_function_privilege('authenticated', 'exam.problem_report_state_of(exam.problems,exam.problem_sources)', 'EXECUTE') THEN
+     OR has_function_privilege('authenticated', 'exam.problem_report_state_build(jsonb,jsonb,jsonb)', 'EXECUTE') THEN
     RAISE EXCEPTION 'sql/114: 태그·상태 헬퍼가 브라우저에 열려 있다';
   END IF;
-  IF NOT has_function_privilege('authenticated', 'exam.problem_report_state(uuid)', 'EXECUTE')
-     OR has_function_privilege('anon', 'exam.problem_report_state(uuid)', 'EXECUTE') THEN
+  IF NOT has_function_privilege('authenticated', 'exam.problem_report_state(uuid,uuid)', 'EXECUTE')
+     OR has_function_privilege('anon', 'exam.problem_report_state(uuid,uuid)', 'EXECUTE')
+     OR (SELECT count(*) FROM pg_proc WHERE proname = 'problem_report_state' AND pronamespace = 'exam'::regnamespace) <> 1 THEN
     RAISE EXCEPTION 'sql/114: problem_report_state 실행 권한이 authenticated 만이 아니다';
   END IF;
   IF has_column_privilege('authenticated', 'exam.problem_reports', 'tags', 'UPDATE')
@@ -268,13 +291,12 @@ DECLARE
   v_tags    JSONB;
   v_state   JSONB;
   v_istate  JSONB;
-  v_iprob   UUID;
 BEGIN
   -- 단원이 붙은 문항 — 태그가 원본 그대로 굳는지 본다
   SELECT p.id, to_jsonb(p.unit_path) INTO v_problem, v_units
     FROM exam.problems p WHERE cardinality(p.unit_path) > 0 ORDER BY p.created_at LIMIT 1;
   -- 원본 문항이 남은 문제지 항목
-  SELECT i.id, p.updated_at, i.problem_id INTO v_item, v_rev, v_iprob
+  SELECT i.id, p.updated_at INTO v_item, v_rev
     FROM exam.problem_paper_items i JOIN exam.problem_papers p ON p.id = i.paper_id
    WHERE i.problem_id IS NOT NULL ORDER BY i.paper_id, i.order_index LIMIT 1;
   IF v_problem IS NULL THEN
@@ -290,7 +312,8 @@ BEGIN
     -- 창이 읽는 지금 상태 — 태그가 원본 그대로이고 지문이 붙는다
     v_state := exam.problem_report_state(v_problem);
     IF v_state -> 'tags' -> 'unit_path' IS DISTINCT FROM v_units OR length(v_state ->> 'token') <> 32
-       OR jsonb_typeof(v_state -> 'source') <> 'object' THEN
+       OR jsonb_typeof(v_state -> 'source') <> 'object'
+       OR v_state -> 'number' IS DISTINCT FROM (SELECT to_jsonb(p.number) FROM exam.problems p WHERE p.id = v_problem) THEN
       RAISE EXCEPTION '지금 상태가 이상하다: %', v_state;
     END IF;
     -- 그 지문을 실어 신고 — 같으면 된다
@@ -304,7 +327,12 @@ BEGIN
     END IF;
 
     IF v_item IS NOT NULL THEN
-      v_istate := exam.problem_report_state(v_iprob);
+      -- 문제지 항목은 항목 기준 — 출처·번호가 항목 스냅샷(신고가 굳힐 값)과 같아야 한다
+      v_istate := exam.problem_report_state(NULL, v_item);
+      IF v_istate -> 'source' IS DISTINCT FROM (SELECT i.snapshot -> 'source' FROM exam.problem_paper_items i WHERE i.id = v_item)
+         OR v_istate -> 'number' IS DISTINCT FROM (SELECT i.snapshot -> 'number' FROM exam.problem_paper_items i WHERE i.id = v_item) THEN
+        RAISE EXCEPTION '문제지 항목의 상태가 항목 스냅샷과 다르다: %', v_istate;
+      END IF;
       v_id3 := exam.report_problem('tag', '', NULL, v_item, v_rev, v_istate ->> 'token');
       SELECT tags INTO v_tags FROM exam.problem_reports WHERE id = v_id3;
       IF v_tags IS NULL OR jsonb_typeof(v_tags -> 'unit_path') <> 'array' THEN
@@ -357,6 +385,6 @@ BEGIN
   IF EXISTS (SELECT 1 FROM exam.problem_reports WHERE id IN (v_id1, v_id2, v_id3)) THEN
     RAISE EXCEPTION 'sql/114: 검증용 신고가 되돌아가지 않았다';
   END IF;
-  RAISE NOTICE 'sql/114 실제 검증 통과 — 태그 오류(내용 없이, 원본 태그 굳힘 · 문제지 항목도) · 창이 본 상태와 다르면 거절(문항·문제지 항목) · 바깥 도메인 상태 못 읽음 · 출처·번호 오류 신고 · 모르는 종류 거절 (전부 되돌림)';
+  RAISE NOTICE 'sql/114 실제 검증 통과 — 태그 오류(내용 없이, 원본 태그 굳힘 · 문제지 항목도) · 창이 본 상태(태그·굳힐 출처·원래 번호)와 다르면 거절(문항·문제지 항목) · 바깥 도메인 상태 못 읽음 · 출처·번호 오류 신고 · 모르는 종류 거절 (전부 되돌림)';
 END
 $verify_probe$;

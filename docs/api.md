@@ -244,11 +244,11 @@
   원본 문항이 남아 있으면 그 작품·단원·영역·문법 태그를 `tags`(jsonb `{work_titles, unit_path, area_path, grammar_paths}`)로 함께 굳힌다(sql/114 — 태그 신고는 내용 없이도 되므로)
 - 문제지 항목이면 `p_paper_revision`(화면이 본 문제지 `updated_at`, PostgREST 글자 그대로)이 **필수**이고 지금 판과 다르면 `40001`
   '문제지가 다른 곳에서 바뀌었어요…' 로 거절한다(다른 탭이 순서를 바꾼 뒤면 화면의 번호와 다른 문항이 신고된다). 문제지 행을 `FOR SHARE` 로 잡는다
-- 태그·출처 신고면 `p_state_token`(창이 `problem_report_state` 로 읽어 보여 준 상태의 지문)을 싣고, 굳힐 값(같은 SELECT 의 태그·출처)의 지문과 다르면 `40001` '이 문항의 태그나 출처가 방금 다른 곳에서 바뀌었어요…' 로 거절한다. 안 실으면 대조하지 않는다
+- 태그·출처 신고면 `p_state_token`(창이 `problem_report_state` 로 읽어 보여 준 상태의 지문)을 싣고, 굳힐 값(같은 SELECT 의 태그·굳힐 출처·원래 번호)의 지문과 다르면 `40001` '이 문항의 태그나 출처가 방금 다른 곳에서 바뀌었어요…' 로 거절한다. 안 실으면 대조하지 않는다
 
 ## RPC exam.problem_report_state
 - 설명: 문항 하나의 지금 상태 — 태그·출처 신고 창이 보여 주고 지문을 실어 보낸다(sql/114, 도메인 전원, DEFINER)
-- `problem_report_state(p_problem_id uuid) → jsonb`: `{ tags: {work_titles, unit_path, area_path, grammar_paths}, source: <출처 스냅샷>, token: md5 }`. 없으면 `no_data_found`, 바깥 도메인은 `insufficient_privilege`
+- `problem_report_state(p_problem_id uuid, p_paper_item_id uuid) → jsonb`(둘 중 하나): `{ tags: {work_titles, unit_path, area_path, grammar_paths} | null, source: <굳힐 출처 스냅샷>, number: <원래 번호>, token: md5 }`. 문제 은행 문항이면 출처·번호가 지금 원본, 문제지 항목이면 항목 스냅샷(신고가 굳히는 값)이고 태그는 지금 원본(지워졌으면 null). 없으면 `no_data_found`, 바깥 도메인은 `insufficient_privilege`
 - `resolve_problem_report(p_id, p_status, p_note)`: `open·fixed·rejected`, open 으로 되돌리면 처리 기록을 비운다
 
 ## RPC exam.problem_paper_edit_states

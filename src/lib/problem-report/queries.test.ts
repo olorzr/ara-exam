@@ -26,7 +26,8 @@ vi.mock('@/lib/supabase', () => ({
 }));
 
 const {
-  countOpenReports, fetchPaperItemRefs, fetchProblemOrigin, fetchProblemReports, resolveProblemReport, submitProblemReport,
+  countOpenReports, fetchPaperItemRefs, fetchProblemOrigin, fetchProblemReports, fetchReportState, resolveProblemReport,
+  submitProblemReport,
 } = await import('./queries');
 
 beforeEach(() => {
@@ -35,6 +36,25 @@ beforeEach(() => {
   m.rpcResult = { data: 'r1', error: null };
   m.result = { data: [], error: null, count: 0 };
   m.queue = [];
+});
+
+describe('fetchReportState', () => {
+  it('문항이면 문항 id 만, 문제지 항목이면 항목 id 만 싣고 응답을 읽는다', async () => {
+    m.rpcResult = { data: { tags: null, source: null, number: 3, token: 'tok' }, error: null };
+    expect((await fetchReportState({ problemId: 'p1' })).token).toBe('tok');
+    await fetchReportState({ paperItemId: 'i1' });
+    expect(m.rpc).toEqual([
+      ['problem_report_state', { p_problem_id: 'p1', p_paper_item_id: null }],
+      ['problem_report_state', { p_problem_id: null, p_paper_item_id: 'i1' }],
+    ]);
+  });
+
+  it('지문이 없거나 오류면 던진다', async () => {
+    m.rpcResult = { data: { tags: null }, error: null };
+    await expect(fetchReportState({ problemId: 'p1' })).rejects.toThrow();
+    m.rpcResult = { data: null, error: { message: '허용되지 않은 계정입니다' } };
+    await expect(fetchReportState({ problemId: 'p1' })).rejects.toThrow('허용되지 않은 계정입니다');
+  });
 });
 
 describe('submitProblemReport', () => {

@@ -1,12 +1,14 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const m = vi.hoisted(() => ({ fetch: vi.fn<(id: string) => Promise<unknown>>() }));
+const m = vi.hoisted(() => ({ fetch: vi.fn<(subject: unknown) => Promise<unknown>>() }));
 vi.mock('@/lib/problem-report/queries', () => ({ fetchReportState: m.fetch }));
 
 const { useReportState } = await import('./useReportState');
 
-const stateOf = (token: string) => ({ tags: { work_titles: [], unit_path: [], area_path: [], grammar_paths: [] }, source: null, token });
+const stateOf = (token: string) => ({ tags: { work_titles: [], unit_path: [], area_path: [], grammar_paths: [] }, source: null, number: 1, token });
+const P1 = { problemId: 'p1' };
+const P2 = { problemId: 'p2' };
 
 beforeEach(() => {
   m.fetch.mockReset();
@@ -15,7 +17,7 @@ beforeEach(() => {
 describe('useReportState', () => {
   it('태그·출처 종류를 골랐을 때만 읽는다', async () => {
     m.fetch.mockResolvedValue(stateOf('a'));
-    const { result, rerender } = renderHook(({ on }) => useReportState('p1', on), { initialProps: { on: false } });
+    const { result, rerender } = renderHook(({ on }) => useReportState(P1, on), { initialProps: { on: false } });
     expect(result.current.loading).toBe(false);
     expect(m.fetch).not.toHaveBeenCalled();
     rerender({ on: true });
@@ -27,8 +29,8 @@ describe('useReportState', () => {
     let releaseOld: (v: unknown) => void = () => undefined;
     m.fetch.mockImplementationOnce(() => new Promise((r) => { releaseOld = r; }));
     m.fetch.mockResolvedValueOnce(stateOf('new'));
-    const { result, rerender } = renderHook(({ id }) => useReportState(id, true), { initialProps: { id: 'p1' } });
-    rerender({ id: 'p2' });
+    const { result, rerender } = renderHook(({ subject }) => useReportState(subject, true), { initialProps: { subject: P1 } });
+    rerender({ subject: P2 });
     await waitFor(() => expect(result.current.state?.token).toBe('new'));
     act(() => releaseOld(stateOf('old')));
     expect(result.current.state?.token).toBe('new');
@@ -37,14 +39,34 @@ describe('useReportState', () => {
   it('실패를 알리고, 다시 읽으면 새 값', async () => {
     m.fetch.mockRejectedValueOnce(new Error('x'));
     m.fetch.mockResolvedValueOnce(stateOf('b'));
-    const { result } = renderHook(() => useReportState('p1', true));
+    const { result } = renderHook(() => useReportState(P1, true));
     await waitFor(() => expect(result.current.failed).toBe(true));
     act(() => result.current.reload());
     expect(result.current.loading).toBe(true);
     await waitFor(() => expect(result.current.state?.token).toBe('b'));
   });
 
-  it('문항이 없으면(원본이 지워진 항목) 읽지 않는다', () => {
+  it('끄고 다시 켜면 새 요청 — 끝날 때까지 옛 실패를 내주지 않는다', async () => {
+    m.fetch.mockRejectedValueOnce(new Error('x'));
+    let release: (v: unknown) => void = () => undefined;
+    m.fetch.mockImplementationOnce(() => new Promise((r) => { release = r; }));
+    const { result, rerender } = renderHook(({ on }) => useReportState(P1, on), { initialProps: { on: true } });
+    await waitFor(() => expect(result.current.failed).toBe(true));
+    rerender({ on: false });
+    rerender({ on: true });
+    expect(result.current).toMatchObject({ loading: true, failed: false });
+    act(() => release(stateOf('c')));
+    await waitFor(() => expect(result.current.state?.token).toBe('c'));
+  });
+
+  it('문제지 항목은 항목으로 읽는다', async () => {
+    m.fetch.mockResolvedValue(stateOf('i'));
+    const { result } = renderHook(() => useReportState({ paperItemId: 'i1' }, true));
+    await waitFor(() => expect(result.current.state?.token).toBe('i'));
+    expect(m.fetch).toHaveBeenCalledWith({ paperItemId: 'i1' });
+  });
+
+  it('대상이 없으면 읽지 않는다', () => {
     const { result } = renderHook(() => useReportState(null, true));
     expect(result.current).toMatchObject({ state: null, loading: false, failed: false });
     expect(m.fetch).not.toHaveBeenCalled();
