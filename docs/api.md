@@ -231,16 +231,17 @@
   **먼저 저장**하고, 그 뒤 이 라우트가 신고를 다시 읽어 ara-system `/api/integrations/problem-report` 로 보낸다(성적 등록과 같은 공유 비밀)
 - 인증: `Authorization: Bearer <supabase access_token>` (도메인 검사 포함) — **신고한 본인만**(남의 신고는 403)
 - Body: `{ reportId: string }` (UUID)
-- 보내는 것: `{ reportId, reporterId, paperTitle?, printedNo?, sourceLabel?, category(이름표 '정답 오류' 등), note? }`
+- 보내는 것: `{ reportId, reporterId, paperTitle?, printedNo?, sourceLabel?, category(이름표 '정답 오류' 등), note? }` — `sourceLabel` 은 신고 스냅샷의 출처(`snapshot->source`)로 카드·교사용과 같은 규칙(모의고사는 제목, sql/114)으로 만들고 원래 번호를 붙인다. 못 읽으면 저장된 `source_label`
 - Response: `{ ok: true, reached: boolean }` — 보내기 **전에** `notified_at` 을 비어 있을 때만 잡는다(겹친 두 요청이 DM 을 두 번 보내지 않게).
   못 닿았거나(`reached: false`) 인테이크가 거절하면 **내가 잡은 값일 때만** 되돌린다. 이미 잡혔거나 닿은 신고는 `already: true` 로 다시 보내지 않는다
 - 에러: 401 `unauthorized` · 400 `bad_body`/`bad_reportId` · 403 `forbidden` · 404 `not_found` · 502 `intake_failed`(+`status`) · 500 `exception` · 503 `not_configured`
 - 비고: 실패해도 신고는 남아 있다 — 화면이 '알림은 못 보냈어요' 로 알리고 목록에 '알림 안 감' 이 붙는다
 
 ## RPC exam.report_problem / exam.resolve_problem_report
-- 설명: 오류 신고(도메인 전원) · 처리(원장 JWT 이메일만) — sql/113. 표에는 브라우저 쓰기 권한이 없다
+- 설명: 오류 신고(도메인 전원) · 처리(원장 JWT 이메일만) — 신고는 **sql/114**(정식 정의), 처리는 sql/113. 표에는 브라우저 쓰기 권한이 없다
 - `report_problem(p_category, p_note, p_problem_id, p_paper_item_id, p_paper_revision timestamptz) → uuid`: 둘 중 하나만. 문제지 항목이면 그 스냅샷·문제지 제목·문제지 안 번호를,
-  문항이면 `exam.paper_item_snapshot` 으로 지금 원본을 굳혀 남긴다. 종류 `answer·text·passage·figure·other`('기타' 는 내용 필수), 내용 1,000자
+  문항이면 `exam.paper_item_snapshot` 으로 지금 원본을 굳혀 남긴다. 종류 `answer·text·passage·figure·tag·source·other`('기타' 만 내용 필수 — `tag` 태그 오류 · `source` 출처·번호 오류는 sql/114), 내용 1,000자.
+  원본 문항이 남아 있으면 그 작품·단원·영역·문법 태그를 `tags`(jsonb `{work_titles, unit_path, area_path, grammar_paths}`)로 함께 굳힌다(sql/114 — 태그 신고는 내용 없이도 되므로)
 - 문제지 항목이면 `p_paper_revision`(화면이 본 문제지 `updated_at`, PostgREST 글자 그대로)이 **필수**이고 지금 판과 다르면 `40001`
   '문제지가 다른 곳에서 바뀌었어요…' 로 거절한다(다른 탭이 순서를 바꾼 뒤면 화면의 번호와 다른 문항이 신고된다). 문제지 행을 `FOR SHARE` 로 잡는다
 - `resolve_problem_report(p_id, p_status, p_note)`: `open·fixed·rejected`, open 으로 되돌리면 처리 기록을 비운다

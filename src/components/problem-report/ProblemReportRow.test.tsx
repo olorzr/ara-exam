@@ -28,6 +28,34 @@ describe('ProblemReportRow', () => {
     expect(screen.getByRole('link', { name: '시험지에서 보기' }).getAttribute('href')).toBe('/problems/sources/s1?item=p1');
   });
 
+  it('출처 줄은 스냅샷 출처로 카드와 같은 규칙 — 모의고사는 제목', () => {
+    const mockReport = {
+      ...report,
+      snapshot: { ...report.snapshot, source: { source_type: '모의고사', title: '2026학년도 수능 (언어와 매체)', school_name: '', year: '2026', grade: '고3', exam_type: '수능', publisher: '' } },
+      source_label: '2026 고3 수능',
+    } as unknown as ProblemReport;
+    render(<ul><ProblemReportRow report={mockReport} n={1} /></ul>);
+    expect(screen.getByText('2026학년도 수능 (언어와 매체) · 원래 12번')).toBeTruthy();
+  });
+
+  it('태그 신고에는 신고 때의 태그를 보여 준다', () => {
+    const tagReport = {
+      ...report, category: 'tag', note: '',
+      tags: { work_titles: ['춘향전'], unit_path: ['2. 고전'], area_path: ['문학 > 고전 소설'], grammar_paths: [] },
+    } as unknown as ProblemReport;
+    const { rerender } = render(<ul><ProblemReportRow report={tagReport} n={1} /></ul>);
+    expect(screen.getByText('태그 오류 (작품·단원·영역)')).toBeTruthy();
+    expect(screen.getByText('신고 때 태그')).toBeTruthy();
+    expect(screen.getByText('· 작품 춘향전')).toBeTruthy();
+    expect(screen.getByText('· 단원 2. 고전')).toBeTruthy();
+    expect(screen.queryByText(/· 문법/)).toBeNull();
+    rerender(<ul><ProblemReportRow report={{ ...tagReport, tags: null }} n={1} /></ul>);
+    expect(screen.getByText(/신고 때 태그는 남지 않았어요/)).toBeTruthy();
+    // 다른 종류에는 태그 줄이 없다
+    rerender(<ul><ProblemReportRow report={report} n={1} /></ul>);
+    expect(screen.queryByText(/신고 때 태그/)).toBeNull();
+  });
+
   it('처리 단추는 원장(onResolve)에게만 그린다', () => {
     const onResolve = vi.fn();
     const { rerender } = draw();

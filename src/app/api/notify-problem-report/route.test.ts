@@ -11,6 +11,7 @@ const baseRow = {
   id: REPORT_ID, user_id: 'u1', notified_at: null as string | null, category: 'answer', note: '정답이 ④예요',
   paper_title: '형태소 복합어 단일어', printed_no: 17, source_label: '2025 중1 압구정중학교 2학기 기말',
   original_no: 12 as unknown,
+  source: null as unknown,
 };
 let row: typeof baseRow | null = baseRow;
 /** 조건부로 잡기(`update … is null … select`)가 돌려줄 행 — 비면 다른 요청이 먼저 잡은 것 */
@@ -81,6 +82,18 @@ describe('POST /api/notify-problem-report', () => {
     await call();
     const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(JSON.parse(String(init.body)).sourceLabel).toBe('2025 중1 압구정중학교 2학기 기말');
+  });
+
+  it('출처 줄은 스냅샷 출처로 카드와 같은 규칙 — 모의고사는 제목(저장된 줄은 과목이 뭉개진다)', async () => {
+    row = {
+      ...baseRow, source_label: '2026 고3 수능', original_no: 35,
+      source: { source_type: '모의고사', title: '2026학년도 수능 (언어와 매체)', school_name: '', year: '2026', grade: '고3', exam_type: '수능', publisher: '' },
+    };
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true, reached: true })));
+    vi.stubGlobal('fetch', fetchMock);
+    await call();
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(String(init.body)).sourceLabel).toBe('2026학년도 수능 (언어와 매체) · 원래 35번');
   });
 
   it('다른 요청이 먼저 잡았으면 보내지 않는다(겹친 두 요청이 DM 을 두 번 보내지 않게)', async () => {

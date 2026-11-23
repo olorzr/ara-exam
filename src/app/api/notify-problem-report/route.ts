@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireSession } from '@/lib/require-session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { reportSourceLabel } from '@/lib/problem-report/display';
 import { REPORT_CATEGORY_LABELS, isReportCategory, withOriginalNumber } from '@/lib/problem-report/types';
 
 /**
@@ -29,6 +30,8 @@ interface ReportRow {
   source_label: string | null;
   /** 신고 때 스냅샷의 원래 번호(`snapshot->number`) — 카드의 출처 줄에 붙인다 */
   original_no: unknown;
+  /** 신고 때 스냅샷의 출처(`snapshot->source`) — 출처 줄을 카드와 같은 규칙으로 만든다 */
+  source: unknown;
 }
 
 export async function POST(request: NextRequest) {
@@ -55,7 +58,7 @@ export async function POST(request: NextRequest) {
   try {
     const { data, error } = await supabaseAdmin
       .from('problem_reports')
-      .select('id, user_id, notified_at, category, note, paper_title, printed_no, source_label, original_no:snapshot->number')
+      .select('id, user_id, notified_at, category, note, paper_title, printed_no, source_label, original_no:snapshot->number, source:snapshot->source')
       .eq('id', reportId)
       .maybeSingle();
     if (error) throw new Error(error.message);
@@ -82,7 +85,8 @@ export async function POST(request: NextRequest) {
         paperTitle: row.paper_title ?? undefined,
         printedNo: row.printed_no ?? undefined,
         // 원본 시험지의 번호까지 — 원장이 원본에서 바로 짚게(2026-11-22). 인테이크는 80자에서 자른다
-        sourceLabel: withOriginalNumber(row.source_label, row.original_no) || undefined,
+        // 출처 줄은 신고 스냅샷의 출처로 카드·교사용과 같은 규칙(모의고사는 제목 — 저장된 줄은 과목이 뭉개진다, sql/114 코덱스 1R)
+        sourceLabel: withOriginalNumber(reportSourceLabel(row.source, row.source_label), row.original_no) || undefined,
         category: isReportCategory(row.category) ? REPORT_CATEGORY_LABELS[row.category] : row.category,
         note: row.note || undefined,
       }),

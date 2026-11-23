@@ -101,6 +101,8 @@ export interface ProblemReport {
   user_id: string;
   created_at: string;
   updated_at: string;
+  /** 신고 때 원본 문항의 태그(sql/114, jsonb) — 읽을 때 `parseReportTags`. 원본이 없었거나 sql/114 전 신고면 null */
+  tags?: unknown;
 }
 
 /** 미리보기 글자 수 */

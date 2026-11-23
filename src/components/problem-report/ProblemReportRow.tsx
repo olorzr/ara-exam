@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ItemNo } from '@/components/magazine';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { parseReportTags, reportSourceLabel, reportTagLines } from '@/lib/problem-report/display';
 import {
   REPORT_CATEGORY_LABELS, REPORT_STATUS_LABELS, reportExcerpt, reportPlaceLabel, withOriginalNumber,
   type ProblemReport, type ReportStatus,
@@ -30,6 +31,7 @@ interface ProblemReportRowProps {
 export default function ProblemReportRow({ report, n, reporter, sourceId, onResolve }: ProblemReportRowProps) {
   const excerpt = reportExcerpt(report.snapshot);
   const closed = report.status !== 'open';
+  const source = reportSourceLabel(report.snapshot?.source, report.source_label);
   return (
     <li className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-start sm:gap-2">
       <div className="flex min-w-0 flex-1 items-start gap-2">
@@ -46,12 +48,13 @@ export default function ProblemReportRow({ report, n, reporter, sourceId, onReso
             {!report.notified_at && <Badge variant="muted" className="ml-2 align-middle">알림 안 감</Badge>}
           </p>
           {/* 문제지에서 신고한 건은 자리가 인쇄 번호라 원래 번호를 출처 줄에 붙인다(문제 은행 신고는 자리에 이미 있다) */}
-          {report.source_label && (
+          {source && (
             <p className="text-xs break-keep [overflow-wrap:anywhere] text-gray-500">
-              {report.paper_title ? withOriginalNumber(report.source_label, report.snapshot?.number) : report.source_label}
+              {report.paper_title ? withOriginalNumber(source, report.snapshot?.number) : source}
             </p>
           )}
           {excerpt && <p className="text-xs break-keep [overflow-wrap:anywhere] text-gray-500">{excerpt}</p>}
+          {report.category === 'tag' && <ReportTagsLine tags={report.tags} />}
           {report.note && (
             <p className="text-sm whitespace-pre-wrap break-keep [overflow-wrap:anywhere] text-gray-800">{report.note}</p>
           )}
@@ -90,5 +93,24 @@ export default function ProblemReportRow({ report, n, reporter, sourceId, onReso
         </div>
       )}
     </li>
+  );
+}
+
+/**
+ * 태그 신고의 '신고 때 태그' 줄 — 원장이 보기 전에 태그가 바뀌어도 선생님이 짚은 값이 남는다(sql/114).
+ * @param props.tags - `problem_reports.tags`(jsonb)
+ */
+function ReportTagsLine({ tags }: { tags: unknown }) {
+  const parsed = parseReportTags(tags);
+  if (!parsed) {
+    return <p className="text-xs text-gray-500">신고 때 태그는 남지 않았어요 — 원본 문항이 없었거나 예전 신고예요.</p>;
+  }
+  const lines = reportTagLines(parsed);
+  if (lines.length === 0) return <p className="text-xs text-gray-500">신고 때 붙은 태그가 없었어요.</p>;
+  return (
+    <p className="text-xs break-keep [overflow-wrap:anywhere] text-gray-600">
+      <span className="font-semibold text-gray-700">신고 때 태그</span>
+      {lines.map((line) => <span key={line.label}> · {line.label} {line.value}</span>)}
+    </p>
   );
 }

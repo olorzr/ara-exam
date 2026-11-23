@@ -917,5 +917,5 @@
 
 ## 오류 신고 (problem report)
 - 정의: 선생님이 문제지를 풀리다(또는 문제 은행에서) 찾은 문항 오류를 원장에게 알리는 기록. 신고 때의 문항 모습(스냅샷)·문제지 제목·문제지 안 번호를 복사해 두어 문항이 다시 올라와도 무엇을 신고했는지 남는다. 처리(고침·반려)는 원장만
-- 코드에서의 사용: `ProblemReport`, `ReportCategory`(answer·text·passage·figure·tag·source·other — tag 는 작품·단원·영역 꼬리표, source 는 출처·원래 번호 줄, sql/114), `ReportStatus`(open·fixed·rejected), `reportPlaceLabel`, `notified_at`
+- 코드에서의 사용: `ProblemReport`, `ReportCategory`(answer·text·passage·figure·tag·source·other — tag 는 작품·단원·영역 꼬리표, source 는 출처·원래 번호 줄, sql/114), `ReportStatus`(open·fixed·rejected), `reportPlaceLabel`, `notified_at`, `tags`(신고 때 원본 문항의 작품·단원·영역·문법 태그, `parseReportTags`·`reportTagLines`), `reportSourceLabel`(출처 줄 — 스냅샷 출처로 카드와 같은 규칙)
 - 관련 파일: sql/113_problem_reports.sql, sql/114_problem_report_tag_source_categories.sql, src/lib/problem-report/, src/components/problem-report/, src/app/(main)/problems/reports/page.tsx, src/app/api/notify-problem-report/route.ts
