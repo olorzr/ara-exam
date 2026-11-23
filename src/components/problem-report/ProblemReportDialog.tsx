@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { sourceLabelWithNumber } from '@/lib/problem-bank/source-label';
+import { useReportState } from '@/hooks/useReportState';
+import { categoryShowsState } from '@/lib/problem-report/display';
 import { notifyProblemReport } from '@/lib/problem-report/notify-client';
 import {
   countOpenReports, fetchPaperItemRefs, submitProblemReport, type PaperItemRef,
@@ -13,6 +15,7 @@ import {
 import {
   REPORT_CATEGORIES, REPORT_NOTE_MAX, isReportCategory, reportExcerpt, reportNotePlaceholder, type ReportCategory,
 } from '@/lib/problem-report/types';
+import ReportCurrentState from './ReportCurrentState';
 import ReportNumberGrid from './ReportNumberGrid';
 import ReportOriginalPage from './ReportOriginalPage';
 import { isPinchZoomed } from '@/hooks/useVisualViewportAnchor';
@@ -21,8 +24,7 @@ import { isPinchZoomed } from '@/hooks/useVisualViewportAnchor';
 export type ReportTarget =
   /** `revision` = 화면이 보고 있는 문제지 판(`updated_at`) — 다른 곳에서 순서를 바꿨으면 번호가 어긋나 신고를 막는다 */
   | { kind: 'paper'; paperId: string; revision: string }
-  /** `revision` = 창이 보여 주는 문항의 판(`updated_at`) — 다른 곳에서 태그·출처를 고쳤으면 신고 때 굳힐 값이 화면과 달라 막는다(sql/114) */
-  | { kind: 'problem'; problemId: string; label: string; revision: string };
+  | { kind: 'problem'; problemId: string; label: string };
 
 interface ProblemReportDialogProps {
   open: boolean;
@@ -80,9 +82,13 @@ export default function ProblemReportDialog({ open, onClose, target }: ProblemRe
     return () => { alive = false; };
   }, [problemId]);
   const shownCount = problemId ? openCount : 0;
+  // 태그·출처 신고는 지금 붙은 값을 보여 주고 그 지문을 실어 보낸다 — 굳힐 값과 다르면 RPC 가 거절한다(sql/114, 코덱스 4R)
+  const showsState = categoryShowsState(category);
+  const stateView = useReportState(problemId, showsState);
 
+  // 지금 상태를 읽는 동안은 기다린다 — 보여 준 값과 실어 보낼 지문이 짝이어야 한다(못 읽었으면 지문 없이 보낸다)
   const ready = category !== '' && !stale && (target.kind === 'problem' || picked !== null)
-    && (category !== 'other' || note.trim() !== '');
+    && (category !== 'other' || note.trim() !== '') && !stateView.loading;
 
   const submit = async () => {
     if (!ready || busy) return;
@@ -91,8 +97,9 @@ export default function ProblemReportDialog({ open, onClose, target }: ProblemRe
       const id = await submitProblemReport({
         category, note: note.trim(),
         ...(target.kind === 'problem'
-          ? { problemId: target.problemId, problemRevision: target.revision }
+          ? { problemId: target.problemId }
           : { paperItemId: itemId, paperRevision: target.revision }),
+        ...(showsState && stateView.state ? { stateToken: stateView.state.token } : {}),
       });
       const notified = await notifyProblemReport(id);
       if (notified === 'reached') toast.success('신고했어요. 원장님께 알렸어요.');
@@ -100,6 +107,8 @@ export default function ProblemReportDialog({ open, onClose, target }: ProblemRe
       onClose();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '신고하지 못했어요.');
+      // 그사이 태그·출처가 바뀌어 거절됐으면 바뀐 값을 다시 띄운다(쓰던 글은 그대로 — 확인하고 다시 누르면 된다)
+      if (showsState) stateView.reload();
     } finally {
       setBusy(false);
     }
@@ -181,6 +190,7 @@ export default function ProblemReportDialog({ open, onClose, target }: ProblemRe
                 {REPORT_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
             </div>
+            {categoryShowsState(category) && problemId && <ReportCurrentState kind={category} view={stateView} />}
             <label className="block space-y-1 text-sm">
               <span className="text-gray-600">내용 {category === 'other' ? '(꼭 적어 주세요)' : '(있으면 좋아요)'}</span>
               <Textarea

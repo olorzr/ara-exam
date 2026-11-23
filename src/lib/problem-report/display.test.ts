@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  INTAKE_SOURCE_LABEL_MAX, intakeSourceLabel, parseReportTags, reportSourceInput, reportSourceLabel, reportTagLines,
+  INTAKE_SOURCE_LABEL_MAX, categoryShowsState, intakeSourceLabel, parseReportState, parseReportTags, reportSourceInput, reportSourceLabel, reportTagLines,
 } from './display';
 
 const mock = {
@@ -82,5 +82,24 @@ describe('intakeSourceLabel', () => {
     const noNumber = intakeSourceLabel(title, null);
     expect(noNumber.length).toBe(INTAKE_SOURCE_LABEL_MAX);
     expect(noNumber.endsWith('…')).toBe(true);
+  });
+});
+
+describe('지금 상태', () => {
+  it('태그·지문이 있어야 읽는다', () => {
+    const state = parseReportState({ tags: { work_titles: ['동백꽃'] }, source: school, token: 'abc' });
+    expect(state?.token).toBe('abc');
+    expect(state?.tags.work_titles).toEqual(['동백꽃']);
+    expect(state?.source?.school_name).toBe('상현중');
+    expect(parseReportState({ tags: {}, token: '' })).toBeNull();
+    expect(parseReportState({ token: 'abc' })).toBeNull();
+    expect(parseReportState(null)).toBeNull();
+  });
+
+  it('태그·출처 신고만 지금 상태를 보여 주고 지문을 싣는다', () => {
+    expect(categoryShowsState('tag')).toBe(true);
+    expect(categoryShowsState('source')).toBe(true);
+    expect(categoryShowsState('answer')).toBe(false);
+    expect(categoryShowsState('')).toBe(false);
   });
 });

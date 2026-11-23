@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { PaperItemSnapshot } from '@/types/problem-bank';
+import { parseReportState, type ReportState } from './display';
 import type { ProblemReport, ReportCategory, ReportStatus } from './types';
 
 /**
@@ -18,8 +19,8 @@ export interface ReportInput {
   /** 문제지 항목이면 화면이 보고 있는 문제지 판(`updated_at`) — 다르면 RPC 가 거절한다(번호가 어긋난다) */
   paperRevision?: string;
   problemId?: string;
-  /** 문항 신고면 창이 보여 주는 문항 판(`updated_at`) — 다르면 RPC 가 거절한다(신고 때 태그가 화면과 달라진다, sql/114) */
-  problemRevision?: string;
+  /** 태그·출처 신고면 창이 보여 준 지금 상태의 지문(`ReportState.token`) — 굳힐 값과 다르면 RPC 가 거절한다(sql/114) */
+  stateToken?: string;
 }
 
 /**
@@ -35,11 +36,25 @@ export async function submitProblemReport(input: ReportInput): Promise<string> {
     p_problem_id: input.problemId ?? null,
     p_paper_item_id: input.paperItemId ?? null,
     p_paper_revision: input.paperRevision ?? null,
-    p_problem_revision: input.problemRevision ?? null,
+    p_state_token: input.stateToken ?? null,
   });
   if (error) throw new Error(error.message);
   if (typeof data !== 'string') throw new Error('신고를 저장하지 못했어요.');
   return data;
+}
+
+/**
+ * 문항의 지금 상태(태그 넷 + 출처 + 지문) — 태그·출처 신고 창이 보여 주고 지문을 실어 보낸다(sql/114).
+ * @param problemId - 문항 id
+ * @returns 지금 상태
+ * @throws 읽기 실패·모양이 다를 때
+ */
+export async function fetchReportState(problemId: string): Promise<ReportState> {
+  const { data, error } = await supabase.rpc('problem_report_state', { p_problem_id: problemId });
+  if (error) throw new Error(error.message);
+  const state = parseReportState(data);
+  if (!state) throw new Error('문항의 지금 태그를 읽지 못했어요.');
+  return state;
 }
 
 /**

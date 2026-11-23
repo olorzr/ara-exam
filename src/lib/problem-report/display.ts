@@ -1,7 +1,7 @@
 import { areaPathLabel } from '@/lib/problem-bank/area-tree';
 import { sourceLabel, type SourceLabelInput } from '@/lib/problem-bank/source-label';
 import type { ProblemSourceType } from '@/types/problem-bank';
-import { withOriginalNumber } from './types';
+import { withOriginalNumber, type ReportCategory } from './types';
 
 /**
  * 오류 신고 목록·원장 알림에 찍는 글 — 출처 줄과 신고 때의 태그(순수, 서버 라우트도 쓴다).
@@ -155,4 +155,34 @@ export function reportTagLines(tags: ReportTags): ReportTagLine[] {
     { label: '문법', value: tags.grammar_paths.join(', ') },
   ];
   return lines.filter((line) => line.value !== '');
+}
+
+/** 신고 창이 읽은 '지금 상태' — 태그 넷 + 출처 + 서버가 만든 지문(`exam.problem_report_state`, sql/114) */
+export interface ReportState {
+  tags: ReportTags;
+  source: SourceLabelInput | null;
+  /** 이 상태의 지문 — 신고에 실어 보내면 RPC 가 굳힐 값과 견준다(브라우저는 견주지 않는다) */
+  token: string;
+}
+
+/**
+ * `problem_report_state` 응답을 읽는다 — 태그·지문이 없으면 null(지문 없이 보내면 대조 없이 지금 값이 굳는다).
+ * @param value - RPC 응답
+ * @returns 지금 상태 또는 null
+ */
+export function parseReportState(value: unknown): ReportState | null {
+  const tags = parseReportTags(fieldOf(value, 'tags'));
+  const token = textOf(value, 'token');
+  if (!tags || !token) return null;
+  return { tags, source: reportSourceInput(fieldOf(value, 'source')), token };
+}
+
+/**
+ * 이 종류는 신고 창이 지금 상태를 보여 주고 그 지문을 실어 보내나 — 태그·출처 신고만.
+ * 다른 종류에 실으면 그사이 태그가 고쳐졌다는 까닭만으로 정답·오타 신고가 거절된다.
+ * @param category - 고른 종류
+ * @returns 태그·출처 신고면 true
+ */
+export function categoryShowsState(category: ReportCategory | ''): category is 'tag' | 'source' {
+  return category === 'tag' || category === 'source';
 }

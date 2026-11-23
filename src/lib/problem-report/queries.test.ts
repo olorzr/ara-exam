@@ -40,10 +40,10 @@ beforeEach(() => {
 describe('submitProblemReport', () => {
   it('문제지 항목 신고는 항목 id 만, 문항 신고는 문항 id 만 싣는다', async () => {
     await submitProblemReport({ category: 'answer', note: '정답', paperItemId: 'i1', paperRevision: 'rev' });
-    await submitProblemReport({ category: 'text', note: '', problemId: 'p1', problemRevision: 'prev' });
+    await submitProblemReport({ category: 'text', note: '', problemId: 'p1', stateToken: 'tok' });
     expect(m.rpc).toEqual([
-      ['report_problem', { p_category: 'answer', p_note: '정답', p_problem_id: null, p_paper_item_id: 'i1', p_paper_revision: 'rev', p_problem_revision: null }],
-      ['report_problem', { p_category: 'text', p_note: '', p_problem_id: 'p1', p_paper_item_id: null, p_paper_revision: null, p_problem_revision: 'prev' }],
+      ['report_problem', { p_category: 'answer', p_note: '정답', p_problem_id: null, p_paper_item_id: 'i1', p_paper_revision: 'rev', p_state_token: null }],
+      ['report_problem', { p_category: 'text', p_note: '', p_problem_id: 'p1', p_paper_item_id: null, p_paper_revision: null, p_state_token: 'tok' }],
     ]);
   });
 

@@ -239,12 +239,16 @@
 
 ## RPC exam.report_problem / exam.resolve_problem_report
 - 설명: 오류 신고(도메인 전원) · 처리(원장 JWT 이메일만) — 신고는 **sql/114**(정식 정의), 처리는 sql/113. 표에는 브라우저 쓰기 권한이 없다
-- `report_problem(p_category, p_note, p_problem_id, p_paper_item_id, p_paper_revision timestamptz, p_problem_revision timestamptz) → uuid`(sql/114 — 옛 다섯 서명은 지웠다): 둘 중 하나만. 문제지 항목이면 그 스냅샷·문제지 제목·문제지 안 번호를,
+- `report_problem(p_category, p_note, p_problem_id, p_paper_item_id, p_paper_revision timestamptz, p_state_token text) → uuid`(sql/114 — 옛 서명은 지웠다): 둘 중 하나만. 문제지 항목이면 그 스냅샷·문제지 제목·문제지 안 번호를,
   문항이면 `exam.paper_item_snapshot` 으로 지금 원본을 굳혀 남긴다. 종류 `answer·text·passage·figure·tag·source·other`('기타' 만 내용 필수 — `tag` 태그 오류 · `source` 출처·번호 오류는 sql/114), 내용 1,000자.
   원본 문항이 남아 있으면 그 작품·단원·영역·문법 태그를 `tags`(jsonb `{work_titles, unit_path, area_path, grammar_paths}`)로 함께 굳힌다(sql/114 — 태그 신고는 내용 없이도 되므로)
 - 문제지 항목이면 `p_paper_revision`(화면이 본 문제지 `updated_at`, PostgREST 글자 그대로)이 **필수**이고 지금 판과 다르면 `40001`
   '문제지가 다른 곳에서 바뀌었어요…' 로 거절한다(다른 탭이 순서를 바꾼 뒤면 화면의 번호와 다른 문항이 신고된다). 문제지 행을 `FOR SHARE` 로 잡는다
-- 문항이면 `p_problem_revision`(창이 보여 주는 문항 `updated_at`)을 싣고, 지금 판과 다르면 `40001` '문항이 다른 곳에서 바뀌었어요…' 로 거절한다(창의 태그와 굳힐 태그가 달라진다). 안 실으면(배포 전 탭) 대조하지 않는다
+- 태그·출처 신고면 `p_state_token`(창이 `problem_report_state` 로 읽어 보여 준 상태의 지문)을 싣고, 굳힐 값(같은 SELECT 의 태그·출처)의 지문과 다르면 `40001` '이 문항의 태그나 출처가 방금 다른 곳에서 바뀌었어요…' 로 거절한다. 안 실으면 대조하지 않는다
+
+## RPC exam.problem_report_state
+- 설명: 문항 하나의 지금 상태 — 태그·출처 신고 창이 보여 주고 지문을 실어 보낸다(sql/114, 도메인 전원, DEFINER)
+- `problem_report_state(p_problem_id uuid) → jsonb`: `{ tags: {work_titles, unit_path, area_path, grammar_paths}, source: <출처 스냅샷>, token: md5 }`. 없으면 `no_data_found`, 바깥 도메인은 `insufficient_privilege`
 - `resolve_problem_report(p_id, p_status, p_note)`: `open·fixed·rejected`, open 으로 되돌리면 처리 기록을 비운다
 
 ## RPC exam.problem_paper_edit_states
