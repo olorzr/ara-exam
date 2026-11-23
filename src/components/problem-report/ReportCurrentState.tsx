@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { reportTagLines, type ReportState } from '@/lib/problem-report/display';
+import { reportSourceDetail, reportTagLines, type ReportState } from '@/lib/problem-report/display';
 import { sourceLabelWithNumber } from '@/lib/problem-bank/source-label';
 import type { ReportStateView } from '@/hooks/useReportState';
 
@@ -38,6 +38,7 @@ export default function ReportCurrentState({ kind, view }: ReportCurrentStatePro
   }
   const tags = tagLinesOf(view.state);
   const source = view.state.source ? sourceLabelWithNumber(view.state.source, view.state.number) : '';
+  const detail = view.state.source ? reportSourceDetail(view.state.source) : '';
   const tagBlock = (
     <div key="tag">
       <p className="font-semibold">지금 붙은 태그</p>
@@ -54,6 +55,8 @@ export default function ReportCurrentState({ kind, view }: ReportCurrentStatePro
     <div key="source">
       <p className="font-semibold">신고될 출처</p>
       <p className={source ? undefined : 'text-gray-500'}>{source || '출처가 비어 있어요.'}</p>
+      {/* 서버는 출처의 모든 칸을 대조한다 — 줄에 안 드러나는 칸(유형·학년·제목 …)도 보이게(7R) */}
+      {detail && detail !== source && <p className="text-[11px] text-gray-500">{detail}</p>}
     </div>
   );
   return (

@@ -113,6 +113,22 @@ const MIN_HEAD_CHARS = 12;
  * @param max - 상한(기본 인테이크 상한)
  * @returns 상한 안의 출처 글
  */
+/**
+ * UTF-16 단위 상한 안에서 글자(코드 포인트) 경계로 자른다 — 이모지 같은 보충 평면 글자를 반으로 가르면 외짝 대리 글자가 남아
+ * 관리자센터의 밤 보관함(jsonb)이 거절한다(코덱스 7R). 상한은 인테이크와 같은 단위(`length`)로 잰다.
+ * @param text - 글
+ * @param maxUnits - UTF-16 단위 상한
+ * @returns 상한 안의 앞부분
+ */
+export function sliceUnits(text: string, maxUnits: number): string {
+  let out = '';
+  for (const ch of text) {
+    if (out.length + ch.length > maxUnits) break;
+    out += ch;
+  }
+  return out;
+}
+
 export function intakeSourceLabel(label: string, number: unknown, max: number = INTAKE_SOURCE_LABEL_MAX): string {
   const base = label.trim();
   const full = withOriginalNumber(base, number);
@@ -123,8 +139,8 @@ export function intakeSourceLabel(label: string, number: unknown, max: number = 
   const section = SECTION_TAIL.exec(base)?.[0] ?? '';
   const head = base.slice(0, base.length - section.length).trimEnd();
   const room = max - tail.length - section.length - 1;
-  if (section && room >= MIN_HEAD_CHARS) return `${head.slice(0, room)}…${section}${tail}`;
-  return `${base.slice(0, Math.max(max - tail.length - 1, 0))}…${tail}`;
+  if (section && room >= MIN_HEAD_CHARS) return `${sliceUnits(head, room)}…${section}${tail}`;
+  return `${sliceUnits(base, Math.max(max - tail.length - 1, 0))}…${tail}`;
 }
 
 /**
@@ -199,4 +215,17 @@ export function parseReportState(value: unknown): ReportState | null {
  */
 export function categoryShowsState(category: ReportCategory | ''): category is 'tag' | 'source' {
   return category === 'tag' || category === 'source';
+}
+
+/**
+ * 출처의 모든 칸을 한 줄로 — 신고 창이 출처 줄 아래에 작게 보여 준다. 지문은 출처의 칸을 전부 담으므로(제목·유형·학년·시험·출판사 …)
+ * 출처 줄(모의고사는 제목만, 내신은 제목이 없다)만 보이면 바뀐 칸이 안 보인 채 거절될 수 있다(코덱스 7R).
+ * @param source - 출처
+ * @returns '모의고사 · 2026학년도 수능 (언어와 매체) · 2026 · 고3 · 수능' 같은 줄
+ */
+export function reportSourceDetail(source: SourceLabelInput): string {
+  return [
+    source.source_type, source.title, source.year, source.grade, source.school_name, source.publisher,
+    source.semester ?? '', source.exam_type,
+  ].map((v) => v.trim()).filter(Boolean).join(' · ');
 }

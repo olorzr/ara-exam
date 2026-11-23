@@ -17,7 +17,7 @@ beforeEach(() => {
 describe('useReportState', () => {
   it('태그·출처 종류를 골랐을 때만 읽는다', async () => {
     m.fetch.mockResolvedValue(stateOf('a'));
-    const { result, rerender } = renderHook(({ on }) => useReportState(P1, on), { initialProps: { on: false } });
+    const { result, rerender } = renderHook(({ on }) => useReportState(P1, on ? 'tag' : null), { initialProps: { on: false } });
     expect(result.current.loading).toBe(false);
     expect(m.fetch).not.toHaveBeenCalled();
     rerender({ on: true });
@@ -29,7 +29,7 @@ describe('useReportState', () => {
     let releaseOld: (v: unknown) => void = () => undefined;
     m.fetch.mockImplementationOnce(() => new Promise((r) => { releaseOld = r; }));
     m.fetch.mockResolvedValueOnce(stateOf('new'));
-    const { result, rerender } = renderHook(({ subject }) => useReportState(subject, true), { initialProps: { subject: P1 } });
+    const { result, rerender } = renderHook(({ subject }) => useReportState(subject, 'tag'), { initialProps: { subject: P1 } });
     rerender({ subject: P2 });
     await waitFor(() => expect(result.current.state?.token).toBe('new'));
     act(() => releaseOld(stateOf('old')));
@@ -39,7 +39,7 @@ describe('useReportState', () => {
   it('실패를 알리고, 다시 읽으면 새 값', async () => {
     m.fetch.mockRejectedValueOnce(new Error('x'));
     m.fetch.mockResolvedValueOnce(stateOf('b'));
-    const { result } = renderHook(() => useReportState(P1, true));
+    const { result } = renderHook(() => useReportState(P1, 'tag'));
     await waitFor(() => expect(result.current.failed).toBe(true));
     act(() => result.current.reload());
     expect(result.current.loading).toBe(true);
@@ -50,7 +50,7 @@ describe('useReportState', () => {
     m.fetch.mockRejectedValueOnce(new Error('x'));
     let release: (v: unknown) => void = () => undefined;
     m.fetch.mockImplementationOnce(() => new Promise((r) => { release = r; }));
-    const { result, rerender } = renderHook(({ on }) => useReportState(P1, on), { initialProps: { on: true } });
+    const { result, rerender } = renderHook(({ on }) => useReportState(P1, on ? 'tag' : null), { initialProps: { on: true } });
     await waitFor(() => expect(result.current.failed).toBe(true));
     rerender({ on: false });
     rerender({ on: true });
@@ -66,7 +66,7 @@ describe('useReportState', () => {
     m.fetch.mockImplementationOnce(() => new Promise((r) => { release = r; }));
     const A = { paperItemId: 'a' };
     const B = { paperItemId: 'b' };
-    const { result, rerender } = renderHook(({ subject }) => useReportState(subject, true), { initialProps: { subject: A } });
+    const { result, rerender } = renderHook(({ subject }) => useReportState(subject, 'tag'), { initialProps: { subject: A } });
     await waitFor(() => expect(result.current.failed).toBe(true));
     rerender({ subject: B });
     rerender({ subject: A });
@@ -75,15 +75,27 @@ describe('useReportState', () => {
     await waitFor(() => expect(result.current.state?.token).toBe('a2'));
   });
 
+  it('태그 → 출처로 종류를 바꾸면 새 요청 — 태그 때의 실패를 내주지 않는다', async () => {
+    m.fetch.mockRejectedValueOnce(new Error('x'));
+    let release: (v: unknown) => void = () => undefined;
+    m.fetch.mockImplementationOnce(() => new Promise((r) => { release = r; }));
+    const { result, rerender } = renderHook(({ mode }) => useReportState(P1, mode), { initialProps: { mode: 'tag' } });
+    await waitFor(() => expect(result.current.failed).toBe(true));
+    rerender({ mode: 'source' });
+    expect(result.current).toMatchObject({ loading: true, failed: false });
+    act(() => release(stateOf('s')));
+    await waitFor(() => expect(result.current.state?.token).toBe('s'));
+  });
+
   it('문제지 항목은 항목으로 읽는다', async () => {
     m.fetch.mockResolvedValue(stateOf('i'));
-    const { result } = renderHook(() => useReportState({ paperItemId: 'i1' }, true));
+    const { result } = renderHook(() => useReportState({ paperItemId: 'i1' }, 'source'));
     await waitFor(() => expect(result.current.state?.token).toBe('i'));
     expect(m.fetch).toHaveBeenCalledWith({ paperItemId: 'i1' });
   });
 
   it('대상이 없으면 읽지 않는다', () => {
-    const { result } = renderHook(() => useReportState(null, true));
+    const { result } = renderHook(() => useReportState(null, 'tag'));
     expect(result.current).toMatchObject({ state: null, loading: false, failed: false });
     expect(m.fetch).not.toHaveBeenCalled();
   });

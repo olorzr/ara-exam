@@ -31,19 +31,19 @@ function subjectKey(subject: ReportStateSubject): string {
 /**
  * 신고 창의 '굳힐 상태'(태그·출처·원래 번호·지문) — 태그·출처 신고일 때만 읽는다(sql/114).
  *
- * 결과는 **요청 하나**에 묶는다(코덱스 5·6R) — 대상을 바꾸거나 종류를 바꿨다 돌아오거나 다시 읽으면 새 요청이고, 그 요청이
+ * 결과는 **요청 하나**에 묶는다(코덱스 5·6·7R) — 대상이나 종류를 바꾸거나 다시 읽으면 새 요청이고, 그 요청이
  * 끝날 때까지는 읽는 중이다. 같은 대상의 옛 실패를 내주면 지문 없이 신고할 수 있는 틈이 생긴다.
  * @param subject - 문제 은행 문항 또는 문제지 항목(없으면 null)
- * @param enabled - 읽을지(태그·출처 종류를 골랐을 때)
+ * @param mode - 고른 종류(태그·출처일 때만, 아니면 null) — 요청 열쇠에 든다(종류를 바꾸면 새 요청, 코덱스 7R)
  * @returns 상태·읽는 중·실패·다시 읽기
  */
-export function useReportState(subject: ReportStateSubject | null, enabled: boolean): ReportStateView {
+export function useReportState(subject: ReportStateSubject | null, mode: string | null): ReportStateView {
   const [read, setRead] = useState<StateRead | null>(null);
   const [generation, setGeneration] = useState(0);
-  // 대상이 바뀌거나 다시 켜질 때마다 새 요청 — 렌더 중 파생 상태로 센다(효과 안에서 상태를 바꾸지 않는다).
-  // A → B → A 로 돌아와도 A 의 옛 결과와 다른 요청이다(코덱스 6R)
+  // 대상·종류가 바뀔 때마다 새 요청 — 렌더 중 파생 상태로 센다(효과 안에서 상태를 바꾸지 않는다).
+  // A → B → A 로 돌아와도(6R), 태그 → 출처로 바꿔도(7R) 옛 결과와 다른 요청이다
   const key = subject ? subjectKey(subject) : null;
-  const base = key && enabled ? key : null;
+  const base = key && mode ? `${key}|${mode}` : null;
   const [seenBase, setSeenBase] = useState(base);
   if (seenBase !== base) {
     setSeenBase(base);

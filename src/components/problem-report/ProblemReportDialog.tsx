@@ -86,7 +86,7 @@ export default function ProblemReportDialog({ open, onClose, target }: ProblemRe
   // 문제지는 항목 기준이다(출처·번호가 문제지를 만들 때의 스냅샷 — 신고가 굳히는 값). 원본이 지워진 항목도 출처·번호는 읽는다
   const showsState = categoryShowsState(category);
   const stateSubject = target.kind === 'problem' ? { problemId: target.problemId } : picked ? { paperItemId: picked.id } : null;
-  const stateView = useReportState(stateSubject, showsState);
+  const stateView = useReportState(stateSubject, showsState ? category : null);
 
   // 지금 상태를 읽는 동안은 기다린다 — 보여 준 값과 실어 보낼 지문이 짝이어야 한다(못 읽었으면 지문 없이 보낸다)
   const ready = category !== '' && !stale && (target.kind === 'problem' || picked !== null)

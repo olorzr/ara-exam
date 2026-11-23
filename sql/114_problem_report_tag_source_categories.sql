@@ -313,7 +313,9 @@ BEGIN
     v_state := exam.problem_report_state(v_problem);
     IF v_state -> 'tags' -> 'unit_path' IS DISTINCT FROM v_units OR length(v_state ->> 'token') <> 32
        OR jsonb_typeof(v_state -> 'source') <> 'object'
-       OR v_state -> 'number' IS DISTINCT FROM (SELECT to_jsonb(p.number) FROM exam.problems p WHERE p.id = v_problem) THEN
+       -- 번호 없는 문항이면 상태엔 JSON null, to_jsonb 는 SQL NULL 이다 — 같은 표현으로 견준다(코덱스 7R)
+       OR v_state -> 'number' IS DISTINCT FROM
+          (SELECT COALESCE(to_jsonb(p.number), 'null'::jsonb) FROM exam.problems p WHERE p.id = v_problem) THEN
       RAISE EXCEPTION '지금 상태가 이상하다: %', v_state;
     END IF;
     -- 그 지문을 실어 신고 — 같으면 된다
@@ -329,8 +331,10 @@ BEGIN
     IF v_item IS NOT NULL THEN
       -- 문제지 항목은 항목 기준 — 출처·번호가 항목 스냅샷(신고가 굳힐 값)과 같아야 한다
       v_istate := exam.problem_report_state(NULL, v_item);
-      IF v_istate -> 'source' IS DISTINCT FROM (SELECT i.snapshot -> 'source' FROM exam.problem_paper_items i WHERE i.id = v_item)
-         OR v_istate -> 'number' IS DISTINCT FROM (SELECT i.snapshot -> 'number' FROM exam.problem_paper_items i WHERE i.id = v_item) THEN
+      IF v_istate -> 'source' IS DISTINCT FROM
+           (SELECT COALESCE(i.snapshot -> 'source', 'null'::jsonb) FROM exam.problem_paper_items i WHERE i.id = v_item)
+         OR v_istate -> 'number' IS DISTINCT FROM
+           (SELECT COALESCE(i.snapshot -> 'number', 'null'::jsonb) FROM exam.problem_paper_items i WHERE i.id = v_item) THEN
         RAISE EXCEPTION '문제지 항목의 상태가 항목 스냅샷과 다르다: %', v_istate;
       END IF;
       v_id3 := exam.report_problem('tag', '', NULL, v_item, v_rev, v_istate ->> 'token');

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  INTAKE_SOURCE_LABEL_MAX, categoryShowsState, intakeSourceLabel, parseReportState, parseReportTags, reportSourceInput, reportSourceLabel, reportTagLines,
+  INTAKE_SOURCE_LABEL_MAX, categoryShowsState, intakeSourceLabel, reportSourceDetail, sliceUnits, parseReportState, parseReportTags, reportSourceInput, reportSourceLabel, reportTagLines,
 } from './display';
 
 const mock = {
@@ -103,5 +103,22 @@ describe('지금 상태', () => {
     expect(categoryShowsState('source')).toBe(true);
     expect(categoryShowsState('answer')).toBe(false);
     expect(categoryShowsState('')).toBe(false);
+  });
+});
+
+describe('글자 경계 자르기', () => {
+  it('보충 평면 글자(이모지)를 반으로 가르지 않는다', () => {
+    expect(sliceUnits('가😀나', 2)).toBe('가');
+    expect(sliceUnits('가😀나', 3)).toBe('가😀');
+    const out = intakeSourceLabel(`${'가'.repeat(60)}😀${'나'.repeat(40)}`, 3);
+    expect(out.length).toBeLessThanOrEqual(INTAKE_SOURCE_LABEL_MAX);
+    expect(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(out)).toBe(false);
+  });
+});
+
+describe('reportSourceDetail', () => {
+  it('출처의 칸을 전부 잇는다(빈 칸은 뺀다)', () => {
+    expect(reportSourceDetail(reportSourceInput(mock)!)).toBe('모의고사 · 2026학년도 수능 (언어와 매체) · 2026 · 고3 · 수능');
+    expect(reportSourceDetail(reportSourceInput(school)!)).toBe('내신기출 · 상현중 기출 · 2026 · 중2 · 상현중 · 1학기 · 중간');
   });
 });
