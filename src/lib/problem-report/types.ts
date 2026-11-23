@@ -6,20 +6,51 @@ import type { PaperItemSnapshot } from '@/types/problem-bank';
  *
  * 원장님(2026-11-22): "문제은행에서 오류가 있는 문제들을 선생님들이 체킹할 수 있는 기능 … 대부분 문제지로 만든 다음
  * 풀리다가 찾거든? 신고하면 나한테 연락오게끔". 저장은 sql/113 의 RPC 둘(신고·처리), 연락은 api/notify-problem-report.
- * ⚠️ 종류·상태 값은 sql/113 CHECK 와 1:1 이다 — 하나를 바꾸면 둘 다.
+ * ⚠️ 종류 값은 sql/114(종류 CHECK·신고 RPC 의 정식 정의), 상태 값은 sql/113 CHECK 와 1:1 이다 — 하나를 바꾸면 둘 다.
  */
 
 /** 신고 종류 */
-export type ReportCategory = 'answer' | 'text' | 'passage' | 'figure' | 'other';
+export type ReportCategory = 'answer' | 'text' | 'passage' | 'figure' | 'tag' | 'source' | 'other';
 
-/** 신고 종류 차례와 이름표 — 고르기 칸·목록 꼬리표·원장 웍스 카드가 같은 글자를 쓴다 */
-export const REPORT_CATEGORIES: readonly { value: ReportCategory; label: string }[] = [
+/** 신고 종류 하나 — `placeholder` 는 그 종류를 골랐을 때 내용 칸의 예시(없으면 기본 예시) */
+export interface ReportCategoryOption {
+  value: ReportCategory;
+  label: string;
+  placeholder?: string;
+}
+
+/**
+ * 신고 종류 차례와 이름표 — 고르기 칸·목록 꼬리표·원장 웍스 카드가 같은 글자를 쓴다.
+ * 태그·출처(2026-11-23, sql/114 — 원장님 "오류 신고에 태그잘못? 이런거 넣어주라"): 태그는 문제 은행 카드의 작품·단원·영역
+ * (문법 태그 포함) 꼬리표, 출처는 교사용·문제 은행에 찍히는 '2026 중2 상현중 1학기 중간 17번' 줄이다. '기타' 는 늘 맨 끝.
+ */
+export const REPORT_CATEGORIES: readonly ReportCategoryOption[] = [
   { value: 'answer', label: '정답 오류' },
   { value: 'text', label: '오타·글자 깨짐' },
   { value: 'passage', label: '지문·보기 문제' },
   { value: 'figure', label: '그림·표 문제' },
+  {
+    value: 'tag', label: '태그 오류 (작품·단원·영역)',
+    placeholder: '예: 작품이 「동백꽃」이 아니라 「봄봄」이에요 / 문법 태그가 품사가 아니라 문장 성분이에요',
+  },
+  {
+    value: 'source', label: '출처·번호 오류',
+    placeholder: '예: 상현중이 아니라 신현중 시험이에요 / 원래 17번이 아니라 18번이에요',
+  },
   { value: 'other', label: '기타' },
 ];
+
+/** 종류를 안 골랐거나 예시가 없는 종류일 때 내용 칸의 예시 */
+export const REPORT_NOTE_PLACEHOLDER = '예: 정답이 ③이 아니라 ④예요 / 보기 ㄷ의 글자가 깨져요';
+
+/**
+ * 내용 칸 예시 — 고른 종류에 맞춘다.
+ * @param category - 고른 종류(안 골랐으면 '')
+ * @returns 예시 글
+ */
+export function reportNotePlaceholder(category: ReportCategory | ''): string {
+  return REPORT_CATEGORIES.find((c) => c.value === category)?.placeholder ?? REPORT_NOTE_PLACEHOLDER;
+}
 
 /** 종류 → 이름표 */
 export const REPORT_CATEGORY_LABELS: Record<ReportCategory, string> = Object.fromEntries(

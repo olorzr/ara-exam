@@ -11,7 +11,7 @@ import {
   countOpenReports, fetchPaperItemRefs, submitProblemReport, type PaperItemRef,
 } from '@/lib/problem-report/queries';
 import {
-  REPORT_CATEGORIES, REPORT_NOTE_MAX, isReportCategory, reportExcerpt, type ReportCategory,
+  REPORT_CATEGORIES, REPORT_NOTE_MAX, isReportCategory, reportExcerpt, reportNotePlaceholder, type ReportCategory,
 } from '@/lib/problem-report/types';
 import ReportNumberGrid from './ReportNumberGrid';
 import ReportOriginalPage from './ReportOriginalPage';
@@ -185,7 +185,7 @@ export default function ProblemReportDialog({ open, onClose, target }: ProblemRe
               <Textarea
                 value={note} maxLength={REPORT_NOTE_MAX} disabled={busy} rows={3}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="예: 정답이 ③이 아니라 ④예요 / 보기 ㄷ의 글자가 깨져요"
+                placeholder={reportNotePlaceholder(category)}
               />
             </label>
           </div>

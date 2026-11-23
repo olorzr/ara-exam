@@ -3,24 +3,40 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { PaperItemSnapshot } from '@/types/problem-bank';
 import {
-  REPORT_CATEGORIES, REPORT_CATEGORY_LABELS, REPORT_NOTE_MAX, isReportCategory, reportExcerpt, reportPlaceLabel,
-  withOriginalNumber,
+  REPORT_CATEGORIES, REPORT_CATEGORY_LABELS, REPORT_NOTE_MAX, REPORT_NOTE_PLACEHOLDER, isReportCategory, reportExcerpt,
+  reportNotePlaceholder, reportPlaceLabel, withOriginalNumber,
 } from './types';
 
 const snap = (over: Partial<PaperItemSnapshot> = {}) => ({ stem_html: '<p>물음</p>', number: 17, ...over }) as PaperItemSnapshot;
 
 describe('신고 종류', () => {
-  it('종류 값은 sql/113 CHECK 와 같다', () => {
-    const sql = readFileSync(join(process.cwd(), 'sql/113_problem_reports.sql'), 'utf8');
-    const check = /category\s+TEXT NOT NULL CHECK \(category IN \(([^)]*)\)\)/.exec(sql)?.[1] ?? '';
-    expect(check.split(',').map((s) => s.trim().replace(/'/g, ''))).toEqual(REPORT_CATEGORIES.map((c) => c.value));
-    expect(sql).toContain(`CHECK (length(note) <= ${REPORT_NOTE_MAX})`);
+  it('종류 값은 sql/114(정식 정의)의 표 CHECK · 신고 RPC 목록과 같다', () => {
+    const sql = readFileSync(join(process.cwd(), 'sql/114_problem_report_tag_source_categories.sql'), 'utf8');
+    const values = (list: string) => list.split(',').map((s) => s.trim().replace(/'/g, ''));
+    const expected = REPORT_CATEGORIES.map((c) => c.value);
+    const check = /problem_reports_category_check\s+CHECK \(category IN \(([^)]*)\)\)/.exec(sql)?.[1] ?? '';
+    const rpc = /p_category NOT IN \(([^)]*)\)/.exec(sql)?.[1] ?? '';
+    expect(values(check)).toEqual(expected);
+    expect(values(rpc)).toEqual(expected);
+    expect(expected.at(-1)).toBe('other');
+    const notes = readFileSync(join(process.cwd(), 'sql/113_problem_reports.sql'), 'utf8');
+    expect(notes).toContain(`CHECK (length(note) <= ${REPORT_NOTE_MAX})`);
   });
 
   it('이름표와 판정', () => {
     expect(REPORT_CATEGORY_LABELS.answer).toBe('정답 오류');
     expect(isReportCategory('figure')).toBe(true);
     expect(isReportCategory('evil')).toBe(false);
+    expect(isReportCategory('tag')).toBe(true);
+    expect(REPORT_CATEGORY_LABELS.tag).toBe('태그 오류 (작품·단원·영역)');
+    expect(REPORT_CATEGORY_LABELS.source).toBe('출처·번호 오류');
+  });
+
+  it('내용 칸 예시는 고른 종류를 따른다', () => {
+    expect(reportNotePlaceholder('')).toBe(REPORT_NOTE_PLACEHOLDER);
+    expect(reportNotePlaceholder('answer')).toBe(REPORT_NOTE_PLACEHOLDER);
+    expect(reportNotePlaceholder('tag')).toContain('문법 태그');
+    expect(reportNotePlaceholder('source')).toContain('원래 17번');
   });
 });
 

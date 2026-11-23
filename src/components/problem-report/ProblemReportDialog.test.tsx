@@ -66,6 +66,19 @@ describe('ProblemReportDialog', () => {
     expect(screen.getByRole('button', { name: '신고하기' })).toHaveProperty('disabled', false);
   });
 
+  it('태그 오류는 내용 없이도 신고되고, 내용 칸 예시가 태그 쪽으로 바뀐다', async () => {
+    const onClose = vi.fn();
+    render(<ProblemReportDialog open onClose={onClose} target={{ kind: 'problem', problemId: 'p9', label: '문항' }} />);
+    const select = screen.getByRole('combobox', { name: '오류 종류' });
+    expect(screen.getByRole('option', { name: '태그 오류 (작품·단원·영역)' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: '출처·번호 오류' })).toBeTruthy();
+    fireEvent.change(select, { target: { value: 'tag' } });
+    expect(screen.getByRole('textbox').getAttribute('placeholder')).toContain('문법 태그');
+    fireEvent.click(screen.getByRole('button', { name: '신고하기' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(m.submit).toHaveBeenCalledWith({ category: 'tag', note: '', problemId: 'p9' });
+  });
+
   it('알림이 못 가도 신고는 저장됐다고 알린다', async () => {
     m.notify.mockResolvedValue('failed');
     const onClose = vi.fn();
